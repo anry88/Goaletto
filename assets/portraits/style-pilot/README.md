@@ -1,11 +1,12 @@
-# Illustrated Dugout face pilot · v01
+# Illustrated Dugout face pilot · v01/v02
 
 Generated with built-in Imagegen on 2026-10-11 for visual approval in AND-44.
 Reference: ../../concepts/c-dugout.png. Prompt: prompt-v01.txt.
 Image: dugout-faces-v01.png (1536 × 1024).
 
-Status: awaiting the user's review of this specific face treatment. Direction C and
-its palette were approved earlier; this sheet is not an approved production library.
+Status: the user liked the v01 faces and requested reduced realism. v02 is the
+refined candidate, awaiting its specific production review. Direction C/palette
+were approved earlier; these sheets are not a production component library.
 It contains assembled portraits on paper, not transparent interchangeable components.
 
 | Review ID | Bank | Intended age | Visible treatment |
@@ -37,3 +38,17 @@ and staff separately; prove a few swaps before expanding. Use stable new version
 component IDs and shared anchors. Check assembled faces at 96/256/512 px. Do not cut
 this sheet into disconnected pieces and claim a production-ready compositor.
 The technical SVG pilot remains available and its original manifest is unchanged.
+
+## Revision v02 and age progression
+
+The user liked v01 on 2026-10-11 and requested a small reduction in realism.
+The current candidate dugout-faces-v02.png preserves identities/layout/palette and
+reduces tiny facial texture and fragmented shading. Prompt: prompt-v02.txt.
+The user has not separately approved this exact revision as the production master.
+
+A second visual test, dugout-aging-p01-v01.png (2172 × 724), shows the same P01 at
+18/24/30/34, with restrained age changes. Prompt: prompt-aging-p01-v01.txt.
+It illustrates identity continuity; it does not assign P01 a retirement age.
+These files use built-in Imagegen, remain assembled review assets, and are not
+transparent interchangeable runtime layers. See docs/player-lifecycle.md for the
+season-based +1 age and progressive last-season decisions at ages 32–38.

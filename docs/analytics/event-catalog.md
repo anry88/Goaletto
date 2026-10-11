@@ -29,6 +29,9 @@
 | experiment_exposed | system | Вариант реально доставлен; assignment + exposure stage |
 | bot_unavailable | system | Подтверждённая недоступность доставки; bounded reason |
 | club_ownership_ended | system | Прекращение конкретного периода владения; ownership + end |
+| player_last_season_announced | system | Решение для полного будущего сезона сохранено; player + target season + stage |
+| player_retired | system | Уход после отмеченного последнего сезона; player + finished season + retirement |
+| bot_youth_replacement_created | automation | Одно молодёжное пополнение после retirement; retired player + season |
 
 Принятая команда не означает применённую. Сохранение автосостава — system, не
 lineup_saved с origin=user. Автоматические решения — origin=automation, не события человеческой активности.
