@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "status": "approval-pilot",
+  "style": "C \u2014 Dugout; simplified technical SVG pilot",
+  "canvas": [
+    256,
+    256
+  ],
+  "layer_order": [
+    "torso",
+    "neck",
+    "ears",
+    "face",
+    "eyes",
+    "nose",
+    "mouth",
+    "age_details",
+    "hair",
+    "accessories"
+  ],
+  "banks": {
+    "players": {
+      "torso": [
+        "components/players/torso-jersey.svg",
+        "components/players/torso-striped.svg",
+        "components/players/torso-vneck.svg"
+      ],
+      "neck": [
+        "components/shared/neck.svg"
+      ],
+      "ears": [
+        "components/shared/ears.svg"
+      ],
+      "face": [
+        "components/players/face-oval.svg",
+        "components/players/face-square.svg",
+        "components/players/face-long.svg",
+        "components/players/face-narrow.svg",
+        "components/players/face-round.svg"
+      ],
+      "eyes": [
+        "components/players/eyes-open.svg",
+        "components/players/eyes-focused.svg",
+        "components/players/eyes-narrow.svg",
+        "components/players/eyes-soft.svg"
+      ],
+      "nose": [
+        "components/players/nose-straight.svg",
+        "components/players/nose-round.svg",
+        "components/players/nose-bridge.svg",
+        "components/players/nose-button.svg"
+      ],
+      "mouth": [
+        "components/players/mouth-neutral.svg",
+        "components/players/mouth-smile.svg",
+        "components/players/mouth-curved.svg"
+      ],
+      "age_details": [
+        "components/shared/none.svg"
+      ],
+      "hair": [
+        "components/players/hair-crop.svg",
+        "components/players/hair-curls.svg",
+        "components/players/hair-swept.svg",
+        "components/players/hair-buzz.svg",
+        "components/players/hair-quiff.svg",
+        "components/players/hair-waves.svg"
+      ],
+      "accessories": [
+        "components/shared/none.svg"
+      ]
+    },
+    "staff": {
+      "torso": [
+        "components/staff/torso-polo.svg",
+        "components/staff/torso-track.svg",
+        "components/staff/torso-blazer.svg"
+      ],
+      "neck": [
+        "components/shared/neck.svg"
+      ],
+      "ears": [
+        "components/shared/ears.svg"
+      ],
+      "face": [
+        "components/staff/face-oval.svg",
+        "components/staff/face-square.svg",
+        "components/staff/face-long.svg",
+        "components/staff/face-narrow.svg",
+        "components/staff/face-round.svg"
+      ],
+      "eyes": [
+        "components/staff/eyes-calm.svg",
+        "components/staff/eyes-alert.svg",
+        "components/staff/eyes-narrow.svg",
+        "components/staff/eyes-soft.svg"
+      ],
+      "nose": [
+        "components/staff/nose-straight.svg",
+        "components/staff/nose-wide.svg",
+        "components/staff/nose-bridge.svg",
+        "components/staff/nose-button.svg"
+      ],
+      "mouth": [
+        "components/staff/mouth-neutral.svg",
+        "components/staff/mouth-smile.svg",
+        "components/staff/mouth-curved.svg"
+      ],
+      "age_details": [
+        "components/staff/age-lines.svg",
+        "components/staff/age-deep.svg",
+        "components/staff/age-subtle.svg"
+      ],
+      "hair": [
+        "components/staff/hair-parted.svg",
+        "components/staff/hair-receding.svg",
+        "components/staff/hair-bob.svg",
+        "components/staff/hair-grey-curls.svg",
+        "components/staff/hair-sidepart.svg",
+        "components/staff/hair-silver-short.svg"
+      ],
+      "accessories": [
+        "components/shared/none.svg",
+        "components/staff/accessories-glasses.svg"
+      ]
+    }
+  },
+  "style_approved_at": "2026-10-11"
+}

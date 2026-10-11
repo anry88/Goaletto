@@ -1,0 +1,158 @@
+[
+  {
+    "bank": "players",
+    "components": {
+      "accessories": "components/shared/none.svg",
+      "age_details": "components/shared/none.svg",
+      "ears": "components/shared/ears.svg",
+      "eyes": "components/players/eyes-focused.svg",
+      "face": "components/players/face-round.svg",
+      "hair": "components/players/hair-swept.svg",
+      "mouth": "components/players/mouth-neutral.svg",
+      "neck": "components/shared/neck.svg",
+      "nose": "components/players/nose-bridge.svg",
+      "torso": "components/players/torso-vneck.svg"
+    },
+    "palette": {
+      "accent": "#93886D",
+      "background": "#E8DECB",
+      "hair": "#5E392C",
+      "ink": "#2A2824",
+      "kit": "#743D42",
+      "skin": "#F0C19C",
+      "skin_shadow": "#CE9673"
+    },
+    "schema_version": 1,
+    "seed": "player-07"
+  },
+  {
+    "bank": "players",
+    "components": {
+      "accessories": "components/shared/none.svg",
+      "age_details": "components/shared/none.svg",
+      "ears": "components/shared/ears.svg",
+      "eyes": "components/players/eyes-focused.svg",
+      "face": "components/players/face-oval.svg",
+      "hair": "components/players/hair-buzz.svg",
+      "mouth": "components/players/mouth-neutral.svg",
+      "neck": "components/shared/neck.svg",
+      "nose": "components/players/nose-bridge.svg",
+      "torso": "components/players/torso-vneck.svg"
+    },
+    "palette": {
+      "accent": "#93886D",
+      "background": "#E8DECB",
+      "hair": "#2F302D",
+      "ink": "#2A2824",
+      "kit": "#394F49",
+      "skin": "#754A37",
+      "skin_shadow": "#533427"
+    },
+    "schema_version": 1,
+    "seed": "player-19"
+  },
+  {
+    "bank": "players",
+    "components": {
+      "accessories": "components/shared/none.svg",
+      "age_details": "components/shared/none.svg",
+      "ears": "components/shared/ears.svg",
+      "eyes": "components/players/eyes-narrow.svg",
+      "face": "components/players/face-oval.svg",
+      "hair": "components/players/hair-waves.svg",
+      "mouth": "components/players/mouth-curved.svg",
+      "neck": "components/shared/neck.svg",
+      "nose": "components/players/nose-button.svg",
+      "torso": "components/players/torso-vneck.svg"
+    },
+    "palette": {
+      "accent": "#93886D",
+      "background": "#E8DECB",
+      "hair": "#2F302D",
+      "ink": "#2A2824",
+      "kit": "#394F49",
+      "skin": "#754A37",
+      "skin_shadow": "#533427"
+    },
+    "schema_version": 1,
+    "seed": "player-31"
+  },
+  {
+    "bank": "staff",
+    "components": {
+      "accessories": "components/staff/accessories-glasses.svg",
+      "age_details": "components/staff/age-subtle.svg",
+      "ears": "components/shared/ears.svg",
+      "eyes": "components/staff/eyes-soft.svg",
+      "face": "components/staff/face-round.svg",
+      "hair": "components/staff/hair-bob.svg",
+      "mouth": "components/staff/mouth-smile.svg",
+      "neck": "components/shared/neck.svg",
+      "nose": "components/staff/nose-wide.svg",
+      "torso": "components/staff/torso-polo.svg"
+    },
+    "palette": {
+      "accent": "#93886D",
+      "background": "#E8DECB",
+      "hair": "#85857B",
+      "ink": "#2A2824",
+      "kit": "#394F49",
+      "skin": "#F0C19C",
+      "skin_shadow": "#CE9673"
+    },
+    "schema_version": 1,
+    "seed": "staff-03"
+  },
+  {
+    "bank": "staff",
+    "components": {
+      "accessories": "components/shared/none.svg",
+      "age_details": "components/staff/age-deep.svg",
+      "ears": "components/shared/ears.svg",
+      "eyes": "components/staff/eyes-calm.svg",
+      "face": "components/staff/face-square.svg",
+      "hair": "components/staff/hair-parted.svg",
+      "mouth": "components/staff/mouth-neutral.svg",
+      "neck": "components/shared/neck.svg",
+      "nose": "components/staff/nose-wide.svg",
+      "torso": "components/staff/torso-track.svg"
+    },
+    "palette": {
+      "accent": "#93886D",
+      "background": "#E8DECB",
+      "hair": "#85857B",
+      "ink": "#2A2824",
+      "kit": "#743D42",
+      "skin": "#AB7251",
+      "skin_shadow": "#82533F"
+    },
+    "schema_version": 1,
+    "seed": "staff-14"
+  },
+  {
+    "bank": "staff",
+    "components": {
+      "accessories": "components/shared/none.svg",
+      "age_details": "components/staff/age-subtle.svg",
+      "ears": "components/shared/ears.svg",
+      "eyes": "components/staff/eyes-narrow.svg",
+      "face": "components/staff/face-round.svg",
+      "hair": "components/staff/hair-receding.svg",
+      "mouth": "components/staff/mouth-neutral.svg",
+      "neck": "components/shared/neck.svg",
+      "nose": "components/staff/nose-wide.svg",
+      "torso": "components/staff/torso-polo.svg"
+    },
+    "palette": {
+      "accent": "#93886D",
+      "background": "#E8DECB",
+      "hair": "#2F302D",
+      "ink": "#2A2824",
+      "kit": "#394F49",
+      "skin": "#AB7251",
+      "skin_shadow": "#82533F"
+    },
+    "schema_version": 1,
+    "seed": "staff-28"
+  }
+]

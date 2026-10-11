@@ -1,0 +1,536 @@
+{
+  "project": {
+    "id": "P-AND-11",
+    "uuid": "c7f0c229-15e0-4f51-acf8-023f9992d327",
+    "url": "https://linear.app/andrei-brazhnikov/project/goaletto-eb8cb486bc79"
+  },
+  "date": "2026-10-11",
+  "issues": [
+    {
+      "id": "AND-39",
+      "uuid": "a936e327-778e-467f-977d-fc5d174b5e12",
+      "title": "Создать Python-каркас, Docker Compose и CI",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-39/sozdat-python-karkas-docker-compose-i-ci",
+      "state": "In Progress",
+      "key": "scaffold",
+      "milestone": "foundation",
+      "milestone_id": "7cd2892b-275a-472c-9142-8d839516e37f",
+      "context": "Начальная структура aiogram / domain / application / infrastructure / worker; pyproject, закрытая LICENSE, README, gitignore, Alembic, lockfiles и origin git@github.com:anry88/Goaletto.git.",
+      "acceptance": "Запуск preview-бота и system.ping worker; ruff/mypy/pytest проходят; PostgreSQL migration upgrade/check проверены; исходный каркас опубликован в указанном репозитории.",
+      "depends": []
+    },
+    {
+      "id": "AND-40",
+      "uuid": "9672ad65-6094-47d1-b9c2-9eb5000a4774",
+      "title": "Обновить GDD и зафиксировать правила минутных матчей и лиг",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-40/obnovit-gdd-i-zafiksirovat-pravila-minutnyh-matchej-i-lig",
+      "state": "Done",
+      "key": "rules",
+      "milestone": "foundation",
+      "milestone_id": "7cd2892b-275a-472c-9142-8d839516e37f",
+      "context": "Сохранить исходный GDD в архив; текущая версия описывает Python-only Telegram-бот, 60-секундные тики, 30+3 минуты и комплекты 5×10.",
+      "acceptance": "Нет старой пирамиды/стыковых/двухминутного тика как действующих правил; в таблице граничные исключения лиг 1 и 5; таймлайн заканчивается 90′ на 33:00.",
+      "depends": []
+    },
+    {
+      "id": "AND-41",
+      "uuid": "eb960794-31ff-4fd5-a73f-8c0b851c09d9",
+      "title": "Подготовить три направления оформления и возрастные примеры",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-41/podgotovit-tri-napravleniya-oformleniya-i-vozrastnye-primery",
+      "state": "Done",
+      "key": "concepts",
+      "milestone": "foundation",
+      "milestone_id": "7cd2892b-275a-472c-9142-8d839516e37f",
+      "context": "Концепт-листы A Touchline, B Club Stickers и C Dugout: по 3 игрока и 3 сотрудника; сохранить исходные prompts и ссылки в документации.",
+      "acceptance": "Три изображения сохранены в assets/concepts, вымышленные лица, видны возраст и разнообразие; это концепты, не готовые production-слои.",
+      "depends": []
+    },
+    {
+      "id": "AND-42",
+      "uuid": "402fad92-2ee5-4ef4-81c3-0468861c2e33",
+      "title": "Утвердить направление оформления Goaletto",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-42/utverdit-napravlenie-oformleniya-goaletto",
+      "state": "Done",
+      "key": "style",
+      "milestone": "foundation",
+      "milestone_id": "7cd2892b-275a-472c-9142-8d839516e37f",
+      "context": "Пользователь выбрал C — Dugout 2026-10-11: ретро-футбольный журнал, бордовый, мох и тёплая бумага.",
+      "acceptance": "Решение записано в art direction и GDD; дальнейшие части лица и карточки развиваются в направлении C.",
+      "depends": [
+        "AND-41"
+      ]
+    },
+    {
+      "id": "AND-43",
+      "uuid": "d1e687e7-8843-4ca4-abab-3d18ed65e7ab",
+      "title": "Создать и расширить пилот сборных лиц игроков и персонала",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-43/sozdat-i-rasshirit-pilot-sbornyh-lic-igrokov-i-personala",
+      "state": "In Progress",
+      "key": "portrait-pilot",
+      "milestone": "foundation",
+      "milestone_id": "7cd2892b-275a-472c-9142-8d839516e37f",
+      "context": "Малый детерминированный SVG-комбинатор: отдельные возрастные банки, формы лица, глаза, носы, рот, волосы, одежда и детали персонала; после выбора C адаптировать палитру и добавить несколько вариантов.",
+      "acceptance": "6 собранных SVG/PNG-портретов, recipes и статическая галерея без JavaScript; seed воспроизводим; старые component IDs не переиспользуются; валидны все пробные сочетания. Пилот явно отличается по детализации от иллюстрированного концепта.",
+      "depends": [
+        "AND-42"
+      ]
+    },
+    {
+      "id": "AND-44",
+      "uuid": "3687878d-467e-4441-ab1a-c7b8dfa67241",
+      "title": "Довести иллюстрированные слои Dugout до production-каталога",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-44/dovesti-illyustrirovannye-sloi-dugout-do-production-kataloga",
+      "state": "Backlog",
+      "key": "portrait-production",
+      "milestone": "foundation",
+      "milestone_id": "7cd2892b-275a-472c-9142-8d839516e37f",
+      "context": "После выбора C и проверки пилота создать согласованные части в качестве ретро-концепта: отдельные молодые игроки/взрослый персонал, общие anchors, силуэты, разрешения и каталог совместимости.",
+      "acceptance": "Раздельные прозрачные слои, сохранённые IDs и версии; тесты 96/256/512 px и матрица сочетаний; PNG renderer/cache для карточек; каталог проверен визуально пользователем перед production.",
+      "depends": [
+        "AND-43"
+      ]
+    },
+    {
+      "id": "AND-45",
+      "uuid": "c92ecb1a-7204-4b22-8e2c-2e2078f2643f",
+      "title": "Разработать доменную схему игроков, сезонов и матчей",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-45/razrabotat-domennuyu-shemu-igrokov-sezonov-i-matchej",
+      "state": "Todo",
+      "key": "schema",
+      "milestone": "world",
+      "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
+      "context": "Расширить начальные 5 таблиц: managers, players, staff, seasons, fixtures/matches/ticks, commands, standings; constraints и индексы.",
+      "acceptance": "Миграции upgrade/check проходят; Telegram ID bigint, деньги integer; правила уникальности клуба/тика/сезона; schema/ERD и транзакционные границы документированы.",
+      "depends": [
+        "AND-39",
+        "AND-40"
+      ]
+    },
+    {
+      "id": "AND-46",
+      "uuid": "04813a99-9078-4800-b2db-fdbbfa53827d",
+      "title": "Создать первый комплект пяти лиг и 50 AI-клубов",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-46/sozdat-pervyj-komplekt-pyati-lig-i-50-ai-klubov",
+      "state": "Backlog",
+      "key": "seed",
+      "milestone": "world",
+      "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
+      "context": "Идемпотентный seed: league_set, уровни 1–5 по 10 клубов, составы 18–20 футболистов, позиции/возраст/потенциал, бюджеты и архетипы.",
+      "acceptance": "Первый запуск даёт ровно 5 лиг и 50 клубов; повтор seed не добавляет копии; у каждого клуба корректный состав и вратарь; seed детерминирован для тестов.",
+      "depends": [
+        "AND-45"
+      ]
+    },
+    {
+      "id": "AND-47",
+      "uuid": "64952611-5cb6-47fd-a3e1-b4630d9f95db",
+      "title": "Реализовать выдачу клубов только лиги 5 и расширение мира",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-47/realizovat-vydachu-klubov-tolko-ligi-5-i-rasshirenie-mira",
+      "state": "Backlog",
+      "key": "onboarding",
+      "milestone": "world",
+      "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
+      "context": "Onboarding показывает только свободные AI-клубы уровня 5 во всех комплектах. При отсутствии мест атомарно создать новый полный комплект 5×10.",
+      "acceptance": "Один Telegram ID — один клуб; параллельный claim последнего места не делит клуб/не создаёт лишние комплекты; верхние лиги недоступны новичкам; текущие финансы/таблица клуба сохраняются.",
+      "depends": [
+        "AND-46"
+      ]
+    },
+    {
+      "id": "AND-48",
+      "uuid": "051ffb4e-9286-49b5-ba5c-b441f0fe90dc",
+      "title": "Создать Telegram-навигацию, карточки и пагинацию",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-48/sozdat-telegram-navigaciyu-kartochki-i-paginaciyu",
+      "state": "Todo",
+      "key": "navigation",
+      "milestone": "world",
+      "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
+      "context": "Главное меню и подменю; стабильные Назад/Главное меню, списки/карточки игроков, персонала и клубов; оформление C для изображений и текстов.",
+      "acceptance": "Все действия доступны кнопками/командами без Mini App; быстрый answerCallbackQuery; устаревшие callbacks безопасны; HTML-экранирование имён; показатели доступны текстом.",
+      "depends": [
+        "AND-39",
+        "AND-42"
+      ]
+    },
+    {
+      "id": "AND-49",
+      "uuid": "11e0ae85-fea2-482f-bff1-c53eabc99f04",
+      "title": "Реализовать состав, схему и предматчевую тактику",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-49/realizovat-sostav-shemu-i-predmatchevuyu-taktiku",
+      "state": "Backlog",
+      "key": "lineup",
+      "milestone": "world",
+      "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
+      "context": "Выбор схемы, позиции, стартовой XI, скамейки, капитана и тактики через кнопки; штрафы за неподходящую позицию; блокировка за минуту до матча.",
+      "acceptance": "Только владелец меняет состав; нельзя задублировать игрока/выставить травмированного; корректные 11 позиций и вратарь; сохранение в БД; автосостав при отсутствии выбора.",
+      "depends": [
+        "AND-45",
+        "AND-47",
+        "AND-48"
+      ]
+    },
+    {
+      "id": "AND-50",
+      "uuid": "797900ca-404e-4fa4-a845-0a1956556228",
+      "title": "Реализовать AI-подхват и освобождение неактивных клубов",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-50/realizovat-ai-podhvat-i-osvobozhdenie-neaktivnyh-klubov",
+      "state": "Backlog",
+      "key": "inactive",
+      "milestone": "world",
+      "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
+      "context": "AI-помощь после 2 недель неактивности; освобождение после 4; сроки и предупреждения из GDD.",
+      "acceptance": "Повтор job не освобождает активного владельца; клуб сохраняет историю; освобождённый клуб лиг 1–4 не выдаётся новичку; сообщения через outbox.",
+      "depends": [
+        "AND-47"
+      ]
+    },
+    {
+      "id": "AND-51",
+      "uuid": "68e6c62f-8a4e-49d2-9325-a143bebfff4d",
+      "title": "Разработать детерминированный матчевый движок",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-51/razrabotat-determinirovannyj-matchevyj-dvizhok",
+      "state": "Backlog",
+      "key": "simulation",
+      "milestone": "matches",
+      "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
+      "context": "Чистые функции: секторные рейтинги, владение, шансы, исходы, выносливость, карточки/травмы; явные state/commands/seed/version.",
+      "acceptance": "Одинаковые входы дают одинаковые события и state; no Telegram/DB imports; golden seed/replay tests; осмысленные распределения результатов на серии симуляций.",
+      "depends": [
+        "AND-45",
+        "AND-49"
+      ]
+    },
+    {
+      "id": "AND-52",
+      "uuid": "5e077e00-4b7c-4af1-8009-d45ea5655ea0",
+      "title": "Реализовать долговечный минутный runtime матчей",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-52/realizovat-dolgovechnyj-minutnyj-runtime-matchej",
+      "state": "Backlog",
+      "key": "ticks",
+      "milestone": "matches",
+      "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
+      "context": "30 тиков по 60 секунд/3 игровых минуты, 180-секундный перерыв после тика 15; абсолютные сроки, отдельное событие старта второго тайма.",
+      "acceptance": "Тик 15 в 15:00, старт тайма 2 в 18:00, тик 16 в 19:00, тик 30/90′ в 33:00; повтор tick не меняет счёт дважды; state/events/jobs/outbox commit атомарен.",
+      "depends": [
+        "AND-51"
+      ]
+    },
+    {
+      "id": "AND-53",
+      "uuid": "24257ae0-eba6-4cea-adf9-b92d9c159b27",
+      "title": "Добавить live-замены, тактику и инструкции между тиками",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-53/dobavit-live-zameny-taktiku-i-instrukcii-mezhdu-tikami",
+      "state": "Backlog",
+      "key": "live-commands",
+      "milestone": "matches",
+      "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
+      "context": "Команды в БД на следующий тик; серверные дедлайны и порядок; 5 замен/3 окна + перерыв, 3 смены тактики, менталитет и инструкции.",
+      "acceptance": "UI различает принято/применено; повтор callback не расходует лимит дважды; устаревшая команда не меняет завершённый матч; удалённого футболиста заменить нельзя.",
+      "depends": [
+        "AND-52",
+        "AND-49"
+      ]
+    },
+    {
+      "id": "AND-54",
+      "uuid": "3e024594-d05e-4d23-ab0f-1e4b63316e4e",
+      "title": "Разработать AI-менеджеров разных уровней",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-54/razrabotat-ai-menedzherov-raznyh-urovnej",
+      "state": "Backlog",
+      "key": "ai",
+      "milestone": "matches",
+      "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
+      "context": "Состав, тренировки и live-решения simple/medium/smart; учитывать позиции, усталость, травмы, текущий счёт; не использовать LLM в обязательном runtime.",
+      "acceptance": "Каждый AI-клуб может пройти сезон без человека; правила/лимиты такие же, как для людей; claim отключает AI-управление; deterministic seed tests.",
+      "depends": [
+        "AND-46",
+        "AND-51"
+      ]
+    },
+    {
+      "id": "AND-55",
+      "uuid": "a45503d3-df28-4a8f-afd2-ddd0e67f2b86",
+      "title": "Создать двухкруговой календарь и недельное расписание",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-55/sozdat-dvuhkrugovoj-kalendar-i-nedelnoe-raspisanie",
+      "state": "Backlog",
+      "key": "fixtures",
+      "milestone": "matches",
+      "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
+      "context": "По 18 туров для каждой лиги 10 клубов; суббота 18:00 UTC; сезоны комплектов независимы; начало/межсезонье и уведомления.",
+      "acceptance": "Каждая пара играет дома/в гостях; 5 матчей в туре и 90 в сезоне на лигу; нет пересечений клуба по времени; повтор планирования не дублирует fixtures/jobs.",
+      "depends": [
+        "AND-46",
+        "AND-52"
+      ]
+    },
+    {
+      "id": "AND-56",
+      "uuid": "834169c8-573c-4048-bf7f-25617f85143e",
+      "title": "Реализовать результаты, таблицы и стабильные tie-breaks",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-56/realizovat-rezultaty-tablicy-i-stabilnye-tie-breaks",
+      "state": "Backlog",
+      "key": "standings",
+      "milestone": "matches",
+      "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
+      "context": "Матч заканчивается один раз, обновляет played/points/goals; таблица с paging; решить разность мячей/забитые/предсезонный жребий.",
+      "acceptance": "3/1/0 очков начисляются один раз; до/после restart таблица одинакова; ничьи по показателям имеют стабильный порядок; отчёты открываются кнопкой.",
+      "depends": [
+        "AND-55"
+      ]
+    },
+    {
+      "id": "AND-57",
+      "uuid": "e892e92a-d6a7-48c9-925d-76b744341238",
+      "title": "Реализовать одновременное повышение и понижение 2×2",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-57/realizovat-odnovremennoe-povyshenie-i-ponizhenie-22",
+      "state": "Backlog",
+      "key": "rollover",
+      "milestone": "matches",
+      "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
+      "context": "Итоговый план всех 5 лиг: топ-2 вверх, нижние-2 вниз, граничные исключения; внутри league_set, без стыковых.",
+      "acceptance": "Одна транзакция/season lock; 50 уникальных клубов и 10 в каждой лиге; один уровень за сезон; повтор rollover безопасен; история сезона остаётся неизменной.",
+      "depends": [
+        "AND-56"
+      ]
+    },
+    {
+      "id": "AND-58",
+      "uuid": "cd606904-41ba-4753-b974-f0b088bed23a",
+      "title": "Добавить недельные тренировки и возрастной прогресс",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-58/dobavit-nedelnye-trenirovki-i-vozrastnoj-progress",
+      "state": "Backlog",
+      "key": "training",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Фокусы навыков, форма/выносливость, возрастные коэффициенты, потолок потенциала и тренерские бонусы по GDD.",
+      "acceptance": "Один расчёт на клуб/неделю; навык/возраст ограничены валидными диапазонами; UI показывает результат; повтор job не тренирует дважды.",
+      "depends": [
+        "AND-45",
+        "AND-47"
+      ]
+    },
+    {
+      "id": "AND-59",
+      "uuid": "2ecf8269-470d-4aa3-8a85-4b690228df66",
+      "title": "Создать экономику клуба и денежный ledger",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-59/sozdat-ekonomiku-kluba-i-denezhnyj-ledger",
+      "state": "Backlog",
+      "key": "ledger",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Баланс integer, журнал транзакций, зарплаты/спонсоры/билеты/призы; атомарные операции, reservations под ставки и контроль повторов.",
+      "acceptance": "Повтор начисления не удваивает баланс; параллельные расходы не дают недопустимый остаток; финансовый экран согласуется с ledger; правила зарплат/банкротства описаны.",
+      "depends": [
+        "AND-45"
+      ]
+    },
+    {
+      "id": "AND-60",
+      "uuid": "a9960893-f5c2-43b7-9c42-d4a2da1cd108",
+      "title": "Реализовать аукционный трансферный рынок",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-60/realizovat-aukcionnyj-transfernyj-rynok",
+      "state": "Backlog",
+      "key": "transfers",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Листинг на 48 часов, ставки, резервы, освобождение проигравших резервов, продление анти-снайпера, расчёт после закрытия; окна и лимиты 16–25.",
+      "acceptance": "Параллельные ставки/закрытие безопасны; один владелец игрока; повтор settlement не переводит деньги/игрока дважды; проверка окна/минимальной цены/остатка; уведомления через outbox.",
+      "depends": [
+        "AND-59",
+        "AND-49"
+      ]
+    },
+    {
+      "id": "AND-61",
+      "uuid": "7fa8139b-3b3f-434e-a291-1f11bf603d1b",
+      "title": "Добавить персонал клуба и скаутские задания",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-61/dobavit-personal-kluba-i-skautskie-zadaniya",
+      "state": "Backlog",
+      "key": "staff-scouting",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Тренер/скаут/physio, зарплаты и бонусы; скаутские направления, сроки и отчёты; staff portrait bank Dugout.",
+      "acceptance": "Найм и расчёт зарплат атомарны; один отчёт на завершённое задание; статистика скрытого потенциала раскрывается по правилам; отдельные зрелые лица персонала.",
+      "depends": [
+        "AND-58",
+        "AND-59",
+        "AND-43"
+      ]
+    },
+    {
+      "id": "AND-62",
+      "uuid": "40139b78-3642-47ce-b786-1ff7cfd346f6",
+      "title": "Реализовать академию и выпуск молодых игроков",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-62/realizovat-akademiyu-i-vypusk-molodyh-igrokov",
+      "state": "Backlog",
+      "key": "academy",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Уровни академии, расходы, выпуск 17-летних, скрытый потенциал, сроки и лимиты состава.",
+      "acceptance": "Выпуск не дублируется; корректные позиции/возраст; нельзя превысить 25 игроков; затраты попадают в ledger; объяснимый экран академии.",
+      "depends": [
+        "AND-58",
+        "AND-59"
+      ]
+    },
+    {
+      "id": "AND-63",
+      "uuid": "32adc8d8-6a0c-40ed-9e32-9ae61ff2a921",
+      "title": "Добавить стадион, содержание и матчевый доход",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-63/dobavit-stadion-soderzhanie-i-matchevyj-dohod",
+      "state": "Backlog",
+      "key": "stadium",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Уровни, вместимость, стоимость/срок расширения, доход с учётом лиги, формы и посещаемости.",
+      "acceptance": "Одно улучшение/начисление за событие; нет бесплатного повторного апгрейда; экономика проверена на сезонном прогоне; финансовая запись соответствует стадиону.",
+      "depends": [
+        "AND-59"
+      ]
+    },
+    {
+      "id": "AND-64",
+      "uuid": "c4a4ae1c-a212-400e-a09d-c8e93cc4bcfd",
+      "title": "Добавить мораль, форму, опыт и старение футболистов",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-64/dobavit-moral-formu-opyt-i-starenie-futbolistov",
+      "state": "Backlog",
+      "key": "morale",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Сезонные/недельные расчёты по возрасту, опыту и морали; документировать связь реального времени и игрового возраста.",
+      "acceptance": "Диапазоны и скорости согласованы; повтор расчёта безопасен; изменения влияют на sim; сезонная симуляция не даёт мгновенных пенсионеров/навыков 20.",
+      "depends": [
+        "AND-58",
+        "AND-51"
+      ]
+    },
+    {
+      "id": "AND-65",
+      "uuid": "b9d07f0b-820b-430e-b2ce-04e7c8aecb15",
+      "title": "Реализовать кубок, дополнительное время и пенальти",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-65/realizovat-kubok-dopolnitelnoe-vremya-i-penalti",
+      "state": "Backlog",
+      "key": "cup",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Кубок по средам, жеребьёвка, bye для некратного числа участников; extra time/penalties с отдельной спецификацией часов.",
+      "acceptance": "Победитель определён, нет double elimination/results; календарь не конфликтует с лигой; лимиты команд и длительности допвремени объяснены; replay tests.",
+      "depends": [
+        "AND-52",
+        "AND-55"
+      ]
+    },
+    {
+      "id": "AND-66",
+      "uuid": "681e7e2e-53b2-4b55-a977-694eab91cbbb",
+      "title": "Создать историю матчей, статистику и отчёты",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-66/sozdat-istoriyu-matchej-statistiku-i-otchyoty",
+      "state": "Backlog",
+      "key": "statistics",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "История клуба/игрока, события/замены/лучший игрок, архив сезона и replay данных; генерация карточек в стиле Dugout.",
+      "acceptance": "Отчёт повторно открывается после restart; архив не переписывается при rollover; списки paginated; ключевые показатели доступны в тексте.",
+      "depends": [
+        "AND-56"
+      ]
+    },
+    {
+      "id": "AND-67",
+      "uuid": "4ed225c5-6de8-4c43-bb11-79a47071dba5",
+      "title": "Добавить косметические покупки за Telegram Stars",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-67/dobavit-kosmeticheskie-pokupki-za-telegram-stars",
+      "state": "Backlog",
+      "key": "stars",
+      "milestone": "economy",
+      "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
+      "context": "Герб/форма и косметика, цены/платежи/refunds/ledger; сначала решить влияние аналитики и скаутских слотов на fairness.",
+      "acceptance": "Нет продажи прямого преимущества без отдельного решения; повтор payment update не выдаёт покупку дважды; проверка суммы/валюты; описаны возвраты и поддержка.",
+      "depends": [
+        "AND-59",
+        "AND-44"
+      ]
+    },
+    {
+      "id": "AND-68",
+      "uuid": "fe591512-9a92-4192-8c76-1404fcbe38b1",
+      "title": "Реализовать sender уведомлений и устойчивое live-табло",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-68/realizovat-sender-uvedomlenij-i-ustojchivoe-live-tablo",
+      "state": "Backlog",
+      "key": "outbox",
+      "milestone": "operations",
+      "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
+      "context": "Outbox dispatcher с lease/retry_after, приоритетами и стабильным message_id; не держать DB transaction во время Telegram call.",
+      "acceptance": "Telegram rate limits не останавливают sim; рестарт возвращает взятые lease; отправки отслеживаются; задокументирован риск дубля send после crash; edit повторобезопасен.",
+      "depends": [
+        "AND-52"
+      ]
+    },
+    {
+      "id": "AND-69",
+      "uuid": "4d964e2b-6b3b-414c-8afb-4bc4e0273f91",
+      "title": "Проверить восстановление после сбоев HDC и БД",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-69/proverit-vosstanovlenie-posle-sboev-hdc-i-bd",
+      "state": "Backlog",
+      "key": "recovery",
+      "milestone": "operations",
+      "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
+      "context": "Crash points: тик до/после commit, rollover, claim, bid/settlement и отправка outbox; пауза live-матча вместо залпового catch-up.",
+      "acceptance": "Голы/деньги/клубы не дублируются; менеджерам сохраняется окно решений после простоя; degraded mode и recovery runbook; периодический reconciliation jobs.",
+      "depends": [
+        "AND-52",
+        "AND-57",
+        "AND-60"
+      ]
+    },
+    {
+      "id": "AND-70",
+      "uuid": "7ece0b71-a857-45bf-9ec0-8c24efc75214",
+      "title": "Подготовить backup, health и наблюдаемость на HDC",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-70/podgotovit-backup-health-i-nablyudaemost-na-hdc",
+      "state": "Backlog",
+      "key": "observability",
+      "milestone": "operations",
+      "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
+      "context": "Метрики tick lateness/queue/outbox/failed jobs/диск; ежедневные backup вне HDC и restore drill; автозапуск после reboot.",
+      "acceptance": "Секреты не попадают в логи; backup восстанавливается в изолированной БД; health отражает DB/worker heartbeat; monitoring интегрирован в существующий HDC без нарушения соседних сервисов.",
+      "depends": [
+        "AND-39"
+      ]
+    },
+    {
+      "id": "AND-71",
+      "uuid": "6a53997e-e774-4706-bcde-f3144688728a",
+      "title": "Провести нагрузочные, балансные и конкурентные проверки",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-71/provesti-nagruzochnye-balansnye-i-konkurentnye-proverki",
+      "state": "Backlog",
+      "key": "qa",
+      "milestone": "operations",
+      "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
+      "context": "Несколько комплектов, одновременные матчи/регистрации/ставки; сезонные sim-прогоны; целевые показатели определить по измеренным ресурсам HDC.",
+      "acceptance": "Проверены race cases и аварии; измерены p95 tick lateness/callback latency; сезон сохраняет 10 клубов в лиге; документированы bottlenecks и лимиты для запуска.",
+      "depends": [
+        "AND-57",
+        "AND-60",
+        "AND-68",
+        "AND-69"
+      ]
+    },
+    {
+      "id": "AND-72",
+      "uuid": "d1733778-8929-4a3e-afbf-70e32fd9876d",
+      "title": "Развернуть готовый MVP на HDC и провести smoke",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-72/razvernut-gotovyj-mvp-na-hdc-i-provesti-smoke",
+      "state": "Backlog",
+      "key": "deploy",
+      "milestone": "operations",
+      "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
+      "context": "Существующий Windows Docker host; отдельный Compose project/volumes/secrets, без публичного PostgreSQL и Mini App. Запуск bot long polling после migration.",
+      "acceptance": "Проверены BotFather username/token и один polling instance; /start→claim→lineup→live→result; reboot/rollback/restore; соседние сервисы не перезапущены; deploy записан в runbook.",
+      "depends": [
+        "AND-70",
+        "AND-71"
+      ]
+    }
+  ]
+}

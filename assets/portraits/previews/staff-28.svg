@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>staff portrait staff-28</title><metadata>{
+  &quot;bank&quot;: &quot;staff&quot;,
+  &quot;components&quot;: {
+    &quot;accessories&quot;: &quot;components/shared/none.svg&quot;,
+    &quot;age_details&quot;: &quot;components/staff/age-subtle.svg&quot;,
+    &quot;ears&quot;: &quot;components/shared/ears.svg&quot;,
+    &quot;eyes&quot;: &quot;components/staff/eyes-narrow.svg&quot;,
+    &quot;face&quot;: &quot;components/staff/face-round.svg&quot;,
+    &quot;hair&quot;: &quot;components/staff/hair-receding.svg&quot;,
+    &quot;mouth&quot;: &quot;components/staff/mouth-neutral.svg&quot;,
+    &quot;neck&quot;: &quot;components/shared/neck.svg&quot;,
+    &quot;nose&quot;: &quot;components/staff/nose-wide.svg&quot;,
+    &quot;torso&quot;: &quot;components/staff/torso-polo.svg&quot;
+  },
+  &quot;palette&quot;: {
+    &quot;accent&quot;: &quot;#93886D&quot;,
+    &quot;background&quot;: &quot;#E8DECB&quot;,
+    &quot;hair&quot;: &quot;#2F302D&quot;,
+    &quot;ink&quot;: &quot;#2A2824&quot;,
+    &quot;kit&quot;: &quot;#394F49&quot;,
+    &quot;skin&quot;: &quot;#AB7251&quot;,
+    &quot;skin_shadow&quot;: &quot;#82533F&quot;
+  },
+  &quot;schema_version&quot;: 1,
+  &quot;seed&quot;: &quot;staff-28&quot;
+}</metadata><rect width="256" height="256" rx="24" fill="#E8DECB"/><path d="M16 210H240M16 224H240" stroke="#DFA642" stroke-width="1" opacity=".25"/><g stroke-linecap="round" stroke-linejoin="round"><g id="torso"><path d="M41 256L47 217Q62 201 105 191L128 207 151 191Q194 201 210 217L215 256Z" fill="#394F49" stroke="#2A2824" stroke-width="3"/><path d="M105 193L128 208 114 226 101 207ZM151 193L128 208 141 226 156 207Z" fill="#182B28" stroke="#F2E9D8" stroke-width="2"/><path d="M128 208V245" stroke="#F2E9D8" stroke-width="2"/><circle cx="133" cy="231" r="2" fill="#93886D"/>
+
+</g><g id="neck"><path d="M106 167V198L128 214 150 198V167" fill="#AB7251" stroke="#2A2824" stroke-width="2.8"/><path d="M107 176Q128 191 149 176V189Q128 204 107 189Z" fill="#82533F"/>
+
+</g><g id="ears"><ellipse cx="81" cy="125" rx="10" ry="17" fill="#AB7251" stroke="#2A2824" stroke-width="2.6"/><ellipse cx="175" cy="125" rx="10" ry="17" fill="#AB7251" stroke="#2A2824" stroke-width="2.6"/><path d="M79 118Q87 122 81 131M177 118Q169 122 175 131" fill="none" stroke="#82533F" stroke-width="3"/>
+
+</g><g id="face"><path d="M82 88Q79 55 128 55Q177 55 174 88L172 141Q162 175 128 186Q94 175 84 141Z" fill="#AB7251" stroke="#2A2824" stroke-width="2.2"/><path d="M159 86Q173 116 162 143Q151 172 128 181Q160 177 169 147Z" fill="#82533F" opacity=".6"/>
+
+</g><g id="eyes"><path d="M94 119Q105 112 117 119M139 119Q151 112 163 119" stroke="#2A2824" stroke-width="2" fill="none"/><circle cx="107" cy="118" r="3.1" fill="#2A2824"/><circle cx="150" cy="118" r="3.1" fill="#2A2824"/><path d="M94 106L116 107M140 107L162 106" stroke="#2F302D" stroke-width="3.2"/>
+
+</g><g id="nose"><path d="M126 124Q116 140 118 149Q130 159 143 149L138 141" fill="#82533F" opacity=".6"/><path d="M117 149Q131 156 143 149" fill="none" stroke="#2A2824" stroke-width="1.8"/>
+
+</g><g id="mouth"><path d="M110 164Q128 169 145 164" fill="none" stroke="#2A2824" stroke-width="2.4"/><path d="M117 175Q130 180 140 175" fill="none" stroke="#82533F" stroke-width="2"/>
+
+</g><g id="age_details"><path d="M111 96Q129 93 146 96M93 127L97 129M159 129L164 127M109 149L106 158M147 149L150 158" stroke="#82533F" stroke-width="1.4" opacity=".6" fill="none"/>
+
+</g><g id="hair"><path d="M80 107L80 84Q81 64 96 61L99 76 92 95 89 116Z" fill="#2F302D" stroke="#2A2824" stroke-width="2.5"/><path d="M176 108L176 84Q173 62 158 61L157 76 166 95 168 116Z" fill="#2F302D" stroke="#2A2824" stroke-width="2.5"/><path d="M104 59Q127 51 151 59" fill="none" stroke="#82533F" stroke-width="2"/>
+
+</g><g id="accessories">
+
+</g></g></svg>

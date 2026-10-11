@@ -1,0 +1,26 @@
+{
+  "bank": "players",
+  "components": {
+    "accessories": "components/shared/none.svg",
+    "age_details": "components/shared/none.svg",
+    "ears": "components/shared/ears.svg",
+    "eyes": "components/players/eyes-focused.svg",
+    "face": "components/players/face-round.svg",
+    "hair": "components/players/hair-swept.svg",
+    "mouth": "components/players/mouth-neutral.svg",
+    "neck": "components/shared/neck.svg",
+    "nose": "components/players/nose-bridge.svg",
+    "torso": "components/players/torso-vneck.svg"
+  },
+  "palette": {
+    "accent": "#93886D",
+    "background": "#E8DECB",
+    "hair": "#5E392C",
+    "ink": "#2A2824",
+    "kit": "#743D42",
+    "skin": "#F0C19C",
+    "skin_shadow": "#CE9673"
+  },
+  "schema_version": 1,
+  "seed": "player-07"
+}

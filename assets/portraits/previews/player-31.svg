@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>players portrait player-31</title><metadata>{
+  &quot;bank&quot;: &quot;players&quot;,
+  &quot;components&quot;: {
+    &quot;accessories&quot;: &quot;components/shared/none.svg&quot;,
+    &quot;age_details&quot;: &quot;components/shared/none.svg&quot;,
+    &quot;ears&quot;: &quot;components/shared/ears.svg&quot;,
+    &quot;eyes&quot;: &quot;components/players/eyes-narrow.svg&quot;,
+    &quot;face&quot;: &quot;components/players/face-oval.svg&quot;,
+    &quot;hair&quot;: &quot;components/players/hair-waves.svg&quot;,
+    &quot;mouth&quot;: &quot;components/players/mouth-curved.svg&quot;,
+    &quot;neck&quot;: &quot;components/shared/neck.svg&quot;,
+    &quot;nose&quot;: &quot;components/players/nose-button.svg&quot;,
+    &quot;torso&quot;: &quot;components/players/torso-vneck.svg&quot;
+  },
+  &quot;palette&quot;: {
+    &quot;accent&quot;: &quot;#93886D&quot;,
+    &quot;background&quot;: &quot;#E8DECB&quot;,
+    &quot;hair&quot;: &quot;#2F302D&quot;,
+    &quot;ink&quot;: &quot;#2A2824&quot;,
+    &quot;kit&quot;: &quot;#394F49&quot;,
+    &quot;skin&quot;: &quot;#754A37&quot;,
+    &quot;skin_shadow&quot;: &quot;#533427&quot;
+  },
+  &quot;schema_version&quot;: 1,
+  &quot;seed&quot;: &quot;player-31&quot;
+}</metadata><rect width="256" height="256" rx="24" fill="#E8DECB"/><path d="M16 210H240M16 224H240" stroke="#DFA642" stroke-width="1" opacity=".25"/><g stroke-linecap="round" stroke-linejoin="round"><g id="torso"><path d="M42 256L46 217Q61 198 106 190L128 210 150 190Q195 198 210 217L214 256Z" fill="#394F49" stroke="#2A2824" stroke-width="2.2"/><path d="M105 192L128 213 151 192" stroke="#E8DECB" stroke-width="7" fill="none"/><path d="M67 218H90M165 218H188" stroke="#93886D" stroke-width="2"/>
+
+</g><g id="neck"><path d="M106 167V198L128 214 150 198V167" fill="#754A37" stroke="#2A2824" stroke-width="2.8"/><path d="M107 176Q128 191 149 176V189Q128 204 107 189Z" fill="#533427"/>
+
+</g><g id="ears"><ellipse cx="81" cy="125" rx="10" ry="17" fill="#754A37" stroke="#2A2824" stroke-width="2.6"/><ellipse cx="175" cy="125" rx="10" ry="17" fill="#754A37" stroke="#2A2824" stroke-width="2.6"/><path d="M79 118Q87 122 81 131M177 118Q169 122 175 131" fill="none" stroke="#533427" stroke-width="3"/>
+
+</g><g id="face"><path d="M82 85Q82 55 128 55Q174 55 174 85L171 138Q165 174 128 188Q91 174 85 138Z" fill="#754A37" stroke="#2A2824" stroke-width="2.8"/><path d="M158 83Q174 120 158 153Q151 171 128 185Q150 180 165 158Q179 126 170 85Z" fill="#533427" opacity=".55"/>
+
+</g><g id="eyes"><path d="M94 119Q105 112 117 119M139 119Q151 112 163 119" stroke="#2A2824" stroke-width="2" fill="none"/><circle cx="107" cy="118" r="3.1" fill="#2A2824"/><circle cx="150" cy="118" r="3.1" fill="#2A2824"/><path d="M94 106L116 107M140 107L162 106" stroke="#2F302D" stroke-width="3.2"/>
+
+</g><g id="nose"><path d="M126 130Q120 140 123 147Q130 151 138 147Q141 143 135 140" fill="#533427" opacity=".55"/><path d="M123 149Q130 152 138 148" stroke="#2A2824" stroke-width="1.3" fill="none"/>
+
+</g><g id="mouth"><path d="M111 162Q127 171 145 162" fill="none" stroke="#2A2824" stroke-width="1.8"/><path d="M121 174Q129 176 137 173" fill="none" stroke="#533427" stroke-width="1.5"/>
+
+</g><g id="age_details">
+
+</g><g id="hair"><path d="M80 107L78 79Q83 47 112 48Q143 37 169 57Q181 65 178 87L173 110 165 87Q151 89 142 77Q127 87 114 80Q102 91 91 89Z" fill="#2F302D" stroke="#2A2824" stroke-width="2.2"/><path d="M92 72Q105 58 119 66Q132 54 145 65Q160 55 170 71" stroke="#93886D" opacity=".5" stroke-width="1.5" fill="none"/>
+
+</g><g id="accessories">
+
+</g></g></svg>

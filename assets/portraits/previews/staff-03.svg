@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>staff portrait staff-03</title><metadata>{
+  &quot;bank&quot;: &quot;staff&quot;,
+  &quot;components&quot;: {
+    &quot;accessories&quot;: &quot;components/staff/accessories-glasses.svg&quot;,
+    &quot;age_details&quot;: &quot;components/staff/age-subtle.svg&quot;,
+    &quot;ears&quot;: &quot;components/shared/ears.svg&quot;,
+    &quot;eyes&quot;: &quot;components/staff/eyes-soft.svg&quot;,
+    &quot;face&quot;: &quot;components/staff/face-round.svg&quot;,
+    &quot;hair&quot;: &quot;components/staff/hair-bob.svg&quot;,
+    &quot;mouth&quot;: &quot;components/staff/mouth-smile.svg&quot;,
+    &quot;neck&quot;: &quot;components/shared/neck.svg&quot;,
+    &quot;nose&quot;: &quot;components/staff/nose-wide.svg&quot;,
+    &quot;torso&quot;: &quot;components/staff/torso-polo.svg&quot;
+  },
+  &quot;palette&quot;: {
+    &quot;accent&quot;: &quot;#93886D&quot;,
+    &quot;background&quot;: &quot;#E8DECB&quot;,
+    &quot;hair&quot;: &quot;#85857B&quot;,
+    &quot;ink&quot;: &quot;#2A2824&quot;,
+    &quot;kit&quot;: &quot;#394F49&quot;,
+    &quot;skin&quot;: &quot;#F0C19C&quot;,
+    &quot;skin_shadow&quot;: &quot;#CE9673&quot;
+  },
+  &quot;schema_version&quot;: 1,
+  &quot;seed&quot;: &quot;staff-03&quot;
+}</metadata><rect width="256" height="256" rx="24" fill="#E8DECB"/><path d="M16 210H240M16 224H240" stroke="#DFA642" stroke-width="1" opacity=".25"/><g stroke-linecap="round" stroke-linejoin="round"><g id="torso"><path d="M41 256L47 217Q62 201 105 191L128 207 151 191Q194 201 210 217L215 256Z" fill="#394F49" stroke="#2A2824" stroke-width="3"/><path d="M105 193L128 208 114 226 101 207ZM151 193L128 208 141 226 156 207Z" fill="#182B28" stroke="#F2E9D8" stroke-width="2"/><path d="M128 208V245" stroke="#F2E9D8" stroke-width="2"/><circle cx="133" cy="231" r="2" fill="#93886D"/>
+
+</g><g id="neck"><path d="M106 167V198L128 214 150 198V167" fill="#F0C19C" stroke="#2A2824" stroke-width="2.8"/><path d="M107 176Q128 191 149 176V189Q128 204 107 189Z" fill="#CE9673"/>
+
+</g><g id="ears"><ellipse cx="81" cy="125" rx="10" ry="17" fill="#F0C19C" stroke="#2A2824" stroke-width="2.6"/><ellipse cx="175" cy="125" rx="10" ry="17" fill="#F0C19C" stroke="#2A2824" stroke-width="2.6"/><path d="M79 118Q87 122 81 131M177 118Q169 122 175 131" fill="none" stroke="#CE9673" stroke-width="3"/>
+
+</g><g id="face"><path d="M82 88Q79 55 128 55Q177 55 174 88L172 141Q162 175 128 186Q94 175 84 141Z" fill="#F0C19C" stroke="#2A2824" stroke-width="2.2"/><path d="M159 86Q173 116 162 143Q151 172 128 181Q160 177 169 147Z" fill="#CE9673" opacity=".6"/>
+
+</g><g id="eyes"><path d="M94 118Q105 111 116 118Q105 123 94 118M140 118Q151 111 162 118Q151 123 140 118" fill="#EEE5D4" stroke="#2A2824" stroke-width="1.7"/><circle cx="106" cy="117" r="3.6" fill="#2A2824"/><circle cx="151" cy="117" r="3.6" fill="#2A2824"/><path d="M93 105Q104 101 117 106M139 106Q151 101 163 105" fill="none" stroke="#85857B" stroke-width="3"/>
+
+</g><g id="nose"><path d="M126 124Q116 140 118 149Q130 159 143 149L138 141" fill="#CE9673" opacity=".6"/><path d="M117 149Q131 156 143 149" fill="none" stroke="#2A2824" stroke-width="1.8"/>
+
+</g><g id="mouth"><path d="M110 162Q128 179 146 161Q128 167 110 162Z" fill="#FFF9ED" stroke="#2A2824" stroke-width="2.1"/><path d="M114 160L108 163M145 160L150 163" stroke="#CE9673" stroke-width="2"/>
+
+</g><g id="age_details"><path d="M111 96Q129 93 146 96M93 127L97 129M159 129L164 127M109 149L106 158M147 149L150 158" stroke="#CE9673" stroke-width="1.4" opacity=".6" fill="none"/>
+
+</g><g id="hair"><path d="M80 155Q64 139 71 91Q76 52 119 48Q159 38 180 76Q188 107 182 152L167 160 169 91Q150 80 137 72Q113 88 87 88L88 159Z" fill="#85857B" stroke="#2A2824" stroke-width="2.8"/><path d="M81 90Q88 63 115 59M166 82Q181 103 176 143" fill="none" stroke="#E4DCCA" opacity=".45" stroke-width="2"/>
+
+</g><g id="accessories"><rect x="90" y="110" width="31" height="23" rx="7" fill="none" stroke="#2A2824" stroke-width="3"/><rect x="136" y="110" width="31" height="23" rx="7" fill="none" stroke="#2A2824" stroke-width="3"/><path d="M121 118Q128 113 136 118M90 117L80 112M167 117L176 112" fill="none" stroke="#2A2824" stroke-width="3"/>
+
+</g></g></svg>

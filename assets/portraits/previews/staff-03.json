@@ -1,0 +1,26 @@
+{
+  "bank": "staff",
+  "components": {
+    "accessories": "components/staff/accessories-glasses.svg",
+    "age_details": "components/staff/age-subtle.svg",
+    "ears": "components/shared/ears.svg",
+    "eyes": "components/staff/eyes-soft.svg",
+    "face": "components/staff/face-round.svg",
+    "hair": "components/staff/hair-bob.svg",
+    "mouth": "components/staff/mouth-smile.svg",
+    "neck": "components/shared/neck.svg",
+    "nose": "components/staff/nose-wide.svg",
+    "torso": "components/staff/torso-polo.svg"
+  },
+  "palette": {
+    "accent": "#93886D",
+    "background": "#E8DECB",
+    "hair": "#85857B",
+    "ink": "#2A2824",
+    "kit": "#394F49",
+    "skin": "#F0C19C",
+    "skin_shadow": "#CE9673"
+  },
+  "schema_version": 1,
+  "seed": "staff-03"
+}

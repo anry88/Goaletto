@@ -1,0 +1,10 @@
+# Merge with compose.yaml. PostgreSQL stays internal on the existing HDC host.
+services:
+  postgres:
+    ports: !reset []
+  bot:
+    environment:
+      GOALETTO_ENVIRONMENT: production
+  worker:
+    environment:
+      GOALETTO_ENVIRONMENT: production

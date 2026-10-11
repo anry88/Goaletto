@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>staff portrait staff-14</title><metadata>{
+  &quot;bank&quot;: &quot;staff&quot;,
+  &quot;components&quot;: {
+    &quot;accessories&quot;: &quot;components/shared/none.svg&quot;,
+    &quot;age_details&quot;: &quot;components/staff/age-deep.svg&quot;,
+    &quot;ears&quot;: &quot;components/shared/ears.svg&quot;,
+    &quot;eyes&quot;: &quot;components/staff/eyes-calm.svg&quot;,
+    &quot;face&quot;: &quot;components/staff/face-square.svg&quot;,
+    &quot;hair&quot;: &quot;components/staff/hair-parted.svg&quot;,
+    &quot;mouth&quot;: &quot;components/staff/mouth-neutral.svg&quot;,
+    &quot;neck&quot;: &quot;components/shared/neck.svg&quot;,
+    &quot;nose&quot;: &quot;components/staff/nose-wide.svg&quot;,
+    &quot;torso&quot;: &quot;components/staff/torso-track.svg&quot;
+  },
+  &quot;palette&quot;: {
+    &quot;accent&quot;: &quot;#93886D&quot;,
+    &quot;background&quot;: &quot;#E8DECB&quot;,
+    &quot;hair&quot;: &quot;#85857B&quot;,
+    &quot;ink&quot;: &quot;#2A2824&quot;,
+    &quot;kit&quot;: &quot;#743D42&quot;,
+    &quot;skin&quot;: &quot;#AB7251&quot;,
+    &quot;skin_shadow&quot;: &quot;#82533F&quot;
+  },
+  &quot;schema_version&quot;: 1,
+  &quot;seed&quot;: &quot;staff-14&quot;
+}</metadata><rect width="256" height="256" rx="24" fill="#E8DECB"/><path d="M16 210H240M16 224H240" stroke="#DFA642" stroke-width="1" opacity=".25"/><g stroke-linecap="round" stroke-linejoin="round"><g id="torso"><path d="M41 256L47 217Q62 201 105 191L128 207 151 191Q194 201 210 217L215 256Z" fill="#253936" stroke="#2A2824" stroke-width="3"/><path d="M106 191L109 207 128 217 147 207 150 191" fill="#743D42" stroke="#2A2824" stroke-width="2.5"/><path d="M128 215V256" stroke="#93886D" stroke-width="2.8"/><path d="M71 209L60 253M185 209L196 253" stroke="#F2E9D8" stroke-width="5"/>
+
+</g><g id="neck"><path d="M106 167V198L128 214 150 198V167" fill="#AB7251" stroke="#2A2824" stroke-width="2.8"/><path d="M107 176Q128 191 149 176V189Q128 204 107 189Z" fill="#82533F"/>
+
+</g><g id="ears"><ellipse cx="81" cy="125" rx="10" ry="17" fill="#AB7251" stroke="#2A2824" stroke-width="2.6"/><ellipse cx="175" cy="125" rx="10" ry="17" fill="#AB7251" stroke="#2A2824" stroke-width="2.6"/><path d="M79 118Q87 122 81 131M177 118Q169 122 175 131" fill="none" stroke="#82533F" stroke-width="3"/>
+
+</g><g id="face"><path d="M82 91Q83 56 128 56Q173 56 174 91L171 153 154 180Q128 194 102 180L85 153Z" fill="#AB7251" stroke="#2A2824" stroke-width="2.8"/><path d="M159 87L170 103 168 152 152 178 136 185 157 153Z" fill="#82533F" opacity=".65"/>
+
+</g><g id="eyes"><path d="M94 119Q105 113 116 119M140 119Q151 113 162 119" stroke="#2A2824" stroke-width="2.5" fill="none"/><ellipse cx="106" cy="119" rx="3.5" ry="4.2" fill="#2A2824"/><ellipse cx="151" cy="119" rx="3.5" ry="4.2" fill="#2A2824"/><path d="M94 106Q107 100 117 106M139 106Q151 100 163 106" stroke="#85857B" stroke-width="4" fill="none"/><path d="M96 126L112 129M144 129L159 126" stroke="#82533F" stroke-width="2" fill="none"/>
+
+</g><g id="nose"><path d="M126 124Q116 140 118 149Q130 159 143 149L138 141" fill="#82533F" opacity=".6"/><path d="M117 149Q131 156 143 149" fill="none" stroke="#2A2824" stroke-width="1.8"/>
+
+</g><g id="mouth"><path d="M110 164Q128 169 145 164" fill="none" stroke="#2A2824" stroke-width="2.4"/><path d="M117 175Q130 180 140 175" fill="none" stroke="#82533F" stroke-width="2"/>
+
+</g><g id="age_details"><path d="M104 92Q128 87 151 92M109 97Q128 94 146 97M113 102Q128 99 143 102M90 125L96 127M90 130L96 130M162 127L168 125M162 130L168 130M109 146L102 160M147 146L154 160M114 179Q128 185 142 179" stroke="#82533F" stroke-width="1.6" opacity=".85" fill="none"/>
+
+</g><g id="hair"><path d="M81 109L78 83Q82 50 120 48Q145 38 171 64L178 85 174 107 164 82Q153 68 132 70Q111 86 92 82Z" fill="#85857B" stroke="#2A2824" stroke-width="2.8"/><path d="M93 71Q119 58 142 58M136 70L155 59" fill="none" stroke="#E4DCCA" opacity=".6" stroke-width="2"/>
+
+</g><g id="accessories">
+
+</g></g></svg>
