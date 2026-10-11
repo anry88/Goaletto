@@ -20,10 +20,12 @@ flowchart LR
 - bot: форматирование, кнопки, маршрутизация, немедленный answerCallbackQuery.
 - domain: часы, рейтинги, симуляция, таблицы, правила переходов; переданный seed и
   явные входные данные. Сетевых вызовов и импортов framework здесь нет.
-- application: права на клуб, игровые use cases, транзакции и последовательность эффектов.
+- application: контракт аналитических эффектов и граница атомарного создания person;
+  права на клуб и остальные игровые use cases остаются в плане.
 - infrastructure: SQLAlchemy, репозитории, jobs/outbox.
 - worker: получение просроченной работы и вызов application.
-- portraits: recipe → SVG; PNG для Telegram рендерятся и кешируются отдельным адаптером.
+- portraits: стабильная identity/variant → цельный PNG и перекраска одежды;
+  Telegram file_id cache остаётся отдельным адаптером в плане. SVG-пилот исторический.
 
 ## Долговечные операции
 
@@ -66,13 +68,19 @@ infrastructure обеспечивает versioning, dedupe и псевдоним
 Domain не импортирует аналитический сборщик. User-действия отделены от system/automation;
 доставка уведомления не означает прочтение и не создаёт retention.
 Отчёты используют PostgreSQL и операторский Grafana на HDC без публичного API.
-Эти таблицы и сбор пока не реализованы.
+Envelope/allowlist v1 реализован в `application.analytics`, [контракт](analytics/contract-v1.md).
+Таблица псевдонимов присутствует в новой миграции; journey collection, сессии,
+атрибуция, feedback и SQL-отчёты пока не реализованы.
 
-Сейчас миграция содержит league_sets, leagues, clubs, jobs, outbox_messages.
-Она не обеспечивает самостоятельно ровно 10 клубов в лиге: это инвариант seed/rollover.
-Далее отдельными миграциями: managers, players, staff, seasons, fixtures, matches,
-match_ticks, commands, standings, training, auctions, ledger, scouting, academy.
-Схема не должна подменять реализацию соответствующих use cases.
+Миграции foundation + game_foundation описывают 24 таблицы: topology/jobs/outbox,
+managers/analytics IDs/ownership, persons/appearance registry/player/staff careers,
+season memberships/standings, lineups, fixtures/matches/ticks и accepted commands.
+[ERD, ограничения и транзакционные границы](data-model.md).
+Схема не обеспечивает самостоятельно ровно 10 клубов в лиге: это инвариант seed/rollover.
+Выполнение новой миграции на PostgreSQL пока не проверено: по текущему указанию
+пользователя используются проверки без БД, и CI не создаёт тестовый PostgreSQL.
+Далее отдельно: gameplay use cases, training, auctions, ledger, scouting, academy.
+Схема не подменяет реализацию этих операций.
 
 Источники:
 [aiogram polling](https://docs.aiogram.dev/en/latest/dispatcher/long_polling.html),

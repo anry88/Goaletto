@@ -51,5 +51,7 @@
 - This repository is proprietary; do not change licensing without user instruction.
 - Keep Linear tasks aligned with meaningful completed work. Do not close unimplemented
   gameplay tasks merely because scaffolding exists.
-- Run ruff, mypy and relevant pytest checks. PostgreSQL integration checks use an
-  isolated GOALETTO_TEST_DATABASE_URL, never a production database.
+- Run ruff, mypy and relevant pytest checks. Current user instruction: no test
+  databases at this development stage, locally or in CI. Use offline migration
+  rendering and `pytest -m 'not integration'`; never substitute a production DB.
+  Integration tests remain available for a later explicitly requested DB check.

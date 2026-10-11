@@ -1,5 +1,8 @@
 # Проверка начального каркаса · 2026-10-11
 
+Исторический прогон ниже был выполнен до текущего решения пользователя не создавать
+тестовые БД. На новом этапе PostgreSQL локально/в CI не поднимается.
+
 - Ruff check и format: успешно.
 - mypy strict: успешно, 18 исходных Python-модулей.
 - pytest с изолированным PostgreSQL 17: 23 теста успешно.
@@ -33,3 +36,23 @@ CI на GitHub проверяется отдельно после первого
   `recipe_for_age` сохраняет identity; missing stage даёт ошибку. Старые base
   variant IDs и PNG сохранены. PG assignment, старение/карьеры и Telegram cache
   ещё не реализованы.
+
+## Основание данных и контракт аналитики · 2026-10-12
+
+- Новая миграция `0002_game_foundation`: 19 новых таблиц, всего 24 с исходной схемой.
+  Миграция содержит замороженный DDL, не импортирует текущие ORM-модели и не делает seed.
+- Offline upgrade/downgrade успешно сформированы без соединения с БД; новые CREATE
+  TABLE и все индексы сопоставлены с PostgreSQL DDL моделей. Это не выполнение SQL сервером.
+- Контракт v1: allowlist/required refs/origin, закрытый envelope, стабильный effect key,
+  отказ от произвольного текста, различие user activity и ownership activity, UTC-границы
+  зрелости, D7, перенос матча, 30-минутная сессия и шесть календарных месяцев.
+- Каталог: 1080 identity, дополнительные age/staff варианты не увеличивают число людей;
+  все registry asset/mask пути существуют. DB registry и allocation используют общий
+  advisory transaction lock; гонки/rollback на PostgreSQL пока не проверены.
+- Ruff check/format: успешно, 94 Python-файла. mypy strict: успешно, 26 исходных модулей.
+- pytest без integration: **96 passed, 2 deselected**. Новых БД не создано для прогона.
+- Исполнение миграции, `alembic check` и PostgreSQL integration не выполнялись по
+  указанию пользователя. Созданный до уточнения временный контейнер удалён вместе
+  с его данными. CI больше не создаёт PostgreSQL service и не выполняет online migration.
+- Ни сбор событий, ни club claim/seed, ни симуляция/пенсия/найм из схемы автоматически
+  не появляются. Worker остаётся `system.ping`, Telegram-бот — preview; HDC не менялся.

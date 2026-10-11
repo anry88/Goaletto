@@ -4,7 +4,8 @@
 Python, сообщения и inline-кнопки; без Mini App и JavaScript.
 
 **Состояние: начальный каркас, не готовая игра.** Доступны демонстрационное меню бота,
-чистые правила времени и переходов между лигами, базовая миграция PostgreSQL, диагностический
+чистые правила времени и переходов между лигами, миграции основания PostgreSQL,
+контракт аналитических событий, граница назначения внешностей, диагностический
 worker и портретные инструменты. Пользователь выбрал цельные иллюстрации вместо
 сборки деталей: первый комплект 50 × 20 требует 1 000 разных футбольных внешностей,
 без повторов, и отдельный банк персонала. [Проверка подходов](docs/portrait-feasibility.md),
@@ -74,12 +75,16 @@ goaletto-worker
 ruff check .
 ruff format --check .
 mypy
-pytest -q
+pytest -q -m 'not integration'
+mkdir -p work
+alembic upgrade head --sql > work/migration.sql
 ```
 
-PostgreSQL-проверки пропускаются без GOALETTO_TEST_DATABASE_URL.
-Для полного прогона укажите отдельную тестовую БД, выполните миграции в ней и запустите pytest.
-CI создаёт изолированный PostgreSQL и проверяет миграции, блокировки и повторное добавление задач.
+По текущему решению пользователя тестовые БД не создаются, локально и в CI.
+CI проверяет Python и offline SQL миграций без PostgreSQL. Исполнение миграций,
+`alembic check` и конкурентные DB-операции сейчас не проверяются.
+Существующие integration-тесты сохранены для позже, когда проверка БД будет явно запрошена.
+Каталог и транзакционные границы описаны в [схеме данных](docs/data-model.md).
 
 ## Предпросмотр портретов
 
@@ -91,8 +96,9 @@ CI создаёт изолированный PostgreSQL и проверяет м
 [сходные пары для проверки](assets/portraits/whole-v2/previews/closest-pairs.png).
 Воспроизведение: `python scripts/pack_portrait_atlases.py --require-complete`,
 затем `python scripts/review_whole_portraits.py`. Отчёты и предпросмотры —
-assets/portraits/whole-v2/. Резервирование identity в PostgreSQL,
-Telegram cache ещё требуют реализации.
+assets/portraits/whole-v2/. Граница резервирования identity в PostgreSQL создана,
+но пока не проверена на сервере и не подключена к игровому seed;
+Telegram cache ещё требует реализации.
 Возрастное расширение добавляет 1 740 вариантов: 240 игроков со всеми семью группами и 20 частично.
 Полный набор пока не завершён из-за лимита Imagegen; [галерея возраста](assets/portraits/whole-v2/lifecycle-v1/index.html), [контракт](docs/portrait-lifecycle.md).
 
@@ -120,8 +126,8 @@ python scripts/render_raster_portrait_preview.py
 src/goaletto/
   bot/              Telegram handlers и запуск polling
   domain/           чистые clock и league movement rules
-  application/      граница будущих игровых use cases
-  infrastructure/   PostgreSQL models, transactions, jobs
+  application/      контракт событий, создание человека; остальные use cases в плане
+  infrastructure/   PostgreSQL schema, catalog publication, transactions, jobs
   worker/           отдельный обработчик фоновой работы
   portraits/        цельные PNG, перекраска одежды, исторические комбинаторы
 migrations/         Alembic
