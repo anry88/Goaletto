@@ -59,6 +59,15 @@ Sender и политика доставки в плане, начальный wo
 
 ## Схема сейчас и далее
 
+Аналитика запланирована до первого привлечения пользователей:
+[контракт и метрики](analytics/measurement-plan.md), [события](analytics/event-catalog.md).
+Application пишет успешное бизнес-событие атомарно с состоянием/accepted command;
+infrastructure обеспечивает versioning, dedupe и псевдонимы до claim клуба.
+Domain не импортирует аналитический сборщик. User-действия отделены от system/AI;
+доставка уведомления не означает прочтение и не создаёт retention.
+Отчёты используют PostgreSQL и операторский Grafana на HDC без публичного API.
+Эти таблицы и сбор пока не реализованы.
+
 Сейчас миграция содержит league_sets, leagues, clubs, jobs, outbox_messages.
 Она не обеспечивает самостоятельно ровно 10 клубов в лиге: это инвариант seed/rollover.
 Далее отдельными миграциями: managers, players, staff, seasons, fixtures, matches,

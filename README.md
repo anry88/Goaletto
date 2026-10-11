@@ -12,6 +12,7 @@ outbox-уведомлений пока не реализованы.
 - [Правила и принятые решения](docs/game-rules.md)
 - [Документация](docs/README.md)
 - [Архитектура](docs/architecture.md)
+- [Воронки, удержание и обратная связь](docs/analytics/measurement-plan.md)
 - [Стиль и портреты](docs/art-direction.md)
 - [Задачи в Linear](https://linear.app/andrei-brazhnikov/project/goaletto-eb8cb486bc79)
 - [GitHub](https://github.com/anry88/Goaletto)
