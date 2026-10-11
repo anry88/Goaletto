@@ -80,11 +80,11 @@
       "uuid": "3687878d-467e-4441-ab1a-c7b8dfa67241",
       "title": "Довести иллюстрированные слои Dugout до production-каталога",
       "url": "https://linear.app/andrei-brazhnikov/issue/AND-44/dovesti-illyustrirovannye-sloi-dugout-do-production-kataloga",
-      "state": "Backlog",
+      "state": "In Progress",
       "key": "portrait-production",
       "milestone": "foundation",
       "milestone_id": "7cd2892b-275a-472c-9142-8d839516e37f",
-      "context": "После выбора C и проверки пилота создать согласованные части в качестве ретро-концепта: отдельные молодые игроки/взрослый персонал, общие anchors, силуэты, разрешения и каталог совместимости.",
+      "context": "После выбора C и проверки пилота создать согласованные части в качестве ретро-концепта: отдельные молодые игроки/взрослый персонал, общие anchors, силуэты, разрешения и каталог совместимости. Начат illustrated style pilot v01: 3 игрока и 3 сотрудника, docs/portrait-style-pilot.md; конкретные внешности на рассмотрении, production-слои пока не готовы.",
       "acceptance": "Раздельные прозрачные слои, сохранённые IDs и версии; тесты 96/256/512 px и матрица сочетаний; PNG renderer/cache для карточек; каталог проверен визуально пользователем перед production.",
       "depends": [
         "AND-43"

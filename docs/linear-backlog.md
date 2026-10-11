@@ -56,6 +56,8 @@ Linear — источник актуального статуса; реестр 
 
 **Зависимости:** AND-43.
 
+**Прогресс:** In Progress. Проба v01 из шести лиц сохранена в assets/portraits/style-pilot, описание в [portrait-style-pilot.md](portrait-style-pilot.md). Ожидается отзыв по внешностям; прозрачные слои/renderer/полный каталог остаются в работе.
+
 ### [AND-73 · Зафиксировать контракт событий и метрики воронок Goaletto](https://linear.app/andrei-brazhnikov/issue/AND-73/zafiksirovat-kontrakt-sobytij-i-metriki-voronok-goaletto)
 
 Исходный план уже записан в docs/analytics/measurement-plan.md и event-catalog.md; довести до контракта реализации, не объявлять сбор готовым. Опыт Frontline AND-24/26/27 адаптирован к недельной лиге.
