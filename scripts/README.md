@@ -13,3 +13,8 @@ The PNG CLI is python -m goaletto.portraits.raster_cli; see docs/portrait-raster
 The r1 PNG pilot was rejected visually. check_portrait_feasibility.py compares it
 with proportionally scaled parts and an intact master, verifies kit recoloring,
 and displays offline24/35 age variants. See docs/portrait-feasibility.md for limits.
+
+check_portrait_combinations.py extends the proportional B experiment to nine real
+part combinations, with exact recipes, cumulative layer breakdown and96px contact
+sheet. It uses existing atlases without network calls or new whole-face generation.
+Review output: assets/portraits/combinations-v01/. Not a production renderer replacement.

@@ -85,6 +85,7 @@ CI создаёт изолированный PostgreSQL и проверяет м
 
 ```bash
 python scripts/check_portrait_feasibility.py
+python scripts/check_portrait_combinations.py
 goaletto-portraits --seed player-01 --bank players --output work/player.svg
 python scripts/render_portrait_preview.py
 python -m goaletto.portraits.raster_cli --seed player-01 --bank players --age 24 \

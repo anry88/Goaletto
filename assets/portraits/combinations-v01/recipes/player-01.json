@@ -1,0 +1,13 @@
+{
+  "asset_version": 1,
+  "bank": "players",
+  "components": {
+    "eyes": "dugout-r1/players/eyes-calm",
+    "hair": "dugout-r1/players/hair-swept",
+    "head": "dugout-r1/players/head-oval",
+    "mouth": "dugout-r1/players/mouth-neutral",
+    "nose": "dugout-r1/players/nose-straight",
+    "torso": "dugout-r1/players/torso-round"
+  },
+  "seed": "combination-review-01"
+}

@@ -1,0 +1,47 @@
+{
+  "status": "part-combination-review-awaiting-user-feedback",
+  "source_catalog": "dugout-r1 (rejected original import preserved)",
+  "placement": "feasibility B: proportional scaling; neck trim; skin-edge tint",
+  "primary": "#743D42",
+  "secondary": "#F2E9D8",
+  "age_layers": false,
+  "records": [
+    {
+      "image": "player-01.png",
+      "recipe": "recipes/player-01.json"
+    },
+    {
+      "image": "player-02.png",
+      "recipe": "recipes/player-02.json"
+    },
+    {
+      "image": "player-03.png",
+      "recipe": "recipes/player-03.json"
+    },
+    {
+      "image": "player-04.png",
+      "recipe": "recipes/player-04.json"
+    },
+    {
+      "image": "player-05.png",
+      "recipe": "recipes/player-05.json"
+    },
+    {
+      "image": "player-06.png",
+      "recipe": "recipes/player-06.json"
+    },
+    {
+      "image": "player-07.png",
+      "recipe": "recipes/player-07.json"
+    },
+    {
+      "image": "player-08.png",
+      "recipe": "recipes/player-08.json"
+    },
+    {
+      "image": "player-09.png",
+      "recipe": "recipes/player-09.json"
+    }
+  ],
+  "limits": "Male players only; three source heads couple shape and skin tone. No staff, aging or production compatibility guarantee."
+}
