@@ -44,6 +44,7 @@ def contact_sheet(variants: list[str], filename: str, cols: int = 8) -> None:
 def main() -> None:
     catalog = json.loads((ROOT / "manifest.json").read_text())
     entries = catalog["variants"]
+    (ROOT / "previews/portraits").mkdir(parents=True, exist_ok=True)
     hashes = {}
     face_pixels = {}
     exact_heads: list[list[str]] = []
@@ -60,6 +61,7 @@ def main() -> None:
         if digest != entry["pixel_sha256"]:
             raise ValueError(f"Manifest hash mismatch: {variant}")
         first = tint_kit(image, "#743D42", "#F2E9D8", material_mask=mask)
+        first.save(ROOT / "previews/portraits" / f"{variant}.webp", quality=90, method=4)
         second = tint_kit(image, "#3152A8", "#E3BF54", material_mask=mask)
         if first.getchannel("A").tobytes() != image.getchannel("A").tobytes():
             raise ValueError(f"Alpha changed: {variant}")
@@ -140,9 +142,11 @@ def main() -> None:
         "exact_duplicate_head_crops": exact_heads,
         "central_face_mask_review": face_mask_overlap,
         "closest_shape_pairs": pairs,
-        "visual_review": "Pending user review; hashes rank shapes and do not certify unique faces",
+        "visual_review": (
+            "Slight likeness accepted by user; shape ranking is not proof of distinct identity"
+        ),
         "age_variants": (
-            "One depiction per identity; complete aging and player-to-staff sets remain future work"
+            "Original depictions preserved; lifecycle-v1 contains illustrated age/career stages"
         ),
     }
     (ROOT / "quality-report.json").write_text(
@@ -155,7 +159,7 @@ def main() -> None:
             entry = entries[variant]
             label = html.escape(variant)
             cards.append(
-                f'<a class="card" href="portraits/{label}.png"><img loading="lazy" '
+                f'<a class="card" href="previews/portraits/{label}.webp"><img loading="lazy" '
                 f'src="thumbnails/{label}.png" width="96" height="96" alt="{label}">'
                 f"<span>{label}</span><small>Внешность ≈ {entry['depicted_age']} лет</small></a>"
             )
@@ -176,9 +180,10 @@ nav{display:flex;gap:24px;flex-wrap:wrap}.grid{display:grid;grid-template-column
 и 80 портретов персонала.
 Это библиотека иллюстраций для проверки, персонажи ещё не назначены в игровой БД.
 Указан изображённый возраст, а не утверждённый возраст стартового состава.
-Полные возрастные и карьерные версии ещё предстоит сделать.
-Нажмите портрет для исходного экспорта 256×256; миниатюры ниже 96×96.</p>
+Возрастные и карьерные версии представлены в отдельной галерее.
+Нажмите портрет для предпросмотра 256×256; миниатюры ниже 96×96.</p>
 <nav><a href="#players">Игроки</a><a href="#staff">Персонал</a>
+<a href="lifecycle-v1/index.html">Возраст и карьера</a>
 <a href="previews/kit-colors.png">Цвета формы</a>
 <a href="previews/closest-pairs.png">24 близкие по форме пары</a>
 <a href="quality-report.json">Отчёт проверки</a></nav>

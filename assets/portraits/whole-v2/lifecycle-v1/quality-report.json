@@ -1,0 +1,272 @@
+{
+  "checked_variants": 1740,
+  "identities": 260,
+  "status": "partial-generation",
+  "alpha_and_pixels_outside_mask_preserved": true,
+  "all_garments_change_color": true,
+  "exact_duplicate_pixels": 0,
+  "no_technical_jersey_fragments_above_hair": true,
+  "no_faint_neighbor_baselines_above_hair": true,
+  "central_face_mask_review": [],
+  "similarity_policy": "Slight likeness between different faces accepted by user",
+  "visual_limits": "Technical checks do not certify same-person visual continuity",
+  "continuity_review": [
+    {
+      "variant": "p0073-staff-early-l1",
+      "identity_id": "dugout-whole-v2/p0073",
+      "own_rank": 3,
+      "own_distance": 61,
+      "closest_identity": "dugout-whole-v2/p0066",
+      "margin": 13
+    },
+    {
+      "variant": "p0183-staff-senior-l1",
+      "identity_id": "dugout-whole-v2/p0183",
+      "own_rank": 2,
+      "own_distance": 59,
+      "closest_identity": "dugout-whole-v2/p0199",
+      "margin": 12
+    },
+    {
+      "variant": "p0141-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0141",
+      "own_rank": 3,
+      "own_distance": 58,
+      "closest_identity": "dugout-whole-v2/p0143",
+      "margin": 10
+    },
+    {
+      "variant": "p0051-staff-senior-l1",
+      "identity_id": "dugout-whole-v2/p0051",
+      "own_rank": 7,
+      "own_distance": 79,
+      "closest_identity": "dugout-whole-v2/p0052",
+      "margin": 9
+    },
+    {
+      "variant": "p0211-staff-early-l1",
+      "identity_id": "dugout-whole-v2/p0211",
+      "own_rank": 5,
+      "own_distance": 63,
+      "closest_identity": "dugout-whole-v2/p0216",
+      "margin": 8
+    },
+    {
+      "variant": "p0141-staff-early-l1",
+      "identity_id": "dugout-whole-v2/p0141",
+      "own_rank": 3,
+      "own_distance": 60,
+      "closest_identity": "dugout-whole-v2/p0145",
+      "margin": 7
+    },
+    {
+      "variant": "p0071-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0071",
+      "own_rank": 5,
+      "own_distance": 59,
+      "closest_identity": "dugout-whole-v2/p0070",
+      "margin": 7
+    },
+    {
+      "variant": "p0151-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0151",
+      "own_rank": 2,
+      "own_distance": 54,
+      "closest_identity": "dugout-whole-v2/p0155",
+      "margin": 7
+    },
+    {
+      "variant": "p0086-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0086",
+      "own_rank": 2,
+      "own_distance": 47,
+      "closest_identity": "dugout-whole-v2/p0095",
+      "margin": 7
+    },
+    {
+      "variant": "p0019-player-youth-l1",
+      "identity_id": "dugout-whole-v2/p0019",
+      "own_rank": 3,
+      "own_distance": 49,
+      "closest_identity": "dugout-whole-v2/p0008",
+      "margin": 6
+    },
+    {
+      "variant": "p0100-player-youth-l1",
+      "identity_id": "dugout-whole-v2/p0100",
+      "own_rank": 3,
+      "own_distance": 48,
+      "closest_identity": "dugout-whole-v2/p0086",
+      "margin": 6
+    },
+    {
+      "variant": "p0068-staff-early-l1",
+      "identity_id": "dugout-whole-v2/p0068",
+      "own_rank": 3,
+      "own_distance": 76,
+      "closest_identity": "dugout-whole-v2/p0078",
+      "margin": 5
+    },
+    {
+      "variant": "p0196-staff-senior-l1",
+      "identity_id": "dugout-whole-v2/p0196",
+      "own_rank": 2,
+      "own_distance": 62,
+      "closest_identity": "dugout-whole-v2/p0193",
+      "margin": 5
+    },
+    {
+      "variant": "p0086-staff-senior-l1",
+      "identity_id": "dugout-whole-v2/p0086",
+      "own_rank": 2,
+      "own_distance": 56,
+      "closest_identity": "dugout-whole-v2/p0095",
+      "margin": 5
+    },
+    {
+      "variant": "p0105-staff-senior-l1",
+      "identity_id": "dugout-whole-v2/p0105",
+      "own_rank": 3,
+      "own_distance": 50,
+      "closest_identity": "dugout-whole-v2/p0102",
+      "margin": 5
+    },
+    {
+      "variant": "p0052-staff-early-l1",
+      "identity_id": "dugout-whole-v2/p0052",
+      "own_rank": 2,
+      "own_distance": 45,
+      "closest_identity": "dugout-whole-v2/p0041",
+      "margin": 5
+    },
+    {
+      "variant": "p0021-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0021",
+      "own_rank": 2,
+      "own_distance": 63,
+      "closest_identity": "dugout-whole-v2/p0029",
+      "margin": 4
+    },
+    {
+      "variant": "p0077-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0077",
+      "own_rank": 3,
+      "own_distance": 54,
+      "closest_identity": "dugout-whole-v2/p0071",
+      "margin": 4
+    },
+    {
+      "variant": "p0021-player-veteran-l1",
+      "identity_id": "dugout-whole-v2/p0021",
+      "own_rank": 2,
+      "own_distance": 47,
+      "closest_identity": "dugout-whole-v2/p0028",
+      "margin": 4
+    },
+    {
+      "variant": "p0141-staff-senior-l1",
+      "identity_id": "dugout-whole-v2/p0141",
+      "own_rank": 2,
+      "own_distance": 52,
+      "closest_identity": "dugout-whole-v2/p0145",
+      "margin": 3
+    },
+    {
+      "variant": "p0155-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0155",
+      "own_rank": 2,
+      "own_distance": 47,
+      "closest_identity": "dugout-whole-v2/p0143",
+      "margin": 3
+    },
+    {
+      "variant": "p0174-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0174",
+      "own_rank": 2,
+      "own_distance": 55,
+      "closest_identity": "dugout-whole-v2/p0170",
+      "margin": 2
+    },
+    {
+      "variant": "p0148-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0148",
+      "own_rank": 3,
+      "own_distance": 52,
+      "closest_identity": "dugout-whole-v2/p0145",
+      "margin": 2
+    },
+    {
+      "variant": "p0077-player-adult-l1",
+      "identity_id": "dugout-whole-v2/p0077",
+      "own_rank": 2,
+      "own_distance": 41,
+      "closest_identity": "dugout-whole-v2/p0071",
+      "margin": 2
+    },
+    {
+      "variant": "p0050-staff-early-l1",
+      "identity_id": "dugout-whole-v2/p0050",
+      "own_rank": 2,
+      "own_distance": 24,
+      "closest_identity": "dugout-whole-v2/p0057",
+      "margin": 2
+    },
+    {
+      "variant": "p0151-staff-senior-l1",
+      "identity_id": "dugout-whole-v2/p0151",
+      "own_rank": 2,
+      "own_distance": 68,
+      "closest_identity": "dugout-whole-v2/p0149",
+      "margin": 1
+    },
+    {
+      "variant": "p0052-player-veteran-l1",
+      "identity_id": "dugout-whole-v2/p0052",
+      "own_rank": 2,
+      "own_distance": 51,
+      "closest_identity": "dugout-whole-v2/p0041",
+      "margin": 1
+    },
+    {
+      "variant": "p0196-staff-middle-l1",
+      "identity_id": "dugout-whole-v2/p0196",
+      "own_rank": 4,
+      "own_distance": 51,
+      "closest_identity": "dugout-whole-v2/p0188",
+      "margin": 1
+    },
+    {
+      "variant": "p0120-staff-senior-l1",
+      "identity_id": "dugout-whole-v2/p0120",
+      "own_rank": 2,
+      "own_distance": 46,
+      "closest_identity": "dugout-whole-v2/p0113",
+      "margin": 1
+    },
+    {
+      "variant": "p0071-player-adult-l1",
+      "identity_id": "dugout-whole-v2/p0071",
+      "own_rank": 2,
+      "own_distance": 45,
+      "closest_identity": "dugout-whole-v2/p0067",
+      "margin": 1
+    },
+    {
+      "variant": "p0070-staff-early-l1",
+      "identity_id": "dugout-whole-v2/p0070",
+      "own_rank": 2,
+      "own_distance": 41,
+      "closest_identity": "dugout-whole-v2/p0071",
+      "margin": 1
+    },
+    {
+      "variant": "p0151-staff-early-l1",
+      "identity_id": "dugout-whole-v2/p0151",
+      "own_rank": 2,
+      "own_distance": 39,
+      "closest_identity": "dugout-whole-v2/p0155",
+      "margin": 1
+    }
+  ],
+  "continuity_ranking_policy": "Coarse shape distance against the 20 original faces in the same atlas; review aid only, not an identity classifier or automatic rejection"
+}

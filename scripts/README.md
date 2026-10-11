@@ -30,3 +30,11 @@ and game assignment remain separate work. Target 50 × 20 players, no repeated i
 review_whole_portraits.py audits all 1,080 exports in two kit colors, ranks nearby face
 shape hashes for human review and builds a static offline HTML gallery (no JavaScript).
 Shape similarity scores are a review aid, not proof that identities are visually distinct.
+
+pack_portrait_lifecycle.py imports identity-preserving whole-person age/career atlases.
+The default requires every planned atlas; --allow-partial is for development only.
+review_portrait_lifecycle.py checks all age exports, generates per-atlas comparison
+pages, clothing/alpha checks and continuity review pairs. Gallery previews use normal
+Dugout colors; technical magenta/cyan remains in renderer inputs. See
+docs/portrait-lifecycle.md. render_whole_portrait.py accepts --age together with --bank
+to select a prepared stage of the same person; missing stages never borrow another face.

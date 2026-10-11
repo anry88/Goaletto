@@ -16,7 +16,7 @@ intended stable identities and depicted ages; it is not durable gameplay state.
 Runtime/exports: 256×256 RGBA portraits + explicit technical-pigment clothing masks;
 96×96 thumbnails, proportional scaling only, actual alpha preserved. Current club
 colors recolor the garment; no image-generation calls happen in local rendering.
-One source depiction per identity is not a full age-variant or staff-career catalog.
+Original source depictions stay pinned. lifecycle-v1 adds age/career stages of the same people; its manifest and import-report record actual coverage. The extension is currently partial (Imagegen daily limit).
 
 ```bash
 python scripts/pack_portrait_atlases.py --require-complete
@@ -29,8 +29,8 @@ checks count, alpha, sprite bounds, material mask and exact pixel duplicates. Th
 checks do not prove that every face is visually distinct; review sheets and near
 duplicate review are required before game assignment. `import-report.json` reports
 actual imported count and missing sources. All 54 sources are present. Pixel-exact
-duplicates are absent; similarity-ranked pairs still need visual review, especially
-recurring hair/head silhouettes. Numerical uniqueness does not certify distinct identity.
+duplicates are absent; slight likeness is accepted by the user. Similarity-ranked
+pairs are an inspection aid, not a demand to redraw close silhouettes. Numerical uniqueness does not certify distinct identity.
 
 Review [all portraits](index.html), [player sample](previews/players-sample.png),
 [staff sample](previews/staff-sample.png), [kit colors](previews/kit-colors.png), and
@@ -46,3 +46,8 @@ On retry, look up existing person assignments first; plan only newly unassigned 
 Retired identities remain reserved permanently. A second league set and academy
 replacements need more portraits: the first 1,000 cover exactly the starting players.
 No real clubs/players, retirement/pools or Telegram file cache are created by this import.
+
+Age/career expansion: [lifecycle-v1](lifecycle-v1/README.md),
+[comparison gallery](lifecycle-v1/index.html). 1,740 additional variants are saved:
+240 players with seven stages, 20 with three. 275 source atlases remain after the
+built-in tool reached its daily quota. See generation-checkpoint.json for resume.

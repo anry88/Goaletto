@@ -92,7 +92,9 @@ CI создаёт изолированный PostgreSQL и проверяет м
 Воспроизведение: `python scripts/pack_portrait_atlases.py --require-complete`,
 затем `python scripts/review_whole_portraits.py`. Отчёты и предпросмотры —
 assets/portraits/whole-v2/. Резервирование identity в PostgreSQL,
-Telegram cache и полный набор возрастных/карьерных вариантов ещё требуют реализации.
+Telegram cache ещё требуют реализации.
+Возрастное расширение добавляет 1 740 вариантов: 240 игроков со всеми семью группами и 20 частично.
+Полный набор пока не завершён из-за лимита Imagegen; [галерея возраста](assets/portraits/whole-v2/lifecycle-v1/index.html), [контракт](docs/portrait-lifecycle.md).
 
 ```bash
 python scripts/check_portrait_feasibility.py

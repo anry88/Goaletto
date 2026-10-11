@@ -45,6 +45,9 @@
   individual new illustrations still need quality review. Preserve aspect ratio and clothing masks.
 - Staff age and retire; retired players may enter qualified staff pools with the same
   person/history/appearance. See docs/staff-lifecycle.md; do not assume unsettled probabilities.
+- Slight likeness between different faces is acceptable per the user's clarification.
+  Never reuse an appearance identity between people. Lifecycle variants preserve the
+  same identity; see docs/portrait-lifecycle.md. Visual bands do not decide retirement.
 - This repository is proprietary; do not change licensing without user instruction.
 - Keep Linear tasks aligned with meaningful completed work. Do not close unimplemented
   gameplay tasks merely because scaffolding exists.
