@@ -1,0 +1,14 @@
+# Use after compose.yaml and compose.hdc.yaml for manually loaded release images.
+services:
+  migrate:
+    image: ${GOALETTO_IMAGE:?Set GOALETTO_IMAGE to the loaded release tag}
+    build: !reset null
+    pull_policy: never
+  bot:
+    image: ${GOALETTO_IMAGE:?Set GOALETTO_IMAGE to the loaded release tag}
+    build: !reset null
+    pull_policy: never
+  worker:
+    image: ${GOALETTO_IMAGE:?Set GOALETTO_IMAGE to the loaded release tag}
+    build: !reset null
+    pull_policy: never

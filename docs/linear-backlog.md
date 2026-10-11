@@ -299,6 +299,8 @@ Crash points: тик до/после commit, rollover, claim, bid/settlement и 
 
 **Дополнение аналитики:** Дополнительный gate: AND-82 подтверждает точные воронки/зрелые когорты и исключение internal/AI до первого внешнего привлечения. Зафиксировать coverage_start; операторские отчёты доступны. Эксперименты AND-81 не блокируют MVP.
 
+**Деплой · уточнение пользователя:** Решение пользователя 2026-10-11: локально управляемый ручной деплой. Основной путь: собрать/проверить образ здесь под архитектуру HDC → docker save → SFTP/SCP → SHA-256/image ID check → docker load на HDC → Compose --no-build. Альтернатива: commit/push здесь → git pull --ff-only выбранного проверенного SHA на HDC → локальный docker build там. Оба пути используют immutable release tag/GOALETTO_IMAGE и deploy/compose.release.yaml для migrate/bot/worker. Credentials только host-only, CI выполняет проверки и не деплоит. Приёмка AND-72: проверены согласованный путь, metadata/smoke/rollback предыдущего image, миграции до запуска worker и отсутствие изменений соседних сервисов. Документация: docs/deployment-hdc.md. Настройка пути не означает выполненный HDC deploy.
+
 ## Аналитика до привлечения игроков · AND-73–AND-82
 
 Распределены по существующим вехам; это план реализации, не завершённый сбор. [Определения и метрики](analytics/measurement-plan.md), [каталог событий](analytics/event-catalog.md).

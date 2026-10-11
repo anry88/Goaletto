@@ -102,4 +102,8 @@ deploy/             настройки существующего HDC
 [Инструкция для HDC](docs/deployment-hdc.md): Linux-контейнеры на существующем Windows
 Docker host, PostgreSQL в закрытой сети и long polling. Развёртывание на сервере ещё не выполнено.
 
+Деплой управляется локально: основной путь — сборка образа здесь и перенос на HDC;
+альтернатива — commit/push здесь, pull и сборка на HDC. GitHub Actions выполняет проверки.
+Для готового image используется deploy/compose.release.yaml поверх HDC override.
+
 Copyright © 2026 anry88. Все права защищены. См. [LICENSE](LICENSE).
