@@ -1,0 +1,131 @@
+{
+  "checked_variants": 1080,
+  "all_garments_change_color": true,
+  "alpha_and_pixels_outside_mask_preserved": true,
+  "exact_duplicate_head_crops": [],
+  "central_face_mask_review": [],
+  "closest_shape_pairs": [
+    {
+      "distance": 20,
+      "left": "p0429-player18",
+      "right": "p0448-player26"
+    },
+    {
+      "distance": 20,
+      "left": "p0395-player30",
+      "right": "p0997-player32"
+    },
+    {
+      "distance": 21,
+      "left": "p0448-player26",
+      "right": "s0057-staff44"
+    },
+    {
+      "distance": 21,
+      "left": "p0193-player34",
+      "right": "p0776-player28"
+    },
+    {
+      "distance": 21,
+      "left": "p0188-player20",
+      "right": "p0357-player35"
+    },
+    {
+      "distance": 22,
+      "left": "p0835-player24",
+      "right": "p0854-player32"
+    },
+    {
+      "distance": 22,
+      "left": "p0714-player32",
+      "right": "p0864-player19"
+    },
+    {
+      "distance": 22,
+      "left": "p0088-player29",
+      "right": "p0854-player32"
+    },
+    {
+      "distance": 22,
+      "left": "p0072-player21",
+      "right": "p0578-player18"
+    },
+    {
+      "distance": 22,
+      "left": "p0057-player20",
+      "right": "p0302-player26"
+    },
+    {
+      "distance": 23,
+      "left": "p0438-player18",
+      "right": "p0569-player18"
+    },
+    {
+      "distance": 23,
+      "left": "p0429-player18",
+      "right": "s0057-staff44"
+    },
+    {
+      "distance": 23,
+      "left": "p0050-player34",
+      "right": "p0119-player37"
+    },
+    {
+      "distance": 24,
+      "left": "p0647-player22",
+      "right": "s0061-staff42"
+    },
+    {
+      "distance": 24,
+      "left": "p0233-player22",
+      "right": "s0035-staff40"
+    },
+    {
+      "distance": 24,
+      "left": "p0126-player24",
+      "right": "p0816-player37"
+    },
+    {
+      "distance": 24,
+      "left": "p0107-player37",
+      "right": "p0647-player22"
+    },
+    {
+      "distance": 24,
+      "left": "p0050-player34",
+      "right": "p0395-player30"
+    },
+    {
+      "distance": 25,
+      "left": "p0941-player37",
+      "right": "p0948-player23"
+    },
+    {
+      "distance": 25,
+      "left": "p0619-player34",
+      "right": "p0895-player27"
+    },
+    {
+      "distance": 25,
+      "left": "p0576-player25",
+      "right": "p0812-player30"
+    },
+    {
+      "distance": 25,
+      "left": "p0411-player38",
+      "right": "p0418-player24"
+    },
+    {
+      "distance": 25,
+      "left": "p0173-player19",
+      "right": "p0951-player23"
+    },
+    {
+      "distance": 25,
+      "left": "p0093-player22",
+      "right": "p0576-player25"
+    }
+  ],
+  "visual_review": "Pending user review; hashes rank shapes and do not certify unique faces",
+  "age_variants": "One depiction per identity; complete aging and player-to-staff sets remain future work"
+}

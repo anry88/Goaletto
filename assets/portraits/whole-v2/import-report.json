@@ -1,0 +1,9 @@
+{
+  "players": 1000,
+  "staff": 80,
+  "missing_atlases": [],
+  "exact_duplicate_pixels": 0,
+  "total_png_bytes": 94280138,
+  "mean_png_bytes": 87296,
+  "limits": "Pixel uniqueness is not proof of visual distinction; review sheets required"
+}

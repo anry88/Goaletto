@@ -18,3 +18,15 @@ check_portrait_combinations.py extends the proportional B experiment to nine rea
 part combinations, with exact recipes, cumulative layer breakdown and96px contact
 sheet. It uses existing atlases without network calls or new whole-face generation.
 Review output: assets/portraits/combinations-v01/. Not a production renderer replacement.
+
+Whole portraits are the chosen approach. pack_whole_portraits.py reproduces the v1
+24/12 individual-image experiment (too much identity similarity from one face reference).
+pack_portrait_atlases.py imports complete-person v2 atlases, checks alpha/count/exact
+duplicates, makes256px portraits/masks,96px thumbnails and contact sheets.
+render_whole_portrait.py renders a pinned variant locally; no image-generation calls.
+plan_identity_allocation is a capacity-guarded preview planner; PG uniqueness/locks
+and game assignment remain separate work. Target 50 × 20 players, no repeated identities.
+
+review_whole_portraits.py audits all 1,080 exports in two kit colors, ranks nearby face
+shape hashes for human review and builds a static offline HTML gallery (no JavaScript).
+Shape similarity scores are a review aid, not proof that identities are visually distinct.

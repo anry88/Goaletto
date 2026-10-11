@@ -1,0 +1,642 @@
+{
+  "catalog_version": 1,
+  "status": "first-wave-illustrations-awaiting-review",
+  "sizes": [
+    96,
+    256
+  ],
+  "banks": {
+    "players": [
+      "p01-player24",
+      "p02-player23",
+      "p03-player28",
+      "p04-player20",
+      "p05-player26",
+      "p06-player21",
+      "p07-player31",
+      "p08-player19",
+      "p09-player27",
+      "p10-player22",
+      "p11-player30",
+      "p12-player18",
+      "p13-player25",
+      "p14-player29",
+      "p15-player20",
+      "p16-player33",
+      "p17-player24",
+      "p18-player28",
+      "p19-player21",
+      "p20-player26",
+      "p21-player32",
+      "p22-player23",
+      "p23-player27",
+      "p24-player19"
+    ],
+    "staff": [
+      "s01-staff46",
+      "s02-staff58",
+      "s03-staff39",
+      "s04-staff63",
+      "s05-staff51",
+      "s06-staff44",
+      "s07-staff35",
+      "s08-staff66",
+      "s09-staff54",
+      "s10-staff41",
+      "s11-staff60",
+      "s12-staff48"
+    ]
+  },
+  "variants": {
+    "p01-player24": {
+      "identity_id": "dugout-whole-v1/p01",
+      "bank": "players",
+      "depicted_age": 24,
+      "image": "portraits/p01-player24.png",
+      "garment_mask": "masks/p01-player24.png",
+      "source": "sources/p01.png",
+      "prompt": "prompts/p01.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p02-player23": {
+      "identity_id": "dugout-whole-v1/p02",
+      "bank": "players",
+      "depicted_age": 23,
+      "image": "portraits/p02-player23.png",
+      "garment_mask": "masks/p02-player23.png",
+      "source": "sources/p02.png",
+      "prompt": "prompts/p02.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p03-player28": {
+      "identity_id": "dugout-whole-v1/p03",
+      "bank": "players",
+      "depicted_age": 28,
+      "image": "portraits/p03-player28.png",
+      "garment_mask": "masks/p03-player28.png",
+      "source": "sources/p03.png",
+      "prompt": "prompts/p03.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p04-player20": {
+      "identity_id": "dugout-whole-v1/p04",
+      "bank": "players",
+      "depicted_age": 20,
+      "image": "portraits/p04-player20.png",
+      "garment_mask": "masks/p04-player20.png",
+      "source": "sources/p04.png",
+      "prompt": "prompts/p04.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p05-player26": {
+      "identity_id": "dugout-whole-v1/p05",
+      "bank": "players",
+      "depicted_age": 26,
+      "image": "portraits/p05-player26.png",
+      "garment_mask": "masks/p05-player26.png",
+      "source": "sources/p05.png",
+      "prompt": "prompts/p05.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p06-player21": {
+      "identity_id": "dugout-whole-v1/p06",
+      "bank": "players",
+      "depicted_age": 21,
+      "image": "portraits/p06-player21.png",
+      "garment_mask": "masks/p06-player21.png",
+      "source": "sources/p06.png",
+      "prompt": "prompts/p06.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p07-player31": {
+      "identity_id": "dugout-whole-v1/p07",
+      "bank": "players",
+      "depicted_age": 31,
+      "image": "portraits/p07-player31.png",
+      "garment_mask": "masks/p07-player31.png",
+      "source": "sources/p07.png",
+      "prompt": "prompts/p07.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p08-player19": {
+      "identity_id": "dugout-whole-v1/p08",
+      "bank": "players",
+      "depicted_age": 19,
+      "image": "portraits/p08-player19.png",
+      "garment_mask": "masks/p08-player19.png",
+      "source": "sources/p08.png",
+      "prompt": "prompts/p08.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p09-player27": {
+      "identity_id": "dugout-whole-v1/p09",
+      "bank": "players",
+      "depicted_age": 27,
+      "image": "portraits/p09-player27.png",
+      "garment_mask": "masks/p09-player27.png",
+      "source": "sources/p09.png",
+      "prompt": "prompts/p09.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p10-player22": {
+      "identity_id": "dugout-whole-v1/p10",
+      "bank": "players",
+      "depicted_age": 22,
+      "image": "portraits/p10-player22.png",
+      "garment_mask": "masks/p10-player22.png",
+      "source": "sources/p10.png",
+      "prompt": "prompts/p10.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p11-player30": {
+      "identity_id": "dugout-whole-v1/p11",
+      "bank": "players",
+      "depicted_age": 30,
+      "image": "portraits/p11-player30.png",
+      "garment_mask": "masks/p11-player30.png",
+      "source": "sources/p11.png",
+      "prompt": "prompts/p11.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p12-player18": {
+      "identity_id": "dugout-whole-v1/p12",
+      "bank": "players",
+      "depicted_age": 18,
+      "image": "portraits/p12-player18.png",
+      "garment_mask": "masks/p12-player18.png",
+      "source": "sources/p12.png",
+      "prompt": "prompts/p12.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p13-player25": {
+      "identity_id": "dugout-whole-v1/p13",
+      "bank": "players",
+      "depicted_age": 25,
+      "image": "portraits/p13-player25.png",
+      "garment_mask": "masks/p13-player25.png",
+      "source": "sources/p13.png",
+      "prompt": "prompts/p13.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p14-player29": {
+      "identity_id": "dugout-whole-v1/p14",
+      "bank": "players",
+      "depicted_age": 29,
+      "image": "portraits/p14-player29.png",
+      "garment_mask": "masks/p14-player29.png",
+      "source": "sources/p14.png",
+      "prompt": "prompts/p14.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p15-player20": {
+      "identity_id": "dugout-whole-v1/p15",
+      "bank": "players",
+      "depicted_age": 20,
+      "image": "portraits/p15-player20.png",
+      "garment_mask": "masks/p15-player20.png",
+      "source": "sources/p15.png",
+      "prompt": "prompts/p15.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p16-player33": {
+      "identity_id": "dugout-whole-v1/p16",
+      "bank": "players",
+      "depicted_age": 33,
+      "image": "portraits/p16-player33.png",
+      "garment_mask": "masks/p16-player33.png",
+      "source": "sources/p16.png",
+      "prompt": "prompts/p16.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p17-player24": {
+      "identity_id": "dugout-whole-v1/p17",
+      "bank": "players",
+      "depicted_age": 24,
+      "image": "portraits/p17-player24.png",
+      "garment_mask": "masks/p17-player24.png",
+      "source": "sources/p17.png",
+      "prompt": "prompts/p17.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p18-player28": {
+      "identity_id": "dugout-whole-v1/p18",
+      "bank": "players",
+      "depicted_age": 28,
+      "image": "portraits/p18-player28.png",
+      "garment_mask": "masks/p18-player28.png",
+      "source": "sources/p18.png",
+      "prompt": "prompts/p18.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p19-player21": {
+      "identity_id": "dugout-whole-v1/p19",
+      "bank": "players",
+      "depicted_age": 21,
+      "image": "portraits/p19-player21.png",
+      "garment_mask": "masks/p19-player21.png",
+      "source": "sources/p19.png",
+      "prompt": "prompts/p19.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p20-player26": {
+      "identity_id": "dugout-whole-v1/p20",
+      "bank": "players",
+      "depicted_age": 26,
+      "image": "portraits/p20-player26.png",
+      "garment_mask": "masks/p20-player26.png",
+      "source": "sources/p20.png",
+      "prompt": "prompts/p20.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p21-player32": {
+      "identity_id": "dugout-whole-v1/p21",
+      "bank": "players",
+      "depicted_age": 32,
+      "image": "portraits/p21-player32.png",
+      "garment_mask": "masks/p21-player32.png",
+      "source": "sources/p21.png",
+      "prompt": "prompts/p21.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p22-player23": {
+      "identity_id": "dugout-whole-v1/p22",
+      "bank": "players",
+      "depicted_age": 23,
+      "image": "portraits/p22-player23.png",
+      "garment_mask": "masks/p22-player23.png",
+      "source": "sources/p22.png",
+      "prompt": "prompts/p22.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p23-player27": {
+      "identity_id": "dugout-whole-v1/p23",
+      "bank": "players",
+      "depicted_age": 27,
+      "image": "portraits/p23-player27.png",
+      "garment_mask": "masks/p23-player27.png",
+      "source": "sources/p23.png",
+      "prompt": "prompts/p23.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p24-player19": {
+      "identity_id": "dugout-whole-v1/p24",
+      "bank": "players",
+      "depicted_age": 19,
+      "image": "portraits/p24-player19.png",
+      "garment_mask": "masks/p24-player19.png",
+      "source": "sources/p24.png",
+      "prompt": "prompts/p24.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s01-staff46": {
+      "identity_id": "dugout-whole-v1/s01",
+      "bank": "staff",
+      "depicted_age": 46,
+      "image": "portraits/s01-staff46.png",
+      "garment_mask": "masks/s01-staff46.png",
+      "source": "sources/s01.png",
+      "prompt": "prompts/s01.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s02-staff58": {
+      "identity_id": "dugout-whole-v1/s02",
+      "bank": "staff",
+      "depicted_age": 58,
+      "image": "portraits/s02-staff58.png",
+      "garment_mask": "masks/s02-staff58.png",
+      "source": "sources/s02.png",
+      "prompt": "prompts/s02.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s03-staff39": {
+      "identity_id": "dugout-whole-v1/s03",
+      "bank": "staff",
+      "depicted_age": 39,
+      "image": "portraits/s03-staff39.png",
+      "garment_mask": "masks/s03-staff39.png",
+      "source": "sources/s03.png",
+      "prompt": "prompts/s03.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s04-staff63": {
+      "identity_id": "dugout-whole-v1/s04",
+      "bank": "staff",
+      "depicted_age": 63,
+      "image": "portraits/s04-staff63.png",
+      "garment_mask": "masks/s04-staff63.png",
+      "source": "sources/s04.png",
+      "prompt": "prompts/s04.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s05-staff51": {
+      "identity_id": "dugout-whole-v1/s05",
+      "bank": "staff",
+      "depicted_age": 51,
+      "image": "portraits/s05-staff51.png",
+      "garment_mask": "masks/s05-staff51.png",
+      "source": "sources/s05.png",
+      "prompt": "prompts/s05.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s06-staff44": {
+      "identity_id": "dugout-whole-v1/s06",
+      "bank": "staff",
+      "depicted_age": 44,
+      "image": "portraits/s06-staff44.png",
+      "garment_mask": "masks/s06-staff44.png",
+      "source": "sources/s06.png",
+      "prompt": "prompts/s06.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s07-staff35": {
+      "identity_id": "dugout-whole-v1/s07",
+      "bank": "staff",
+      "depicted_age": 35,
+      "image": "portraits/s07-staff35.png",
+      "garment_mask": "masks/s07-staff35.png",
+      "source": "sources/s07.png",
+      "prompt": "prompts/s07.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s08-staff66": {
+      "identity_id": "dugout-whole-v1/s08",
+      "bank": "staff",
+      "depicted_age": 66,
+      "image": "portraits/s08-staff66.png",
+      "garment_mask": "masks/s08-staff66.png",
+      "source": "sources/s08.png",
+      "prompt": "prompts/s08.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s09-staff54": {
+      "identity_id": "dugout-whole-v1/s09",
+      "bank": "staff",
+      "depicted_age": 54,
+      "image": "portraits/s09-staff54.png",
+      "garment_mask": "masks/s09-staff54.png",
+      "source": "sources/s09.png",
+      "prompt": "prompts/s09.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s10-staff41": {
+      "identity_id": "dugout-whole-v1/s10",
+      "bank": "staff",
+      "depicted_age": 41,
+      "image": "portraits/s10-staff41.png",
+      "garment_mask": "masks/s10-staff41.png",
+      "source": "sources/s10.png",
+      "prompt": "prompts/s10.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s11-staff60": {
+      "identity_id": "dugout-whole-v1/s11",
+      "bank": "staff",
+      "depicted_age": 60,
+      "image": "portraits/s11-staff60.png",
+      "garment_mask": "masks/s11-staff60.png",
+      "source": "sources/s11.png",
+      "prompt": "prompts/s11.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "s12-staff48": {
+      "identity_id": "dugout-whole-v1/s12",
+      "bank": "staff",
+      "depicted_age": 48,
+      "image": "portraits/s12-staff48.png",
+      "garment_mask": "masks/s12-staff48.png",
+      "source": "sources/s12.png",
+      "prompt": "prompts/s12.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    },
+    "p01-staff42": {
+      "identity_id": "dugout-whole-v1/p01",
+      "bank": "staff",
+      "depicted_age": 42,
+      "image": "portraits/p01-staff42.png",
+      "garment_mask": "masks/p01-staff42.png",
+      "source": "sources/p01-staff42.png",
+      "prompt": "prompts/p01-staff42.txt",
+      "review_status": "awaiting-user-review",
+      "age_policy": "single illustrated age, no automatic age-stage completeness"
+    }
+  },
+  "identities": {
+    "dugout-whole-v1/p01": {
+      "variants": [
+        "p01-player24",
+        "p01-staff42"
+      ]
+    },
+    "dugout-whole-v1/p02": {
+      "variants": [
+        "p02-player23"
+      ]
+    },
+    "dugout-whole-v1/p03": {
+      "variants": [
+        "p03-player28"
+      ]
+    },
+    "dugout-whole-v1/p04": {
+      "variants": [
+        "p04-player20"
+      ]
+    },
+    "dugout-whole-v1/p05": {
+      "variants": [
+        "p05-player26"
+      ]
+    },
+    "dugout-whole-v1/p06": {
+      "variants": [
+        "p06-player21"
+      ]
+    },
+    "dugout-whole-v1/p07": {
+      "variants": [
+        "p07-player31"
+      ]
+    },
+    "dugout-whole-v1/p08": {
+      "variants": [
+        "p08-player19"
+      ]
+    },
+    "dugout-whole-v1/p09": {
+      "variants": [
+        "p09-player27"
+      ]
+    },
+    "dugout-whole-v1/p10": {
+      "variants": [
+        "p10-player22"
+      ]
+    },
+    "dugout-whole-v1/p11": {
+      "variants": [
+        "p11-player30"
+      ]
+    },
+    "dugout-whole-v1/p12": {
+      "variants": [
+        "p12-player18"
+      ]
+    },
+    "dugout-whole-v1/p13": {
+      "variants": [
+        "p13-player25"
+      ]
+    },
+    "dugout-whole-v1/p14": {
+      "variants": [
+        "p14-player29"
+      ]
+    },
+    "dugout-whole-v1/p15": {
+      "variants": [
+        "p15-player20"
+      ]
+    },
+    "dugout-whole-v1/p16": {
+      "variants": [
+        "p16-player33"
+      ]
+    },
+    "dugout-whole-v1/p17": {
+      "variants": [
+        "p17-player24"
+      ]
+    },
+    "dugout-whole-v1/p18": {
+      "variants": [
+        "p18-player28"
+      ]
+    },
+    "dugout-whole-v1/p19": {
+      "variants": [
+        "p19-player21"
+      ]
+    },
+    "dugout-whole-v1/p20": {
+      "variants": [
+        "p20-player26"
+      ]
+    },
+    "dugout-whole-v1/p21": {
+      "variants": [
+        "p21-player32"
+      ]
+    },
+    "dugout-whole-v1/p22": {
+      "variants": [
+        "p22-player23"
+      ]
+    },
+    "dugout-whole-v1/p23": {
+      "variants": [
+        "p23-player27"
+      ]
+    },
+    "dugout-whole-v1/p24": {
+      "variants": [
+        "p24-player19"
+      ]
+    },
+    "dugout-whole-v1/s01": {
+      "variants": [
+        "s01-staff46"
+      ]
+    },
+    "dugout-whole-v1/s02": {
+      "variants": [
+        "s02-staff58"
+      ]
+    },
+    "dugout-whole-v1/s03": {
+      "variants": [
+        "s03-staff39"
+      ]
+    },
+    "dugout-whole-v1/s04": {
+      "variants": [
+        "s04-staff63"
+      ]
+    },
+    "dugout-whole-v1/s05": {
+      "variants": [
+        "s05-staff51"
+      ]
+    },
+    "dugout-whole-v1/s06": {
+      "variants": [
+        "s06-staff44"
+      ]
+    },
+    "dugout-whole-v1/s07": {
+      "variants": [
+        "s07-staff35"
+      ]
+    },
+    "dugout-whole-v1/s08": {
+      "variants": [
+        "s08-staff66"
+      ]
+    },
+    "dugout-whole-v1/s09": {
+      "variants": [
+        "s09-staff54"
+      ]
+    },
+    "dugout-whole-v1/s10": {
+      "variants": [
+        "s10-staff41"
+      ]
+    },
+    "dugout-whole-v1/s11": {
+      "variants": [
+        "s11-staff60"
+      ]
+    },
+    "dugout-whole-v1/s12": {
+      "variants": [
+        "s12-staff48"
+      ]
+    }
+  }
+}

@@ -31,13 +31,20 @@
 - Do not store game state only in aiogram FSM or process memory.
 - Secrets stay in environment variables or host-only secret files. Never print bot
   tokens or credential-bearing database URLs.
-- Art is a small approval pilot. Preserve separate player/staff banks and stable
-  component IDs. Direction C — Dugout was approved on 2026-10-11; retain a small technical pilot
-  and review illustrated component quality before mass production.
+- User chose whole illustrated portraits after the part-combination review on 2026-10-11.
+  Preserve separate male player/staff banks, stable appearance IDs and rejected pilot IDs.
+  Direction C — Dugout stays approved. Export 256px/96px, retain sources separately,
+  recolor only garment material masks, preserve person identity across player/staff careers.
+- First set: 20 players per club, 1,000 unique player appearances for 50 clubs, no reuse
+  across people. A small repeated bank is insufficient. Reserve unique appearance IDs
+  durably; exhausted catalog must not silently repeat. Staff last work season is 60-70,
+  guaranteed last at 70; exact probabilities are not yet approved.
 - The r1 PNG small-part faces were rejected for visual quality on 2026-10-11.
   See docs/portrait-feasibility.md. Preserve them as experiments; do not mass-produce
-  or claim accepted art from rendering tests. Intact portrait masters are a candidate,
-  not yet an approved replacement. Preserve aspect ratio and explicit clothing masks.
+  or claim accepted art from rendering tests. Whole portraits are the chosen approach;
+  individual new illustrations still need quality review. Preserve aspect ratio and clothing masks.
+- Staff age and retire; retired players may enter qualified staff pools with the same
+  person/history/appearance. See docs/staff-lifecycle.md; do not assume unsettled probabilities.
 - This repository is proprietary; do not change licensing without user instruction.
 - Keep Linear tasks aligned with meaningful completed work. Do not close unimplemented
   gameplay tasks merely because scaffolding exists.

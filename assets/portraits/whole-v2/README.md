@@ -1,0 +1,48 @@
+# Whole-person library v2 · generation and quality review
+
+Imported: 1,000 male player portraits, 50 clubs × 20 players, plus 80 staff
+portrait assets. The staff image count is capacity; the actual role/initial hiring
+pool size is not yet an approved gameplay rule. No repeating an appearance between
+different people, even after a person's retirement. A former player's staff/age
+variant belongs to the same identity, not another random staff face.
+
+Each source atlas is a generated asset containing 20 **complete coherent people**
+in a 5×4 grid. Cropping whole portraits does not assemble separate eyes/noses/mouths.
+Each atlas has a separate built-in Imagegen call and saved prompt; no CLI/API fallback.
+Player atlas01 was generated without one face reference, then simplified by an edit.
+It is the style/grid reference for subsequent atlases. `production-plan.json` holds
+intended stable identities and depicted ages; it is not durable gameplay state.
+
+Runtime/exports: 256×256 RGBA portraits + explicit technical-pigment clothing masks;
+96×96 thumbnails, proportional scaling only, actual alpha preserved. Current club
+colors recolor the garment; no image-generation calls happen in local rendering.
+One source depiction per identity is not a full age-variant or staff-career catalog.
+
+```bash
+python scripts/pack_portrait_atlases.py --require-complete
+python scripts/review_whole_portraits.py
+```
+
+Sources/prompts remain here, images in portraits/, masks in masks/, contact sheets
+in previews/. `manifest.json` pins identity/variant/source crop/age/version. Import
+checks count, alpha, sprite bounds, material mask and exact pixel duplicates. Those
+checks do not prove that every face is visually distinct; review sheets and near
+duplicate review are required before game assignment. `import-report.json` reports
+actual imported count and missing sources. All 54 sources are present. Pixel-exact
+duplicates are absent; similarity-ranked pairs still need visual review, especially
+recurring hair/head silhouettes. Numerical uniqueness does not certify distinct identity.
+
+Review [all portraits](index.html), [player sample](previews/players-sample.png),
+[staff sample](previews/staff-sample.png), [kit colors](previews/kit-colors.png), and
+[24 nearest shape pairs](previews/closest-pairs.png). `quality-report.json` checks every
+portrait in two kit colors, preserving alpha and every pixel outside its garment mask.
+The importer trims atlas gutters below the broad shoulder baseline and retains the
+main connected figure; it never changes face proportions. Masks keep only technical
+pigment regions connected to the lower garment, bridging narrow black seams.
+
+`plan_identity_allocation` plans without replacement and refuses an exhausted bank.
+Application still needs PG reservation uniqueness, locks and persistent assignment.
+On retry, look up existing person assignments first; plan only newly unassigned people.
+Retired identities remain reserved permanently. A second league set and academy
+replacements need more portraits: the first 1,000 cover exactly the starting players.
+No real clubs/players, retirement/pools or Telegram file cache are created by this import.
