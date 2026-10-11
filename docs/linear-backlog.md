@@ -2,8 +2,9 @@
 
 [Проект Goaletto](https://linear.app/andrei-brazhnikov/project/goaletto-eb8cb486bc79) · 44 задачи · 5 вех.
 
-Linear — источник актуального статуса; этот реестр — snapshot нарезки, дополненный планом аналитики 2026-10-11.
-Выполненными отмечаются только завершённые foundation-работы, не запланированный gameplay.
+Linear — источник актуального статуса; реестр синхронизирован с уточнениями 2026-10-11.
+Запланированный gameplay не отмечается выполненным. [Бот-клубы и владение](bot-clubs.md),
+[аналитика](analytics/measurement-plan.md), [ручной деплой](deployment-hdc.md).
 
 ## 01 · Основание и оформление
 
@@ -55,45 +56,47 @@ Linear — источник актуального статуса; этот ре
 
 **Зависимости:** AND-43.
 
+### [AND-73 · Зафиксировать контракт событий и метрики воронок Goaletto](https://linear.app/andrei-brazhnikov/issue/AND-73/zafiksirovat-kontrakt-sobytij-i-metriki-voronok-goaletto)
+
+Исходный план уже записан в docs/analytics/measurement-plan.md и event-catalog.md; довести до контракта реализации, не объявлять сбор готовым. Опыт Frontline AND-24/26/27 адаптирован к недельной лиге.
+
+**Приёмка:** Утверждены versioned event schema/allowlist и определения трёх KPI с n/N, UTC-окнами и зрелостью. manager_started создаётся до claim; automation/system/operator исключены из user activity. Чётко различаются Telegram accepted, просмотр по кнопке и неизвестное чтение. D1/D3/D7 не заменяют недельные матчевые возможности. Зафиксированы retention/доступы/удаление, версии, начало покрытия и миграция контракта. Проверены продуктовые примеры, не только список имён.
+
+**Зависимости:** AND-40.
+
 ## 02 · Игровой мир и вход
 
 ### [AND-45 · Разработать доменную схему игроков, сезонов и матчей](https://linear.app/andrei-brazhnikov/issue/AND-45/razrabotat-domennuyu-shemu-igrokov-sezonov-i-matchej)
 
 Расширить начальные 5 таблиц: managers, players, staff, seasons, fixtures/matches/ticks, commands, standings; constraints и индексы.
 
-**Приёмка:** Миграции upgrade/check проходят; Telegram ID bigint, деньги integer; правила уникальности клуба/тика/сезона; schema/ERD и транзакционные границы документированы.
+**Приёмка:** Миграции upgrade/check проходят; Telegram ID bigint, деньги integer; правила уникальности клуба/тика/сезона; schema/ERD и транзакционные границы документированы. Схема аналитики: managers создаются до claim клуба; контракт AND-73 задаёт псевдонимы/идентификаторы и границы application. Принимать миграции совместно с планом docs/analytics/measurement-plan.md. Уточнение пользователя: Данные владения: ownership periods, last_game_action_at и дедлайн +6 календарных месяцев; owner до claim/после release и бывший владелец различаются. Сохранённая базовая XI/скамейка/тактика бот-клуба; никакого ai_level. Правила в docs/bot-clubs.md.
 
 **Зависимости:** AND-39, AND-40, AND-73.
 
-**Дополнение аналитики:** Схема аналитики: managers создаются до claim клуба; контракт AND-73 задаёт псевдонимы/идентификаторы и границы application. Принимать миграции совместно с планом docs/analytics/measurement-plan.md.
+### [AND-46 · Создать первый комплект пяти лиг и 50 бот-клубов с близкими составами](https://linear.app/andrei-brazhnikov/issue/AND-46/sozdat-pervyj-komplekt-pyati-lig-i-50-bot-klubov-s-blizkimi-sostavami)
 
-### [AND-46 · Создать первый комплект пяти лиг и 50 AI-клубов](https://linear.app/andrei-brazhnikov/issue/AND-46/sozdat-pervyj-komplekt-pyati-lig-i-50-ai-klubov)
+Идемпотентный seed: первый league_set, уровни 1–5 по 10 клубов без владельцев. У всех примерно одинаковые базовые составы независимо от tier: общий размер/позиционный шаблон и близкие рейтинги, небольшое seed-воспроизводимое разнообразие. Убрать сильные/слабые стартовые архетипы. Примерные ресурсы по общей стартовой модели; точные числа проверить в балансе.
 
-Идемпотентный seed: league_set, уровни 1–5 по 10 клубов, составы 18–20 футболистов, позиции/возраст/потенциал, бюджеты и архетипы.
-
-**Приёмка:** Первый запуск даёт ровно 5 лиг и 50 клубов; повтор seed не добавляет копии; у каждого клуба корректный состав и вратарь; seed детерминирован для тестов.
+**Приёмка:** Ровно 5 лиг/50 уникальных клубов; repeat seed без копий; у каждого сохранённая XI/схема/скамейка, покрытие позиций и резервный вратарь. Сила сопоставима по измеренному допуску, без tier handicap. Нет нейросетей, тренировок/трансферов/тактической оптимизации бот-клубов. Возраст позволяет обычное старение; начальные составы воспроизводимы. Claim сохраняет текущее состояние, не выдаёт стартовый reset.
 
 **Зависимости:** AND-45.
 
 ### [AND-47 · Реализовать выдачу клубов только лиги 5 и расширение мира](https://linear.app/andrei-brazhnikov/issue/AND-47/realizovat-vydachu-klubov-tolko-ligi-5-i-rasshirenie-mira)
 
-Onboarding показывает только свободные AI-клубы уровня 5 во всех комплектах. При отсутствии мест атомарно создать новый полный комплект 5×10.
+Onboarding показывает только свободные бот-клубы уровня 5 во всех комплектах. При отсутствии мест атомарно создать новый полный комплект 5×10.
 
-**Приёмка:** Один Telegram ID — один клуб; параллельный claim последнего места не делит клуб/не создаёт лишние комплекты; верхние лиги недоступны новичкам; текущие финансы/таблица клуба сохраняются.
+**Приёмка:** Один Telegram ID — один клуб; параллельный claim последнего места не делит клуб/не создаёт лишние комплекты; верхние лиги недоступны новичкам; текущие финансы/таблица клуба сохраняются. Приёмка аналитики: первый игровой /start и источник фиксируются до claim; club_claimed атомарен с владением, retry/race не удваивают событие. Internal/автоматика отделены. Полнота воронки проверяется в AND-76.
 
 **Зависимости:** AND-46, AND-74, AND-75.
-
-**Дополнение аналитики:** Приёмка аналитики: первый игровой /start и источник фиксируются до claim; club_claimed атомарен с владением, retry/race не удваивают событие. Internal/AI отделены. Полнота воронки проверяется в AND-76.
 
 ### [AND-48 · Создать Telegram-навигацию, карточки и пагинацию](https://linear.app/andrei-brazhnikov/issue/AND-48/sozdat-telegram-navigaciyu-kartochki-i-paginaciyu)
 
 Главное меню и подменю; стабильные Назад/Главное меню, списки/карточки игроков, персонала и клубов; оформление C для изображений и текстов.
 
-**Приёмка:** Все действия доступны кнопками/командами без Mini App; быстрый answerCallbackQuery; устаревшие callbacks безопасны; HTML-экранирование имён; показатели доступны текстом.
+**Приёмка:** Все действия доступны кнопками/командами без Mini App; быстрый answerCallbackQuery; устаревшие callbacks безопасны; HTML-экранирование имён; показатели доступны текстом. Приёмка аналитики: явный переход/нажатие отделены от доставки экрана. Ошибки/устаревшие кнопки имеют конечные reason_code, контекстная помощь и успешный recovery отслеживаются без raw callback или текста. Сбор по контракту AND-73; e2e AND-76.
 
 **Зависимости:** AND-39, AND-42, AND-74.
-
-**Дополнение аналитики:** Приёмка аналитики: явный переход/нажатие отделены от доставки экрана. Ошибки/устаревшие кнопки имеют конечные reason_code, контекстная помощь и успешный recovery отслеживаются без raw callback или текста. Сбор по контракту AND-73; e2e AND-76.
 
 ### [AND-49 · Реализовать состав, схему и предматчевую тактику](https://linear.app/andrei-brazhnikov/issue/AND-49/realizovat-sostav-shemu-i-predmatchevuyu-taktiku)
 
@@ -103,13 +106,37 @@ Onboarding показывает только свободные AI-клубы у
 
 **Зависимости:** AND-45, AND-47, AND-48.
 
-### [AND-50 · Реализовать AI-подхват и освобождение неактивных клубов](https://linear.app/andrei-brazhnikov/issue/AND-50/realizovat-ai-podhvat-i-osvobozhdenie-neaktivnyh-klubov)
+### [AND-50 · Сохранять клуб шесть месяцев неактивности, напоминать и освобождать](https://linear.app/andrei-brazhnikov/issue/AND-50/sohranyat-klub-shest-mesyacev-neaktivnosti-napominat-i-osvobozhdat)
 
-AI-помощь после 2 недель неактивности; освобождение после 4; сроки и предупреждения из GDD.
+Решение пользователя 2026-10-11: владение сохраняется шесть календарных месяцев от последнего явного игрового действия владельца; claim — начальная дата. Новое действие переносит дедлайн. Автоматические матчи, доставка и jobs не продлевают владение. Периодические уведомления «Ваш клуб ждёт вас». После истечения клуб полностью бот и доступен новичку только в лиге 5. Сроки подхвата 2 недели/освобождения 4 недели отменены.
 
-**Приёмка:** Повтор job не освобождает активного владельца; клуб сохраняет историю; освобождённый клуб лиг 1–4 не выдаётся новичку; сообщения через outbox.
+**Приёмка:** Durable ownership period/last_game_action_at/deadline; шесть календарных месяцев, не 180 дней, конец месяца ограничивается допустимой датой. Return vs release атомарно перепроверяет owner/deadline и не отбирает активный клуб; retry не повторяет release. Состав/финансы/история сохраняются. Upper-tier released club не выдаётся новичкам; tier5 claim по обычным правилам. Reminders via outbox с dedupe period+interval, ограниченной настраиваемой частотой, opt-out/unavailable и проверкой актуальности перед отправкой; доставка не считается действием. Старые callbacks бывшего владельца запрещены. Сборка docs/bot-clubs.md проверена календарными и race-сценариями.
 
-**Зависимости:** AND-47.
+**Зависимости:** AND-47, AND-68.
+
+### [AND-74 · Сохранять события менеджеров в PostgreSQL без дублей и внутренних аккаунтов](https://linear.app/andrei-brazhnikov/issue/AND-74/sohranyat-sobytiya-menedzherov-v-postgresql-bez-dublej-i-vnutrennih)
+
+События живут в application/infrastructure, domain чистый. Основа должна появиться до игрового /start; нынешний preview не становится исторической когортой.
+
+**Приёмка:** Миграции analytics_managers/journey_events; псевдоним до получения клуба, отдельная restricted связь с Telegram ID. Успешные события и accepted commands коммитятся атомарно; rollback не оставляет успех. Update/effect и worker/business dedupe переживают restart. Явный реестр internal/test/operator, действия бот-клубов исключены из default aggregates. Нет raw callback/токенов/чатов; сессии только по allowlist user-действий; сроки хранения/доступы проверены. Внешний экспорт не блокирует игру.
+
+**Зависимости:** AND-73, AND-45.
+
+### [AND-75 · Добавить ссылки кампаний и атрибуцию привлечения через Telegram /start](https://linear.app/andrei-brazhnikov/issue/AND-75/dobavit-ssylki-kampanij-i-atribuciyu-privlecheniya-cherez-telegram)
+
+Python-only bot, без публичного redirect, frontend и нового web API. Ограничение: наблюдаем принятый /start, а не чтение или клик до него.
+
+**Приёмка:** Реестр opaque start-кодов <=64 допустимых символов, source/placement/date и ссылки t.me/GoalettoBot. direct/unknown/known разделены. First-touch сохраняется до claim и неизменяем; повторный /start — касание, не новый manager. Отчёт source→claim→готовность; internal исключён. Тесты валидных/неизвестных/повторных кодов. CTR/CAC не выдумываются без данных показов/кликов/расходов.
+
+**Зависимости:** AND-74.
+
+### [AND-76 · Инструментировать вход, состав и восстановление после непонятных действий](https://linear.app/andrei-brazhnikov/issue/AND-76/instrumentirovat-vhod-sostav-i-vosstanovlenie-posle-neponyatnyh)
+
+Связать аналитику с реализацией AND-47/48/49; существующие задачи создают UI и gameplay, эта задача проверяет полноту e2e событий и диагностический контекст.
+
+**Приёмка:** События start/offer delivery/claim/lineup open/save и optional previews связаны с маршрутом и версией. Автосостав не считается ручной готовностью. Категории stale/invalid/claim race/lineup invalid и доставка помощи; recovery — успешное целевое user-действие за 30 минут. Retry/rollback не удваивают ступени. Обходные пути учитываются отдельно; отчёт не объявляет причину путаницы по кнопке Назад.
+
+**Зависимости:** AND-74, AND-47, AND-48, AND-49, AND-75.
 
 ## 03 · Live-матчи и сезоны
 
@@ -125,11 +152,9 @@ AI-помощь после 2 недель неактивности; освобо
 
 30 тиков по 60 секунд/3 игровых минуты, 180-секундный перерыв после тика 15; абсолютные сроки, отдельное событие старта второго тайма.
 
-**Приёмка:** Тик 15 в 15:00, старт тайма 2 в 18:00, тик 16 в 19:00, тик 30/90′ в 33:00; повтор tick не меняет счёт дважды; state/events/jobs/outbox commit атомарен.
+**Приёмка:** Тик 15 в 15:00, старт тайма 2 в 18:00, тик 16 в 19:00, тик 30/90′ в 33:00; повтор tick не меняет счёт дважды; state/events/jobs/outbox commit атомарен. Приёмка аналитики: ticks/fixture lifecycle — system, не user activity. События lifecycle пишутся атомарно и dedupe по fixture/stage/version. Принятие/применение команд и технические попытки коррелируются; перенос/пауза сохраняют actual times для AND-77.
 
 **Зависимости:** AND-51, AND-74.
-
-**Дополнение аналитики:** Приёмка аналитики: ticks/fixture lifecycle — system, не user activity. События lifecycle пишутся атомарно и dedupe по fixture/stage/version. Принятие/применение команд и технические попытки коррелируются; перенос/пауза сохраняют actual times для AND-77.
 
 ### [AND-53 · Добавить live-замены, тактику и инструкции между тиками](https://linear.app/andrei-brazhnikov/issue/AND-53/dobavit-live-zameny-taktiku-i-instrukcii-mezhdu-tikami)
 
@@ -139,11 +164,11 @@ AI-помощь после 2 недель неактивности; освобо
 
 **Зависимости:** AND-52, AND-49.
 
-### [AND-54 · Разработать AI-менеджеров разных уровней](https://linear.app/andrei-brazhnikov/issue/AND-54/razrabotat-ai-menedzherov-raznyh-urovnej)
+### [AND-54 · Реализовать фиксированные составы бот-клубов и пополнение после пенсии](https://linear.app/andrei-brazhnikov/issue/AND-54/realizovat-fiksirovannye-sostavy-bot-klubov-i-popolnenie-posle-pensii)
 
-Состав, тренировки и live-решения simple/medium/smart; учитывать позиции, усталость, травмы, текущий счёт; не использовать LLM в обязательном runtime.
+Простая автоматика клубов без владельцев: играют общей симуляцией сохранённой XI/скамейкой/схемой/тактикой. Никаких LLM, уровней simple/medium/smart, тренировок, трансферов, подбора тактики, ротации по счёту/усталости. Автоматически заменить только травмированного здоровым резервом по стабильному правилу. В межсезонье ушедшего на пенсию пополнить из молодёжки; полный продукт академии AND-62 для базового пополнения не требуется.
 
-**Приёмка:** Каждый AI-клуб может пройти сезон без человека; правила/лимиты такие же, как для людей; claim отключает AI-управление; deterministic seed tests.
+**Приёмка:** Бот-клуб играет полный сезон общей симуляцией, его базовая XI не меняется от OVR/формы/счёта. Замены только травмированных, общие лимиты и запрет замены удалённого. Приёмка фиксирует поведение без резерва/с дисквалификацией по общим правилам допуска; не вводить иммунитет ботов. Retirement/replacement по season+player идемпотентен, позиция/размер состава сохраняются; травма не генерирует молодого игрока. Claim переводит управление человеку; отсутствие человека не запускает скрытые тренировки/тактику. Pure seeded rules, no network; replay/rerun tests.
 
 **Зависимости:** AND-46, AND-51.
 
@@ -171,13 +196,29 @@ AI-помощь после 2 недель неактивности; освобо
 
 **Зависимости:** AND-56.
 
+### [AND-77 · Измерять участие в матчах отдельно от симуляции и задержек доставки](https://linear.app/andrei-brazhnikov/issue/AND-77/izmeryat-uchastie-v-matchah-otdelno-ot-simulyacii-i-zaderzhek-dostavki)
+
+30 тиков + 3 минуты перерыва, недельное расписание: 24 часа без второго матча не означают отвал. Без предположений о присутствии онлайн по пассивному табло.
+
+**Приёмка:** Явные match/report open, accepted/applied command, fixture finished и result delivery имеют корреляцию/дедуп. Eligible opportunity определяется владением до lineup lock; перенос/пауза по actual times, смена владельца отдельно. автоматика/ticks/delivery не дают user retention. Технические попытки accepted→commit→queued→render→Telegram accepted/failed/unknown измеряются отдельно, p50/p95 и очередь не включают календарное ожидание. Restart/uncertain send сохраняют правдивый статус.
+
+**Зависимости:** AND-74, AND-52, AND-53, AND-55, AND-56, AND-66, AND-68.
+
+### [AND-78 · Собирать добровольные причины остановки и отзывы внутри Telegram](https://linear.app/andrei-brazhnikov/issue/AND-78/sobirat-dobrovolnye-prichiny-ostanovki-i-otzyvy-vnutri-telegram)
+
+Основа Frontline AND-27. Сначала реализовать и проверить на synthetic/internal, не отправлять сейчас сообщения реальным людям; основной игровой CTA сохраняет приоритет.
+
+**Приёмка:** Вторичная кнопка после первого результата; помощь для незавершённого входа через 24 ч и один опрос после пропущенной зрелой матчевой возможности. Ожидание календаря не триггер. Кампания/менеджер уникальны; skip/opt-out terminal, cooldown >=7 дней, недоступность/unknown delivery безопасны. Конечные причины и optional comment <=500 символов в явном 30-мин окне, команды не перехватываются. Restricted текст, retention cleanup, без логов/labels. Доля ответов/skip показана; причины не приписываются молча ушедшим.
+
+**Зависимости:** AND-76, AND-77.
+
 ## 04 · Развитие клуба
 
 ### [AND-58 · Добавить недельные тренировки и возрастной прогресс](https://linear.app/andrei-brazhnikov/issue/AND-58/dobavit-nedelnye-trenirovki-i-vozrastnoj-progress)
 
 Фокусы навыков, форма/выносливость, возрастные коэффициенты, потолок потенциала и тренерские бонусы по GDD.
 
-**Приёмка:** Один расчёт на клуб/неделю; навык/возраст ограничены валидными диапазонами; UI показывает результат; повтор job не тренирует дважды.
+**Приёмка:** Один расчёт на клуб/неделю; навык/возраст ограничены валидными диапазонами; UI показывает результат; повтор job не тренирует дважды. Уточнение пользователя: Клубы без владельцев не тренируются. Не создавать автоматический тренировочный фокус за отсутствующего человека. Очередь тренировки повторно проверяет актуального владельца при применении, включая release race.
 
 **Зависимости:** AND-45, AND-47.
 
@@ -209,7 +250,7 @@ AI-помощь после 2 недель неактивности; освобо
 
 Уровни академии, расходы, выпуск 17-летних, скрытый потенциал, сроки и лимиты состава.
 
-**Приёмка:** Выпуск не дублируется; корректные позиции/возраст; нельзя превысить 25 игроков; затраты попадают в ledger; объяснимый экран академии.
+**Приёмка:** Выпуск не дублируется; корректные позиции/возраст; нельзя превысить 25 игроков; затраты попадают в ledger; объяснимый экран академии. Уточнение пользователя: Базовая молодёжная замена ушедшего на пенсию бот-футболиста реализуется в AND-54 без ожидания полной пользовательской академии. Здесь расширяется пользовательская академия; не создавать второй выпуск по одному retirement.
 
 **Зависимости:** AND-58, AND-59.
 
@@ -225,7 +266,7 @@ AI-помощь после 2 недель неактивности; освобо
 
 Сезонные/недельные расчёты по возрасту, опыту и морали; документировать связь реального времени и игрового возраста.
 
-**Приёмка:** Диапазоны и скорости согласованы; повтор расчёта безопасен; изменения влияют на sim; сезонная симуляция не даёт мгновенных пенсионеров/навыков 20.
+**Приёмка:** Диапазоны и скорости согласованы; повтор расчёта безопасен; изменения влияют на sim; сезонная симуляция не даёт мгновенных пенсионеров/навыков 20. Уточнение пользователя: Пенсия и пополнение бот-клубов выполняются в межсезонье, без внезапного retirement/replacement посреди live-матча. Согласовать общие возрастные параметры с AND-54; без повторного replacement и тренировок клубов без владельца.
 
 **Зависимости:** AND-58, AND-51.
 
@@ -259,17 +300,15 @@ AI-помощь после 2 недель неактивности; освобо
 
 Outbox dispatcher с lease/retry_after, приоритетами и стабильным message_id; не держать DB transaction во время Telegram call.
 
-**Приёмка:** Telegram rate limits не останавливают sim; рестарт возвращает взятые lease; отправки отслеживаются; задокументирован риск дубля send после crash; edit повторобезопасен.
+**Приёмка:** Telegram rate limits не останавливают sim; рестарт возвращает взятые lease; отправки отслеживаются; задокументирован риск дубля send после crash; edit повторобезопасен. Приёмка аналитики: delivery означает Telegram accepted, не read. Попытки и outcome_unknown после crash отделены от логического события, без продления user session. Время queue/render/delivery измеряется отдельно от календаря; детали в AND-77.
 
 **Зависимости:** AND-52.
-
-**Дополнение аналитики:** Приёмка аналитики: delivery означает Telegram accepted, не read. Попытки и outcome_unknown после crash отделены от логического события, без продления user session. Время queue/render/delivery измеряется отдельно от календаря; детали в AND-77.
 
 ### [AND-69 · Проверить восстановление после сбоев HDC и БД](https://linear.app/andrei-brazhnikov/issue/AND-69/proverit-vosstanovlenie-posle-sboev-hdc-i-bd)
 
 Crash points: тик до/после commit, rollover, claim, bid/settlement и отправка outbox; пауза live-матча вместо залпового catch-up.
 
-**Приёмка:** Голы/деньги/клубы не дублируются; менеджерам сохраняется окно решений после простоя; degraded mode и recovery runbook; периодический reconciliation jobs.
+**Приёмка:** Голы/деньги/клубы не дублируются; менеджерам сохраняется окно решений после простоя; degraded mode и recovery runbook; периодический reconciliation jobs. Уточнение пользователя: Recovery включает last_game_action_at/ownership deadline, повтор освобождения и устаревшие reminders; нельзя отобрать вернувшийся активный клуб или отправить сообщение старому владельцу после нового claim.
 
 **Зависимости:** AND-52, AND-57, AND-60.
 
@@ -285,7 +324,7 @@ Crash points: тик до/после commit, rollover, claim, bid/settlement и 
 
 Несколько комплектов, одновременные матчи/регистрации/ставки; сезонные sim-прогоны; целевые показатели определить по измеренным ресурсам HDC.
 
-**Приёмка:** Проверены race cases и аварии; измерены p95 tick lateness/callback latency; сезон сохраняет 10 клубов в лиге; документированы bottlenecks и лимиты для запуска.
+**Приёмка:** Проверены race cases и аварии; измерены p95 tick lateness/callback latency; сезон сохраняет 10 клубов в лиге; документированы bottlenecks и лимиты для запуска. Уточнение пользователя: Дополнительные сценарии: бот-клубы играют фиксированной XI без тренировок/тактической ротации; близкие начальные составы; injury-only substitutions; retirement+young replacement в межсезонье; шесть календарных месяцев/конец месяца/возврат одновременно с release. Никакой внешний ИИ.
 
 **Зависимости:** AND-57, AND-60, AND-68, AND-69.
 
@@ -293,65 +332,9 @@ Crash points: тик до/после commit, rollover, claim, bid/settlement и 
 
 Существующий Windows Docker host; отдельный Compose project/volumes/secrets, без публичного PostgreSQL и Mini App. Запуск bot long polling после migration.
 
-**Приёмка:** Проверены BotFather username/token и один polling instance; /start→claim→lineup→live→result; reboot/rollback/restore; соседние сервисы не перезапущены; deploy записан в runbook.
+**Приёмка:** Проверены BotFather username/token и один polling instance; /start→claim→lineup→live→result; reboot/rollback/restore; соседние сервисы не перезапущены; deploy записан в runbook. Дополнительный gate: AND-82 подтверждает точные воронки/зрелые когорты и исключение internal/автоматика до первого внешнего привлечения. Зафиксировать coverage_start; операторские отчёты доступны. Эксперименты AND-81 не блокируют MVP. Решение пользователя 2026-10-11: локально управляемый ручной деплой. Основной путь: собрать/проверить образ здесь под архитектуру HDC → docker save → SFTP/SCP → SHA-256/image ID check → docker load на HDC → Compose --no-build. Альтернатива: commit/push здесь → git pull --ff-only выбранного проверенного SHA на HDC → локальный docker build там. Оба пути используют immutable release tag/GOALETTO_IMAGE и deploy/compose.release.yaml для migrate/bot/worker. Credentials только host-only, CI выполняет проверки и не деплоит. Приёмка AND-72: проверены согласованный путь, metadata/smoke/rollback предыдущего image, миграции до запуска worker и отсутствие изменений соседних сервисов. Документация: docs/deployment-hdc.md. Настройка пути не означает выполненный HDC deploy.
 
 **Зависимости:** AND-71, AND-70, AND-82.
-
-**Дополнение аналитики:** Дополнительный gate: AND-82 подтверждает точные воронки/зрелые когорты и исключение internal/AI до первого внешнего привлечения. Зафиксировать coverage_start; операторские отчёты доступны. Эксперименты AND-81 не блокируют MVP.
-
-**Деплой · уточнение пользователя:** Решение пользователя 2026-10-11: локально управляемый ручной деплой. Основной путь: собрать/проверить образ здесь под архитектуру HDC → docker save → SFTP/SCP → SHA-256/image ID check → docker load на HDC → Compose --no-build. Альтернатива: commit/push здесь → git pull --ff-only выбранного проверенного SHA на HDC → локальный docker build там. Оба пути используют immutable release tag/GOALETTO_IMAGE и deploy/compose.release.yaml для migrate/bot/worker. Credentials только host-only, CI выполняет проверки и не деплоит. Приёмка AND-72: проверены согласованный путь, metadata/smoke/rollback предыдущего image, миграции до запуска worker и отсутствие изменений соседних сервисов. Документация: docs/deployment-hdc.md. Настройка пути не означает выполненный HDC deploy.
-
-## Аналитика до привлечения игроков · AND-73–AND-82
-
-Распределены по существующим вехам; это план реализации, не завершённый сбор. [Определения и метрики](analytics/measurement-plan.md), [каталог событий](analytics/event-catalog.md).
-
-### [AND-73 · Зафиксировать контракт событий и метрики воронок Goaletto](https://linear.app/andrei-brazhnikov/issue/AND-73/zafiksirovat-kontrakt-sobytij-i-metriki-voronok-goaletto)
-
-Исходный план уже записан в docs/analytics/measurement-plan.md и event-catalog.md; довести до контракта реализации, не объявлять сбор готовым. Опыт Frontline AND-24/26/27 адаптирован к недельной лиге.
-
-**Приёмка:** Утверждены versioned event schema/allowlist и определения трёх KPI с n/N, UTC-окнами и зрелостью. manager_started создаётся до claim; AI/system/operator исключены из user activity. Чётко различаются Telegram accepted, просмотр по кнопке и неизвестное чтение. D1/D3/D7 не заменяют недельные матчевые возможности. Зафиксированы retention/доступы/удаление, версии, начало покрытия и миграция контракта. Проверены продуктовые примеры, не только список имён.
-
-**Зависимости:** AND-40.
-
-### [AND-74 · Сохранять события менеджеров в PostgreSQL без дублей и внутренних аккаунтов](https://linear.app/andrei-brazhnikov/issue/AND-74/sohranyat-sobytiya-menedzherov-v-postgresql-bez-dublej-i-vnutrennih)
-
-События живут в application/infrastructure, domain чистый. Основа должна появиться до игрового /start; нынешний preview не становится исторической когортой.
-
-**Приёмка:** Миграции analytics_managers/journey_events; псевдоним до получения клуба, отдельная restricted связь с Telegram ID. Успешные события и accepted commands коммитятся атомарно; rollback не оставляет успех. Update/effect и worker/business dedupe переживают restart. Явный реестр internal/test/operator, AI исключены из default aggregates. Нет raw callback/токенов/чатов; сессии только по allowlist user-действий; сроки хранения/доступы проверены. Внешний экспорт не блокирует игру.
-
-**Зависимости:** AND-73, AND-45.
-
-### [AND-75 · Добавить ссылки кампаний и атрибуцию привлечения через Telegram /start](https://linear.app/andrei-brazhnikov/issue/AND-75/dobavit-ssylki-kampanij-i-atribuciyu-privlecheniya-cherez-telegram)
-
-Python-only bot, без публичного redirect, frontend и нового web API. Ограничение: наблюдаем принятый /start, а не чтение или клик до него.
-
-**Приёмка:** Реестр opaque start-кодов <=64 допустимых символов, source/placement/date и ссылки t.me/GoalettoBot. direct/unknown/known разделены. First-touch сохраняется до claim и неизменяем; повторный /start — касание, не новый manager. Отчёт source→claim→готовность; internal исключён. Тесты валидных/неизвестных/повторных кодов. CTR/CAC не выдумываются без данных показов/кликов/расходов.
-
-**Зависимости:** AND-74.
-
-### [AND-76 · Инструментировать вход, состав и восстановление после непонятных действий](https://linear.app/andrei-brazhnikov/issue/AND-76/instrumentirovat-vhod-sostav-i-vosstanovlenie-posle-neponyatnyh)
-
-Связать аналитику с реализацией AND-47/48/49; существующие задачи создают UI и gameplay, эта задача проверяет полноту e2e событий и диагностический контекст.
-
-**Приёмка:** События start/offer delivery/claim/lineup open/save и optional previews связаны с маршрутом и версией. Автосостав не считается ручной готовностью. Категории stale/invalid/claim race/lineup invalid и доставка помощи; recovery — успешное целевое user-действие за 30 минут. Retry/rollback не удваивают ступени. Обходные пути учитываются отдельно; отчёт не объявляет причину путаницы по кнопке Назад.
-
-**Зависимости:** AND-74, AND-47, AND-48, AND-49, AND-75.
-
-### [AND-77 · Измерять участие в матчах отдельно от симуляции и задержек доставки](https://linear.app/andrei-brazhnikov/issue/AND-77/izmeryat-uchastie-v-matchah-otdelno-ot-simulyacii-i-zaderzhek-dostavki)
-
-30 тиков + 3 минуты перерыва, недельное расписание: 24 часа без второго матча не означают отвал. Без предположений о присутствии онлайн по пассивному табло.
-
-**Приёмка:** Явные match/report open, accepted/applied command, fixture finished и result delivery имеют корреляцию/дедуп. Eligible opportunity определяется владением до lineup lock; перенос/пауза по actual times, смена владельца отдельно. AI/ticks/delivery не дают user retention. Технические попытки accepted→commit→queued→render→Telegram accepted/failed/unknown измеряются отдельно, p50/p95 и очередь не включают календарное ожидание. Restart/uncertain send сохраняют правдивый статус.
-
-**Зависимости:** AND-74, AND-52, AND-53, AND-55, AND-56, AND-66, AND-68.
-
-### [AND-78 · Собирать добровольные причины остановки и отзывы внутри Telegram](https://linear.app/andrei-brazhnikov/issue/AND-78/sobirat-dobrovolnye-prichiny-ostanovki-i-otzyvy-vnutri-telegram)
-
-Основа Frontline AND-27. Сначала реализовать и проверить на synthetic/internal, не отправлять сейчас сообщения реальным людям; основной игровой CTA сохраняет приоритет.
-
-**Приёмка:** Вторичная кнопка после первого результата; помощь для незавершённого входа через 24 ч и один опрос после пропущенной зрелой матчевой возможности. Ожидание календаря не триггер. Кампания/менеджер уникальны; skip/opt-out terminal, cooldown >=7 дней, недоступность/unknown delivery безопасны. Конечные причины и optional comment <=500 символов в явном 30-мин окне, команды не перехватываются. Restricted текст, retention cleanup, без логов/labels. Доля ответов/skip показана; причины не приписываются молча ушедшим.
-
-**Зависимости:** AND-76, AND-77.
 
 ### [AND-79 · Построить SQL-воронки, зрелые когорты и отчёт о местах остановки](https://linear.app/andrei-brazhnikov/issue/AND-79/postroit-sql-voronki-zrelye-kogorty-i-otchyot-o-mestah-ostanovki)
 
@@ -381,6 +364,6 @@ Python-only bot, без публичного redirect, frontend и нового 
 
 Аналитика должна объяснять стартовую когорту с первого дня; синтетические данные не смешивать с внешними пользователями.
 
-**Приёмка:** Изолированная PG fixture с точными ожидаемыми n/N: direct/campaign/unknown, drop до claim, manual/autolineup, AI/internal, retry/rollback/restart, delivery unknown, transfer ownership, перенос/межсезонье/первый матч через7д, незрелыйD7. Delivered без user action не retention. SQL/report/dashboard согласованы, доступы/cleanup/feedback caps/экспорт проверены. Runbook с coverage_start и troubleshooting; gate AND-72, без production DB.
+**Приёмка:** Изолированная PG fixture с точными ожидаемыми n/N: direct/campaign/unknown, drop до claim, manual/autolineup, бот-клубы/internal, retry/rollback/restart, delivery unknown, transfer ownership, перенос/межсезонье/первый матч через7д, незрелыйD7. Delivered без user action не retention. SQL/report/dashboard согласованы, доступы/cleanup/feedback caps/экспорт проверены. Runbook с coverage_start и troubleshooting; gate AND-72, без production DB.
 
 **Зависимости:** AND-80, AND-71.

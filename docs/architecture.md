@@ -63,7 +63,7 @@ Sender и политика доставки в плане, начальный wo
 [контракт и метрики](analytics/measurement-plan.md), [события](analytics/event-catalog.md).
 Application пишет успешное бизнес-событие атомарно с состоянием/accepted command;
 infrastructure обеспечивает versioning, dedupe и псевдонимы до claim клуба.
-Domain не импортирует аналитический сборщик. User-действия отделены от system/AI;
+Domain не импортирует аналитический сборщик. User-действия отделены от system/automation;
 доставка уведомления не означает прочтение и не создаёт retention.
 Отчёты используют PostgreSQL и операторский Grafana на HDC без публичного API.
 Эти таблицы и сбор пока не реализованы.
@@ -78,3 +78,7 @@ match_ticks, commands, standings, training, auctions, ledger, scouting, academy.
 [aiogram polling](https://docs.aiogram.dev/en/latest/dispatcher/long_polling.html),
 [PostgreSQL locking](https://www.postgresql.org/docs/current/sql-select.html),
 [SQLAlchemy asyncio](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html).
+
+Владение и простая автоматика: [bot-clubs.md](bot-clubs.md). Дедлайн неактивности —
+последнее игровое действие + шесть календарных месяцев, отдельно от матчевых jobs.
+Освобождение/возврат и повторные напоминания защищаются транзакцией и dedupe.

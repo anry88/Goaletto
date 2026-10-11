@@ -100,7 +100,7 @@
       "milestone": "world",
       "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
       "context": "Расширить начальные 5 таблиц: managers, players, staff, seasons, fixtures/matches/ticks, commands, standings; constraints и индексы.",
-      "acceptance": "Миграции upgrade/check проходят; Telegram ID bigint, деньги integer; правила уникальности клуба/тика/сезона; schema/ERD и транзакционные границы документированы. Схема аналитики: managers создаются до claim клуба; контракт AND-73 задаёт псевдонимы/идентификаторы и границы application. Принимать миграции совместно с планом docs/analytics/measurement-plan.md.",
+      "acceptance": "Миграции upgrade/check проходят; Telegram ID bigint, деньги integer; правила уникальности клуба/тика/сезона; schema/ERD и транзакционные границы документированы. Схема аналитики: managers создаются до claim клуба; контракт AND-73 задаёт псевдонимы/идентификаторы и границы application. Принимать миграции совместно с планом docs/analytics/measurement-plan.md. Уточнение пользователя: Данные владения: ownership periods, last_game_action_at и дедлайн +6 календарных месяцев; owner до claim/после release и бывший владелец различаются. Сохранённая базовая XI/скамейка/тактика бот-клуба; никакого ai_level. Правила в docs/bot-clubs.md.",
       "depends": [
         "AND-39",
         "AND-40",
@@ -110,14 +110,14 @@
     {
       "id": "AND-46",
       "uuid": "04813a99-9078-4800-b2db-fdbbfa53827d",
-      "title": "Создать первый комплект пяти лиг и 50 AI-клубов",
-      "url": "https://linear.app/andrei-brazhnikov/issue/AND-46/sozdat-pervyj-komplekt-pyati-lig-i-50-ai-klubov",
+      "title": "Создать первый комплект пяти лиг и 50 бот-клубов с близкими составами",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-46/sozdat-pervyj-komplekt-pyati-lig-i-50-bot-klubov-s-blizkimi-sostavami",
       "state": "Backlog",
       "key": "seed",
       "milestone": "world",
       "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
-      "context": "Идемпотентный seed: league_set, уровни 1–5 по 10 клубов, составы 18–20 футболистов, позиции/возраст/потенциал, бюджеты и архетипы.",
-      "acceptance": "Первый запуск даёт ровно 5 лиг и 50 клубов; повтор seed не добавляет копии; у каждого клуба корректный состав и вратарь; seed детерминирован для тестов.",
+      "context": "Идемпотентный seed: первый league_set, уровни 1–5 по 10 клубов без владельцев. У всех примерно одинаковые базовые составы независимо от tier: общий размер/позиционный шаблон и близкие рейтинги, небольшое seed-воспроизводимое разнообразие. Убрать сильные/слабые стартовые архетипы. Примерные ресурсы по общей стартовой модели; точные числа проверить в балансе.",
+      "acceptance": "Ровно 5 лиг/50 уникальных клубов; repeat seed без копий; у каждого сохранённая XI/схема/скамейка, покрытие позиций и резервный вратарь. Сила сопоставима по измеренному допуску, без tier handicap. Нет нейросетей, тренировок/трансферов/тактической оптимизации бот-клубов. Возраст позволяет обычное старение; начальные составы воспроизводимы. Claim сохраняет текущее состояние, не выдаёт стартовый reset.",
       "depends": [
         "AND-45"
       ]
@@ -131,8 +131,8 @@
       "key": "onboarding",
       "milestone": "world",
       "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
-      "context": "Onboarding показывает только свободные AI-клубы уровня 5 во всех комплектах. При отсутствии мест атомарно создать новый полный комплект 5×10.",
-      "acceptance": "Один Telegram ID — один клуб; параллельный claim последнего места не делит клуб/не создаёт лишние комплекты; верхние лиги недоступны новичкам; текущие финансы/таблица клуба сохраняются. Приёмка аналитики: первый игровой /start и источник фиксируются до claim; club_claimed атомарен с владением, retry/race не удваивают событие. Internal/AI отделены. Полнота воронки проверяется в AND-76.",
+      "context": "Onboarding показывает только свободные бот-клубы уровня 5 во всех комплектах. При отсутствии мест атомарно создать новый полный комплект 5×10.",
+      "acceptance": "Один Telegram ID — один клуб; параллельный claim последнего места не делит клуб/не создаёт лишние комплекты; верхние лиги недоступны новичкам; текущие финансы/таблица клуба сохраняются. Приёмка аналитики: первый игровой /start и источник фиксируются до claim; club_claimed атомарен с владением, retry/race не удваивают событие. Internal/автоматика отделены. Полнота воронки проверяется в AND-76.",
       "depends": [
         "AND-46",
         "AND-74",
@@ -176,16 +176,17 @@
     {
       "id": "AND-50",
       "uuid": "797900ca-404e-4fa4-a845-0a1956556228",
-      "title": "Реализовать AI-подхват и освобождение неактивных клубов",
-      "url": "https://linear.app/andrei-brazhnikov/issue/AND-50/realizovat-ai-podhvat-i-osvobozhdenie-neaktivnyh-klubov",
+      "title": "Сохранять клуб шесть месяцев неактивности, напоминать и освобождать",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-50/sohranyat-klub-shest-mesyacev-neaktivnosti-napominat-i-osvobozhdat",
       "state": "Backlog",
       "key": "inactive",
       "milestone": "world",
       "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
-      "context": "AI-помощь после 2 недель неактивности; освобождение после 4; сроки и предупреждения из GDD.",
-      "acceptance": "Повтор job не освобождает активного владельца; клуб сохраняет историю; освобождённый клуб лиг 1–4 не выдаётся новичку; сообщения через outbox.",
+      "context": "Решение пользователя 2026-10-11: владение сохраняется шесть календарных месяцев от последнего явного игрового действия владельца; claim — начальная дата. Новое действие переносит дедлайн. Автоматические матчи, доставка и jobs не продлевают владение. Периодические уведомления «Ваш клуб ждёт вас». После истечения клуб полностью бот и доступен новичку только в лиге 5. Сроки подхвата 2 недели/освобождения 4 недели отменены.",
+      "acceptance": "Durable ownership period/last_game_action_at/deadline; шесть календарных месяцев, не 180 дней, конец месяца ограничивается допустимой датой. Return vs release атомарно перепроверяет owner/deadline и не отбирает активный клуб; retry не повторяет release. Состав/финансы/история сохраняются. Upper-tier released club не выдаётся новичкам; tier5 claim по обычным правилам. Reminders via outbox с dedupe period+interval, ограниченной настраиваемой частотой, opt-out/unavailable и проверкой актуальности перед отправкой; доставка не считается действием. Старые callbacks бывшего владельца запрещены. Сборка docs/bot-clubs.md проверена календарными и race-сценариями.",
       "depends": [
-        "AND-47"
+        "AND-47",
+        "AND-68"
       ]
     },
     {
@@ -239,14 +240,14 @@
     {
       "id": "AND-54",
       "uuid": "3e024594-d05e-4d23-ab0f-1e4b63316e4e",
-      "title": "Разработать AI-менеджеров разных уровней",
-      "url": "https://linear.app/andrei-brazhnikov/issue/AND-54/razrabotat-ai-menedzherov-raznyh-urovnej",
+      "title": "Реализовать фиксированные составы бот-клубов и пополнение после пенсии",
+      "url": "https://linear.app/andrei-brazhnikov/issue/AND-54/realizovat-fiksirovannye-sostavy-bot-klubov-i-popolnenie-posle-pensii",
       "state": "Backlog",
-      "key": "ai",
+      "key": "bot-automation",
       "milestone": "matches",
       "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
-      "context": "Состав, тренировки и live-решения simple/medium/smart; учитывать позиции, усталость, травмы, текущий счёт; не использовать LLM в обязательном runtime.",
-      "acceptance": "Каждый AI-клуб может пройти сезон без человека; правила/лимиты такие же, как для людей; claim отключает AI-управление; deterministic seed tests.",
+      "context": "Простая автоматика клубов без владельцев: играют общей симуляцией сохранённой XI/скамейкой/схемой/тактикой. Никаких LLM, уровней simple/medium/smart, тренировок, трансферов, подбора тактики, ротации по счёту/усталости. Автоматически заменить только травмированного здоровым резервом по стабильному правилу. В межсезонье ушедшего на пенсию пополнить из молодёжки; полный продукт академии AND-62 для базового пополнения не требуется.",
+      "acceptance": "Бот-клуб играет полный сезон общей симуляцией, его базовая XI не меняется от OVR/формы/счёта. Замены только травмированных, общие лимиты и запрет замены удалённого. Приёмка фиксирует поведение без резерва/с дисквалификацией по общим правилам допуска; не вводить иммунитет ботов. Retirement/replacement по season+player идемпотентен, позиция/размер состава сохраняются; травма не генерирует молодого игрока. Claim переводит управление человеку; отсутствие человека не запускает скрытые тренировки/тактику. Pure seeded rules, no network; replay/rerun tests.",
       "depends": [
         "AND-46",
         "AND-51"
@@ -308,7 +309,7 @@
       "milestone": "economy",
       "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
       "context": "Фокусы навыков, форма/выносливость, возрастные коэффициенты, потолок потенциала и тренерские бонусы по GDD.",
-      "acceptance": "Один расчёт на клуб/неделю; навык/возраст ограничены валидными диапазонами; UI показывает результат; повтор job не тренирует дважды.",
+      "acceptance": "Один расчёт на клуб/неделю; навык/возраст ограничены валидными диапазонами; UI показывает результат; повтор job не тренирует дважды. Уточнение пользователя: Клубы без владельцев не тренируются. Не создавать автоматический тренировочный фокус за отсутствующего человека. Очередь тренировки повторно проверяет актуального владельца при применении, включая release race.",
       "depends": [
         "AND-45",
         "AND-47"
@@ -372,7 +373,7 @@
       "milestone": "economy",
       "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
       "context": "Уровни академии, расходы, выпуск 17-летних, скрытый потенциал, сроки и лимиты состава.",
-      "acceptance": "Выпуск не дублируется; корректные позиции/возраст; нельзя превысить 25 игроков; затраты попадают в ledger; объяснимый экран академии.",
+      "acceptance": "Выпуск не дублируется; корректные позиции/возраст; нельзя превысить 25 игроков; затраты попадают в ledger; объяснимый экран академии. Уточнение пользователя: Базовая молодёжная замена ушедшего на пенсию бот-футболиста реализуется в AND-54 без ожидания полной пользовательской академии. Здесь расширяется пользовательская академия; не создавать второй выпуск по одному retirement.",
       "depends": [
         "AND-58",
         "AND-59"
@@ -403,7 +404,7 @@
       "milestone": "economy",
       "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
       "context": "Сезонные/недельные расчёты по возрасту, опыту и морали; документировать связь реального времени и игрового возраста.",
-      "acceptance": "Диапазоны и скорости согласованы; повтор расчёта безопасен; изменения влияют на sim; сезонная симуляция не даёт мгновенных пенсионеров/навыков 20.",
+      "acceptance": "Диапазоны и скорости согласованы; повтор расчёта безопасен; изменения влияют на sim; сезонная симуляция не даёт мгновенных пенсионеров/навыков 20. Уточнение пользователя: Пенсия и пополнение бот-клубов выполняются в межсезонье, без внезапного retirement/replacement посреди live-матча. Согласовать общие возрастные параметры с AND-54; без повторного replacement и тренировок клубов без владельца.",
       "depends": [
         "AND-58",
         "AND-51"
@@ -481,7 +482,7 @@
       "milestone": "operations",
       "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
       "context": "Crash points: тик до/после commit, rollover, claim, bid/settlement и отправка outbox; пауза live-матча вместо залпового catch-up.",
-      "acceptance": "Голы/деньги/клубы не дублируются; менеджерам сохраняется окно решений после простоя; degraded mode и recovery runbook; периодический reconciliation jobs.",
+      "acceptance": "Голы/деньги/клубы не дублируются; менеджерам сохраняется окно решений после простоя; degraded mode и recovery runbook; периодический reconciliation jobs. Уточнение пользователя: Recovery включает last_game_action_at/ownership deadline, повтор освобождения и устаревшие reminders; нельзя отобрать вернувшийся активный клуб или отправить сообщение старому владельцу после нового claim.",
       "depends": [
         "AND-52",
         "AND-57",
@@ -513,7 +514,7 @@
       "milestone": "operations",
       "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
       "context": "Несколько комплектов, одновременные матчи/регистрации/ставки; сезонные sim-прогоны; целевые показатели определить по измеренным ресурсам HDC.",
-      "acceptance": "Проверены race cases и аварии; измерены p95 tick lateness/callback latency; сезон сохраняет 10 клубов в лиге; документированы bottlenecks и лимиты для запуска.",
+      "acceptance": "Проверены race cases и аварии; измерены p95 tick lateness/callback latency; сезон сохраняет 10 клубов в лиге; документированы bottlenecks и лимиты для запуска. Уточнение пользователя: Дополнительные сценарии: бот-клубы играют фиксированной XI без тренировок/тактической ротации; близкие начальные составы; injury-only substitutions; retirement+young replacement в межсезонье; шесть календарных месяцев/конец месяца/возврат одновременно с release. Никакой внешний ИИ.",
       "depends": [
         "AND-57",
         "AND-60",
@@ -531,7 +532,7 @@
       "milestone": "operations",
       "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
       "context": "Существующий Windows Docker host; отдельный Compose project/volumes/secrets, без публичного PostgreSQL и Mini App. Запуск bot long polling после migration.",
-      "acceptance": "Проверены BotFather username/token и один polling instance; /start→claim→lineup→live→result; reboot/rollback/restore; соседние сервисы не перезапущены; deploy записан в runbook. Дополнительный gate: AND-82 подтверждает точные воронки/зрелые когорты и исключение internal/AI до первого внешнего привлечения. Зафиксировать coverage_start; операторские отчёты доступны. Эксперименты AND-81 не блокируют MVP. Решение пользователя 2026-10-11: локально управляемый ручной деплой. Основной путь: собрать/проверить образ здесь под архитектуру HDC → docker save → SFTP/SCP → SHA-256/image ID check → docker load на HDC → Compose --no-build. Альтернатива: commit/push здесь → git pull --ff-only выбранного проверенного SHA на HDC → локальный docker build там. Оба пути используют immutable release tag/GOALETTO_IMAGE и deploy/compose.release.yaml для migrate/bot/worker. Credentials только host-only, CI выполняет проверки и не деплоит. Приёмка AND-72: проверены согласованный путь, metadata/smoke/rollback предыдущего image, миграции до запуска worker и отсутствие изменений соседних сервисов. Документация: docs/deployment-hdc.md. Настройка пути не означает выполненный HDC deploy.",
+      "acceptance": "Проверены BotFather username/token и один polling instance; /start→claim→lineup→live→result; reboot/rollback/restore; соседние сервисы не перезапущены; deploy записан в runbook. Дополнительный gate: AND-82 подтверждает точные воронки/зрелые когорты и исключение internal/автоматика до первого внешнего привлечения. Зафиксировать coverage_start; операторские отчёты доступны. Эксперименты AND-81 не блокируют MVP. Решение пользователя 2026-10-11: локально управляемый ручной деплой. Основной путь: собрать/проверить образ здесь под архитектуру HDC → docker save → SFTP/SCP → SHA-256/image ID check → docker load на HDC → Compose --no-build. Альтернатива: commit/push здесь → git pull --ff-only выбранного проверенного SHA на HDC → локальный docker build там. Оба пути используют immutable release tag/GOALETTO_IMAGE и deploy/compose.release.yaml для migrate/bot/worker. Credentials только host-only, CI выполняет проверки и не деплоит. Приёмка AND-72: проверены согласованный путь, metadata/smoke/rollback предыдущего image, миграции до запуска worker и отсутствие изменений соседних сервисов. Документация: docs/deployment-hdc.md. Настройка пути не означает выполненный HDC deploy.",
       "depends": [
         "AND-71",
         "AND-70",
@@ -545,7 +546,7 @@
       "depends": [
         "AND-40"
       ],
-      "acceptance": "Утверждены versioned event schema/allowlist и определения трёх KPI с n/N, UTC-окнами и зрелостью. manager_started создаётся до claim; AI/system/operator исключены из user activity. Чётко различаются Telegram accepted, просмотр по кнопке и неизвестное чтение. D1/D3/D7 не заменяют недельные матчевые возможности. Зафиксированы retention/доступы/удаление, версии, начало покрытия и миграция контракта. Проверены продуктовые примеры, не только список имён.",
+      "acceptance": "Утверждены versioned event schema/allowlist и определения трёх KPI с n/N, UTC-окнами и зрелостью. manager_started создаётся до claim; automation/system/operator исключены из user activity. Чётко различаются Telegram accepted, просмотр по кнопке и неизвестное чтение. D1/D3/D7 не заменяют недельные матчевые возможности. Зафиксированы retention/доступы/удаление, версии, начало покрытия и миграция контракта. Проверены продуктовые примеры, не только список имён.",
       "context": "Исходный план уже записан в docs/analytics/measurement-plan.md и event-catalog.md; довести до контракта реализации, не объявлять сбор готовым. Опыт Frontline AND-24/26/27 адаптирован к недельной лиге.",
       "id": "AND-73",
       "uuid": "e54ab3c4-422c-4a66-ba2d-4ed1c6fe21cc",
@@ -561,7 +562,7 @@
         "AND-73",
         "AND-45"
       ],
-      "acceptance": "Миграции analytics_managers/journey_events; псевдоним до получения клуба, отдельная restricted связь с Telegram ID. Успешные события и accepted commands коммитятся атомарно; rollback не оставляет успех. Update/effect и worker/business dedupe переживают restart. Явный реестр internal/test/operator, AI исключены из default aggregates. Нет raw callback/токенов/чатов; сессии только по allowlist user-действий; сроки хранения/доступы проверены. Внешний экспорт не блокирует игру.",
+      "acceptance": "Миграции analytics_managers/journey_events; псевдоним до получения клуба, отдельная restricted связь с Telegram ID. Успешные события и accepted commands коммитятся атомарно; rollback не оставляет успех. Update/effect и worker/business dedupe переживают restart. Явный реестр internal/test/operator, действия бот-клубов исключены из default aggregates. Нет raw callback/токенов/чатов; сессии только по allowlist user-действий; сроки хранения/доступы проверены. Внешний экспорт не блокирует игру.",
       "context": "События живут в application/infrastructure, domain чистый. Основа должна появиться до игрового /start; нынешний preview не становится исторической когортой.",
       "id": "AND-74",
       "uuid": "f290c896-a714-4be1-b755-b7da0e9767bd",
@@ -616,7 +617,7 @@
         "AND-66",
         "AND-68"
       ],
-      "acceptance": "Явные match/report open, accepted/applied command, fixture finished и result delivery имеют корреляцию/дедуп. Eligible opportunity определяется владением до lineup lock; перенос/пауза по actual times, смена владельца отдельно. AI/ticks/delivery не дают user retention. Технические попытки accepted→commit→queued→render→Telegram accepted/failed/unknown измеряются отдельно, p50/p95 и очередь не включают календарное ожидание. Restart/uncertain send сохраняют правдивый статус.",
+      "acceptance": "Явные match/report open, accepted/applied command, fixture finished и result delivery имеют корреляцию/дедуп. Eligible opportunity определяется владением до lineup lock; перенос/пауза по actual times, смена владельца отдельно. автоматика/ticks/delivery не дают user retention. Технические попытки accepted→commit→queued→render→Telegram accepted/failed/unknown измеряются отдельно, p50/p95 и очередь не включают календарное ожидание. Restart/uncertain send сохраняют правдивый статус.",
       "context": "30 тиков + 3 минуты перерыва, недельное расписание: 24 часа без второго матча не означают отвал. Без предположений о присутствии онлайн по пассивному табло.",
       "id": "AND-77",
       "uuid": "9038db56-0960-4d2b-ba60-56f25cf2a769",
@@ -696,7 +697,7 @@
         "AND-80",
         "AND-71"
       ],
-      "acceptance": "Изолированная PG fixture с точными ожидаемыми n/N: direct/campaign/unknown, drop до claim, manual/autolineup, AI/internal, retry/rollback/restart, delivery unknown, transfer ownership, перенос/межсезонье/первый матч через7д, незрелыйD7. Delivered без user action не retention. SQL/report/dashboard согласованы, доступы/cleanup/feedback caps/экспорт проверены. Runbook с coverage_start и troubleshooting; gate AND-72, без production DB.",
+      "acceptance": "Изолированная PG fixture с точными ожидаемыми n/N: direct/campaign/unknown, drop до claim, manual/autolineup, бот-клубы/internal, retry/rollback/restart, delivery unknown, transfer ownership, перенос/межсезонье/первый матч через7д, незрелыйD7. Delivered без user action не retention. SQL/report/dashboard согласованы, доступы/cleanup/feedback caps/экспорт проверены. Runbook с coverage_start и troubleshooting; gate AND-72, без production DB.",
       "context": "Аналитика должна объяснять стартовую когорту с первого дня; синтетические данные не смешивать с внешними пользователями.",
       "id": "AND-82",
       "uuid": "f61487cb-84c4-43fe-ac4b-1c0f422e8cf8",

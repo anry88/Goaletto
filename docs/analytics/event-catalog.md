@@ -31,7 +31,7 @@
 | club_ownership_ended | system | Прекращение конкретного периода владения; ownership + end |
 
 Принятая команда не означает применённую. Сохранение автосостава — system, не
-lineup_saved с origin=user. AI-решения — origin=ai, не события человеческой активности.
+lineup_saved с origin=user. Автоматические решения — origin=automation, не события человеческой активности.
 Доставка и exposure не продлевают user-сессию.
 
 manager_started начинается с игрового онбординга. Preview /start нынешнего каркаса

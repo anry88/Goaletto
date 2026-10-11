@@ -12,6 +12,11 @@
 - Each league set has 5 leagues of exactly 10 clubs. New managers enter only tier 5.
   Promotion/relegation happens simultaneously, within a set, with two clubs each way.
   Tier 1 has no promotion; tier 5 has no relegation; no playoffs.
+- Unowned clubs use comparable baseline squads, fixed lineups, no training or AI/LLM
+  integration. Automatic substitutions are injury-only; retirements receive youth
+  replacements in the offseason. See docs/bot-clubs.md.
+- Ownership expires after six calendar months without an explicit game action.
+  Periodic reminders and automated matches never extend it. Reclaim is tier-5 only.
 - PostgreSQL owns durable state, accepted commands, scheduled jobs and notification
   outbox. Make ticks, season rollover, club claims and money movements idempotent.
 - Do not store game state only in aiogram FSM or process memory.
