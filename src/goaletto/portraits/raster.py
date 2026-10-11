@@ -83,13 +83,28 @@ def _rgb(color: str) -> tuple[int, int, int]:
     return int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
 
 
-def tint_kit(image: Image.Image, primary: str, secondary: str) -> Image.Image:
+def tint_kit(
+    image: Image.Image,
+    primary: str,
+    secondary: str,
+    *,
+    material_mask: Image.Image | None = None,
+) -> Image.Image:
     """Replace magenta/cyan material colors; retain ink, shading and alpha."""
     main, trim = _rgb(primary), _rgb(secondary)
     result = image.convert("RGBA")
+    if material_mask is not None and (
+        material_mask.mode != "L" or material_mask.size != result.size
+    ):
+        raise ValueError("Material mask must be a matching grayscale image")
+    mask_pixels = material_mask.get_flattened_data() if material_mask is not None else None
     pixels: list[tuple[int, int, int, int]] = []
-    for pixel in result.get_flattened_data():
+    for index, pixel in enumerate(result.get_flattened_data()):
         red, green, blue, alpha = cast(tuple[int, int, int, int], pixel)
+        if alpha < 16 or (mask_pixels is not None and mask_pixels[index] == 0):
+            # Near-transparent RGB noise from generated cutouts is not a material mask.
+            pixels.append((red, green, blue, alpha))
+            continue
         if min(red, blue) - green > 35:
             material, intensity = main, max(red, blue) / 255
         elif min(green, blue) - red > 35:

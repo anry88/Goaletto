@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-11",
+  "status": "visual-feasibility-experiment-awaiting-review",
+  "cases": [
+    "A / REJECTED R1",
+    "B / PROPORTIONAL PARTS",
+    "C / INTACT MASTER"
+  ],
+  "proportional_rects": {
+    "head": [
+      126,
+      52,
+      260,
+      356
+    ],
+    "torso": [
+      48,
+      345,
+      416,
+      210
+    ],
+    "eyes": [
+      153,
+      179,
+      206,
+      70
+    ],
+    "nose": [
+      224,
+      244,
+      64,
+      70
+    ],
+    "mouth": [
+      201,
+      301,
+      110,
+      60
+    ],
+    "hair": [
+      99,
+      18,
+      314,
+      204
+    ]
+  },
+  "limits": "One player identity, two offline age variants; no large catalog or staff proof.",
+  "checks": {
+    "face_pixels_unchanged_by_kit": true,
+    "uniform_component_scaling": true
+  }
+}

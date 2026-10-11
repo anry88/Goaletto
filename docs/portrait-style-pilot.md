@@ -1,5 +1,8 @@
 # Проба внешностей Dugout · 2026-10-11
 
+Последующая PNG-сборка r1 отклонена по качеству. Новый [эксперимент](portrait-feasibility.md)
+возвращается к анатомии/стилю целого эталона; нижеследующие пробы сохранены для истории.
+
 Первый этап AND-44: закрепить конкретную иллюстрированную внешность, прежде чем
 расширять библиотеку. Актуальная более чистая [проба v02](../assets/portraits/style-pilot/dugout-faces-v02.png)
 и [prompt v02](../assets/portraits/style-pilot/prompt-v02.txt). Исходный [лист v01](../assets/portraits/style-pilot/dugout-faces-v01.png),

@@ -63,6 +63,24 @@ def test_age_layers_change_only_age_region_without_new_identity() -> None:
     assert age_stage("staff", 60) == "mature"
 
 
+def test_near_transparent_rgb_noise_is_not_recolored_as_kit() -> None:
+    sprite = Image.new("RGBA", (2, 1))
+    pixels = [(145, 72, 109, 7), (0, 255, 255, 255)]
+    sprite.putdata(pixels)
+    result = tint_kit(sprite, "#743D42", "#6B755D")
+    assert result.getpixel((0, 0)) == pixels[0]
+    assert result.getpixel((1, 0)) == (107, 117, 93, 255)
+
+
+def test_semantic_material_mask_protects_non_clothing_with_same_color() -> None:
+    sprite = Image.new("RGBA", (1, 2), (0, 255, 255, 255))
+    mask = Image.new("L", sprite.size)
+    mask.putpixel((0, 1), 255)
+    result = tint_kit(sprite, "#743D42", "#6B755D", material_mask=mask)
+    assert result.getpixel((0, 0)) == (0, 255, 255, 255)
+    assert result.getpixel((0, 1)) == (107, 117, 93, 255)
+
+
 @pytest.mark.parametrize("bank,age", [("players", 24), ("staff", 55)])
 def test_every_component_can_be_assembled_in_its_own_bank(bank: str, age: int) -> None:
     catalog = load_catalog()

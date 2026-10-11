@@ -5,7 +5,9 @@ Python, сообщения и inline-кнопки; без Mini App и JavaScript
 
 **Состояние: начальный каркас, не готовая игра.** Доступны демонстрационное меню бота,
 чистые правила времени и переходов между лигами, базовая миграция PostgreSQL, диагностический
-worker и портретные комбинаторы: технический SVG и иллюстрированный PNG из прозрачных частей.
+worker и портретные эксперименты. Иллюстрированный PNG-комбинатор r1 отклонён по
+визуальному качеству; [проверка нового подхода](docs/portrait-feasibility.md) сравнивает
+сборку деталей и цельный персонаж с цветами формы.
 Регистрация, симуляция матчей, экономика и отправка
 outbox-уведомлений пока не реализованы.
 
@@ -78,7 +80,11 @@ CI создаёт изолированный PostgreSQL и проверяет м
 
 ## Предпросмотр портретов
 
+**Текущий этап — проверка качества**, [A/B/C и выводы](docs/portrait-feasibility.md).
+Прежний PNG-комбинатор ниже сохранён для воспроизведения и не принят для игры.
+
 ```bash
+python scripts/check_portrait_feasibility.py
 goaletto-portraits --seed player-01 --bank players --output work/player.svg
 python scripts/render_portrait_preview.py
 python -m goaletto.portraits.raster_cli --seed player-01 --bank players --age 24 \
@@ -91,7 +97,7 @@ python scripts/render_raster_portrait_preview.py
 Для старых SVG→PNG-предпросмотров нужны python -m pip install '.[art]' и системная библиотека Cairo
 (macOS: brew install cairo; Debian/Ubuntu: libcairo2). SVG-комбинатор работает без Cairo.
 Концепты находятся в assets/concepts/, модульные пилоты — в assets/portraits/.
-Новый [растровый комбинатор](docs/portrait-system.md) хранит рецепт лица отдельно от возраста и формы.
+[Растровый эксперимент](docs/portrait-system.md) хранит рецепт лица отдельно от возраста и формы.
 Статическая галерея открывается как обычный HTML-файл и не использует JavaScript.
 
 ## Структура

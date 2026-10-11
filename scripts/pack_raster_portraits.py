@@ -70,7 +70,7 @@ REGIONS = {
 def main() -> None:
     catalog: dict[str, Any] = {
         "asset_version": 1,
-        "status": "illustrated-modular-pilot-not-production",
+        "status": "rejected-visual-quality",
         "canvas": [512, 512],
         "scope": "male players and male staff; separate banks",
         "banks": {},

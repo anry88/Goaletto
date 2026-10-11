@@ -1,0 +1,5 @@
+Use case: identity-preserve
+Asset type: OFFLINE age variant of an existing coherent male footballer portrait.
+Edit target: supplied transparent portrait master of one24-year-old man.
+Make THIS SAME fictional man look35 years old. Keep recognizable face structure: same eyes and spacing, nose shape, lip shape/fullness, warm skin, hairline, swept brown curls and overall silhouette. Add restrained natural adult maturity: slight cheek/jaw definition, very subtle outer-eye/brow maturity and a faint neatly shaved stubble shadow. He is an active athlete35, not old staff; no greying, balding, deep wrinkles or changed identity. Do not lengthen the face, purse lips or enlarge nose.
+Preserve neck/shoulder/collar geometry, short normal neck, square canvas, head position and lighting, alpha silhouette, the same #FF00FF main jersey and #00FFFF collar/shoulder strips. Face and garments remain coherent hand-inked Dugout editorial illustration with simplified broad shadows, not photography. Change ONLY age-related facial treatment. No separate pasted age lines, labels, background, frame, logos or badges.

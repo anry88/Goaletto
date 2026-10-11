@@ -34,6 +34,10 @@
 - Art is a small approval pilot. Preserve separate player/staff banks and stable
   component IDs. Direction C — Dugout was approved on 2026-10-11; retain a small technical pilot
   and review illustrated component quality before mass production.
+- The r1 PNG small-part faces were rejected for visual quality on 2026-10-11.
+  See docs/portrait-feasibility.md. Preserve them as experiments; do not mass-produce
+  or claim accepted art from rendering tests. Intact portrait masters are a candidate,
+  not yet an approved replacement. Preserve aspect ratio and explicit clothing masks.
 - This repository is proprietary; do not change licensing without user instruction.
 - Keep Linear tasks aligned with meaningful completed work. Do not close unimplemented
   gameplay tasks merely because scaffolding exists.

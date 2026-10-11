@@ -1,5 +1,9 @@
 # Dugout illustrated modular pilot
 
+REJECTED FOR VISUAL QUALITY on2026-10-11: stretched faces, tight mouths and neck/kit
+geometry. Preserve r1 assets/IDs as a reproducible experiment; do not expand them.
+Current assessment: ../../../docs/portrait-feasibility.md.
+
 Real local Python/Pillow compositor, separate male players/staff banks.
 32 genuine transparent parts in components-v1/, stable IDs in manifest-v1.json.
 Source atlases were generated as isolated parts by built-in Imagegen, not extracted
