@@ -1,0 +1,403 @@
+{
+  "asset_version": 1,
+  "status": "illustrated-modular-pilot-not-production",
+  "canvas": [
+    512,
+    512
+  ],
+  "scope": "male players and male staff; separate banks",
+  "banks": {
+    "players": {
+      "head": [
+        "dugout-r1/players/head-oval",
+        "dugout-r1/players/head-square",
+        "dugout-r1/players/head-long"
+      ],
+      "hair": [
+        "dugout-r1/players/hair-swept",
+        "dugout-r1/players/hair-curls",
+        "dugout-r1/players/hair-crop"
+      ],
+      "eyes": [
+        "dugout-r1/players/eyes-calm",
+        "dugout-r1/players/eyes-focused"
+      ],
+      "nose": [
+        "dugout-r1/players/nose-straight",
+        "dugout-r1/players/nose-wide"
+      ],
+      "mouth": [
+        "dugout-r1/players/mouth-neutral",
+        "dugout-r1/players/mouth-curved"
+      ],
+      "torso": [
+        "dugout-r1/players/torso-round",
+        "dugout-r1/players/torso-vneck"
+      ],
+      "age_details": {
+        "subtle": "dugout-r1/players/age_details-subtle",
+        "mature": "dugout-r1/players/age_details-mature"
+      }
+    },
+    "staff": {
+      "head": [
+        "dugout-r1/staff/head-oval",
+        "dugout-r1/staff/head-square",
+        "dugout-r1/staff/head-long"
+      ],
+      "hair": [
+        "dugout-r1/staff/hair-sidepart-grey",
+        "dugout-r1/staff/hair-receding-grey",
+        "dugout-r1/staff/hair-curls-grey"
+      ],
+      "eyes": [
+        "dugout-r1/staff/eyes-calm",
+        "dugout-r1/staff/eyes-focused"
+      ],
+      "nose": [
+        "dugout-r1/staff/nose-straight",
+        "dugout-r1/staff/nose-wide"
+      ],
+      "mouth": [
+        "dugout-r1/staff/mouth-neutral",
+        "dugout-r1/staff/mouth-curved"
+      ],
+      "torso": [
+        "dugout-r1/staff/torso-polo",
+        "dugout-r1/staff/torso-track"
+      ],
+      "age_details": {
+        "subtle": "dugout-r1/staff/age_details-subtle",
+        "mature": "dugout-r1/staff/age_details-mature"
+      }
+    }
+  },
+  "components": {
+    "dugout-r1/players/head-oval": {
+      "path": "components-v1/players/head-oval.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        0,
+        0,
+        335,
+        430
+      ],
+      "skin_tone": "light"
+    },
+    "dugout-r1/players/head-square": {
+      "path": "components-v1/players/head-square.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        335,
+        0,
+        654,
+        430
+      ],
+      "skin_tone": "tan"
+    },
+    "dugout-r1/players/head-long": {
+      "path": "components-v1/players/head-long.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        654,
+        0,
+        944,
+        430
+      ],
+      "skin_tone": "deep"
+    },
+    "dugout-r1/players/hair-swept": {
+      "path": "components-v1/players/hair-swept.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        944,
+        0,
+        1266,
+        430
+      ]
+    },
+    "dugout-r1/players/hair-curls": {
+      "path": "components-v1/players/hair-curls.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        0,
+        430,
+        335,
+        730
+      ]
+    },
+    "dugout-r1/players/hair-crop": {
+      "path": "components-v1/players/hair-crop.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        335,
+        430,
+        654,
+        730
+      ]
+    },
+    "dugout-r1/players/eyes-calm": {
+      "path": "components-v1/players/eyes-calm.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        654,
+        430,
+        944,
+        730
+      ]
+    },
+    "dugout-r1/players/eyes-focused": {
+      "path": "components-v1/players/eyes-focused.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        944,
+        430,
+        1266,
+        730
+      ]
+    },
+    "dugout-r1/players/nose-straight": {
+      "path": "components-v1/players/nose-straight.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        0,
+        730,
+        335,
+        965
+      ]
+    },
+    "dugout-r1/players/nose-wide": {
+      "path": "components-v1/players/nose-wide.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        335,
+        730,
+        654,
+        965
+      ]
+    },
+    "dugout-r1/players/mouth-neutral": {
+      "path": "components-v1/players/mouth-neutral.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        654,
+        730,
+        944,
+        965
+      ]
+    },
+    "dugout-r1/players/mouth-curved": {
+      "path": "components-v1/players/mouth-curved.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        944,
+        730,
+        1266,
+        965
+      ]
+    },
+    "dugout-r1/players/torso-round": {
+      "path": "components-v1/players/torso-round.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        0,
+        965,
+        332,
+        1200
+      ]
+    },
+    "dugout-r1/players/torso-vneck": {
+      "path": "components-v1/players/torso-vneck.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        332,
+        965,
+        662,
+        1200
+      ]
+    },
+    "dugout-r1/players/age_details-subtle": {
+      "path": "components-v1/players/age_details-subtle.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        662,
+        965,
+        944,
+        1200
+      ]
+    },
+    "dugout-r1/players/age_details-mature": {
+      "path": "components-v1/players/age_details-mature.png",
+      "source": "players-atlas-v02.png",
+      "crop": [
+        944,
+        965,
+        1266,
+        1200
+      ]
+    },
+    "dugout-r1/staff/head-oval": {
+      "path": "components-v1/staff/head-oval.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        0,
+        0,
+        384,
+        350
+      ],
+      "skin_tone": "light"
+    },
+    "dugout-r1/staff/head-square": {
+      "path": "components-v1/staff/head-square.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        384,
+        0,
+        768,
+        350
+      ],
+      "skin_tone": "tan"
+    },
+    "dugout-r1/staff/head-long": {
+      "path": "components-v1/staff/head-long.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        768,
+        0,
+        1152,
+        350
+      ],
+      "skin_tone": "deep"
+    },
+    "dugout-r1/staff/hair-sidepart-grey": {
+      "path": "components-v1/staff/hair-sidepart-grey.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        1152,
+        0,
+        1536,
+        350
+      ]
+    },
+    "dugout-r1/staff/hair-receding-grey": {
+      "path": "components-v1/staff/hair-receding-grey.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        0,
+        350,
+        384,
+        590
+      ]
+    },
+    "dugout-r1/staff/hair-curls-grey": {
+      "path": "components-v1/staff/hair-curls-grey.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        384,
+        350,
+        768,
+        590
+      ]
+    },
+    "dugout-r1/staff/eyes-calm": {
+      "path": "components-v1/staff/eyes-calm.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        768,
+        350,
+        1152,
+        590
+      ]
+    },
+    "dugout-r1/staff/eyes-focused": {
+      "path": "components-v1/staff/eyes-focused.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        1152,
+        350,
+        1536,
+        590
+      ]
+    },
+    "dugout-r1/staff/nose-straight": {
+      "path": "components-v1/staff/nose-straight.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        0,
+        590,
+        384,
+        755
+      ]
+    },
+    "dugout-r1/staff/nose-wide": {
+      "path": "components-v1/staff/nose-wide.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        384,
+        590,
+        768,
+        755
+      ]
+    },
+    "dugout-r1/staff/mouth-neutral": {
+      "path": "components-v1/staff/mouth-neutral.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        768,
+        590,
+        1152,
+        755
+      ]
+    },
+    "dugout-r1/staff/mouth-curved": {
+      "path": "components-v1/staff/mouth-curved.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        1152,
+        590,
+        1536,
+        755
+      ]
+    },
+    "dugout-r1/staff/torso-polo": {
+      "path": "components-v1/staff/torso-polo.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        0,
+        755,
+        400,
+        1003
+      ]
+    },
+    "dugout-r1/staff/torso-track": {
+      "path": "components-v1/staff/torso-track.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        400,
+        755,
+        790,
+        1003
+      ]
+    },
+    "dugout-r1/staff/age_details-subtle": {
+      "path": "components-v1/staff/age_details-subtle.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        790,
+        755,
+        1152,
+        1003
+      ]
+    },
+    "dugout-r1/staff/age_details-mature": {
+      "path": "components-v1/staff/age_details-mature.png",
+      "source": "staff-atlas-v01.png",
+      "crop": [
+        1152,
+        755,
+        1536,
+        1003
+      ]
+    }
+  }
+}

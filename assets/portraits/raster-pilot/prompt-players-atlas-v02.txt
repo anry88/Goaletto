@@ -1,0 +1,7 @@
+Use case: precise-object-edit
+Asset type: transparent modular male footballer component atlas revision.
+Edit target: supplied player component atlas. Keep its 16-part layout, blank heads/ears/necks, hair, eyes, mouth shapes, jersey material colors and hand-inked Dugout style unchanged.
+Change ONLY the following:
+1. BOTH noses in row3 columns1 and2: replace opaque flesh-colored nose fill with transparent negative space. Retain the same nose shapes through sparse charcoal nostril outlines, side lines, tip accents, faint translucent shadows only. No opaque skin backing; these noses must layer over light, tan OR deep brown heads without a pale sticker patch.
+2. BOTH age overlays in row4 columns3 and4: REMOVE the duplicated eyebrows. Keep only sparse forehead and outer-eye/cheek age lines with transparent interiors. No eyes/brows/skin. Moderate, natural aging for a footballer28-38, not an elderly face.
+Everything else stays identical. Real alpha transparency preserved, no background, frame, text, grid or checkerboard. Do not add complete faces or move any parts.

@@ -5,7 +5,8 @@ Python, сообщения и inline-кнопки; без Mini App и JavaScript
 
 **Состояние: начальный каркас, не готовая игра.** Доступны демонстрационное меню бота,
 чистые правила времени и переходов между лигами, базовая миграция PostgreSQL, диагностический
-worker и малый портретный комбинатор. Регистрация, симуляция матчей, экономика и отправка
+worker и портретные комбинаторы: технический SVG и иллюстрированный PNG из прозрачных частей.
+Регистрация, симуляция матчей, экономика и отправка
 outbox-уведомлений пока не реализованы.
 
 - [Актуальный GDD](football-manager-bot-gdd.md)
@@ -31,7 +32,10 @@ outbox-уведомлений пока не реализованы.
 - Владение сохраняется шесть календарных месяцев с последнего игрового действия;
   периодические напоминания, затем освобождение. [Правила](docs/bot-clubs.md).
 - Портреты: отдельные банки игроков и персонала. В библиотеке только небольшой пилот;
-  направление C — Dugout согласовано; production-каталог развивается отдельно.
+  сейчас мужские варианты, одежда в двух цветах клуба. Направление C — Dugout
+  согласовано; production-каталог развивается отдельно.
+- Пенсия: утверждённая шкала 5/10/20/35/55/80/100% в 32–38; заранее объявленный
+  последний сезон запрещает сделки с футболистом. [Контракт](docs/player-lifecycle.md).
 
 ## Локальная разработка
 
@@ -77,11 +81,17 @@ CI создаёт изолированный PostgreSQL и проверяет м
 ```bash
 goaletto-portraits --seed player-01 --bank players --output work/player.svg
 python scripts/render_portrait_preview.py
+python -m goaletto.portraits.raster_cli --seed player-01 --bank players --age 24 \
+  --kit-primary '#743D42' --kit-secondary '#F2E9D8' --output work/player.png \
+  --recipe-output work/player-recipe.json
+python scripts/render_raster_portrait_preview.py
 ```
 
-Для PNG-предпросмотров: python -m pip install '.[art]' и системная библиотека Cairo
+Для иллюстрированных PNG достаточно обычных runtime dependencies (Pillow; без сети при рендере).
+Для старых SVG→PNG-предпросмотров нужны python -m pip install '.[art]' и системная библиотека Cairo
 (macOS: brew install cairo; Debian/Ubuntu: libcairo2). SVG-комбинатор работает без Cairo.
-Концепты находятся в assets/concepts/, модульный пилот — в assets/portraits/.
+Концепты находятся в assets/concepts/, модульные пилоты — в assets/portraits/.
+Новый [растровый комбинатор](docs/portrait-system.md) хранит рецепт лица отдельно от возраста и формы.
 Статическая галерея открывается как обычный HTML-файл и не использует JavaScript.
 
 ## Структура
@@ -93,7 +103,7 @@ src/goaletto/
   application/      граница будущих игровых use cases
   infrastructure/   PostgreSQL models, transactions, jobs
   worker/           отдельный обработчик фоновой работы
-  portraits/        детерминированный SVG-комбинатор
+  portraits/        детерминированные SVG/PNG-комбинаторы
 migrations/         Alembic
 tests/              unit и PostgreSQL integration
 docs/               правила, архитектура, план, эксплуатация

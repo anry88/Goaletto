@@ -1,0 +1,13 @@
+{
+  "asset_version": 1,
+  "bank": "staff",
+  "components": {
+    "eyes": "dugout-r1/staff/eyes-focused",
+    "hair": "dugout-r1/staff/hair-receding-grey",
+    "head": "dugout-r1/staff/head-oval",
+    "mouth": "dugout-r1/staff/mouth-curved",
+    "nose": "dugout-r1/staff/nose-straight",
+    "torso": "dugout-r1/staff/torso-polo"
+  },
+  "seed": "modular-staff-03"
+}

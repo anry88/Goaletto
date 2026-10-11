@@ -21,6 +21,11 @@
   for the upcoming season being their last, with increasing chance at ages 32-38
   and certainty at 38. Warn for that full season, then retire; never reroll on retry.
   Preserve face identity while applying age layers. See docs/player-lifecycle.md.
+- The agreed retirement probabilities at ages 32..38 are 5/10/20/35/55/80/100%.
+  An announced last season forbids player trades; cancel open listings and release
+  reservations idempotently. Check status under lock at listing, bid and settlement.
+- New portrait banks are male-only for now. Clothing takes current club primary/
+  secondary colors at render time; never change face identity to recolor a kit.
 - PostgreSQL owns durable state, accepted commands, scheduled jobs and notification
   outbox. Make ticks, season rollover, club claims and money movements idempotent.
 - Do not store game state only in aiogram FSM or process memory.

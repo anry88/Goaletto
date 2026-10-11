@@ -52,3 +52,12 @@ It illustrates identity continuity; it does not assign P01 a retirement age.
 These files use built-in Imagegen, remain assembled review assets, and are not
 transparent interchangeable runtime layers. See docs/player-lifecycle.md for the
 season-based +1 age and progressive last-season decisions at ages 32–38.
+
+## Male scope and real assembly
+
+The user deferred female variants on 2026-10-11. The historical S01 stays in v01/v02,
+but the new banks are male-only. dugout-male-players-v01.png and dugout-male-staff-v01.png
+are six-person style references, with neutral kit material and full adjacent prompts.
+They are not the generator input portraits. The working generator uses purpose-made
+transparent parts in ../raster-pilot/, with separate identity, age and club kit colors.
+See ../../../docs/portrait-raster-generator.md for the actual assembly outputs.

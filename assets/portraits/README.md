@@ -10,3 +10,8 @@ Regenerate from the repo root: python scripts/render_portrait_preview.py.
 
 This is an approval-stage technical pilot in the approved direction C palette, expanded with a few extra parts
 after selection. Illustrated production quality is still a separate task.
+
+raster-pilot/ now contains a working illustrated PNG compositor's two male banks:
+32 transparent parts, source atlases/prompts and actual automatic assembly previews.
+Current age and club primary/secondary colors are renderer context, separate from identity.
+See ../../docs/portrait-raster-generator.md; the original SVG pilot is unchanged.
