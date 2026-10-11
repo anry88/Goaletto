@@ -20,7 +20,7 @@ flowchart LR
 - bot: форматирование, кнопки, маршрутизация, немедленный answerCallbackQuery.
 - domain: часы, рейтинги, симуляция, таблицы, правила переходов; переданный seed и
   явные входные данные. Сетевых вызовов и импортов framework здесь нет.
-- application: контракт аналитических эффектов и граница атомарного создания person;
+- application: контракт аналитических эффектов, атомарное создание person/мира;
   права на клуб и остальные игровые use cases остаются в плане.
 - infrastructure: SQLAlchemy, репозитории, jobs/outbox.
 - worker: получение просроченной работы и вызов application.
@@ -72,9 +72,11 @@ Envelope/allowlist v1 реализован в `application.analytics`, [конт
 Таблица псевдонимов присутствует в новой миграции; journey collection, сессии,
 атрибуция, feedback и SQL-отчёты пока не реализованы.
 
-Миграции foundation + game_foundation описывают 24 таблицы: topology/jobs/outbox,
+Миграции foundation + game_foundation + world_seed описывают 25 таблиц: topology/jobs/outbox,
 managers/analytics IDs/ownership, persons/appearance registry/player/staff careers,
-season memberships/standings, lineups, fixtures/matches/ticks и accepted commands.
+season memberships/standings, lineups, fixtures/matches/ticks, accepted commands
+и immutable world_seed_receipt. [Seed и календарь](world-initialization.md).
+Calendar jobs сохраняются held: текущий worker их не исполняет до появления handlers.
 [ERD, ограничения и транзакционные границы](data-model.md).
 Схема не обеспечивает самостоятельно ровно 10 клубов в лиге: это инвариант seed/rollover.
 Выполнение новой миграции на PostgreSQL пока не проверено: по текущему указанию

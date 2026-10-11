@@ -26,6 +26,7 @@ art = ["CairoSVG>=2.7,<3"]
 [project.scripts]
 goaletto-bot = "goaletto.bot.main:main"
 goaletto-worker = "goaletto.worker.main:main"
+goaletto-world = "goaletto.application.world_cli:main"
 goaletto-portraits = "goaletto.portraits.cli:main"
 goaletto-raster-portraits = "goaletto.portraits.raster_cli:main"
 

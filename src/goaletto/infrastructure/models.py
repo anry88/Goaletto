@@ -68,7 +68,7 @@ class Club(Base):
 class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
-        CheckConstraint("status IN ('pending', 'done', 'failed')", name="ck_job_status"),
+        CheckConstraint("status IN ('held', 'pending', 'done', 'failed')", name="ck_job_status"),
         CheckConstraint("attempts >= 0", name="ck_job_attempts"),
         Index("ix_jobs_due", "status", "due_at"),
     )
@@ -617,3 +617,17 @@ class Standing(Base):
     goals_for: Mapped[int] = mapped_column(Integer, default=0)
     goals_against: Mapped[int] = mapped_column(Integer, default=0)
     points: Mapped[int] = mapped_column(SmallInteger, default=0)
+
+
+class WorldSeedReceipt(Base):
+    """Committed seed key, independent of subsequent gameplay changes."""
+
+    __tablename__ = "world_seed_receipts"
+    __table_args__ = (CheckConstraint("length(config_hash) = 64", name="ck_world_seed_hash"),)
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    league_set_id: Mapped[UUID] = mapped_column(ForeignKey("league_sets.id"), unique=True)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), unique=True)
+    config_hash: Mapped[str] = mapped_column(String(64))
+    policy_version: Mapped[str] = mapped_column(String(80))
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

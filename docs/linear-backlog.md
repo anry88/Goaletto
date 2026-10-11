@@ -90,11 +90,9 @@ Linear — источник актуального статуса; реестр 
 
 ### [AND-46 · Создать первый комплект пяти лиг и 50 бот-клубов с близкими составами](https://linear.app/andrei-brazhnikov/issue/AND-46/sozdat-pervyj-komplekt-pyati-lig-i-50-bot-klubov-s-blizkimi-sostavami)
 
-Уточнение стартового состава: ровно 20 футболистов на клуб, всего 1 000 для первого комплекта. Каждому человеку свой appearance identity без повторов, назначение атомарно с seed и reservation в PostgreSQL; retry возвращает существующие назначения. Подготовлен whole-v2 на 1 000 игроков/80 сотрудников, графика ещё на визуальной проверке. Локальный plan_identity_allocation не заменяет durable seed. Изображённый возраст каталога не диктует возрастной состав; подобрать подходящий вариант. Начальный кадровый пул и количество нанятых staff пока не утверждены.
+Реализованы domain.world/build_world, application.world/initialize_world и CLI goaletto-world. Воспроизводимый комплект: 5 лиг × 10 клубов × 20 футболистов, все без владельцев; fixed 4-4-2/bench с запасным GK, сопоставимые профили навыков без tier handicap, одинаковый общий budget parameter. PostgreSQL seed использует общий allocation transaction lock, immutable receipt/config hash, 1000 уникальных person/face reservations и отказ при исчерпании age-compatible каталога. Repeat receipt возвращает прежние IDs и не сбрасывает финансы/лица/возраст/составы/владение после матчей. Стартеры 32–38 получают persisted first-season retirement decision; 38 всегда последний. Шкала staff и стартовый staff pool не вводятся.
 
-Идемпотентный seed: первый league_set, уровни 1–5 по 10 клубов без владельцев. У всех примерно одинаковые базовые составы независимо от tier: общий размер/позиционный шаблон и близкие рейтинги, небольшое seed-воспроизводимое разнообразие. Убрать сильные/слабые стартовые архетипы. Примерные ресурсы по общей стартовой модели; точные числа проверить в балансе.
-
-**Приёмка:** Ровно 5 лиг/50 уникальных клубов; repeat seed без копий; у каждого сохранённая XI/схема/скамейка, покрытие позиций и резервный вратарь. Сила сопоставима по измеренному допуску, без tier handicap. Нет нейросетей, тренировок/трансферов/тактической оптимизации бот-клубов. Возраст позволяет обычное старение; начальные составы воспроизводимы. Claim сохраняет текущее состояние, не выдаёт стартовый reset.
+**Приёмка:** Проверен offline preview: 5 лиг, 50 клубов, 1000 игроков/лиц, 450 fixtures и 15302 held jobs. Core skill mean 8.91875, spread 0; это proxy начального баланса, не окончательный OVR. 134 unit tests passed, 2 integration deselected; Ruff/format/mypy и offline upgrade/downgrade прошли. SQL-recording проверяет compiled batches, unique faces, held jobs и receipt последним; retry не перестраивает мир. По указанию пользователя новые БД не создаются: реальный PostgreSQL seed/concurrency/rollback и --apply не выполнялись. Документация docs/world-initialization.md. Реализованный seed не означает runtime матчей, claim или HDC deploy.
 
 **Зависимости:** AND-45.
 
@@ -203,9 +201,9 @@ Python-only bot, без публичного redirect, frontend и нового 
 
 ### [AND-55 · Создать двухкруговой календарь и недельное расписание](https://linear.app/andrei-brazhnikov/issue/AND-55/sozdat-dvuhkrugovoj-kalendar-i-nedelnoe-raspisanie)
 
-По 18 туров для каждой лиги 10 клубов; суббота 18:00 UTC; сезоны комплектов независимы; начало/межсезонье и уведомления.
+Реализован чистый circle calendar: 18 туров, 90 матчей на лигу, 450 на комплект; пары home/away, 5 игр/тур и один матч клуба за тур. UTC Saturday 18:00, независимый kickoff комплекта; две пустые субботы после последнего тура. UUID/keys/deadlines стабильны. Seed атомарно сохраняет fixtures и 34 jobs/матч: remind -5min, lock -1min, start, 30 ticks и second-half 18:00; season open/rollover отдельно.
 
-**Приёмка:** Каждая пара играет дома/в гостях; 5 матчей в туре и 90 в сезоне на лигу; нет пересечений клуба по времени; повтор планирования не дублирует fixtures/jobs.
+**Приёмка:** Календарь и clock boundaries проверены unit-тестами для нескольких seed, включая DST и tick15/16/30. Повтор world seed возвращает receipt без повторного fixtures/jobs. Все календарные jobs held, worker их не исполняет. Задача остаётся In Progress: нужны runtime handlers/recovery AND-52 и delivery AND-68, затем безопасная активация поддерживаемых jobs. События фактического старта/окончания и уведомления сейчас не отправлялись. Проверок БД и --apply не было. docs/world-initialization.md.
 
 **Зависимости:** AND-46, AND-52.
 
