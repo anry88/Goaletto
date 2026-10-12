@@ -54,16 +54,29 @@ be assigned to a new unrelated employee. Retired identities stay reserved.
 This extension does not implement PostgreSQL reservations, people/club seeding,
 season aging, retirement, recruitment, Telegram delivery or Telegram file caching.
 
-Current saved batch (2026-10-11): 87 atlases / 1,740 age-career variants.
-240 player identities have all seven stages; another 20 have three stages.
-The other 760 player identities and all 80 initial staff identities retain their
-base portraits, with lifecycle stages still missing. Built-in Imagegen reached its
-daily usage limit. 275 atlases remain; generation-checkpoint.json lists them.
-Reset reported by tool: 2026-10-12 10:19:38 UTC (12:19 Belgrade).
+Current saved batch (2026-10-12): 289 atlases / 5,780 age-career variants.
+This session added 202 atlases / 4,040 variants to the previous 87 atlases.
+780 player identities (p0001..p0780) have all seven stages; another 20
+(p0781..p0800) have all four football stages but still lack their staff stages.
+All 80 initial staff identities have all three staff stages. The other 200 player
+identities retain their base portraits, with lifecycle stages still missing.
+Built-in Imagegen reached usage_limit_reached. 73 atlases / 1,460 variants remain;
+generation-checkpoint.json lists them. Resume with players-40-staff-early, then
+players-40-staff-middle/senior, then all seven stages for players-41..50.
+Reset reported by tool: 2026-10-13 11:57:51 UTC (13:57 Belgrade).
 No scheduled continuation or API generation has been enabled.
 
-Review: all 13 available atlas comparison pages and the highest-distance original/age
-pairs were inspected. Previous-row garment/baseline fragments were removed by
-whole-tile extraction; faces were not assembled or stretched. The technical audit
-checks strong technical pigments and faint horizontal neighbor edges above hair.
-These checks do not replace future visual review of newly generated batches.
+Review: all 44 available atlas comparison pages have been inspected (40 player
+atlases and four staff atlases). No obvious identity swaps were found; similarity
+ranking remains a review aid, not proof of same-person continuity. The technical
+audit passed for all 5,780 available variants: zero exact pixel duplicates, valid
+alpha/masks, preserved pixels outside clothing, and no neighbor garment/baseline
+fragments above hair. These checks do not certify the missing part of the plan.
+
+The importer now removes a sloping neighboring jersey hem that previously escaped
+the gutter boundary check. The p0487-staff-early-l1 and p0489-staff-senior-l1 crops from this session
+are regression fixtures for this case. Original source atlases, base portraits
+and appearance identities remain unchanged; lifecycle exports were reimported.
+Ruff check/format and mypy passed; 213 non-integration tests passed, two integration
+tests were deselected. The final expanded catalog also passed all 24 portrait
+lifecycle tests. No database was used for these checks.

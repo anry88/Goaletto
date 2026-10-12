@@ -32,7 +32,9 @@ def clean_lifecycle_person(sprite: Image.Image) -> Image.Image:
         )
         # Jersey pigments distinguish the broad intruding edge from actual hair.
         # A very thin black shoulder baseline can also intrude without pigment.
-        if counts[row] >= width * 0.55 and counts[row + 1] < width * 0.5:
+        # A sloping jersey hem can taper to half the tile width before the
+        # transparent gutter; requiring 55% misses that final opaque row.
+        if counts[row] >= width * 0.5 and counts[row + 1] < width * 0.5:
             if pigment >= width * 2 or row < 4:
                 cutoff = row + 1
     if cutoff is not None:

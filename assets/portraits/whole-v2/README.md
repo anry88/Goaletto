@@ -41,13 +41,17 @@ main connected figure; it never changes face proportions. Masks keep only techni
 pigment regions connected to the lower garment, bridging narrow black seams.
 
 `plan_identity_allocation` plans without replacement and refuses an exhausted bank.
-Application still needs PG reservation uniqueness, locks and persistent assignment.
+PG reservation uniqueness, locks and persistent assignment are implemented in
+the game foundation/world initializer (AND-45/46); this offline import does not run them.
 On retry, look up existing person assignments first; plan only newly unassigned people.
 Retired identities remain reserved permanently. A second league set and academy
 replacements need more portraits: the first 1,000 cover exactly the starting players.
 No real clubs/players, retirement/pools or Telegram file cache are created by this import.
 
 Age/career expansion: [lifecycle-v1](lifecycle-v1/README.md),
-[comparison gallery](lifecycle-v1/index.html). 1,740 additional variants are saved:
-240 players with seven stages, 20 with three. 275 source atlases remain after the
-built-in tool reached its daily quota. See generation-checkpoint.json for resume.
+[comparison gallery](lifecycle-v1/index.html). 5,780 additional variants are saved:
+780 players with seven stages, 20 with four football stages, and all 80 initial
+staff with three staff stages. 73 source atlases / 1,460 variants remain after the
+built-in tool reached its usage limit on 2026-10-12. The tool reported a reset at
+2026-10-13 11:57:51 UTC (13:57 Belgrade). See lifecycle-v1/generation-checkpoint.json
+for the exact missing sources; no continuation has been scheduled.

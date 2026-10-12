@@ -132,6 +132,8 @@ def test_previous_atlas_row_is_not_exported_above_hair() -> None:
         "p0173-staff-early-l1",
         "p0175-staff-early-l1",
         "p0147-player-veteran-l1",
+        "p0487-staff-early-l1",
+        "p0489-staff-senior-l1",
     )
     for variant in variants:
         recipe = recipe_for_variant(variant, ROOT)
