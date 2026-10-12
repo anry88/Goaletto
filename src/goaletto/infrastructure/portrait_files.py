@@ -1,4 +1,4 @@
-"""Durable Telegram portrait file cache. PROPOSAL for Codex review.
+"""Durable Telegram portrait file cache.
 
 New table only; existing models, chain history and worker wiring are untouched.
 Until the migration is agreed and applied, bot code uses the in-memory store
@@ -9,35 +9,10 @@ not prove live PostgreSQL races, rollback or trigger behavior.
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
 
-from goaletto.infrastructure.models import Base
-
-
-class TelegramPortraitFile(Base):
-    __tablename__ = "telegram_portrait_files"
-    __table_args__ = (
-        CheckConstraint("length(cache_key) = 64", name="ck_portrait_file_key"),
-        CheckConstraint("catalog_version > 0", name="ck_portrait_file_catalog"),
-        CheckConstraint("kit_version > 0", name="ck_portrait_file_kit_version"),
-        CheckConstraint("size IN (96, 256)", name="ck_portrait_file_size"),
-        CheckConstraint("length(file_id) BETWEEN 1 AND 500", name="ck_portrait_file_id"),
-    )
-    cache_key: Mapped[str] = mapped_column(String(64), primary_key=True)
-    identity_id: Mapped[str] = mapped_column(String(100))
-    variant_id: Mapped[str] = mapped_column(String(100))
-    catalog_version: Mapped[int] = mapped_column(Integer)
-    kit_primary: Mapped[str] = mapped_column(String(7))
-    kit_secondary: Mapped[str] = mapped_column(String(7))
-    kit_version: Mapped[int] = mapped_column(Integer)
-    size: Mapped[int] = mapped_column(Integer)
-    background: Mapped[str] = mapped_column(String(32), default="transparent")
-    file_id: Mapped[str] = mapped_column(String(500))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+from goaletto.infrastructure.models import TelegramPortraitFile
 
 
 async def load_file_id(session: AsyncSession, cache_key: str) -> str | None:

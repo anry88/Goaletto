@@ -90,7 +90,17 @@ class OutboxMessage(Base):
     __tablename__ = "outbox_messages"
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'sent', 'failed')", name="ck_outbox_status"),
+        CheckConstraint("priority BETWEEN 0 AND 100", name="ck_outbox_priority"),
+        CheckConstraint("attempts >= 0", name="ck_outbox_attempts"),
+        CheckConstraint("(leased_until IS NULL) = (lease_owner IS NULL)", name="ck_outbox_lease"),
+        CheckConstraint(
+            "telegram_message_id IS NULL OR telegram_message_id > 0",
+            name="ck_outbox_message_id",
+        ),
         Index("ix_outbox_due", "status", "due_at"),
+        Index("ix_outbox_delivery", "status", "priority", "due_at"),
+        Index("ix_outbox_lease", "status", "leased_until"),
+        Index("ix_outbox_live_board", "live_board_key"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     dedupe_key: Mapped[str] = mapped_column(String(200), unique=True)
@@ -99,7 +109,70 @@ class OutboxMessage(Base):
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16), default="pending")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
-    # Delivery dispatcher with leases/retry_after is still a separate backlog item.
+    # Short database leases; Telegram calls never hold these row locks.
+    leased_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_owner: Mapped[str | None] = mapped_column(String(64))
+    telegram_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    live_board_key: Mapped[str | None] = mapped_column(String(200))
+    priority: Mapped[int] = mapped_column(SmallInteger, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(String(80))
+
+
+class OutboxBoard(Base):
+    """One durable message and delivery lease per fixture/ownership stream."""
+
+    __tablename__ = "outbox_boards"
+    __table_args__ = (
+        UniqueConstraint("fixture_id", "ownership_id", name="uq_outbox_board_stream"),
+        CheckConstraint(
+            "telegram_message_id IS NULL OR telegram_message_id > 0",
+            name="ck_board_message_id",
+        ),
+        CheckConstraint("revision BETWEEN -1 AND 1000", name="ck_board_revision"),
+        CheckConstraint("(leased_until IS NULL) = (lease_owner IS NULL)", name="ck_board_lease"),
+    )
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    fixture_id: Mapped[UUID] = mapped_column(ForeignKey("fixtures.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    chat_id: Mapped[int] = mapped_column(BigInteger)
+    telegram_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    revision: Mapped[int] = mapped_column(SmallInteger, server_default="-1")
+    leased_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_owner: Mapped[str | None] = mapped_column(String(64))
+    retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class OutboxDeliveryAttempt(Base):
+    """Operational history independent of journey retention/analytics opt-out."""
+
+    __tablename__ = "outbox_delivery_attempts"
+    __table_args__ = (
+        CheckConstraint("attempt > 0", name="ck_delivery_attempt_number"),
+        CheckConstraint(
+            "outcome IN ('claimed','sending','sent','edited','duplicate','rate_limited',"
+            "'transient','unknown', 'blocked','chat_unavailable','invalid_request',"
+            "'skip_stale','skip_unavailable')",
+            name="ck_delivery_outcome",
+        ),
+        CheckConstraint(
+            "(outcome IN ('claimed','sending')) = (finished_at IS NULL)",
+            name="ck_delivery_finished",
+        ),
+        CheckConstraint(
+            "(network_started_at IS NULL OR network_started_at >= started_at) AND "
+            "(finished_at IS NULL OR finished_at >= started_at) AND "
+            "(finished_at IS NULL OR network_started_at IS NULL OR "
+            "finished_at >= network_started_at)",
+            name="ck_delivery_times",
+        ),
+    )
+    outbox_id: Mapped[UUID] = mapped_column(ForeignKey("outbox_messages.id"), primary_key=True)
+    attempt: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lease_owner: Mapped[str] = mapped_column(String(64))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    network_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome: Mapped[str] = mapped_column(String(24))
 
 
 class Manager(Base):
@@ -114,6 +187,7 @@ class Manager(Base):
     first_game_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reminders_enabled: Mapped[bool] = mapped_column(Boolean, server_default="true")
     bot_available: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    bot_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AnalyticsManager(Base):
@@ -898,3 +972,28 @@ class GameActionReceipt(Base):
     club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"))
     kind: Mapped[str] = mapped_column(String(80))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TelegramPortraitFile(Base):
+    __tablename__ = "telegram_portrait_files"
+    __table_args__ = (
+        CheckConstraint("length(cache_key) = 64", name="ck_portrait_file_key"),
+        CheckConstraint("catalog_version > 0", name="ck_portrait_file_catalog"),
+        CheckConstraint("kit_version > 0", name="ck_portrait_file_kit_version"),
+        CheckConstraint("size IN (96, 256)", name="ck_portrait_file_size"),
+        CheckConstraint("length(file_id) BETWEEN 1 AND 500", name="ck_portrait_file_id"),
+    )
+    cache_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    identity_id: Mapped[str] = mapped_column(String(100))
+    variant_id: Mapped[str] = mapped_column(String(100))
+    catalog_version: Mapped[int] = mapped_column(Integer)
+    kit_primary: Mapped[str] = mapped_column(String(7))
+    kit_secondary: Mapped[str] = mapped_column(String(7))
+    kit_version: Mapped[int] = mapped_column(Integer)
+    size: Mapped[int] = mapped_column(Integer)
+    background: Mapped[str] = mapped_column(
+        String(32), default="transparent", server_default="transparent"
+    )
+    file_id: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

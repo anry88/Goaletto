@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,9 @@ from goaletto.bot.portrait_cache import (
     PortraitFileStore,
     portrait_cache_key,
 )
+from goaletto.bot.responses import edit_response
+from goaletto.infrastructure.database import Database
+from goaletto.infrastructure.portrait_files import load_file_id, store_file_id
 from goaletto.portraits.whole import (
     WholePortraitRecipe,
     recipe_for_age,
@@ -103,7 +107,7 @@ async def build_player_response(
 
 
 @router.callback_query(F.data.startswith("vc:p:"))
-async def player_card(query: CallbackQuery, session: AsyncSession) -> None:
+async def player_card(query: CallbackQuery, database: Database) -> None:
     await query.answer()
     message = query.message
     user = query.from_user
@@ -114,23 +118,28 @@ async def player_card(query: CallbackQuery, session: AsyncSession) -> None:
         if kind != "player" or person_id is None:
             raise ValueError("Not a player callback")
         now = datetime.now(UTC)
-        text, keyboard, card, recipe, key = await build_player_response(
-            session, user.id, query.id, now, person_id, page
-        )
-        await message.edit_text(text, reply_markup=keyboard)
+        async with database.transaction() as session:
+            text, keyboard, card, recipe, key = await build_player_response(
+                session, user.id, query.id, now, person_id, page
+            )
+        await edit_response(message, text, keyboard)
         if recipe is not None and key:
             await _maybe_send_portrait(
                 query,
                 recipe,
                 key,
+                database=database,
+                kit_version=card.kit_version,
                 kit_primary=card.kit_primary,
                 kit_secondary=card.kit_secondary,
             )
     except PermissionDenied:
-        await message.edit_text("Нет доступа: клуб больше не принадлежит вам. Откройте /start.")
+        await edit_response(
+            message, "Нет доступа: клуб больше не принадлежит вам. Откройте /start."
+        )
     except ValueError:
         text, keyboard = stale_view()
-        await message.edit_text(text, reply_markup=keyboard)
+        await edit_response(message, text, keyboard)
 
 
 async def _maybe_send_portrait(
@@ -140,25 +149,52 @@ async def _maybe_send_portrait(
     *,
     kit_primary: str,
     kit_secondary: str,
+    kit_version: int = 1,
+    database: Database | None = None,
 ) -> None:
     """Best-effort photo; any failure keeps the text card as the source of truth."""
     message = query.message
     if not isinstance(message, Message):
         return
     try:
-        file_id = await _store.get(key)
+        if database is not None:
+            async with database.transaction() as session:
+                file_id = await load_file_id(session, key)
+        else:
+            file_id = await _store.get(key)
         if file_id is not None:
             try:
                 await message.answer_photo(photo=file_id)
                 return
-            except Exception:
-                pass  # Stale file_id (e.g. after restart): re-render same face.
+            except TelegramBadRequest as error:
+                if not any(
+                    code in error.message.lower()
+                    for code in ("wrong file", "file_id", "file identifier")
+                ):
+                    return
         png = render_portrait_png(
             recipe, kit_primary=kit_primary, kit_secondary=kit_secondary, size=256
         )
         sent = await message.answer_photo(photo=BufferedInputFile(png, filename="p.png"))
         photos = getattr(sent, "photo", None) or []
         if photos:
-            await _store.put(key, photos[-1].file_id)
+            if database is not None:
+                async with database.transaction() as session:
+                    await store_file_id(
+                        session,
+                        cache_key=key,
+                        file_id=photos[-1].file_id,
+                        identity_id=recipe.identity_id,
+                        variant_id=recipe.variant_id,
+                        catalog_version=recipe.catalog_version,
+                        kit_primary=kit_primary,
+                        kit_secondary=kit_secondary,
+                        kit_version=kit_version,
+                        size=256,
+                        background="transparent",
+                        at=datetime.now(UTC),
+                    )
+            else:
+                await _store.put(key, photos[-1].file_id)
     except Exception:
         return

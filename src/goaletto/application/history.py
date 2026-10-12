@@ -31,6 +31,7 @@ from goaletto.infrastructure.models import (
     League,
     Match,
     MatchResult,
+    MatchStage,
     MatchTick,
     Person,
     Player,
@@ -259,8 +260,6 @@ async def get_club_results(
         if receipt is None:
             raise ValueError("Finished fixture has no immutable result receipt")
         receipts[fixture_id] = receipt
-    club_ids = {c for f in chosen for c in (f.home_club_id, f.away_club_id)}
-    names = await _club_names(session, club_ids)
     entries: list[ClubResultEntry] = []
     for fixture in chosen:
         receipt = receipts[fixture.id]
@@ -276,8 +275,8 @@ async def get_club_results(
                 fixture.scheduled_start_at,
                 fixture.home_club_id,
                 fixture.away_club_id,
-                names.get(fixture.home_club_id, "?"),
-                names.get(fixture.away_club_id, "?"),
+                restore_state(match_by_fixture[fixture.id].starting_snapshot).home.snapshot.name,
+                restore_state(match_by_fixture[fixture.id].starting_snapshot).away.snapshot.name,
                 receipt.home_goals,
                 receipt.away_goals,
                 outcome,
@@ -294,6 +293,40 @@ async def _club_names(session: AsyncSession, club_ids: set[UUID]) -> dict[UUID, 
         return {}
     rows = (await session.scalars(select(Club).where(Club.id.in_(club_ids)))).all()
     return {row.id: row.name for row in rows}
+
+
+async def stored_events(session: AsyncSession, match_id: UUID) -> list[dict[str, object]]:
+    """Include halftime/stage commands, preserving stored order and event IDs."""
+    ticks = (
+        await session.scalars(
+            select(MatchTick).where(MatchTick.match_id == match_id).order_by(MatchTick.tick_number)
+        )
+    ).all()
+    stages = (
+        await session.scalars(
+            select(MatchStage)
+            .where(MatchStage.match_id == match_id)
+            .order_by(MatchStage.occurred_at, MatchStage.stage)
+        )
+    ).all()
+    chunks = [(row.tick_number, 0, row.events) for row in ticks]
+    for row in stages:
+        for raw in row.events or ():
+            if isinstance(raw, dict) and type(raw.get("tick")) is int:
+                chunks.append((raw["tick"], 1, [raw]))
+    seen = set()
+    result = []
+    for _, _, docs in sorted(chunks, key=lambda item: (item[0], item[1])):
+        for raw in docs or ():
+            if not isinstance(raw, dict):
+                continue
+            identity = raw.get("id")
+            if isinstance(identity, str):
+                if identity in seen:
+                    continue
+                seen.add(identity)
+            result.append(raw)
+    return result
 
 
 async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID) -> MatchReport:
@@ -320,16 +353,7 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         for team in (initial.home.snapshot, initial.away.snapshot)
         for p in team.players
     }
-    tick_rows = (
-        await session.scalars(
-            select(MatchTick).where(MatchTick.match_id == match.id).order_by(MatchTick.tick_number)
-        )
-    ).all()
-    raw_events: list[dict[str, object]] = []
-    for row in tick_rows:
-        for raw in row.events or ():
-            if isinstance(raw, dict):
-                raw_events.append(raw)
+    raw_events = await stored_events(session, match.id)
     events: list[ReportEvent] = []
     for raw in raw_events:
         decoded = _decode_event(raw, names)
@@ -457,28 +481,23 @@ async def get_player_matches(
         snapshot_name = ""
         for candidate in ("home", "away"):
             team = initial.home if candidate == "home" else initial.away
+            if team.snapshot.club_id != club.id:
+                continue
             for snapshot_player in team.snapshot.players:
                 if snapshot_player.id == person_id:
                     side = candidate
                     snapshot_name = snapshot_player.name
         if side is None:
             continue
-        person_name = snapshot_name
+        if not person_name:
+            person_name = snapshot_name
         final_team = terminal.home if side == "home" else terminal.away
         condition = next((c for c in final_team.conditions if c.player_id == person_id), None)
-        tick_rows = (
-            await session.scalars(
-                select(MatchTick)
-                .where(MatchTick.match_id == match.id)
-                .order_by(MatchTick.tick_number)
-            )
-        ).all()
+        raw_events = await stored_events(session, match.id)
         goals = sum(
             1
-            for row in tick_rows
-            for raw in row.events or ()
-            if isinstance(raw, dict)
-            and raw.get("kind") == "goal"
+            for raw in raw_events
+            if raw.get("kind") == "goal"
             and raw.get("side") == side
             and _raw_person(raw.get("player_id")) == person_id
         )

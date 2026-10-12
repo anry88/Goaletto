@@ -42,9 +42,13 @@
 - [Транзакционный сбор событий и доступы](analytics/storage.md)
 
 - [Долговечный матчевый worker и активация](match-runtime.md)
+- [Outbox sender, delivery leases и устойчивое табло](outbox-delivery.md)
 
 - [Результат матча, очки и таблица](match-results.md)
 
 - [Кампании и источник /start](analytics/acquisition.md)
 
 - [Выдача клуба, операционные receipts и полгода владения](club-entry.md)
+
+- [Review первой волны агентов и PostgreSQL-проверки](agent-wave1-review.md)
+- [Задания следующей волны внешней разработки](agent-handoff-plan.md)

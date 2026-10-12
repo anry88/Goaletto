@@ -11,7 +11,7 @@ flowchart LR
     WORKER[Worker / durable jobs] --> APP
     APP --> DOMAIN[Pure domain rules]
     DB --> OUTBOX[Notification outbox]
-    OUTBOX --> DELIVERY[Delivery adapter · planned]
+    OUTBOX --> DELIVERY[Delivery adapter · explicit enable]
     DELIVERY --> TG
 ```
 
@@ -58,7 +58,11 @@ Outbox создаётся в той же транзакции, что и игр�
 Атомарную отправку сообщения в Telegram и commit PostgreSQL гарантировать нельзя:
 доставка at-least-once может продублировать новое сообщение при аварии после отправки.
 Документировать это ограничение, использовать стабильное табло и повторобезопасные edit.
-Sender и политика доставки в плане, начальный worker сообщения не отправляет.
+[Sender](outbox-delivery.md) подключён отдельным async-циклом worker и по умолчанию
+выключен. Lease/token/attempt fence, board stream lease/revision и история попыток
+сохраняются в PostgreSQL. Fresh preflight выполняется перед сетью; rate limit не
+блокирует матчевый цикл. PostgreSQL проверен на единственной рабочей локальной DB;
+Telegram заменён fake transport.
 
 ## Схема сейчас и далее
 
@@ -70,18 +74,20 @@ Domain не импортирует аналитический сборщик. Us
 доставка уведомления не означает прочтение и не создаёт retention.
 Отчёты используют PostgreSQL и операторский Grafana на HDC без публичного API.
 Envelope/allowlist v1 реализован в `application.analytics`, [контракт](analytics/contract-v1.md).
-Таблица псевдонимов присутствует в новой миграции; journey collection, сессии,
-атрибуция, feedback и SQL-отчёты пока не реализованы.
+Таблица псевдонимов присутствует в новой миграции; journey collection, сессии и атрибуция реализованы; feedback и полные
+когортные SQL-отчёты ещё в плане.
 
 Миграции foundation + game_foundation + world_seed описывают 25 таблиц: topology/jobs/outbox,
 managers/analytics IDs/ownership, persons/appearance registry/player/staff careers,
 season memberships/standings, lineups, fixtures/matches/ticks, accepted commands
 и immutable world_seed_receipt. [Seed и календарь](world-initialization.md).
-Calendar jobs сохраняются held: текущий worker их не исполняет до появления handlers.
+Calendar jobs сохраняются held до явной активации. Worker поддерживает матчевые
+handlers; основной календарь пока не активирован.
 [ERD, ограничения и транзакционные границы](data-model.md).
 Схема не обеспечивает самостоятельно ровно 10 клубов в лиге: это инвариант seed/rollover.
-Выполнение новой миграции на PostgreSQL пока не проверено: по текущему указанию
-пользователя используются проверки без БД, и CI не создаёт тестовый PostgreSQL.
+Текущая схема до head0010 проверена online и alembic check на единственной
+Goaletto DB. Пока нет реальных пользователей, на ней разрешены reset/checks;
+новые тестовые DB локально/в CI не создаются.
 Далее отдельно: gameplay use cases, training, auctions, ledger, scouting, academy.
 Схема не подменяет реализацию этих операций.
 

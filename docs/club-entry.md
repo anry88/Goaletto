@@ -47,10 +47,14 @@ Domain clock не читает wall clock/БД; application получает я�
 
 ## Осталось до готового интерфейса
 
-AND-47 In Progress: игровой start/выбор/claim callbacks и navigation ещё не подключены.
-AND-50 backend реализован в рамках entry, но settings UI/opt-out, sender availability
-и финальная повторная проверка owner/inactivity **перед Telegram send** остаются AND-68/50.
-Backend очередь не означает доставку. AND-75 backend готов, start path тоже пока не routed.
+Игровой start/выбор/preview/claim и navigation подключены opt-in флагом
+`GOALETTO_GAME_ENABLED`. Реальный dispatcher проверен на PostgreSQL с fake Telegram.
+AND-50 backend реализован в рамках entry; settings UI/opt-out остаются AND-50.
+[Sender](outbox-delivery.md) повторно проверяет owner/inactivity/preferences после
+claim и перед сетью, подтверждает недоступность и сохраняет историю попыток.
+Новый игровой /start сохраняет bot_confirmed_at: старый blocked response не отменяет
+более новое подтверждение доступности. Sender по умолчанию выключен; реальных
+отправок не было. Backend очередь не означает доставку. AND-75 start path подключён.
 
 Проверка SQL-recording: один claim на retry, tier5 predicate/club lock, budget unchanged,
 receipt idempotency без analytics,6 calendar months/end month, release retry/early return,

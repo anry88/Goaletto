@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import JourneyEvent, Origin, Surface, require_utc
+from goaletto.application.outbox_delivery import live_board_key_for, priority_for
 from goaletto.application.results import finalize_result
 from goaletto.domain.calendar import CALENDAR_VERSION
 from goaletto.domain.clock import MatchClock, MatchPhase
@@ -328,6 +329,8 @@ async def queue_notification(
                 dedupe_key=f"match:v1:{fixture.id}:{stage}:{ownership.id}",
                 chat_id=manager.telegram_id,
                 payload=payload,
+                priority=priority_for(payload),
+                live_board_key=live_board_key_for(payload),
                 due_at=at,
                 status="pending",
                 attempts=0,

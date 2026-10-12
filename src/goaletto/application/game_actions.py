@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from goaletto.application.acquisition import telegram_operation
 from goaletto.application.analytics import EVENT_SPECS, JourneyEvent, Origin, Surface, require_utc
 from goaletto.application.match_runtime import NotReady
+from goaletto.application.outbox_delivery import PRIORITY_BY_KIND
 from goaletto.domain.ownership import calendar_months_after, ownership_deadline
 from goaletto.infrastructure.analytics import record_event
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
@@ -33,6 +34,7 @@ class Actor:
     analytics_id: UUID | None
     operation_id: UUID
     at: datetime
+    update_id: int | None = None
 
     def __post_init__(self) -> None:
         require_utc(self.at)
@@ -43,6 +45,8 @@ class Actor:
             and not isinstance(self.analytics_id, UUID)
             or type(self.telegram_id) is not int
             or not 0 < self.telegram_id < 2**63
+            or self.update_id is not None
+            and (type(self.update_id) is not int or not 0 <= self.update_id < 2**63)
         ):
             raise ValueError("Invalid game actor")
 
@@ -110,7 +114,7 @@ async def actor_for(
     analytics_id = await session.scalar(
         select(AnalyticsManager.id).where(AnalyticsManager.manager_id == manager.id)
     )
-    return Actor(manager.id, manager.telegram_id, analytics_id, operation, at)
+    return Actor(manager.id, manager.telegram_id, analytics_id, operation, at, update_id)
 
 
 async def schedule_lease(
@@ -384,6 +388,7 @@ async def handle_lease_job(session: AsyncSession, job: Job, at: datetime) -> Non
             due_at=at,
             status="pending",
             attempts=0,
+            priority=PRIORITY_BY_KIND["ownership_reminder"],
             payload={
                 "version": 1,
                 "kind": "ownership_reminder",

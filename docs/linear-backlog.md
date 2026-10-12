@@ -1,5 +1,13 @@
 # Задачи Goaletto в Linear
 
+Текущая сборка 2026-10-12: sender AND-68, состав AND-49 и routed results AND-56
+реализованы и проверены на единственной рабочей Goaletto DB. Карточки AND-48 и
+история AND-66 приняты в объёме внешних заданий, parent ещё не полностью готов.
+/start и claim/navigation AND-47/75 подключены opt-in. Предыдущие записи проверок
+ниже исторические; свежая приёмка — docs/agent-wave1-review.md, новая выдача —
+docs/agent-handoff-plan.md. DB политика: без новых тестовых DB, checks/reset на
+одной основной DB разрешены пользователем пока нет реальных пользователей.
+
 [Проект Goaletto](https://linear.app/andrei-brazhnikov/project/goaletto-eb8cb486bc79) · 45 задач · 5 вех.
 
 Linear — источник актуального статуса; реестр синхронизирован с выполненной работой 2026-10-12.
@@ -67,6 +75,8 @@ Linear — источник актуального статуса; реестр 
 
 **Зависимости:** AND-43.
 
+Обновление 2026-10-12: сохранено 289 возрастных листов / 5 780 вариантов; за этот этап добавлено 202 листа / 4 040 вариантов. 780 игроков имеют все 7 групп, ещё 20 — 4 футбольные группы; все 80 исходных сотрудников имеют 3 кадровые группы. Это варианты тех же людей, не увеличение банка identity. Все 44 доступных сравнительных страницы просмотрены; технический аудит 5 780 вариантов прошёл, точных дублей и полос соседней формы над волосами нет. Исправлено извлечение наклонного края соседнего бюста для двух новых экспортов; исходники и прежние 87 листов не изменены. Ruff/format/mypy прошли; 213 non-integration tests passed, 2 integration deselected, без БД. Полный план — 7 240 вариантов. Imagegen достиг usage_limit_reached; осталось 73 листа / 1 460 вариантов, сброс 2026-10-13 11:57:51 UTC / 13:57 Белград. generation-checkpoint.json и prompts сохраняют точную точку продолжения: players-40-staff-early, оставшиеся кадровые группы players-40, затем все группы players-41..50. AND-44 остаётся In Progress. Кадровая механика и Telegram cache остаются отдельными задачами; PG-назначение реализовано в AND-45/46.
+
 ### [AND-73 · Зафиксировать контракт событий и метрики воронок Goaletto](https://linear.app/andrei-brazhnikov/issue/AND-73/zafiksirovat-kontrakt-sobytij-i-metriki-voronok-goaletto)
 
 Закреплён контракт реализации v1 в application/analytics.py: закрытый envelope, name/origin/required-ref allowlist, стабильный operation/effect dedupe, UTC windows и различие человеческой активности/доставки/автоматики. Добавлен club_opened и отдельный allowlist обновления ownership; feedback и action_rejected не продлевают владение. docs/analytics/contract-v1.md фиксирует определения трёх KPI, D1/D3/D7/D30, зрелость, product n/N examples, version rollout, coverage_start, доступы и стартовую retention policy. Сбор/сессии/cleanup/SQL не реализованы; это AND-74/76/79/82.
@@ -77,8 +87,6 @@ Linear — источник актуального статуса; реестр 
 
 ## 02 · Мир и вход в игру
 
-
-Дополнение: 87 возрастных листов = 1 740 вариантов; 240 игроков имеют все 7 групп, ещё 20 — 3 группы. План полного расширения — 7 240 вариантов. Встроенный Imagegen достиг суточного лимита; остаётся 275 листов. Сброс 12 октября 10:19 UTC / 12:19 Белград. Список недостающих листов и prompts сохранены в whole-v2/lifecycle-v1. Локальный selector и галерея готовы; PG/карьеры/Telegram cache относятся к другим задачам. AND-44 остаётся In Progress.
 
 ### [AND-45 · Разработать доменную схему игроков, сезонов и матчей](https://linear.app/andrei-brazhnikov/issue/AND-45/razrabotat-domennuyu-shemu-igrokov-sezonov-i-matchej)
 
@@ -360,6 +368,15 @@ Backend и Telegram presenters реализованы: immutable result receipt,
 ## 05 · HDC и эксплуатация
 
 ### [AND-68 · Реализовать sender уведомлений и устойчивое live-табло](https://linear.app/andrei-brazhnikov/issue/AND-68/realizovat-sender-uvedomlenij-i-ustojchivoe-live-tablo)
+
+Реализация агента A проверена и доработана Codex: sender подключён независимым
+циклом worker, по умолчанию выключен. Исправлены clipping retry_after, поздний
+finish/skip, отсутствие приоритетов у producers, параллельный первый send и
+откат табло старым тиком. Durable board lease/revision, attempt history,
+availability confirmation, fresh preflight и HTML escaping; frozen migration0009.
+Проверки без БД/сети. Общая сборка/фиксация изменений ещё в работе; задача In Progress.
+Подробности и ограничения — docs/outbox-delivery.md. Preferences UI остаётся AND-50,
+полная аналитика/метрики — AND-77; реальный PG/Telegram/HDC не запускались.
 
 Outbox dispatcher с lease/retry_after, приоритетами и стабильным message_id; не держать DB transaction во время Telegram call.
 

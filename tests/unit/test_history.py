@@ -17,6 +17,7 @@ from goaletto.application.history import (
     get_match_report,
     get_player_matches,
     get_season_archive,
+    stored_events,
 )
 from goaletto.application.match_simulation import demo_match, simulate_match
 from goaletto.bot import history_router
@@ -46,6 +47,7 @@ from goaletto.infrastructure.models import (
     Manager,
     Match,
     MatchResult,
+    MatchStage,
     MatchTick,
     OwnershipPeriod,
     Person,
@@ -162,6 +164,7 @@ class Recorder:
                 ],
             ),
         ]
+        self.stages = []
         self.fixtures = [self.fixture]
         self.matches = [self.match]
         self.receipts_by_match = {self.match.id: self.receipt}
@@ -339,6 +342,8 @@ class Recorder:
             return Rows(list(self.matches))
         if entity is MatchTick:
             return Rows(list(self.ticks))
+        if entity is MatchStage:
+            return Rows(list(self.stages))
         if entity is SeasonClub:
             params = statement.compile().params  # type: ignore[union-attr]
             if "club_id_1" in params:
@@ -445,7 +450,7 @@ async def test_club_results_paginate_and_record_receipt() -> None:
     assert page.entries[0].outcome == "loss"  # owned club is home, lost 1:2
     assert len(recorder.receipt_rows) == 1
     text, keyboard = results_view(page)
-    assert "Переименованный клуб 1:2 Маяк" in text  # list uses live club names
+    assert "Янтарь 1:2 Маяк" in text  # list preserves the kickoff names
     assert any(
         b.callback_data == match_callback(page.entries[0].fixture_id, 1)
         for row in keyboard.inline_keyboard
@@ -521,6 +526,40 @@ async def test_player_history_from_snapshots_minutes_and_goals() -> None:
             uuid4(),
             1,
         )
+
+
+async def test_opponent_is_not_part_of_owned_club_player_history() -> None:
+    recorder = Recorder()
+    recorder.live_player = None
+    opponent = FINAL.away.snapshot.players[0].id
+    with pytest.raises(PermissionDenied):
+        await get_player_matches(session(recorder), recorder.actor, opponent, 1)
+
+
+async def test_halftime_stage_events_are_included_once_in_stored_order() -> None:
+    recorder = Recorder()
+    duplicate = recorder.ticks[0].events[0]
+    substitution = {
+        "id": str(uuid4()),
+        "kind": "substitution",
+        "tick": 15,
+        "minute": 45,
+        "side": "home",
+        "player_id": str(STARTER_ID),
+        "other_player_id": str(uuid4()),
+        "detail": None,
+    }
+    recorder.stages = [
+        MatchStage(
+            match_id=recorder.match.id,
+            stage="second_half_start",
+            occurred_at=NOW,
+            events=[duplicate, substitution],
+            state_hash="0" * 64,
+        )
+    ]
+    events = await stored_events(session(recorder), recorder.match.id)
+    assert [event["kind"] for event in events] == ["goal", "yellow", "substitution"]
 
 
 async def test_archive_uses_membership_and_stored_counters() -> None:
@@ -646,6 +685,11 @@ async def test_history_router_answers_first_and_handles_stale() -> None:
             assert calls == ["answer"]
             return True
 
-    await history_router.history_screen(query, cast(AsyncSession, TouchSession()))
+    class DatabaseStub:
+        @asynccontextmanager
+        async def transaction(self):
+            yield cast(AsyncSession, TouchSession())
+
+    await history_router.history_screen(query, DatabaseStub())
     assert calls == ["answer"] and touched and len(edits) == 1
-    assert "Переименованный клуб 1:2 Маяк" in edits[0]
+    assert "Янтарь 1:2 Маяк" in edits[0]

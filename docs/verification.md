@@ -1,7 +1,41 @@
 # Проверка начального каркаса · 2026-10-11
 
+## Текущая общая сборка первой волны · 2026-10-12
+
+305 unit/offline passed; 8 real PostgreSQL integration passed. Ruff/format (178
+файлов), mypy71, online upgrade/metadata check и downgrade0010→0008→upgradehead
+успешны. Рабочая локальная Goaletto DB одна, порт5433, без реальных пользователей;
+дополнительные тестовые DB не создаются. PostgreSQL race/rollback/full match и
+настоящий Dispatcher проверены с fake Telegram. Polling/Telegram/HDC не запускались.
+Полный перечень исправлений и ограничений — [agent-wave1-review.md](agent-wave1-review.md).
+
+Раздел sender ниже описывает промежуточный этап до PostgreSQL-проверки и интеграции.
+
+## Review/integration sender AND-68 · 2026-10-12
+
+- Исправлены retry_after clipping, поздние finish/skip, отсутствие persisted
+  priority у producers, параллельный первый send и откат табло старым тиком.
+- Добавлены board stream lease/revision, operational attempt history и guard
+  более нового подтверждения bot availability. Telegram HTML-экранируется;
+  abandoned не объявляется присуждённым результатом.
+- Worker wiring проверен без запуска: независимые jobs/sender tasks, opt-in flag,
+  token validation, cancellation/cleanup. Fake transport проверяет реально
+  открытые transaction contexts; запросы ограничены временем.
+- Ruff check/format и mypy64 модулей успешны. Целевые sender/transport/worker/
+  schema/entry проверки:60 passed. Общий checkout (включая параллельные изменения
+  карточек/состава и портретов):289 passed,2 integration deselected.
+- Offline upgrade до текущего head0010 и downgrade0009→0008 сформированы;
+  frozen CREATE TABLE/index/checks сверены с ORM. Одна Alembic head.
+- PostgreSQL, polling, seed/activation --apply, sender и HDC не запускались.
+  Реальные PG races/rollback/constraints и Telegram не считаются проверенными.
+- Изменения остаются в рабочем дереве общей сборки; AND-68 In Progress.
+  Чужие портретные изменения не включались в sender review.
+
+Исторические прогоны ниже описывают состояние на указанный этап.
+
 Исторический прогон ниже был выполнен до текущего решения пользователя не создавать
-тестовые БД. На новом этапе PostgreSQL локально/в CI не поднимается.
+дополнительные тестовые БД. Уточнение 2026-10-12 разрешает проверки/reset
+на одной рабочей Goaletto DB, пока нет реальных пользователей.
 
 - Ruff check и format: успешно.
 - mypy strict: успешно, 18 исходных Python-модулей.

@@ -3,7 +3,8 @@
 Футбольный менеджер целиком в Telegram: клуб, состав, тренировки, трансферы и live-матчи.
 Python, сообщения и inline-кнопки; без Mini App и JavaScript.
 
-**Состояние: начальный каркас, не готовая игра.** Доступны демонстрационное меню бота,
+**Состояние: собрана первая игровая вертикаль, полная игра ещё в разработке.**
+Доступны Telegram-вход и получение клуба, карточки, предматчевый состав, история/отчёты и таблицы,
 чистые правила времени и переходов между лигами, миграции основания PostgreSQL,
 контракт и транзакционный collector аналитических событий, инициализация мира 5×10×20, двухкруговой календарь,
 граница назначения внешностей, диагностический worker и портретные инструменты.
@@ -12,12 +13,13 @@ Python, сообщения и inline-кнопки; без Mini App и JavaScript
 без повторов, и отдельный банк персонала. [Проверка подходов](docs/portrait-feasibility.md),
 [библиотека цельных людей](assets/portraits/whole-v2/README.md), [вторая карьера](docs/staff-lifecycle.md).
 Экспорт 256/96px, одежда перекрашивается локально в цвета клуба. Новый каталог на
-визуальной проверке. Код seed реализован; рабочая БД этим этапом не заполнялась.
+визуальной проверке. Создана одна локальная рабочая БД Goaletto; PostgreSQL-проверки выполняются на ней.
 Чистый [матчевый движок](docs/match-engine.md) симулирует 30 тиков, поддерживает
 checkpoint/replay и события. Durable [live-worker](docs/match-runtime.md) реализован, но календарь ещё не активирован.
 Очки и таблицы начисляются атомарно с финальным тиком. Backend регистрации/выдачи клуба/6-месячного владения реализован:
-[club-entry.md](docs/club-entry.md). Игровой /start и кнопки таблицы/отчёта, экономика
-и отправка outbox-уведомлений ещё не подключены.
+[club-entry.md](docs/club-entry.md). Игровой `/start` и кнопки подключены при `GOALETTO_GAME_ENABLED=true`.
+Live-команды менеджера, rollover и экономика ещё в разработке. [Outbox sender](docs/outbox-delivery.md) подключён отдельным
+циклом worker; по умолчанию выключен (`GOALETTO_OUTBOX_ENABLED=false`).
 
 - [Актуальный GDD](football-manager-bot-gdd.md)
 - [Правила и принятые решения](docs/game-rules.md)
@@ -57,13 +59,20 @@ source .venv/bin/activate
 python -m pip install -r requirements-dev.lock
 python -m pip install --no-deps -e .
 cp .env.example .env
-docker compose up -d postgres
+docker compose -f compose.yaml -f compose.local.yaml up -d postgres
 alembic upgrade head
 goaletto-worker
 ```
 
 В отдельном терминале задайте GOALETTO_BOT_TOKEN в .env и запустите goaletto-bot.
 Для Windows PowerShell активация: .venv\Scripts\Activate.ps1.
+
+Исходящие уведомления worker включаются отдельно через `GOALETTO_OUTBOX_ENABLED=true`
+с тем же токеном, после миграций и подготовки игрового потока. Sender не запускает
+polling и не удерживает DB-транзакцию во время Telegram-вызова. Он проверен
+на PostgreSQL с fake Telegram; реальные отправки и polling не запускались.
+Локальная БД использует постоянный volume и порт 5433; 5432 занят другим проектом.
+Для игры включите `GOALETTO_GAME_ENABLED=true`; календарь активируется отдельно.
 
 Весь стек локально:
 1. В .env задайте URL с хостом **postgres**, а не localhost:
@@ -84,10 +93,18 @@ mkdir -p work
 alembic upgrade head --sql > work/migration.sql
 ```
 
-По текущему решению пользователя тестовые БД не создаются, локально и в CI.
-CI проверяет Python и offline SQL миграций без PostgreSQL. Исполнение миграций,
-`alembic check` и конкурентные DB-операции сейчас не проверяются.
-Существующие integration-тесты сохранены для позже, когда проверка БД будет явно запрошена.
+Уточнение пользователя 2026-10-12: не создавать дополнительные тестовые БД.
+Пока нет реальных пользователей, проверять на единственной рабочей Goaletto DB
+и при необходимости сбрасывать игровые данные. CI остаётся без новой DB/service.
+Локальный интеграционный прогон **сбрасывает данные Goaletto перед каждым тестом**:
+
+```bash
+GOALETTO_ALLOW_DEVELOPMENT_RESET=1 python -m pytest -q -m integration
+```
+
+Требуются `GOALETTO_ENVIRONMENT=development`, настроенная база `goaletto` и миграции
+head. Не направляйте этот прогон в БД другого проекта или в игру с пользователями.
+Online migrations, `alembic check`, concurrency/rollback/full match уже проверены.
 Каталог и транзакционные границы описаны в [схеме данных](docs/data-model.md).
 
 ## Мир и календарь
@@ -104,9 +121,10 @@ goaletto-world --key initial --seed 0 --first-kickoff 2026-10-17T18:00:00Z \
   --output work/initial-world-preview.json
 ```
 
-Запись в игровую БД требует явного `--apply`; он здесь не запускался.
+Запись в игровую БД требует явного `--apply`. Основной локальный мир подготовлен;
+календарные jobs пока held.
 Все календарные задачи исходно `held`. Явная активация supported jobs описана
-в [match-runtime.md](docs/match-runtime.md); `--apply` ещё не запускался.
+в [match-runtime.md](docs/match-runtime.md); основной календарь ещё не активирован.
 
 ## Предпросмотр портретов
 
@@ -119,10 +137,12 @@ goaletto-world --key initial --seed 0 --first-kickoff 2026-10-17T18:00:00Z \
 Воспроизведение: `python scripts/pack_portrait_atlases.py --require-complete`,
 затем `python scripts/review_whole_portraits.py`. Отчёты и предпросмотры —
 assets/portraits/whole-v2/. Назначение identity подключено к коду игрового seed,
-но пока не проверено на PostgreSQL;
-Telegram cache ещё требует реализации.
-Возрастное расширение добавляет 1 740 вариантов: 240 игроков со всеми семью группами и 20 частично.
-Полный набор пока не завершён из-за лимита Imagegen; [галерея возраста](assets/portraits/whole-v2/lifecycle-v1/index.html), [контракт](docs/portrait-lifecycle.md).
+и проверено на PostgreSQL в локальной игровой БД;
+Durable Telegram file cache реализован; реальные загрузки Telegram ещё не проверены.
+Возрастное расширение добавляет 5 780 вариантов: 780 игроков со всеми семью группами,
+20 с четырьмя футбольными группами и все 80 исходных сотрудников с тремя кадровыми группами.
+Остаётся 73 листа / 1 460 вариантов; Imagegen сообщил сброс лимита 13 октября 2026 в 13:57 по Белграду.
+[Галерея возраста](assets/portraits/whole-v2/lifecycle-v1/index.html), [контракт](docs/portrait-lifecycle.md).
 
 ```bash
 python scripts/check_portrait_feasibility.py

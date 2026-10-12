@@ -122,11 +122,15 @@ async def begin_game(
     start = await accept_start(
         session, telegram_id=telegram_id, update_id=update_id, payload=payload, at=at
     )
-    actor = Actor(start.manager_id, telegram_id, start.analytics_manager_id, start.operation_id, at)
+    actor = Actor(
+        start.manager_id, telegram_id, start.analytics_manager_id, start.operation_id, at, update_id
+    )
     manager = await session.get(Manager, actor.manager_id)
     if manager is None:
         raise ValueError("Manager disappeared")
     manager.bot_available = True
+    if manager.bot_confirmed_at is None or manager.bot_confirmed_at < at:
+        manager.bot_confirmed_at = at
     ownership = await session.scalar(
         select(OwnershipPeriod)
         .where(OwnershipPeriod.manager_id == actor.manager_id, OwnershipPeriod.ended_at.is_(None))

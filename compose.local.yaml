@@ -1,0 +1,6 @@
+# Local development uses the one Goaletto application database, not a test clone.
+# Port 5432 already belongs to another project on this computer.
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:${GOALETTO_POSTGRES_PORT:-5433}:5432"

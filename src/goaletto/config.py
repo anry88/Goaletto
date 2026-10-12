@@ -14,3 +14,5 @@ class Settings(BaseSettings):
     )
     log_level: str = "INFO"
     worker_poll_seconds: float = Field(default=1, ge=0.1, le=60)
+    outbox_enabled: bool = False
+    game_enabled: bool = False

@@ -1,0 +1,234 @@
+"""Pure lineup editor presenters and compact callbacks. No database or network calls."""
+
+from html import escape
+from uuid import UUID
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+from goaletto.application.lineup import LineupData
+from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.domain.lineup import FORMATION_SHAPES
+from goaletto.domain.match_types import Mentality, Tactic
+
+TACTIC_LABELS = {
+    Tactic.NORMAL: "Обычная",
+    Tactic.PRESSING: "⚡ Прессинг",
+    Tactic.COUNTER: "🏃 Контратаки",
+    Tactic.WINGS: "↗️ Фланги",
+    Tactic.DEFENCE: "🛡 Оборона",
+    Tactic.LONG_BALLS: "⬆️ Длинные мячи",
+}
+
+MENTALITY_LABELS = {
+    Mentality.ULTRA_ATTACK: "🔥 Ультраатака",
+    Mentality.ATTACK: "⚔️ Атака",
+    Mentality.BALANCED: "⚖️ Баланс",
+    Mentality.DEFENCE: "🛡 Защита",
+    Mentality.ULTRA_DEFENCE: "🧱 Ультразащита",
+}
+
+PANELS = frozenset({"main", "formation", "tactic", "mentality", "swap", "captain"})
+
+
+def _version_text(value: int) -> str:
+    if type(value) is not int or not 1 <= value <= 2**31 - 1:
+        raise ValueError("Editor revision must be a positive integer")
+    return str(value)
+
+
+def _badges(person_id: UUID, slot: str, data: LineupData) -> str:
+    marks = ""
+    if data.captain_id == person_id:
+        marks += " ©"
+    member = next((m for m in (*data.starters, *data.bench) if m.person_id == person_id), None)
+    if member is not None and member.last_season:
+        marks += " 🔶"
+    if member is not None and member.injured:
+        marks += " 🤕"
+    if member is not None and slot != member.position:
+        marks += " ⚠️"
+    return marks
+
+
+def render_main(data: LineupData, notice: str | None = None) -> str:
+    lines = [f"📋 <b>{escape(data.club_name)}</b> · {escape(data.formation)}"]
+    try:
+        tactic = TACTIC_LABELS[Tactic(data.tactic)]
+    except ValueError:
+        tactic = data.tactic
+    try:
+        mentality = MENTALITY_LABELS[Mentality(data.mentality)]
+    except ValueError:
+        mentality = data.mentality
+    lines.append(f"Тактика: {escape(tactic)} · Настрой: {escape(mentality)}")
+    captain = next((m for m in data.starters if m.person_id == data.captain_id), None)
+    lines.append(f"Капитан: {escape(captain.name) if captain else '— не выбран'}")
+    if data.lock_at is not None:
+        stamp = data.lock_at.strftime("%d.%m %H:%M UTC")
+        lines.append(
+            "🔒 Состав заблокирован перед матчем." if data.locked else f"Блокировка: {stamp}."
+        )
+    lines.append("")
+    lines.append("<b>Основа:</b>")
+    for index, member in enumerate(data.starters, start=1):
+        lines.append(
+            f"{index}. {escape(member.name)} ({escape(member.slot_position)})"
+            f"{_badges(member.person_id, member.slot_position, data)}"
+        )
+    lines.append("")
+    lines.append("<b>Запас:</b>")
+    for index, member in enumerate(data.bench, start=12):
+        lines.append(
+            f"{index}. {escape(member.name)} ({escape(member.position)})"
+            f"{_badges(member.person_id, member.position, data)}"
+        )
+    lines.append("")
+    lines.append("🔶 — последний сезон (играет). ⚠️ — не на позиции. 🤕 — травма.")
+    if notice:
+        lines.append("")
+        lines.append(escape(notice))
+    return "\n".join(lines)
+
+
+def _button(text: str, callback: str) -> InlineKeyboardButton:
+    if len(callback.encode()) > 64:
+        raise ValueError("Callback exceeds the Telegram limit")
+    return InlineKeyboardButton(text=text, callback_data=callback)
+
+
+def main_keyboard(data: LineupData) -> InlineKeyboardMarkup:
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    if data.locked:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [_button("🔄 Обновить", f"ln:refresh:{version}")],
+                [_button("🏟 Клуб", "vc:c")],
+            ]
+        )
+    rows = [
+        [_button("🔄 Замена", f"ln:panel:swap:{version}")],
+        [
+            _button("Схема", f"ln:panel:formation:{version}"),
+            _button("Тактика", f"ln:panel:tactic:{version}"),
+        ],
+        [
+            _button("Настрой", f"ln:panel:mentality:{version}"),
+            _button("Капитан", f"ln:panel:captain:{version}"),
+        ],
+        [_button("🔄 Обновить", f"ln:refresh:{version}")],
+    ]
+    rows.append([_button("🏟 Клуб", "vc:c")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def formation_keyboard(data: LineupData) -> InlineKeyboardMarkup:
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    rows = [
+        [_button(name, f"ln:f:{name}:{version}")]
+        for name in sorted(FORMATION_SHAPES)
+        if name != data.formation
+    ]
+    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def tactic_keyboard(data: LineupData) -> InlineKeyboardMarkup:
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    rows = [
+        [_button(label, f"ln:t:{tactic.value}:{version}")]
+        for tactic, label in TACTIC_LABELS.items()
+        if tactic.value != data.tactic
+    ]
+    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def mentality_keyboard(data: LineupData) -> InlineKeyboardMarkup:
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    rows = [
+        [_button(label, f"ln:mo:{mentality.value}:{version}")]
+        for mentality, label in MENTALITY_LABELS.items()
+        if mentality.value != data.mentality
+    ]
+    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    if not 1 <= slot <= len(data.starters):
+        raise ValueError("Invalid starter slot")
+    rows = [
+        [_button("← Основа", f"ln:panel:main:{version}")],
+    ]
+    rows.extend(
+        [_button(f"⇄ {member.name}", f"ln:s:{slot}:{compact_id(member.person_id)}:{version}")]
+        for member in data.bench
+    )
+    rows.append([_button("← Назад", f"ln:panel:swap:{version}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def starter_keyboard(data: LineupData) -> InlineKeyboardMarkup:
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    rows = [
+        [_button(f"{index}. {member.name}", f"ln:sel:{index}:{version}")]
+        for index, member in enumerate(data.starters, start=1)
+    ]
+    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def captain_keyboard(data: LineupData) -> InlineKeyboardMarkup:
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    rows = [
+        [
+            _button(
+                f"{'© ' if member.person_id == data.captain_id else ''}{member.name}",
+                f"ln:cap:{compact_id(member.person_id)}:{version}",
+            )
+        ]
+        for member in data.starters
+    ]
+    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def parse_callback(value: str) -> tuple[str, tuple[str, ...]]:
+    """Mutations carry canonical ownership scope and bounded revision."""
+    if not isinstance(value, str) or len(value.encode()) > 64:
+        raise ValueError("Invalid lineup callback")
+    parts = value.split(":")
+    if len(parts) < 2 or parts[0] != "ln":
+        raise ValueError("Not a lineup callback")
+    action, args = parts[1], tuple(parts[2:])
+    if action == "open" and not args:
+        return action, args
+    if len(args) < 2 or not args[-1].isascii() or not args[-1].isdigit():
+        raise ValueError("Stale lineup callback")
+    _version_text(int(args[-1]))
+    if str(int(args[-1])) != args[-1]:
+        raise ValueError("Invalid revision encoding")
+    expand_id(args[-2])
+    values = args[:-2]
+    if action == "refresh" and not values:
+        return action, args
+    if action == "panel" and len(values) == 1 and values[0] in PANELS:
+        return action, args
+    if action == "f" and len(values) == 1 and values[0] in FORMATION_SHAPES:
+        return action, args
+    if action == "t" and len(values) == 1:
+        Tactic(values[0])
+        return action, args
+    if action == "mo" and len(values) == 1:
+        Mentality(values[0])
+        return action, args
+    if action == "sel" and len(values) == 1 and values[0].isdigit() and 1 <= int(values[0]) <= 11:
+        return action, args
+    if action == "s" and len(values) == 2 and values[0].isdigit() and 1 <= int(values[0]) <= 11:
+        expand_id(values[1])
+        return "sw", args
+    if action == "cap" and len(values) == 1:
+        expand_id(values[0])
+        return action, args
+    raise ValueError("Invalid lineup callback")

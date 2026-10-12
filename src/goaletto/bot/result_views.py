@@ -62,7 +62,7 @@ def table_view(
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="← 1–5" if page == 2 else "6–10 →", callback_data=callback)],
-            [InlineKeyboardButton(text="Мой клуб", callback_data="game:club")],
+            [InlineKeyboardButton(text="Мой клуб", callback_data="vc:c")],
         ]
     )
     return "\n".join(lines), keyboard
@@ -100,6 +100,6 @@ def result_keyboard(fixture_id: UUID) -> InlineKeyboardMarkup:
                     text="📋 Отчёт о матче", callback_data=f"report:{compact_id(fixture_id)}"
                 )
             ],
-            [InlineKeyboardButton(text="Мой клуб", callback_data="game:club")],
+            [InlineKeyboardButton(text="Мой клуб", callback_data="vc:c")],
         ]
     )

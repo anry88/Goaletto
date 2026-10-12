@@ -121,6 +121,8 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
         inline_keyboard=[
             [InlineKeyboardButton(text="🏟 Мой клуб", callback_data=CLUB_CALLBACK)],
             [InlineKeyboardButton(text="👥 Состав", callback_data=squad_callback(1))],
+            [InlineKeyboardButton(text="📋 Расстановка", callback_data="ln:open")],
+            [InlineKeyboardButton(text="🏆 Таблица", callback_data="nav:table")],
             [InlineKeyboardButton(text="📜 История", callback_data=results_callback(1))],
         ]
     )
@@ -138,6 +140,8 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="👥 Состав", callback_data=squad_callback(1))],
+            [InlineKeyboardButton(text="📋 Расстановка", callback_data="ln:open")],
+            [InlineKeyboardButton(text="🏆 Таблица", callback_data="nav:table")],
             [InlineKeyboardButton(text="📜 История", callback_data=results_callback(1))],
             [InlineKeyboardButton(text="🗂 Сезоны", callback_data=seasons_callback(1))],
             [InlineKeyboardButton(text="🏠 Главное меню", callback_data=MENU_CALLBACK)],

@@ -15,6 +15,8 @@ from goaletto.bot.club_cards import (
     menu_view,
     stale_view,
 )
+from goaletto.bot.responses import edit_response
+from goaletto.infrastructure.database import Database
 
 router = Router(name="club-view")
 
@@ -30,20 +32,25 @@ async def build_club_response(
 
 
 @router.callback_query(F.data == CLUB_CALLBACK)
-async def club_home(query: CallbackQuery, session: AsyncSession) -> None:
+async def club_home(query: CallbackQuery, database: Database) -> None:
     await query.answer()
     message = query.message
     user = query.from_user
     if not isinstance(message, Message) or user is None:
         return
     try:
-        text, keyboard = await build_club_response(session, user.id, query.id, datetime.now(UTC))
-        await message.edit_text(text, reply_markup=keyboard)
+        async with database.transaction() as session:
+            text, keyboard = await build_club_response(
+                session, user.id, query.id, datetime.now(UTC)
+            )
+        await edit_response(message, text, keyboard)
     except PermissionDenied:
-        await message.edit_text("Нет доступа: клуб больше не принадлежит вам. Откройте /start.")
+        await edit_response(
+            message, "Нет доступа: клуб больше не принадлежит вам. Откройте /start."
+        )
     except ValueError:
         text, keyboard = stale_view()
-        await message.edit_text(text, reply_markup=keyboard)
+        await edit_response(message, text, keyboard)
 
 
 @router.callback_query(F.data == MENU_CALLBACK)
@@ -53,7 +60,7 @@ async def main_menu(query: CallbackQuery) -> None:
     if not isinstance(message, Message):
         return
     text, keyboard = menu_view()
-    await message.edit_text(text, reply_markup=keyboard)
+    await edit_response(message, text, keyboard)
 
 
 @router.callback_query(
@@ -65,7 +72,7 @@ async def main_menu(query: CallbackQuery) -> None:
         and not q.data.startswith("vc:p:")
     )
 )
-async def club_fallback(query: CallbackQuery, session: AsyncSession) -> None:
+async def club_fallback(query: CallbackQuery, database: Database) -> None:
     """Unknown vc: values land here: never apply an action, show fresh state."""
     await query.answer()
     message = query.message
@@ -73,7 +80,10 @@ async def club_fallback(query: CallbackQuery, session: AsyncSession) -> None:
     if not isinstance(message, Message) or user is None:
         return
     try:
-        text, keyboard = await build_club_response(session, user.id, query.id, datetime.now(UTC))
+        async with database.transaction() as session:
+            text, keyboard = await build_club_response(
+                session, user.id, query.id, datetime.now(UTC)
+            )
     except (PermissionDenied, ValueError):
         text, keyboard = stale_view()
-    await message.edit_text(text, reply_markup=keyboard)
+    await edit_response(message, text, keyboard)

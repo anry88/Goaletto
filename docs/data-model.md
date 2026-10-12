@@ -1,5 +1,13 @@
 # Основание данных · AND-45
 
+Расширение AND-68 (`0009_outbox_delivery`): outbox leases/priority/message_id,
+`outbox_boards` (unique fixture+ownership, lease и monotonic revision),
+`outbox_delivery_attempts` (outbox+attempt, token, времена, bounded outcome),
+Manager.bot_confirmed_at. Producers записывают priority/key до enqueue;
+миграция backfill совместима со старой очередью. Online upgrade и alembic check
+успешны на локальной Goaletto DB. `0010` добавляет durable Telegram file cache;
+модель включена в Alembic metadata. Детали — [outbox-delivery.md](outbox-delivery.md).
+
 Модели находятся в `src/goaletto/infrastructure/models.py`, новая миграция —
 `0002_game_foundation`. После применения схема содержит 24 таблицы: пять исходных
 и 19 новых. Следующая миграция `0003_world_seed` добавляет `world_seed_receipts`

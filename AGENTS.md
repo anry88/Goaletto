@@ -51,7 +51,11 @@
 - This repository is proprietary; do not change licensing without user instruction.
 - Keep Linear tasks aligned with meaningful completed work. Do not close unimplemented
   gameplay tasks merely because scaffolding exists.
-- Run ruff, mypy and relevant pytest checks. Current user instruction: no test
-  databases at this development stage, locally or in CI. Use offline migration
-  rendering and `pytest -m 'not integration'`; never substitute a production DB.
-  Integration tests remain available for a later explicitly requested DB check.
+- Run ruff, mypy, relevant pytest checks and migration rendering/execution.
+  User clarified on 2026-10-12: do not create new local/CI test databases.
+  During development, while Goaletto has no real players, use the single
+  Goaletto application database for checks (create the main database if absent);
+  its development data may be reset.
+  Verify the exact Goaletto target before any reset. Never reset another project.
+  Once real players/data exist, this development reset authorization no longer
+  applies. Never print tokens or credential-bearing database URLs.

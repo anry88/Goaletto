@@ -109,6 +109,7 @@ async def actor_for_callback(
     telegram_id: int,
     callback_id: str,
     at: datetime,
+    update_id: int | None = None,
 ) -> Actor:
     """Build an Actor for a callback query without trusting client-side IDs.
 
@@ -131,7 +132,7 @@ async def actor_for_callback(
         select(AnalyticsManager.id).where(AnalyticsManager.manager_id == manager.id)
     )
     operation = uuid5(CALLBACK_NAMESPACE, f"goaletto:callback:v1:{callback_id}")
-    return Actor(manager.id, manager.telegram_id, analytics_id, operation, at)
+    return Actor(manager.id, manager.telegram_id, analytics_id, operation, at, update_id)
 
 
 def _club_card(club: Club, tier: int) -> ClubCard:
@@ -150,21 +151,17 @@ def _club_card(club: Club, tier: int) -> ClubCard:
     )
 
 
-async def get_owned_club(session: AsyncSession, actor: Actor) -> ClubCard:
+async def get_owned_club(session: AsyncSession, actor: Actor, *, record: bool = True) -> ClubCard:
     if not session.in_transaction():
         raise ValueError("Club views need a transaction")
     ownership, club = await owned_club(session, actor)
     league = await session.scalar(select(League).where(League.id == club.league_id))
     if league is None:
         raise ValueError("Club league is missing")
-    await user_effect(
-        session,
-        actor,
-        "club_opened",
-        Surface.CLUB,
-        ownership=ownership,
-        club_id=club.id,
-    )
+    if record:
+        await user_effect(
+            session, actor, "club_opened", Surface.CLUB, ownership=ownership, club_id=club.id
+        )
     return _club_card(club, league.tier)
 
 
@@ -249,6 +246,9 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
     if player.status not in ("active", "last_season", "retired"):
         raise ValueError("Unknown player status")
     if player.status == "retired":
+        from goaletto.application.history import get_player_matches
+
+        await get_player_matches(session, actor, person_id, 1)
         # History view: no game actions, no club match required. The caller
         # must already hold a current ownership (checked above), so a former
         # owner's stale buttons fail before reaching this branch.

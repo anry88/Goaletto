@@ -126,7 +126,12 @@ def make_message(fail_on: tuple[str, ...] = ()) -> Any:
 
     async def answer_photo(photo: Any, **kwargs: Any) -> FakeSent:
         if isinstance(photo, str) and photo in fail_on:
-            raise ValueError("stale file_id")
+            from aiogram.exceptions import TelegramBadRequest
+            from aiogram.methods import SendPhoto
+
+            raise TelegramBadRequest(
+                SendPhoto(chat_id=123, photo="uploaded-id"), "wrong file identifier"
+            )
         photos.append(photo)
         return FakeSent()
 
@@ -166,6 +171,13 @@ class TouchSession:
     def _touch(self) -> None:
         self.touched = True
         assert self.query.calls == ["answer"], "answerCallbackQuery must come first"
+
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def transaction(self):
+        self._touch()
+        yield self
 
     def in_transaction(self) -> bool:
         self._touch()
