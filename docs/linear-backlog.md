@@ -155,7 +155,13 @@ Onboarding показывает только свободные бот-клуб�
 
 ### [AND-75 · Добавить ссылки кампаний и атрибуцию привлечения через Telegram /start](https://linear.app/andrei-brazhnikov/issue/AND-75/dobavit-ssylki-kampanij-i-atribuciyu-privlecheniya-cherez-telegram)
 
-Python-only bot, без публичного redirect, frontend и нового web API. Ограничение: наблюдаем принятый /start, а не чтение или клик до него.
+Backend AND-75 реализован: opaque24-char start codes/immutable campaign registry(source,placement,date), direct/unknown/known, accept_start с Manager/pseudonym до claim, immutable first-touch, per-update retry dedupe, start_accepted/manager_started/campaign_touched и session/coverage collector в одной transaction. Не хранится raw unknown payload. Internal/opt_out исключены; retention deletes touches/first-touch без новой launch cohort.
+
+Source funnel SQL/CLI: mature24h eligible vs waiting, claim/ready того же ownership, internal exclusion, as-of recorded_at, coverage/retention clipping, bounded aggregate/count validation. Нет CTR/CAC без расходов/показов/кликов. Generated links используют официальные Telegram limits.
+
+Ruff/format, mypy48, pytest204 passed/2 deselected; offline migration0007/SQL-recording без БД. CLI preview без подключения, --apply не запускался.
+
+Задача остаётся In Progress: реальный игровой /start handler ещё не подключён в AND-47; preview не начинает cohort. SQL результаты/races на PG не проверены по запрету тестовых БД. Документ docs/analytics/acquisition.md.
 
 **Приёмка:** Реестр opaque start-кодов <=64 допустимых символов, source/placement/date и ссылки t.me/GoalettoBot. direct/unknown/known разделены. First-touch сохраняется до claim и неизменяем; повторный /start — касание, не новый manager. Отчёт source→claim→готовность; internal исключён. Тесты валидных/неизвестных/повторных кодов. CTR/CAC не выдумываются без данных показов/кликов/расходов.
 

@@ -1,6 +1,6 @@
 """Persistence for the game foundation; schema does not execute gameplay."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -8,6 +8,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -819,3 +820,57 @@ class MatchResult(Base):
     actual_finish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     state_hash: Mapped[str] = mapped_column(String(64))
+
+
+class AcquisitionCampaign(Base):
+    __tablename__ = "acquisition_campaigns"
+    __table_args__ = (
+        CheckConstraint("code ~ '^[A-Za-z0-9_-]{1,64}$'", name="ck_campaign_code"),
+        CheckConstraint(
+            "source IN ('telegram_channel','telegram_ads','community','referral','other')",
+            name="ck_campaign_source",
+        ),
+        CheckConstraint("placement ~ '^[a-z0-9_-]{1,80}$'", name="ck_campaign_placement"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True)
+    source: Mapped[str] = mapped_column(String(24))
+    placement: Mapped[str] = mapped_column(String(80))
+    published_on: Mapped[date] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AcquisitionFirstTouch(Base):
+    __tablename__ = "acquisition_first_touches"
+    __table_args__ = (
+        CheckConstraint("kind IN ('direct','unknown','known')", name="ck_first_touch_kind"),
+        CheckConstraint(
+            "(kind = 'known') = (campaign_id IS NOT NULL)", name="ck_first_touch_campaign"
+        ),
+        Index("ix_first_touch_time", "started_at"),
+    )
+    analytics_manager_id: Mapped[UUID] = mapped_column(
+        ForeignKey("analytics_managers.id", ondelete="CASCADE"), primary_key=True
+    )
+    operation_id: Mapped[UUID] = mapped_column(Uuid, unique=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    campaign_id: Mapped[UUID | None] = mapped_column(ForeignKey("acquisition_campaigns.id"))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AcquisitionTouch(Base):
+    __tablename__ = "acquisition_touches"
+    __table_args__ = (
+        CheckConstraint("kind IN ('direct','unknown','known')", name="ck_touch_kind"),
+        CheckConstraint("(kind = 'known') = (campaign_id IS NOT NULL)", name="ck_touch_campaign"),
+        CheckConstraint("recorded_at >= occurred_at", name="ck_touch_time"),
+        Index("ix_touch_retention", "recorded_at"),
+    )
+    operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    analytics_manager_id: Mapped[UUID] = mapped_column(
+        ForeignKey("analytics_managers.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    campaign_id: Mapped[UUID | None] = mapped_column(ForeignKey("acquisition_campaigns.id"))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

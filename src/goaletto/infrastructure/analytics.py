@@ -18,6 +18,8 @@ from goaletto.application.analytics import (
     require_utc,
 )
 from goaletto.infrastructure.models import (
+    AcquisitionFirstTouch,
+    AcquisitionTouch,
     AnalyticsCoverage,
     AnalyticsExclusion,
     AnalyticsManager,
@@ -239,6 +241,10 @@ async def cleanup_events(session: AsyncSession, at: datetime) -> None:
         raise CoverageNotStarted("Collection needs explicit coverage activation")
     cutoff = at - timedelta(days=coverage.retention_days)
     await session.execute(delete(JourneyEventRow).where(JourneyEventRow.recorded_at < cutoff))
+    await session.execute(delete(AcquisitionTouch).where(AcquisitionTouch.recorded_at < cutoff))
+    await session.execute(
+        delete(AcquisitionFirstTouch).where(AcquisitionFirstTouch.started_at < cutoff)
+    )
     await session.execute(
         delete(JourneySession).where(
             JourneySession.last_action_at < cutoff,

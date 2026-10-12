@@ -134,3 +134,14 @@ CI на GitHub проверяется отдельно после первого
 - Ruff/format и mypy45: успешно; полный pytest **190 passed, 2 deselected**.
   После прогона усилена проверка receipt identity/date и повторно проверены relevant tests.
 - Offline0006 upgrade/DDL успешно, PG не запускался. CI runtime645b109 прошёл.
+
+## Attribution foundation · 2026-10-12
+
+- Opaque campaigns, immutable first-touch до claim, direct/unknown/known и retry
+  без нового manager/cohort/session. Internal/opt-out/retention учтены.
+- SQL source funnel/CLI, зрелость24h/waiting, same ownership readiness, coverage
+  clipping и aggregate guards; реальное SQL n/N на PostgreSQL не проверялось.
+- Ruff/format, mypy48: успешно. Full pytest **204 passed, 2 deselected**.
+  Offline0007 DDL/upgrade, CLI preview без .env/соединения: успешно.
+- AND-75 остаётся In Progress до game /start path в AND-47. Preview cohort отсутствует.
+  DB/HDC/Telegram не запускались; CI предыдущего results9ce74a0 прошёл.

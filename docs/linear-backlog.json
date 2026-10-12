@@ -578,11 +578,11 @@
         "AND-74"
       ],
       "acceptance": "Реестр opaque start-кодов <=64 допустимых символов, source/placement/date и ссылки t.me/GoalettoBot. direct/unknown/known разделены. First-touch сохраняется до claim и неизменяем; повторный /start — касание, не новый manager. Отчёт source→claim→готовность; internal исключён. Тесты валидных/неизвестных/повторных кодов. CTR/CAC не выдумываются без данных показов/кликов/расходов.",
-      "context": "Python-only bot, без публичного redirect, frontend и нового web API. Ограничение: наблюдаем принятый /start, а не чтение или клик до него.",
+      "context": "Backend AND-75 реализован: opaque24-char start codes/immutable campaign registry(source,placement,date), direct/unknown/known, accept_start с Manager/pseudonym до claim, immutable first-touch, per-update retry dedupe, start_accepted/manager_started/campaign_touched и session/coverage collector в одной transaction. Не хранится raw unknown payload. Internal/opt_out исключены; retention deletes touches/first-touch без новой launch cohort.\n\nSource funnel SQL/CLI: mature24h eligible vs waiting, claim/ready того же ownership, internal exclusion, as-of recorded_at, coverage/retention clipping, bounded aggregate/count validation. Нет CTR/CAC без расходов/показов/кликов. Generated links используют официальные Telegram limits.\n\nRuff/format, mypy48, pytest204 passed/2 deselected; offline migration0007/SQL-recording без БД. CLI preview без подключения, --apply не запускался.\n\nЗадача остаётся In Progress: реальный игровой /start handler ещё не подключён в AND-47; preview не начинает cohort. SQL результаты/races на PG не проверены по запрету тестовых БД. Документ docs/analytics/acquisition.md.",
       "id": "AND-75",
       "uuid": "c631c68e-aeec-4cde-8486-761eee3f5a45",
       "url": "https://linear.app/andrei-brazhnikov/issue/AND-75/dobavit-ssylki-kampanij-i-atribuciyu-privlecheniya-cherez-telegram",
-      "state": "Backlog",
+      "state": "In Progress",
       "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9"
     },
     {

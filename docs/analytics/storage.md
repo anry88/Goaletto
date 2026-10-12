@@ -53,7 +53,8 @@ USAGE schema и SELECT journey_export; не grant tables/all schemas или writ
 Настройка реальных HDC ролей не выполнялась и должна проверяться перед привлечением.
 
 `cleanup_events` использует persisted retention_days (по умолчанию 180), удаляет rows
-с recorded_at раньше границы и пустые истёкшие sessions. Ровно на границе данные
+с recorded_at раньше границы, пустые истёкшие sessions, acquisition touches
+и истёкший first-touch; first_game_start_at не позволяет повтор launch cohort. Ровно на границе данные
 сохраняются. Вызывать в отдельной короткой maintenance transaction; автоматическое
 расписание/операторский CLI — AND-82. Комментарии/опросы и их сроки — AND-78.
 Внешний экспорт запускается отдельно и не блокирует игровую транзакцию.

@@ -72,3 +72,7 @@ operation UUID закреплён за fixture/stage/tick/version. Не обра
 Command-applied дополнительно требует command_id. Persisted operation_attempts
 отделены от journey и коррелируются через job/fixture/operation; delivery success
 не возникает от постановки outbox.
+
+User start_accepted фиксирует каждый принятый игровой /start; manager_started
+остаётся единственным первым входом. known campaign_touched — отдельный effect.
+Direct/unknown/known и first-touch хранятся в [acquisition](acquisition.md).

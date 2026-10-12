@@ -192,3 +192,7 @@ regulation lifecycle allowlist. [Транзакционные границы](ma
 
 Миграция0006: immutable match_results, composite Match/Fixture и исторические
 membership FK. Receipt+Standing обновляются атомарно с финальным тиком.
+
+Миграция0007: acquisition_campaigns, acquisition_first_touches, acquisition_touches;
+opaque codes, immutable first attribution, pseudonym FK/CASCADE и retention indexes.
+Миграция не начинает collection и не seed manager/campaign rows.

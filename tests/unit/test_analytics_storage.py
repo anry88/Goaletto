@@ -194,7 +194,7 @@ async def test_cleanup_uses_configured_recording_age_and_does_not_remove_live_se
     recorder = Recorder(coverage)
     await cleanup_events(cast(AsyncSession, recorder), NOW)
     assert recorder.statements[1].compile().params["recorded_at_1"] == NOW - timedelta(days=90)
-    assert "NOT (EXISTS" in recorder.sql()[2]
+    assert "NOT (EXISTS" in recorder.sql()[-1]
     recorder = Recorder()
     await start_coverage(cast(AsyncSession, recorder), NOW)
     assert "ON CONFLICT (version) DO NOTHING" in recorder.sql()[0]

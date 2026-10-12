@@ -44,3 +44,5 @@
 - [Долговечный матчевый worker и активация](match-runtime.md)
 
 - [Результат матча, очки и таблица](match-results.md)
+
+- [Кампании и источник /start](analytics/acquisition.md)

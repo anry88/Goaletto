@@ -86,6 +86,7 @@ def _user(*refs: str, ownership: bool = False, activity: bool = True) -> EventSp
 EVENT_SPECS = MappingProxyType(
     {
         "manager_started": _user(),
+        "start_accepted": _user(),
         "campaign_touched": _user("campaign_id"),
         "club_offer_delivered": EventSpec(Origin.SYSTEM, ("analytics_manager_id", "outbox_id")),
         "club_preview_opened": _user("club_id"),
