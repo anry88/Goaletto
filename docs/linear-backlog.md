@@ -98,9 +98,13 @@ Linear — источник актуального статуса; реестр 
 
 ### [AND-47 · Реализовать выдачу клубов только лиги 5 и расширение мира](https://linear.app/andrei-brazhnikov/issue/AND-47/realizovat-vydachu-klubov-tolko-ligi-5-i-rasshirenie-mira)
 
-Каждый новый комплект содержит 50 × 20 = 1 000 новых футболистов с новыми уникальными внешностями. Нельзя повторять лица первого комплекта или освобождать ID после пенсии. Проверить запас каталога до создания населения и пополнять его офлайн заранее; повторный запуск не создаёт частичного мира или случайных назначений. Первый whole-v2 покрывает только первый комплект; ресурс для роста мира и молодёжных замен требует отдельного пополнения.
+В рамках AND-47 реализован backend begin_game/preview/claim: Manager/pseudonym/source до claim, общий allocation lock, только free tier5, один owner, idempotent operation, budget/roster/history без сброса. При исчерпании мест полный новый5×10×20 через initializer+savepoint+activation; нехватка новых unique faces даёт no_capacity без частичного мира/повторов. Backend не вызывался на реальной БД.
 
-Onboarding показывает только свободные бот-клубы уровня 5 во всех комплектах. При отсутствии мест атомарно создать новый полный комплект 5×10.
+Actor scope/GameActionReceipt dedupe работает независимо от analytics opt-out/retention; обязательные refs/тип effect проверяются и без analytics.6 calendar months, reminders1/3/5mo, expiry/release/stale jobs/backend worker реализованы; accepted команды прежнего ownership cancelled при expiry.
+
+Ruff/format, mypy50, полный pytest212 passed/2 deselected; новый guard test и16 targeted tests проходят. Offline0008 upgrade/downgrade/DDL без БД. Документ docs/club-entry.md.
+
+Задача остаётся In Progress: игровой Telegram start/выбор/claim/navigation ещё не routed, sender отсутствует. Второму комплекту нужен новый банк1000 уникальных identities. PG execution/races/rollback не проверены по запрету тестовых БД. HDC/polling/--apply не запускались.
 
 **Приёмка:** Один Telegram ID — один клуб; параллельный claim последнего места не делит клуб/не создаёт лишние комплекты; верхние лиги недоступны новичкам; текущие финансы/таблица клуба сохраняются. Приёмка аналитики: первый игровой /start и источник фиксируются до claim; club_claimed атомарен с владением, retry/race не удваивают событие. Internal/автоматика отделены. Полнота воронки проверяется в AND-76.
 
@@ -135,7 +139,11 @@ Onboarding показывает только свободные бот-клуб�
 
 ### [AND-50 · Сохранять клуб шесть месяцев неактивности, напоминать и освобождать](https://linear.app/andrei-brazhnikov/issue/AND-50/sohranyat-klub-shest-mesyacev-neaktivnosti-napominat-i-osvobozhdat)
 
-Решение пользователя 2026-10-11: владение сохраняется шесть календарных месяцев от последнего явного игрового действия владельца; claim — начальная дата. Новое действие переносит дедлайн. Автоматические матчи, доставка и jobs не продлевают владение. Периодические уведомления «Ваш клуб ждёт вас». После истечения клуб полностью бот и доступен новичку только в лиге 5. Сроки подхвата 2 недели/освобождения 4 недели отменены.
+Backend владения/release/reminders реализован в рамках AND-47: durable6 calendar months/end-month clamp, shared allocation/owner locks, refresh after lock, GameActionReceipt operational dedupe без analytics, stale work guards, configurable LeasePolicy1/3/5mo, expiry always, opt-out/unavailable не создают новые reminders, release сохраняет состав/финансы/историю и отменяет неприменённые команды старого ownership.
+
+Worker поддерживает lease jobs; try-advisory lock avoids Job→allocation deadlock. Outbox dedupe period/last-action epoch/interval; pending delivery не human activity.
+
+Проверено unit/SQL-recording и offline0008 без БД; реальный PG race/rollback не выполнялся. Оставлено In Progress: preferences UI и окончательные guards непосредственно перед Telegram send/availability confirmation требуют AND-68; sender не реализован. docs/club-entry.md.
 
 **Приёмка:** Durable ownership period/last_game_action_at/deadline; шесть календарных месяцев, не 180 дней, конец месяца ограничивается допустимой датой. Return vs release атомарно перепроверяет owner/deadline и не отбирает активный клуб; retry не повторяет release. Состав/финансы/история сохраняются. Upper-tier released club не выдаётся новичкам; tier5 claim по обычным правилам. Reminders via outbox с dedupe period+interval, ограниченной настраиваемой частотой, opt-out/unavailable и проверкой актуальности перед отправкой; доставка не считается действием. Старые callbacks бывшего владельца запрещены. Сборка docs/bot-clubs.md проверена календарными и race-сценариями.
 

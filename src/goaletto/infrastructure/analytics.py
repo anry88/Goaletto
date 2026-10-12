@@ -66,7 +66,10 @@ async def pseudonym_for(session: AsyncSession, manager_id: UUID, at: datetime) -
     """Create mapping before claim, serialized with exclusion/deletion for this manager."""
     require_utc(at)
     manager = await session.scalar(
-        select(Manager).where(Manager.id == manager_id).with_for_update()
+        select(Manager)
+        .where(Manager.id == manager_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if manager is None:
         raise ValueError("Unknown manager")
@@ -111,7 +114,10 @@ async def record_event(session: AsyncSession, event: JourneyEvent) -> bool:
         if mapping is None:
             return False  # Deleted/opted-out identities are never reconstructed from an event.
         manager = await session.scalar(
-            select(Manager).where(Manager.id == mapping.manager_id).with_for_update()
+            select(Manager)
+            .where(Manager.id == mapping.manager_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
         excluded = await session.scalar(
             select(AnalyticsExclusion).where(AnalyticsExclusion.manager_id == mapping.manager_id)
@@ -215,7 +221,10 @@ async def exclude_manager(
     if kind not in {"internal", "test", "operator", "opt_out"}:
         raise ValueError("Unknown exclusion kind")
     manager = await session.scalar(
-        select(Manager).where(Manager.id == manager_id).with_for_update()
+        select(Manager)
+        .where(Manager.id == manager_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if manager is None:
         raise ValueError("Unknown manager")

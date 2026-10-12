@@ -112,6 +112,8 @@ class Manager(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # NULL for legacy/imported managers; preview /start does not create a launch cohort.
     first_game_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reminders_enabled: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    bot_available: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
 
 class AnalyticsManager(Base):
@@ -874,3 +876,25 @@ class AcquisitionTouch(Base):
     campaign_id: Mapped[UUID | None] = mapped_column(ForeignKey("acquisition_campaigns.id"))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class GameActionReceipt(Base):
+    """Operational dedupe independent of optional/expiring analytics."""
+
+    __tablename__ = "game_action_receipts"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["ownership_id", "manager_id", "club_id"],
+            ["ownership_periods.id", "ownership_periods.manager_id", "ownership_periods.club_id"],
+            name="fk_action_ownership",
+        ),
+        CheckConstraint("effect_number BETWEEN 0 AND 32767", name="ck_action_effect"),
+        CheckConstraint("ownership_id IS NULL OR club_id IS NOT NULL", name="ck_action_club"),
+    )
+    operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    effect_number: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    manager_id: Mapped[UUID] = mapped_column(ForeignKey("managers.id"))
+    ownership_id: Mapped[UUID | None] = mapped_column(Uuid)
+    club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"))
+    kind: Mapped[str] = mapped_column(String(80))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

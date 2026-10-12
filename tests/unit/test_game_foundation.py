@@ -25,7 +25,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     command.upgrade(config, "head", sql=True)
     sql = normalized(output.getvalue())
     old = {"league_sets", "leagues", "clubs", "jobs", "outbox_messages"}
-    altered = {"fixtures", "matches", "match_ticks", "accepted_commands"}
+    altered = {"fixtures", "matches", "match_ticks", "accepted_commands", "managers"}
     dialect = postgresql.dialect()
     for table in Base.metadata.sorted_tables:
         if table.name not in old | altered:
@@ -58,6 +58,10 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     assert "ALTER TABLE clubs ADD COLUMN stadium_capacity INTEGER DEFAULT '5000' NOT NULL" in sql
     assert "ALTER TABLE matches ADD COLUMN paused_at TIMESTAMP WITH TIME ZONE" in sql
     assert "CREATE TRIGGER tr_match_stage_immutable" in sql
+    assert (
+        "ALTER TABLE managers ADD COLUMN reminders_enabled BOOLEAN DEFAULT 'true' NOT NULL" in sql
+    )
+    assert "ALTER TABLE managers ADD COLUMN bot_available BOOLEAN DEFAULT 'true' NOT NULL" in sql
 
 
 def test_offline_downgrade_preserves_foundation_and_removes_extension(monkeypatch) -> None:

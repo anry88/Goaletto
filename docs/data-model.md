@@ -196,3 +196,7 @@ membership FK. Receipt+Standing обновляются атомарно с фи�
 Миграция0007: acquisition_campaigns, acquisition_first_touches, acquisition_touches;
 opaque codes, immutable first attribution, pseudonym FK/CASCADE и retention indexes.
 Миграция не начинает collection и не seed manager/campaign rows.
+
+Миграция0008: GameActionReceipt operation/effect scope dedupe independent от
+analytics retention; reminder/availability flags Manager. Миграция не выдаёт клубы,
+не создаёт periods/jobs и не меняет существующего владельца.

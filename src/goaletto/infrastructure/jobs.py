@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
+from goaletto.application.game_actions import handle_lease_job
 from goaletto.application.match_runtime import (
     RUNTIME_KINDS,
     NotReady,
@@ -59,11 +60,14 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
     if job.kind == "system.ping":
         job.status = "done"
         job.last_error = None
-    elif job.kind in RUNTIME_KINDS:
+    elif job.kind in RUNTIME_KINDS | {"ownership.remind", "ownership.expire"}:
         try:
             async with session.begin_nested():
-                await handle_calendar_job(session, job, at)
-                _, fixture_id, _ = job_refs(job)
+                if job.kind in RUNTIME_KINDS:
+                    await handle_calendar_job(session, job, at)
+                    _, fixture_id, _ = job_refs(job)
+                else:
+                    await handle_lease_job(session, job, at)
                 if fixture_id is not None:
                     stage = {
                         "match.lock_lineup": "locked",

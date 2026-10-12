@@ -46,3 +46,5 @@
 - [Результат матча, очки и таблица](match-results.md)
 
 - [Кампании и источник /start](analytics/acquisition.md)
+
+- [Выдача клуба, операционные receipts и полгода владения](club-entry.md)

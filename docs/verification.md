@@ -145,3 +145,17 @@ CI на GitHub проверяется отдельно после первого
   Offline0007 DDL/upgrade, CLI preview без .env/соединения: успешно.
 - AND-75 остаётся In Progress до game /start path в AND-47. Preview cohort отсутствует.
   DB/HDC/Telegram не запускались; CI предыдущего results9ce74a0 прошёл.
+
+## Club entry/lease backend · 2026-10-12
+
+- Atomic tier5 claim/operation retry, budget unchanged, complete world expansion
+  preflight/no_capacity, actor scope/operational receipt независимо от analytics.
+-6 calendar months, end-month clamp, return/release guards, stale/opt-out reminders,
+  expiry при отключённых reminders; pending accepted commands cancelled после expiry.
+- Backend не routed в Telegram: AND-47/50/75 остаются In Progress. Sender/update
+  preferences и проверки прямо перед send ещё не реализованы.
+- Ruff/format, mypy50: успешно. Full pytest **212 passed, 2 deselected**, после него добавлен guard required refs
+  без analytics; все16 targeted entry/dispatcher/schema tests проходят.
+- Offline0008 upgrade/downgrade/DDL без БД успешно. Существующий банк обеспечивает
+  лишь первый полный комплект; расширение ждёт новых уникальных внешностей.
+- DB/HDC/polling не запускались, реальные PG locks/races/rollback не проверены.
