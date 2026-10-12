@@ -1,5 +1,11 @@
 # Working on Goaletto
 
+- `main` is the common integration branch. Start each new task branch from the
+  latest `origin/main`; use the `codex/` prefix by default. After review and
+  relevant checks, merge completed work into `main` and publish the updated
+  `main` before the next agent wave. Do not keep developing from old agent or
+  integration branches. Coordinate shared models, migrations and bot/worker
+  wiring with Codex; preserve other agents' uncommitted changes.
 - Read README.md, docs/game-rules.md and the relevant docs before changing behavior.
 - User instructions override older GDD examples. Current rules are in the root GDD v2,
   docs/game-rules.md and docs/match-clock.md; docs/reference/original-gdd-v1.md is archival.
