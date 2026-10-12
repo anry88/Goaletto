@@ -30,6 +30,7 @@ goaletto-world = "goaletto.application.world_cli:main"
 goaletto-match = "goaletto.application.match_cli:main"
 goaletto-runtime = "goaletto.application.runtime_cli:main"
 goaletto-campaign = "goaletto.application.campaign_cli:main"
+goaletto-diagnostics = "goaletto.diagnostics.cli:main"
 goaletto-portraits = "goaletto.portraits.cli:main"
 goaletto-raster-portraits = "goaletto.portraits.raster_cli:main"
 
