@@ -20,6 +20,7 @@ flowchart LR
 - bot: форматирование, кнопки, маршрутизация, немедленный answerCallbackQuery.
 - domain: часы, рейтинги, симуляция, таблицы, правила переходов; переданный seed и
   явные входные данные. Сетевых вызовов и импортов framework здесь нет.
+  Реализован regulation-v1 engine с closed checkpoints; [границы](match-engine.md).
 - application: контракт аналитических эффектов, атомарное создание person/мира;
   права на клуб и остальные игровые use cases остаются в плане.
 - infrastructure: SQLAlchemy, репозитории, jobs/outbox.

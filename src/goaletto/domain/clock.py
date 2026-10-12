@@ -9,6 +9,7 @@ class MatchPhase(StrEnum):
     HALF_TIME = "half_time"
     SECOND_HALF = "second_half"
     FULL_TIME = "full_time"
+    ABANDONED = "abandoned"
 
 
 @dataclass(frozen=True)

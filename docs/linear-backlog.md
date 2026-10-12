@@ -169,9 +169,13 @@ Python-only bot, без публичного redirect, frontend и нового 
 
 ### [AND-51 · Разработать детерминированный матчевый движок](https://linear.app/andrei-brazhnikov/issue/AND-51/razrabotat-determinirovannyj-matchevyj-dvizhok)
 
-Чистые функции: секторные рейтинги, владение, шансы, исходы, выносливость, карточки/травмы; явные state/commands/seed/version.
+Реализован чистый regulation-v1: frozen snapshots/state/commands, explicit seed и policy, 7 секторов + GK, владение, моменты/исходы, усталость, карточки/травмы, injury-only замены, 5/3 окон, тактика/менталитет, остановка при <7. Закрытый JSON checkpoint/hash и точный replay без Telegram/SQLAlchemy/сети/часов. Домашняя поддержка временно повышает мораль 0–100 по фактическим home_fans, ограниченным вместимостью стадиона; crowd и policy pinned в snapshot. Большая пустая арена не даёт бонус.
 
-**Приёмка:** Одинаковые входы дают одинаковые события и state; no Telegram/DB imports; golden seed/replay tests; осмысленные распределения результатов на серии симуляций.
+Проверка: golden seed7 1:2, 57 событий, checkpoint после 17 тиков даёт тот же финал; 200 seeds с 2500 болельщиками: home/away/draw 78/56/66 против 67/67/66 без поддержки. Коэффициенты предварительные. CLI goaletto-match без БД.
+
+Приёмка: domain/replay/команды/поле реализованы и проверены; runtime/accepted-command persistence/UTC jobs/outbox/Telegram UI остаются AND-52/53/68, финансовый спрос/стадион — AND-63. PostgreSQL и HDC не запускались, тестовые БД не создавались. Документация: docs/match-engine.md.
+
+**Приёмка:** Golden/replay, immutable inputs, события, sector/form/fatigue/morale, команды/лимиты, форсированные cards/injuries и серия баланса проверены без БД.
 
 **Зависимости:** AND-45, AND-49.
 
@@ -291,7 +295,7 @@ Python-only bot, без публичного redirect, frontend и нового 
 
 ### [AND-63 · Добавить стадион, содержание и матчевый доход](https://linear.app/andrei-brazhnikov/issue/AND-63/dobavit-stadion-soderzhanie-i-matchevyj-dohod)
 
-Уровни, вместимость, стоимость/срок расширения, доход с учётом лиги, формы и посещаемости.
+Уровни, вместимость, стоимость/срок расширения, доход с учётом лиги, формы и посещаемости. Домашние болельщики временно повышают morale игроков; посещаемость <= capacity. Pinned crowd в AND-51; спрос/рост фанатов/доход AND-63, пустая арена бонуса не даёт.
 
 **Приёмка:** Одно улучшение/начисление за событие; нет бесплатного повторного апгрейда; экономика проверена на сезонном прогоне; финансовая запись соответствует стадиону.
 

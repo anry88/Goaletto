@@ -194,12 +194,12 @@
       "uuid": "68e6c62f-8a4e-49d2-9325-a143bebfff4d",
       "title": "Разработать детерминированный матчевый движок",
       "url": "https://linear.app/andrei-brazhnikov/issue/AND-51/razrabotat-determinirovannyj-matchevyj-dvizhok",
-      "state": "Backlog",
+      "state": "Done",
       "key": "simulation",
       "milestone": "matches",
       "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
-      "context": "Чистые функции: секторные рейтинги, владение, шансы, исходы, выносливость, карточки/травмы; явные state/commands/seed/version.",
-      "acceptance": "Одинаковые входы дают одинаковые события и state; no Telegram/DB imports; golden seed/replay tests; осмысленные распределения результатов на серии симуляций.",
+      "context": "Реализован чистый regulation-v1: frozen snapshots/state/commands, explicit seed и policy, 7 секторов + GK, владение, моменты/исходы, усталость, карточки/травмы, injury-only замены, 5/3 окон, тактика/менталитет, остановка при <7. Закрытый JSON checkpoint/hash и точный replay без Telegram/SQLAlchemy/сети/часов. Домашняя поддержка временно повышает мораль 0–100 по фактическим home_fans, ограниченным вместимостью стадиона; crowd и policy pinned в snapshot. Большая пустая арена не даёт бонус.\n\nПроверка: golden seed7 1:2, 57 событий, checkpoint после 17 тиков даёт тот же финал; 200 seeds с 2500 болельщиками: home/away/draw 78/56/66 против 67/67/66 без поддержки. Коэффициенты предварительные. CLI goaletto-match без БД.\n\nПриёмка: domain/replay/команды/поле реализованы и проверены; runtime/accepted-command persistence/UTC jobs/outbox/Telegram UI остаются AND-52/53/68, финансовый спрос/стадион — AND-63. PostgreSQL и HDC не запускались, тестовые БД не создавались. Документация: docs/match-engine.md.",
+      "acceptance": "Golden/replay, immutable inputs, события, sector/form/fatigue/morale, команды/лимиты, форсированные cards/injuries и серия баланса проверены без БД.",
       "depends": [
         "AND-45",
         "AND-49"
@@ -388,7 +388,7 @@
       "key": "stadium",
       "milestone": "economy",
       "milestone_id": "6c6d954a-6971-43a9-bf0c-4e46a0ca9c61",
-      "context": "Уровни, вместимость, стоимость/срок расширения, доход с учётом лиги, формы и посещаемости.",
+      "context": "Уровни, вместимость, стоимость/срок расширения, доход с учётом лиги, формы и посещаемости. Домашние болельщики временно повышают morale игроков; посещаемость <= capacity. Pinned crowd в AND-51; спрос/рост фанатов/доход AND-63, пустая арена бонуса не даёт.",
       "acceptance": "Одно улучшение/начисление за событие; нет бесплатного повторного апгрейда; экономика проверена на сезонном прогоне; финансовая запись соответствует стадиону.",
       "depends": [
         "AND-59"

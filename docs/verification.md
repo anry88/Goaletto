@@ -82,3 +82,18 @@ CI на GitHub проверяется отдельно после первого
   `--apply` не запускались. HDC, токен, изображения и действующие боты не менялись.
 - AND-46 реализована как seed use case/CLI. AND-55: планировщик/fixtures/held jobs готовы,
   задача остаётся In Progress до подключения runtime AND-52 и уведомлений AND-68.
+
+## Чистый матчевый движок и поддержка трибун · 2026-10-12
+
+- regulation-v1: 30 ticks/90 game minutes, отдельный halftime, immutable snapshots,
+  named seeded streams, closed checkpoints и stable event IDs.
+- Мораль 0–100, временная домашняя поддержка по pinned home_fans <= stadium capacity.
+  Большой пустой стадион не даёт бонус; расчёт спроса/билетного дохода пока AND-63.
+- Golden seed7 1:2, 57 событий, SHA ae4002fb500d7769e280a9939d3f345f78e935b6c1b1be6a3f0bb792850c6841;
+  checkpoint после 17 тиков даёт тот же финальный state и 27 оставшихся событий.
+- 200 сопоставимых seeds: home/away/draw 78/56/66 при 2500 болельщиках против
+  67/67/66 без поддержки; mean goals 2.14, chances25.22. Это начальный баланс.
+- Проверены лимиты 5/3/3, halftime windows, duplicate commands/ticks, cards/injuries,
+  injury-only bench order, GK fallback и abandoned без присуждения счёта.
+- Ruff check/format, mypy strict39 модулей: успешно. pytest: **156 passed, 2 deselected**.
+- DB/контейнеры/polling/HDC не запускались; runtime/persistence/outbox ещё не подключены.
