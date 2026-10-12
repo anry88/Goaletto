@@ -70,6 +70,7 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
                         "match.start": "started",
                         "match.second_half_start": "second_half",
                         "match.remind": "reminder",
+                        "match.finalize_result": "result",
                         "match.tick": f"tick:{job.payload['tick_number']}",
                     }[job.kind]
                     operation_id = uuid5(fixture_id, f"runtime:v1:{stage}")

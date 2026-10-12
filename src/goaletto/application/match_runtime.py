@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import JourneyEvent, Origin, Surface, require_utc
+from goaletto.application.results import finalize_result
 from goaletto.domain.calendar import CALENDAR_VERSION
 from goaletto.domain.clock import MatchClock, MatchPhase
 from goaletto.domain.match_codec import restore_state, state_document, state_hash
@@ -61,6 +62,7 @@ RUNTIME_KINDS = frozenset(
         "match.start",
         "match.tick",
         "match.second_half_start",
+        "match.finalize_result",
     }
 )
 
@@ -464,6 +466,10 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         raise NotReady("Fixture unavailable or held by another worker")
     if fixture.season_id != season_id:
         raise ValueError("Job belongs to a different season")
+    if job.kind == "match.finalize_result":
+        if await finalize_result(session, fixture.id, at):
+            await lifecycle_event(session, fixture, "result_finalized", "result", at)
+        return
     if fixture.status in {"finished", "abandoned", "cancelled"}:
         return
     if fixture.status == "paused":
@@ -607,13 +613,15 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         stage = "abandoned" if abandoned else "finished"
         await stage_receipt(session, match, stage, at, due)
         await lifecycle_event(session, fixture, f"fixture_{stage}", stage, at)
+        if not abandoned and await finalize_result(session, fixture.id, at):
+            await lifecycle_event(session, fixture, "result_finalized", "result", at)
         await queue_notification(session, fixture, "match_result", stage, at, new)
         await session.execute(
             update(AcceptedCommand)
             .where(AcceptedCommand.match_id == match.id, AcceptedCommand.status == "accepted")
             .values(status="cancelled")
         )
-        # Do not award standings/3:0; result processing has its own idempotent task.
+        # Abandoned fixtures never receive automatic standings/awarded scores.
         await session.execute(
             update(Job)
             .where(

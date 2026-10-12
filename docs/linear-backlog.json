@@ -274,11 +274,11 @@
       "uuid": "834169c8-573c-4048-bf7f-25617f85143e",
       "title": "Реализовать результаты, таблицы и стабильные tie-breaks",
       "url": "https://linear.app/andrei-brazhnikov/issue/AND-56/realizovat-rezultaty-tablicy-i-stabilnye-tie-breaks",
-      "state": "Backlog",
+      "state": "In Progress",
       "key": "standings",
       "milestone": "matches",
       "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
-      "context": "Матч заканчивается один раз, обновляет played/points/goals; таблица с paging; решить разность мячей/забитые/предсезонный жребий.",
+      "context": "Backend и Telegram presenters реализованы: immutable result receipt, атомарные3/1/0 и оба Standing в финальном тике, points/GD/GF/persisted draw, историческая membership, idempotent replay/changed receipt guard, abandoned без очков. Presenter5/page и компактные callbacks/отчёт проверены. Реальные кнопочные handlers/authorization ещё не подключены к onboarding/navigation AND-47/48, задача остаётся In Progress. Документ docs/match-results.md. PostgreSQL не запускался, unit/offline SQL checks без тестовых БД.",
       "acceptance": "3/1/0 очков начисляются один раз; до/после restart таблица одинакова; ничьи по показателям имеют стабильный порядок; отчёты открываются кнопкой.",
       "depends": [
         "AND-55"

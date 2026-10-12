@@ -79,7 +79,9 @@ Full-time записывает actual_finish_at и status finished, abandoned �
 с текущим счётом поля и временем остановки. Не присуждаются 3:0, очки или победитель
 abandoned. Tick может закончиться внутри его трёх игровых минут; SQL допускает это.
 Все будущие tick/halftime jobs закрываются без повторной симуляции.
-Результат для таблиц — AND-56, сезонные переходы — AND-57; они ещё не подключены.
+Начисление очков/receipt/таблица AND-56 подключены атомарно к финальному тику:
+[match-results.md](match-results.md). Telegram navigation пока в плане.
+Сезонные переходы — AND-57, ещё не подключены.
 
 Активные владельцы получают durable outbox requests reminder/board/result. Это
 постановка, не доставка: result_delivered не записывается до Telegram accepted.

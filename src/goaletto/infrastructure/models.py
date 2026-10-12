@@ -504,6 +504,7 @@ class Fixture(Base):
 class Match(Base):
     __tablename__ = "matches"
     __table_args__ = (
+        UniqueConstraint("id", "fixture_id", name="uq_match_fixture_identity"),
         CheckConstraint("completed_tick BETWEEN 0 AND 30", name="ck_match_tick"),
         CheckConstraint("home_goals >= 0 AND away_goals >= 0", name="ck_match_score"),
         CheckConstraint("state_version > 0", name="ck_match_state_version"),
@@ -774,3 +775,47 @@ class OperationAttempt(Base):
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     outcome: Mapped[str] = mapped_column(String(16))
     failure_class: Mapped[str | None] = mapped_column(String(32))
+
+
+class MatchResult(Base):
+    __tablename__ = "match_results"
+    __table_args__ = (
+        UniqueConstraint("fixture_id", name="uq_result_fixture"),
+        ForeignKeyConstraint(
+            ["match_id", "fixture_id"],
+            ["matches.id", "matches.fixture_id"],
+            name="fk_result_match_fixture",
+        ),
+        ForeignKeyConstraint(
+            ["season_id", "home_club_id", "league_id"],
+            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
+            name="fk_result_home_membership",
+        ),
+        ForeignKeyConstraint(
+            ["season_id", "away_club_id", "league_id"],
+            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
+            name="fk_result_away_membership",
+        ),
+        CheckConstraint(
+            "version = 1 AND home_goals >= 0 AND away_goals >= 0 AND home_club_id <> away_club_id",
+            name="ck_result_score",
+        ),
+        CheckConstraint(
+            "actual_finish_at >= actual_start_at AND recorded_at >= actual_finish_at",
+            name="ck_result_dates",
+        ),
+        CheckConstraint("length(state_hash) = 64", name="ck_result_hash"),
+    )
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    fixture_id: Mapped[UUID] = mapped_column(ForeignKey("fixtures.id"))
+    season_id: Mapped[UUID] = mapped_column(Uuid)
+    league_id: Mapped[UUID] = mapped_column(Uuid)
+    home_club_id: Mapped[UUID] = mapped_column(Uuid)
+    away_club_id: Mapped[UUID] = mapped_column(Uuid)
+    version: Mapped[int] = mapped_column(SmallInteger)
+    home_goals: Mapped[int] = mapped_column(SmallInteger)
+    away_goals: Mapped[int] = mapped_column(SmallInteger)
+    actual_start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    actual_finish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    state_hash: Mapped[str] = mapped_column(String(64))

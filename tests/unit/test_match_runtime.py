@@ -141,6 +141,13 @@ def capture_events(monkeypatch):
 
     monkeypatch.setattr("goaletto.application.match_runtime.record_event", capture)
 
+    async def finalized(session, fixture_id, at):
+        assert session.match.phase == "full_time" and session.fixture.status == "finished"
+        assert any(isinstance(t, MatchTick) and t.tick_number == 30 for t in session.added)
+        return True
+
+    monkeypatch.setattr("goaletto.application.match_runtime.finalize_result", finalized)
+
 
 async def run(recorder, kind, tick=None, at=NOW):
     await handle_calendar_job(cast(AsyncSession, recorder), job(recorder.fixture, kind, tick), at)

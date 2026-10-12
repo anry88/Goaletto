@@ -223,7 +223,7 @@ Accepted commands ordered, deadline check, tick FK insert-before-apply, halftime
 
 ### [AND-56 · Реализовать результаты, таблицы и стабильные tie-breaks](https://linear.app/andrei-brazhnikov/issue/AND-56/realizovat-rezultaty-tablicy-i-stabilnye-tie-breaks)
 
-Матч заканчивается один раз, обновляет played/points/goals; таблица с paging; решить разность мячей/забитые/предсезонный жребий.
+Backend и Telegram presenters реализованы: immutable result receipt, атомарные3/1/0 и оба Standing в финальном тике, points/GD/GF/persisted draw, историческая membership, idempotent replay/changed receipt guard, abandoned без очков. Presenter5/page и компактные callbacks/отчёт проверены. Реальные кнопочные handlers/authorization ещё не подключены к onboarding/navigation AND-47/48, задача остаётся In Progress. Документ docs/match-results.md. PostgreSQL не запускался, unit/offline SQL checks без тестовых БД.
 
 **Приёмка:** 3/1/0 очков начисляются один раз; до/после restart таблица одинакова; ничьи по показателям имеют стабильный порядок; отчёты открываются кнопкой.
 

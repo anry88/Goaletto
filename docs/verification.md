@@ -124,3 +124,13 @@ CI на GitHub проверяется отдельно после первого
 - PG server/races/rollback/triggers не выполнялись; БД/контейнеры не создавались.
   Seed/runtime --apply/polling/HDC не запускались; sender/standings/rollover ещё в плане.
 - GitHub CI предыдущих engine/collector commits успешен.
+
+## Результаты и таблицы · 2026-10-12
+
+- Pure3/1/0, points/GD/GF/preseason draw; MatchResult receipt/standing locks и
+  финальный тик/outbox в одной transaction. Abandoned без автоматических очков.
+- Telegram presenters5/page, callbacks<=64 bytes, canonical UUID/HTML escapes.
+  Реальные report/table handlers не подключены; AND-56 остаётся In Progress.
+- Ruff/format и mypy45: успешно; полный pytest **190 passed, 2 deselected**.
+  После прогона усилена проверка receipt identity/date и повторно проверены relevant tests.
+- Offline0006 upgrade/DDL успешно, PG не запускался. CI runtime645b109 прошёл.

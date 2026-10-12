@@ -189,3 +189,6 @@ Club capacity/supporters; Match paused_at/paused_seconds, immutable starting-inp
 trigger; match_stages и operation_attempts. Отдельный fixture/match abandoned;
 MatchTick game_minute допускает остановку внутри тика. Command mentality и
 regulation lifecycle allowlist. [Транзакционные границы](match-runtime.md).
+
+Миграция0006: immutable match_results, composite Match/Fixture и исторические
+membership FK. Receipt+Standing обновляются атомарно с финальным тиком.
