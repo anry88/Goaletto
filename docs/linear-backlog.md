@@ -185,9 +185,15 @@ Python-only bot, без публичного redirect, frontend и нового 
 
 ### [AND-52 · Реализовать долговечный минутный runtime матчей](https://linear.app/andrei-brazhnikov/issue/AND-52/realizovat-dolgovechnyj-minutnyj-runtime-matchej)
 
-30 тиков по 60 секунд/3 игровых минуты, 180-секундный перерыв после тика 15; абсолютные сроки, отдельное событие старта второго тайма.
+Реализован durable regulation runtime, worker dispatcher и explicit season activation CLI. Fixture/Match locks, immutable starting snapshots/seed/version, absolute UTC deadlines от actual_start_at, 15/18/19/33 minute boundaries, closed checkpoint/projection validation, идемпотентные ticks/stages и outbox в одной game transaction. Поддержка трибун pinned: capacity/supporters persisted, baseline attendance=min(supporters,capacity), прогноз спроса остаётся AND-63.
 
-**Приёмка:** Тик 15 в 15:00, старт тайма 2 в 18:00, тик 16 в 19:00, тик 30/90′ в 33:00; повтор tick не меняет счёт дважды; state/events/jobs/outbox commit атомарен. Приёмка аналитики: ticks/fixture lifecycle — system, не user activity. События lifecycle пишутся атомарно и dedupe по fixture/stage/version. Принятие/применение команд и технические попытки коррелируются; перенос/пауза сохраняют actual times для AND-77.
+Accepted commands ordered, deadline check, tick FK insert-before-apply, halftime free window без FK на будущий tick16, applied lifecycle/command correlation. System lifecycle не human activity. Operation attempts, savepoint deferral/failed codes. Late kickoff rebases один раз; mid-match lateness не сдвигает clock. Explicit pause/resume/postpone сохраняют actual dates; abandoned отдельно, без присуждения3:0/очков.
+
+Проверка: Ruff/format, mypy42, полный offline pytest182 passed/2 deselected плюс новый snapshot pin test, 17 targeted runtime/dispatcher checks. Непрерывные30 ticks дают hash ae4002fb500d7769e280a9939d3f345f78e935b6c1b1be6a3f0bb792850c6841; retry/restart/halftime/delay/pause/command FK/deadline/abandoned/outbox проверены SQL-recording без БД. Миграция0005 offline upgrade/ALTER/DDL.
+
+По указанию пользователя тестовые БД не создавались; real PG locks/races/rollback/trigger execution не проверялись. Seed/runtime --apply и HDC не запускались, held jobs не активированы. Sender/live Telegram edit — AND-68, command admission/UI/instructions — AND-53, standings/results — AND-56, rollover — AND-57, disaster recovery — AND-69. Документ docs/match-runtime.md.
+
+**Приёмка:** Runtime/worker/activation, exact UTC deadlines, atomic checkpoint/events/jobs/outbox, commands and attempts реализованы и unit/offline SQL проверены. Online PG не запускался; календарь не активирован.
 
 **Зависимости:** AND-51, AND-74.
 

@@ -12,7 +12,7 @@ async def run() -> None:
     settings = Settings()
     logging.basicConfig(level=settings.log_level)
     database = Database(settings)
-    logger.info("Worker started; current handler: system.ping")
+    logger.info("Worker started; regulation match jobs enabled, calendar activation is explicit")
     try:
         while True:
             try:

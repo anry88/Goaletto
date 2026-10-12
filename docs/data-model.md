@@ -182,3 +182,10 @@ analytics_coverage, analytics_exclusions, journey_sessions и journey_events;
 псевдоним/сессия FK, version/operation/effect unique, restricted export view.
 Миграция не включает collection, preview не является launch cohort.
 [Контракт хранения, sessions, deletion и доступы](analytics/storage.md).
+
+## Regulation runtime · миграция 0005
+
+Club capacity/supporters; Match paused_at/paused_seconds, immutable starting-input
+trigger; match_stages и operation_attempts. Отдельный fixture/match abandoned;
+MatchTick game_minute допускает остановку внутри тика. Command mentality и
+regulation lifecycle allowlist. [Транзакционные границы](match-runtime.md).

@@ -100,6 +100,11 @@ EVENT_SPECS = MappingProxyType(
         ),
         "match_command_applied": EventSpec(Origin.SYSTEM, ("fixture_id", "command_id")),
         "fixture_finished": EventSpec(Origin.SYSTEM, ("fixture_id",)),
+        "fixture_started": EventSpec(Origin.SYSTEM, ("fixture_id",)),
+        "match_lineup_locked": EventSpec(Origin.SYSTEM, ("fixture_id",)),
+        "match_tick_committed": EventSpec(Origin.SYSTEM, ("fixture_id",)),
+        "match_second_half_started": EventSpec(Origin.SYSTEM, ("fixture_id",)),
+        "fixture_abandoned": EventSpec(Origin.SYSTEM, ("fixture_id",)),
         "result_delivered": EventSpec(
             Origin.SYSTEM, ("analytics_manager_id", "fixture_id", "outbox_id")
         ),

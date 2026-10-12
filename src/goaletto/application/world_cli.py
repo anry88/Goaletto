@@ -38,6 +38,8 @@ def preview_document(world: PreparedWorld) -> dict[str, Any]:
                     "name": club.name,
                     "owner": None,
                     "budget": world.plan.options.initial_budget,
+                    "stadium_capacity": 5000,
+                    "supporters": 2500,
                     "kit_primary": club.kit_primary,
                     "kit_secondary": club.kit_secondary,
                     "tie_break_order": club.tie_break_order,

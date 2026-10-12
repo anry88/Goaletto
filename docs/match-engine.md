@@ -3,7 +3,8 @@
 Реализована чистая симуляция без Telegram, SQLAlchemy, сети и чтения часов.
 `start_match`, `advance_tick`, `start_second_half` получают явные snapshots/state,
 commands, seed и policy. Это работающий расчёт матчей, а не подключённый live-worker.
-Календарные jobs пока остаются held; следующий слой — AND-52.
+Durable слой [AND-52](match-runtime.md) реализован; календарь исходно held
+и не активирован на реальной БД.
 
 ## Запуск и восстановление без БД
 

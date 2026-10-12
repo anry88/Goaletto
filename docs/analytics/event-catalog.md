@@ -63,3 +63,12 @@ outcome, bounded failure_class и retry_number. Явные разрешённы�
 измеряет ошибку, но не retention/готовность.
 Добавления экономики/платежей и новые variants сначала получают контракт и критерии
 приёмки. Чувствительные operational identifiers не выводятся в общие выгрузки.
+
+## Regulation lifecycle · AND-52
+
+System events: match_lineup_locked, fixture_started, match_tick_committed,
+match_second_half_started, fixture_finished, fixture_abandoned. Требуют fixture_id;
+operation UUID закреплён за fixture/stage/tick/version. Не образуют human activity.
+Command-applied дополнительно требует command_id. Persisted operation_attempts
+отделены от journey и коррелируются через job/fixture/operation; delivery success
+не возникает от постановки outbox.

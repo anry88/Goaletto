@@ -57,11 +57,14 @@ class Club(Base):
     kit_primary: Mapped[str] = mapped_column(String(7), server_default="#743D42")
     kit_secondary: Mapped[str] = mapped_column(String(7), server_default="#F2E9D8")
     kit_version: Mapped[int] = mapped_column(Integer, server_default="1")
+    stadium_capacity: Mapped[int] = mapped_column(Integer, server_default="5000")
+    supporters: Mapped[int] = mapped_column(Integer, server_default="2500")
     __table_args__ = (
         CheckConstraint("budget >= 0", name="ck_club_budget"),
         CheckConstraint("kit_primary ~ '^#[0-9A-Fa-f]{6}$'", name="ck_club_primary_color"),
         CheckConstraint("kit_secondary ~ '^#[0-9A-Fa-f]{6}$'", name="ck_club_secondary_color"),
         CheckConstraint("kit_version > 0", name="ck_club_kit_version"),
+        CheckConstraint("stadium_capacity >= 0 AND supporters >= 0", name="ck_club_crowd"),
     )
 
 
@@ -466,14 +469,15 @@ class Fixture(Base):
         CheckConstraint("round_number BETWEEN 1 AND 18", name="ck_fixture_round"),
         CheckConstraint("lineup_lock_at <= scheduled_start_at", name="ck_fixture_lock"),
         CheckConstraint(
-            "status IN ('scheduled','live','paused','finished','cancelled')",
+            "status IN ('scheduled','live','paused','finished','abandoned','cancelled')",
             name="ck_fixture_status",
         ),
         CheckConstraint(
-            "(status = 'finished') = (actual_finish_at IS NOT NULL)", name="ck_fixture_finish"
+            "(status IN ('finished','abandoned')) = (actual_finish_at IS NOT NULL)",
+            name="ck_fixture_finish",
         ),
         CheckConstraint(
-            "status NOT IN ('live','paused','finished') OR actual_start_at IS NOT NULL",
+            "status NOT IN ('live','paused','finished','abandoned') OR actual_start_at IS NOT NULL",
             name="ck_fixture_started",
         ),
         CheckConstraint(
@@ -504,10 +508,14 @@ class Match(Base):
         CheckConstraint("home_goals >= 0 AND away_goals >= 0", name="ck_match_score"),
         CheckConstraint("state_version > 0", name="ck_match_state_version"),
         CheckConstraint(
-            "phase IN ('first_half','half_time','second_half','full_time','paused')",
+            "phase IN ('first_half','half_time','second_half','full_time','abandoned','paused')",
             name="ck_match_phase",
         ),
         CheckConstraint("phase <> 'full_time' OR completed_tick = 30", name="ck_match_full_time"),
+        CheckConstraint(
+            "paused_seconds >= 0 AND (phase = 'paused') = (paused_at IS NOT NULL)",
+            name="ck_match_pause",
+        ),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     fixture_id: Mapped[UUID] = mapped_column(ForeignKey("fixtures.id"), unique=True)
@@ -521,13 +529,18 @@ class Match(Base):
     home_goals: Mapped[int] = mapped_column(SmallInteger, default=0)
     away_goals: Mapped[int] = mapped_column(SmallInteger, default=0)
     next_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    paused_seconds: Mapped[int] = mapped_column(Integer, server_default="0")
 
 
 class MatchTick(Base):
     __tablename__ = "match_ticks"
     __table_args__ = (
         CheckConstraint("tick_number BETWEEN 1 AND 30", name="ck_tick_number"),
-        CheckConstraint("game_minute = tick_number * 3", name="ck_tick_game_minute"),
+        CheckConstraint(
+            "game_minute BETWEEN tick_number * 3 - 2 AND tick_number * 3",
+            name="ck_tick_game_minute",
+        ),
     )
     match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
     tick_number: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
@@ -556,7 +569,8 @@ class AcceptedCommand(Base):
         CheckConstraint("payload_version > 0", name="ck_command_payload_version"),
         CheckConstraint("status IN ('accepted','applied','cancelled')", name="ck_command_status"),
         CheckConstraint(
-            "kind IN ('lineup','tactics','substitution','instruction')", name="ck_command_kind"
+            "kind IN ('lineup','tactics','substitution','instruction','mentality')",
+            name="ck_command_kind",
         ),
         CheckConstraint(
             "kind = 'lineup' OR match_id IS NOT NULL", name="ck_command_match_required"
@@ -719,3 +733,44 @@ class JourneyEventRow(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     user_activity: Mapped[bool] = mapped_column(Boolean)
     envelope: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+class MatchStage(Base):
+    __tablename__ = "match_stages"
+    __table_args__ = (
+        CheckConstraint(
+            "stage IN ('locked','started','second_half','finished','abandoned')",
+            name="ck_match_stage",
+        ),
+    )
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    stage: Mapped[str] = mapped_column(String(16), primary_key=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    events: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    state_hash: Mapped[str] = mapped_column(String(64))
+
+
+class OperationAttempt(Base):
+    __tablename__ = "operation_attempts"
+    __table_args__ = (
+        UniqueConstraint("job_id", "retry_number", name="uq_attempt_job_retry"),
+        CheckConstraint("retry_number > 0 AND finished_at >= started_at", name="ck_attempt_time"),
+        CheckConstraint("outcome IN ('committed','deferred','failed')", name="ck_attempt_outcome"),
+        CheckConstraint(
+            "failure_class IS NULL OR failure_class IN "
+            "('not_ready','invalid_state','unsupported_job_kind')",
+            name="ck_attempt_failure",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    job_id: Mapped[UUID] = mapped_column(ForeignKey("jobs.id"))
+    operation_id: Mapped[UUID] = mapped_column(Uuid)
+    fixture_id: Mapped[UUID | None] = mapped_column(ForeignKey("fixtures.id"))
+    retry_number: Mapped[int] = mapped_column(Integer)
+    stage: Mapped[str] = mapped_column(String(80))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    outcome: Mapped[str] = mapped_column(String(16))
+    failure_class: Mapped[str | None] = mapped_column(String(32))

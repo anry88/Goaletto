@@ -109,3 +109,18 @@ CI на GitHub проверяется отдельно после первого
   upgrade сформирован, CREATE TABLE/index соответствует ORM.
 - БД/контейнеры не создавались; PG races/rollback/CASCADE/GRANT не выполнялись.
   Collector не включён в preview; HDC и текущие боты не изменены.
+
+## Regulation runtime · 2026-10-12
+
+- Durable worker/activation API/CLI и миграция0005; seed jobs остаются held до explicit
+  activation. Snapshot pin/immutable trigger, MatchTick/Stage/events/hash/outbox.
+- Unit все30 transitions дают тот же golden hash; 15/18/19/33m boundaries, duplicate/
+  restart, delayed start vs late ticks, pause/resume/postpone, halftime commands,
+  applied tick FK order, deadline cancellation, abandoned и notification outbox.
+- Worker savepoint/deferred/failed attempts проверены без внешних вызовов.
+- Ruff/format, mypy42: успешно. Full pytest **182 passed, 2 deselected**, после него
+  добавлен crowd pin test; все **17 runtime/dispatcher tests** проходят.
+- Offline CREATE/index/ALTER соответствует ORM; upgrade сформирован.
+- PG server/races/rollback/triggers не выполнялись; БД/контейнеры не создавались.
+  Seed/runtime --apply/polling/HDC не запускались; sender/standings/rollover ещё в плане.
+- GitHub CI предыдущих engine/collector commits успешен.

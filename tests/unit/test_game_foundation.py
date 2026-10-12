@@ -25,9 +25,10 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     command.upgrade(config, "head", sql=True)
     sql = normalized(output.getvalue())
     old = {"league_sets", "leagues", "clubs", "jobs", "outbox_messages"}
+    altered = {"fixtures", "matches", "match_ticks", "accepted_commands"}
     dialect = postgresql.dialect()
     for table in Base.metadata.sorted_tables:
-        if table.name not in old:
+        if table.name not in old | altered:
             assert normalized(str(CreateTable(table).compile(dialect=dialect))) in sql
         for index in table.indexes:
             assert normalized(str(CreateIndex(index).compile(dialect=dialect))) in sql
@@ -35,6 +36,28 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     assert "CREATE TRIGGER tr_person_event_immutable" in sql
     assert "CREATE TRIGGER tr_match_tick_immutable" in sql
     assert "INSERT INTO persons" not in sql
+    for table in altered | {"clubs"}:
+        for constraint in Base.metadata.tables[table].constraints:
+            if constraint.name and constraint.name in {
+                "ck_fixture_status",
+                "ck_fixture_finish",
+                "ck_fixture_started",
+                "ck_match_phase",
+                "ck_match_pause",
+                "ck_tick_game_minute",
+                "ck_command_kind",
+                "ck_club_crowd",
+            }:
+                assert (
+                    normalized(
+                        f"ALTER TABLE {table} ADD CONSTRAINT {constraint.name} "
+                        f"CHECK ({constraint.sqltext})"
+                    )
+                    in sql
+                )
+    assert "ALTER TABLE clubs ADD COLUMN stadium_capacity INTEGER DEFAULT '5000' NOT NULL" in sql
+    assert "ALTER TABLE matches ADD COLUMN paused_at TIMESTAMP WITH TIME ZONE" in sql
+    assert "CREATE TRIGGER tr_match_stage_immutable" in sql
 
 
 def test_offline_downgrade_preserves_foundation_and_removes_extension(monkeypatch) -> None:

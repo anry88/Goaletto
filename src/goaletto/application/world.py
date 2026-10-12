@@ -171,6 +171,8 @@ async def initialize_world(
                 "kit_primary": club.kit_primary,
                 "kit_secondary": club.kit_secondary,
                 "kit_version": 1,
+                "stadium_capacity": 5000,
+                "supporters": 2500,
             }
             for club in clubs
         ],
