@@ -13,6 +13,11 @@ from uuid import UUID
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from goaletto.application.club_view import ClubCard, PlayerCard, SquadPage
+from goaletto.bot.history_callbacks import (
+    player_history_callback,
+    results_callback,
+    seasons_callback,
+)
 from goaletto.bot.portrait_cache import PORTRAIT_UNAVAILABLE_TEXT
 from goaletto.bot.result_views import compact_id, expand_id
 
@@ -116,6 +121,7 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
         inline_keyboard=[
             [InlineKeyboardButton(text="🏟 Мой клуб", callback_data=CLUB_CALLBACK)],
             [InlineKeyboardButton(text="👥 Состав", callback_data=squad_callback(1))],
+            [InlineKeyboardButton(text="📜 История", callback_data=results_callback(1))],
         ]
     )
     return text, keyboard
@@ -132,6 +138,8 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="👥 Состав", callback_data=squad_callback(1))],
+            [InlineKeyboardButton(text="📜 История", callback_data=results_callback(1))],
+            [InlineKeyboardButton(text="🗂 Сезоны", callback_data=seasons_callback(1))],
             [InlineKeyboardButton(text="🏠 Главное меню", callback_data=MENU_CALLBACK)],
         ]
     )
@@ -238,6 +246,12 @@ def player_view(
             [
                 InlineKeyboardButton(
                     text="← Назад к составу", callback_data=squad_callback(return_page)
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📜 История игрока",
+                    callback_data=player_history_callback(card.person_id, 1),
                 )
             ],
             [InlineKeyboardButton(text="🏠 Главное меню", callback_data=MENU_CALLBACK)],
