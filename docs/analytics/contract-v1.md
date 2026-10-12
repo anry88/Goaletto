@@ -1,8 +1,9 @@
 # Контракт событий v1 · AND-73
 
 Статус: контракт реализации закреплён в `application/analytics.py`, envelope/allowlist
-и временные границы проверяются без БД. Сбор, сессии, SQL-отчёты, retention cleanup и
-опросы ещё не реализованы. Preview-бот не создаёт launch cohort.
+и временные границы проверяются без БД. Транзакционный collector, sessions,
+dedupe/exclusions и retention helper реализованы: [storage.md](storage.md).
+Продуктовые SQL-отчёты/опросы ещё в плане; реальная collection не включена. Preview-бот не создаёт launch cohort.
 
 ## Формат и версии
 
@@ -49,7 +50,8 @@ next_action сами по себе не продлевают срок. Откр�
 его отдельный effect. Доставка, tick, applied command и автоматика не user activity.
 Будущие рынок/тренировка/финансы должны получить отдельные именованные события до запуска.
 
-User envelope требует analytics_manager_id/session_id. Background envelope запрещает
+Успешный user envelope требует analytics_manager_id/session_id; action_rejected
+может иметь NULL session_id и не создаёт/обновляет сессию. Background envelope запрещает
 session_id; system/automation не продлевают сессию. Operator actions идут в отдельные
 operational attempts; v1 не переименовывает их в человеческие product events.
 Новая сессия начинается при разрыве ≥30 минут между явными успешными user-действиями.

@@ -143,9 +143,13 @@ Onboarding показывает только свободные бот-клуб�
 
 ### [AND-74 · Сохранять события менеджеров в PostgreSQL без дублей и внутренних аккаунтов](https://linear.app/andrei-brazhnikov/issue/AND-74/sohranyat-sobytiya-menedzherov-v-postgresql-bez-dublej-i-vnutrennih)
 
-События живут в application/infrastructure, domain чистый. Основа должна появиться до игрового /start; нынешний preview не становится исторической когортой.
+Реализован transactional collector infrastructure.analytics и миграция 0004: coverage, exclusions/tombstones, journey sessions/events, restricted mapping и default journey_export. Псевдоним создаётся до claim, preview не начинает coverage. Version/operation/effect UNIQUE; retry не обновляет session, конфликт content отклоняется. Запись в транзакции игрового caller без самостоятельного commit/экспорта; rollback откатывает успех.
 
-**Приёмка:** Миграции analytics_managers/journey_events; псевдоним до получения клуба, отдельная restricted связь с Telegram ID. Успешные события и accepted commands коммитятся атомарно; rollback не оставляет успех. Update/effect и worker/business dedupe переживают restart. Явный реестр internal/test/operator, действия бот-клубов исключены из default aggregates. Нет raw callback/токенов/чатов; сессии только по allowlist user-действий; сроки хранения/доступы проверены. Внешний экспорт не блокирует игру.
+Успешные allowlist user-действия образуют сессии с gap <30 минут; action_rejected не создаёт/продлевает session, background без session. Internal/test/operator/opt_out исключены; deletion удаляет mapping/events/sessions и оставляет tombstone. First start не создаётся заново после retention cleanup. Closed envelope/имена/UPDATE guard; retention helper180д, PUBLIC revoke и view без Telegram/envelope/operation refs.
+
+Проверка: Ruff/format, mypy40, pytest166 passed/2 deselected, offline Alembic DDL. SQL-recording проверяет collector/session/dedupe/exclusions/cleanup, без тестовых БД по указанию пользователя. PostgreSQL execution/races/CASCADE/GRANT не проверены и реальный сбор не включён; before launch требуется эксплуатационная проверка. UI instrumentation, SQL KPI, maintenance jobs и фактические HDC roles остаются AND-76/77/79/82. Документ docs/analytics/storage.md.
+
+**Приёмка:** Collector/schema/session/dedupe/exclusion/deletion/retention helpers реализованы, offline SQL и unit checks проходят. Online PG/roles не запускались по текущему запрету тестовых БД.
 
 **Зависимости:** AND-73, AND-45.
 

@@ -175,3 +175,10 @@ JSON здесь — внутренняя versioned state/command граница,
 [возраст футболистов](player-lifecycle.md), [персонал](staff-lifecycle.md) и
 [контракт аналитики](analytics/contract-v1.md). Денежный ledger, аукционы, training,
 скаутинг, сбор journey events, доставка и Telegram cache остаются отдельными задачами.
+
+## Journey collection · миграция 0004
+
+analytics_coverage, analytics_exclusions, journey_sessions и journey_events;
+псевдоним/сессия FK, version/operation/effect unique, restricted export view.
+Миграция не включает collection, preview не является launch cohort.
+[Контракт хранения, sessions, deletion и доступы](analytics/storage.md).

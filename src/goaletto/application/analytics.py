@@ -1,4 +1,4 @@
-"""Version 1 journey contract. Validation only; no collector or database writes."""
+"""Version 1 journey contract; the collector lives in infrastructure."""
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -196,7 +196,9 @@ class JourneyEvent:
         if self.event_id is None or self.operation_id is None:
             raise ValueError("Event and operation IDs are required")
         if self.origin == Origin.USER:
-            if self.analytics_manager_id is None or self.session_id is None:
+            if self.analytics_manager_id is None or (
+                spec.user_activity and self.session_id is None
+            ):
                 raise ValueError("User events need manager and explicit-action session")
         elif self.session_id is not None:
             raise ValueError("Background events must not extend a user session")

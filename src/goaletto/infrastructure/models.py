@@ -631,3 +631,91 @@ class WorldSeedReceipt(Base):
     policy_version: Mapped[str] = mapped_column(String(80))
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AnalyticsCoverage(Base):
+    __tablename__ = "analytics_coverage"
+    __table_args__ = (
+        CheckConstraint("version = 1", name="ck_coverage_version"),
+        CheckConstraint("retention_days BETWEEN 1 AND 730", name="ck_coverage_retention"),
+    )
+    version: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    retention_days: Mapped[int] = mapped_column(Integer)
+
+
+class AnalyticsExclusion(Base):
+    """Explicit internal/test/operator registry and deletion tombstones. Restricted."""
+
+    __tablename__ = "analytics_exclusions"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('internal','test','operator','opt_out')", name="ck_exclusion_kind"
+        ),
+    )
+    manager_id: Mapped[UUID] = mapped_column(ForeignKey("managers.id"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    excluded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class JourneySession(Base):
+    __tablename__ = "journey_sessions"
+    __table_args__ = (
+        CheckConstraint("last_action_at >= first_action_at", name="ck_session_time"),
+        UniqueConstraint("id", "analytics_manager_id", name="uq_session_manager"),
+        Index("ix_session_manager_time", "analytics_manager_id", "last_action_at"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    analytics_manager_id: Mapped[UUID] = mapped_column(
+        ForeignKey("analytics_managers.id", ondelete="CASCADE")
+    )
+    first_action_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_action_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class JourneyEventRow(Base):
+    __tablename__ = "journey_events"
+    __table_args__ = (
+        UniqueConstraint("version", "operation_id", "effect_number", name="uq_journey_effect"),
+        ForeignKeyConstraint(
+            ["session_id", "analytics_manager_id"],
+            ["journey_sessions.id", "journey_sessions.analytics_manager_id"],
+            ondelete="CASCADE",
+            name="fk_journey_session_manager",
+        ),
+        CheckConstraint(
+            "version = 1 AND effect_number BETWEEN 0 AND 32767", name="ck_journey_version"
+        ),
+        CheckConstraint("recorded_at >= occurred_at", name="ck_journey_time"),
+        CheckConstraint(
+            "origin IN ('user','system','automation','operator')", name="ck_journey_origin"
+        ),
+        CheckConstraint(
+            "(origin = 'user' OR session_id IS NULL) AND "
+            "(NOT user_activity OR session_id IS NOT NULL)",
+            name="ck_journey_session_origin",
+        ),
+        CheckConstraint("NOT user_activity OR origin = 'user'", name="ck_journey_activity"),
+        Index("ix_journey_manager_time", "analytics_manager_id", "occurred_at"),
+        Index("ix_journey_retention", "recorded_at"),
+        Index(
+            "uq_journey_manager_start",
+            "analytics_manager_id",
+            unique=True,
+            postgresql_where="name = 'manager_started'",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    version: Mapped[int] = mapped_column(SmallInteger)
+    operation_id: Mapped[UUID] = mapped_column(Uuid)
+    effect_number: Mapped[int] = mapped_column(SmallInteger)
+    name: Mapped[str] = mapped_column(String(80))
+    origin: Mapped[str] = mapped_column(String(16))
+    analytics_manager_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("analytics_managers.id", ondelete="CASCADE")
+    )
+    session_id: Mapped[UUID | None] = mapped_column(Uuid)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    user_activity: Mapped[bool] = mapped_column(Boolean)
+    envelope: Mapped[dict[str, Any]] = mapped_column(JSONB)

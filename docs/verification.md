@@ -97,3 +97,15 @@ CI на GitHub проверяется отдельно после первого
   injury-only bench order, GK fallback и abandoned без присуждения счёта.
 - Ruff check/format, mypy strict39 модулей: успешно. pytest: **156 passed, 2 deselected**.
 - DB/контейнеры/polling/HDC не запускались; runtime/persistence/outbox ещё не подключены.
+
+## Транзакционный collector · 2026-10-12
+
+- Миграция 0004: coverage/exclusions/sessions/journey, закрытые поля/name allowlist,
+  immutable UPDATE guard, export view без Telegram mapping и внутренних аккаунтов.
+- Application collector разделяет транзакцию game use case, не commit/сеть/экспорт.
+  Unit SQL-recording: dedupe/conflict, <30m session, rejection без session touch,
+  background без activity, internal/opt-out, first start после cleanup, retention.
+- Ruff/format и mypy40 модулей: успешно. **166 passed, 2 deselected**; offline SQL
+  upgrade сформирован, CREATE TABLE/index соответствует ORM.
+- БД/контейнеры не создавались; PG races/rollback/CASCADE/GRANT не выполнялись.
+  Collector не включён в preview; HDC и текущие боты не изменены.
