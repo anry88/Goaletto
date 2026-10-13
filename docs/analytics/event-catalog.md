@@ -76,3 +76,9 @@ Command-applied дополнительно требует command_id. Persisted 
 User start_accepted фиксирует каждый принятый игровой /start; manager_started
 остаётся единственным первым входом. known campaign_touched — отдельный effect.
 Direct/unknown/known и first-touch хранятся в [acquisition](acquisition.md).
+
+## Тренировки · training-v1
+
+`training_opened` и `training_plan_saved`: user, club/ownership, явная активность
+продлевает владение. Внутренние аккаунты исключены общим collector; повтор операции
+не дублирует события. Фоновое применение тренировки не образует user session.

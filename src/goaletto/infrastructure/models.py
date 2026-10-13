@@ -774,9 +774,52 @@ class JourneySession(Base):
     last_action_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+JOURNEY_NAMES = (
+    "action_rejected",
+    "bot_unavailable",
+    "bot_youth_replacement_created",
+    "campaign_touched",
+    "club_claimed",
+    "club_offer_delivered",
+    "club_opened",
+    "club_ownership_ended",
+    "club_preview_opened",
+    "experiment_exposed",
+    "feedback_answered",
+    "feedback_prompt_delivered",
+    "feedback_skipped",
+    "fixture_abandoned",
+    "fixture_finished",
+    "fixture_started",
+    "help_delivered",
+    "lineup_opened",
+    "lineup_saved",
+    "manager_started",
+    "match_command_accepted",
+    "match_command_applied",
+    "match_lineup_locked",
+    "match_opened",
+    "match_report_opened",
+    "match_second_half_started",
+    "match_tick_committed",
+    "next_action_opened",
+    "next_fixture_opened",
+    "player_last_season_announced",
+    "player_retired",
+    "result_delivered",
+    "result_finalized",
+    "start_accepted",
+    "training_opened",
+    "training_plan_saved",
+)
+
+
 class JourneyEventRow(Base):
     __tablename__ = "journey_events"
     __table_args__ = (
+        CheckConstraint(
+            "name IN (" + ",".join(f"'{n}'" for n in JOURNEY_NAMES) + ")", name="ck_journey_name"
+        ),
         UniqueConstraint("version", "operation_id", "effect_number", name="uq_journey_effect"),
         ForeignKeyConstraint(
             ["session_id", "analytics_manager_id"],
@@ -976,7 +1019,8 @@ class GameActionReceipt(Base):
         CheckConstraint(
             "kind IN ('club_claimed','club_opened','club_preview_opened','lineup_opened',"
             "'lineup_saved','match_command_accepted','match_opened','match_report_opened',"
-            "'next_fixture_opened','notification_preferences')",
+            "'next_fixture_opened','notification_preferences',"
+            "'training_opened','training_plan_saved')",
             name="ck_action_kind",
         ),
     )
@@ -1012,3 +1056,65 @@ class TelegramPortraitFile(Base):
     file_id: Mapped[str] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PlayerDevelopment(Base):
+    __tablename__ = "player_development"
+    __table_args__ = (
+        CheckConstraint(
+            "jsonb_typeof(caps) = 'object' AND jsonb_typeof(progress) = 'object'",
+            name="ck_development_objects",
+        ),
+        CheckConstraint("policy_version = 'training-v1'", name="ck_development_policy"),
+    )
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
+    caps: Mapped[dict[str, int]] = mapped_column(JSONB)
+    progress: Mapped[dict[str, int]] = mapped_column(JSONB)
+    policy_version: Mapped[str] = mapped_column(String(32))
+
+
+class TrainingPlan(Base):
+    __tablename__ = "training_plans"
+    __table_args__ = (
+        UniqueConstraint("club_id", "week_start", name="uq_training_club_week"),
+        CheckConstraint(
+            "focus IN ('goalkeeping','defending','playmaking','winger','attacking',"
+            "'set_pieces','physical','team')",
+            name="ck_training_focus",
+        ),
+        CheckConstraint("intensity IN ('low','medium','high')", name="ck_training_intensity"),
+        CheckConstraint("status IN ('scheduled','applied','cancelled')", name="ck_training_status"),
+        CheckConstraint(
+            "(status = 'applied') = (applied_at IS NOT NULL)", name="ck_training_applied"
+        ),
+        CheckConstraint(
+            "due_at = week_start + interval '7 days' AND selected_at >= week_start "
+            "AND selected_at < due_at",
+            name="ck_training_week",
+        ),
+        CheckConstraint(
+            "focus <> 'set_pieces' OR executor_id IS NOT NULL", name="ck_training_executor"
+        ),
+        CheckConstraint("policy_version = 'training-v1'", name="ck_training_policy"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    week_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    selected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    focus: Mapped[str] = mapped_column(String(20))
+    intensity: Mapped[str] = mapped_column(String(16))
+    executor_id: Mapped[UUID | None] = mapped_column(ForeignKey("persons.id"))
+    status: Mapped[str] = mapped_column(String(16))
+    policy_version: Mapped[str] = mapped_column(String(32))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    results: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+
+
+class TrainingDecision(Base):
+    __tablename__ = "training_decisions"
+    operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    plan_id: Mapped[UUID] = mapped_column(ForeignKey("training_plans.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)

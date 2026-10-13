@@ -52,6 +52,7 @@ def build_dispatcher(
         player_router,
         settings_router,
         squad_router,
+        training_router,
     )
 
     root = Router(name="game")
@@ -64,6 +65,7 @@ def build_dispatcher(
         lineup_handlers,
         live_router,
         squad_router,
+        training_router,
         player_router,
         settings_router,
         history_router,

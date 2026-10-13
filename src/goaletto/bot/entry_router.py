@@ -160,6 +160,7 @@ async def game_help(message: Message) -> None:
     await message.answer(
         "/start — клуб или выбор клуба\n/squad — состав\n/lineup — расстановка\n"
         "/match — матч и live-команды\n/table — таблица\n/history — результаты\n"
+        "/train — недельные тренировки\n"
         "/settings — напоминания\n/help — помощь\n\n"
         "Развитие клуба и экономика подключаются следующим этапом."
     )

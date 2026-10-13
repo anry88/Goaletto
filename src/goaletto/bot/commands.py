@@ -8,6 +8,7 @@ COMMANDS = (
     ("club", "Мой клуб", "My club"),
     ("squad", "Состав и карточки игроков", "Squad and player cards"),
     ("lineup", "Расстановка и тактика", "Lineup and tactics"),
+    ("train", "Недельные тренировки", "Weekly training"),
     ("match", "Матч и ближайшая встреча", "Live match and next fixture"),
     ("table", "Таблица лиги", "League table"),
     ("history", "Результаты и отчёты матчей", "Match results and reports"),

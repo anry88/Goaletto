@@ -17,7 +17,18 @@ async def test_private_menu_refreshes_all_languages_and_game_mode() -> None:
 
     bot = Bot()
     await configure_commands(bot, game_enabled=True)  # type: ignore[arg-type]
-    expected = ["start", "club", "squad", "lineup", "match", "table", "history", "settings", "help"]
+    expected = [
+        "start",
+        "club",
+        "squad",
+        "lineup",
+        "train",
+        "match",
+        "table",
+        "history",
+        "settings",
+        "help",
+    ]
     assert len(bot.menus) == 3
     for commands, kwargs in bot.menus:
         assert [c.command for c in commands] == expected

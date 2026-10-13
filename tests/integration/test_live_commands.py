@@ -276,7 +276,9 @@ async def test_real_dispatcher_live_controls_ack_before_commit_and_show_applied(
         message_id=77, date=at, chat=Chat(id=1001, type="private"), from_user=user, text="/match"
     )
     await dispatcher.feed_update(bot, Update(update_id=100, message=message))
-    assert "Дедлайн" in telegram.last_message.text
+    assert "Сейчас:" in telegram.last_message.text
+    assert "Дедлайн" not in telegram.last_message.text
+    assert "Принятое применяется на тик" not in telegram.last_message.text
     data = callback(screen, "m", 1)
     query = CallbackQuery(
         id="live-dispatch-101",
@@ -301,7 +303,7 @@ async def test_real_dispatcher_live_controls_ack_before_commit_and_show_applied(
         update={"id": "live-stale-103", "data": data, "message": telegram.last_message}
     )
     await dispatcher.feed_update(bot, Update(update_id=103, callback_query=query))
-    assert "устарело" in telegram.last_message.text
+    assert "Команда не принята" in telegram.last_message.text
     async with sessions.begin() as session:
         assert (
             len(

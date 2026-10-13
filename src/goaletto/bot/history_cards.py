@@ -206,7 +206,8 @@ def report_view(
     if page > total_pages:
         raise ValueError("Report page unavailable")
     lines.append(f"<b>{escape(title)}</b> · {page}/{total_pages}")
-    lines.extend(chunks[page - 1] or ["Событий пока нет."])
+    selected_entries = chunks[page - 1] or ["Событий пока нет."]
+    lines.append(("\n" if section == "events" else "\n\n").join(selected_entries))
     buttons: list[list[InlineKeyboardButton]] = [
         [
             InlineKeyboardButton(

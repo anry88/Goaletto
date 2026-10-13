@@ -13,6 +13,7 @@ from goaletto.application.match_runtime import (
     handle_calendar_job,
     job_refs,
 )
+from goaletto.application.training import apply_training
 from goaletto.infrastructure.models import Fixture, Job, OperationAttempt
 
 
@@ -60,12 +61,14 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
     if job.kind == "system.ping":
         job.status = "done"
         job.last_error = None
-    elif job.kind in RUNTIME_KINDS | {"ownership.remind", "ownership.expire"}:
+    elif job.kind in RUNTIME_KINDS | {"ownership.remind", "ownership.expire", "training.apply"}:
         try:
             async with session.begin_nested():
                 if job.kind in RUNTIME_KINDS:
                     await handle_calendar_job(session, job, at)
                     _, fixture_id, _ = job_refs(job)
+                elif job.kind == "training.apply":
+                    await apply_training(session, job, at)
                 else:
                     await handle_lease_job(session, job, at)
                 if fixture_id is not None:

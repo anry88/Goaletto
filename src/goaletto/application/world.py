@@ -19,6 +19,7 @@ from goaletto.domain.calendar import (
     next_season_kickoff,
     season_finish_at,
 )
+from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS, SKILLS, initial_caps
 from goaletto.domain.world import SKILL_NAMES, WORLD_POLICY, WorldOptions, WorldPlan, build_world
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
 from goaletto.infrastructure.models import (
@@ -33,6 +34,7 @@ from goaletto.infrastructure.models import (
     Person,
     PersonSeasonEvent,
     Player,
+    PlayerDevelopment,
     Season,
     SeasonClub,
     Standing,
@@ -227,6 +229,18 @@ async def initialize_world(
                 "injured_until": None,
             }
             for p in plan.players
+        ],
+    )
+    await write(
+        PlayerDevelopment,
+        [
+            {
+                "person_id": person.id,
+                "caps": initial_caps(person.id, dict(zip(SKILLS, person.skills[:8], strict=True))),
+                "progress": dict.fromkeys(PROGRESS_KEYS, 0),
+                "policy_version": POLICY_VERSION,
+            }
+            for person in plan.players
         ],
     )
     events: list[dict[str, Any]] = []

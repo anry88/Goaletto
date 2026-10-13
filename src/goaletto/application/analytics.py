@@ -111,6 +111,8 @@ EVENT_SPECS = MappingProxyType(
             Origin.SYSTEM, ("analytics_manager_id", "fixture_id", "outbox_id")
         ),
         "match_report_opened": _user("club_id", "ownership_id", "fixture_id", ownership=True),
+        "training_opened": _user("club_id", "ownership_id", ownership=True),
+        "training_plan_saved": _user("club_id", "ownership_id", ownership=True),
         "next_action_opened": _user(),
         "action_rejected": _user(activity=False),
         "help_delivered": EventSpec(Origin.SYSTEM, ("analytics_manager_id", "outbox_id")),

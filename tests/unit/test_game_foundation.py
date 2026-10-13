@@ -32,6 +32,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
         "accepted_commands",
         "managers",
         "game_action_receipts",
+        "journey_events",
     }
     dialect = postgresql.dialect()
     for table in Base.metadata.sorted_tables:
@@ -55,6 +56,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 "ck_command_kind",
                 "ck_club_crowd",
                 "ck_action_kind",
+                "ck_journey_name",
             }:
                 assert (
                     normalized(
