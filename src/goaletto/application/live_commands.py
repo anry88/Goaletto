@@ -61,6 +61,7 @@ class LiveScreen:
     open: bool
     recent: tuple[CommandReceipt, ...]
     commentary: tuple[str, ...] = ()
+    next_fixture: tuple[str, str, datetime] | None = None
 
 
 async def _context(
@@ -83,8 +84,16 @@ async def _context(
         query = query.join(Match, Match.fixture_id == Fixture.id).where(Match.id == match_id)
     else:
         query = (
-            query.where(Fixture.status.in_(("live", "paused", "scheduled")))
-            .order_by(Fixture.status == "scheduled", Fixture.scheduled_start_at, Fixture.id)
+            query.where(
+                Fixture.status.in_(("live", "paused", "finished", "abandoned", "scheduled"))
+            )
+            .order_by(
+                Fixture.status.not_in(("live", "paused")),
+                Fixture.status == "scheduled",
+                Fixture.actual_finish_at.desc().nulls_last(),
+                Fixture.scheduled_start_at,
+                Fixture.id,
+            )
             .limit(1)
         )
     fixture = await session.scalar(
@@ -202,6 +211,22 @@ async def load_live_screen(
             club_id=club.id,
             fixture_id=fixture.id,
         )
+    next_fixture: tuple[str, str, datetime] | None = None
+    if state is None or state.phase in {MatchPhase.FULL_TIME, MatchPhase.ABANDONED}:
+        upcoming = await session.scalar(
+            select(Fixture)
+            .where(
+                Fixture.status == "scheduled",
+                or_(Fixture.home_club_id == club.id, Fixture.away_club_id == club.id),
+            )
+            .order_by(Fixture.scheduled_start_at, Fixture.id)
+            .limit(1)
+        )
+        if upcoming:
+            home = await session.get(Club, upcoming.home_club_id)
+            away = await session.get(Club, upcoming.away_club_id)
+            if home is not None and away is not None:
+                next_fixture = (home.name, away.name, upcoming.scheduled_start_at)
     return LiveScreen(
         ownership.id,
         club.id,
@@ -217,6 +242,7 @@ async def load_live_screen(
         opened,
         recent,
         await load_commentary(session, state) if state else (),
+        next_fixture,
     )
 
 

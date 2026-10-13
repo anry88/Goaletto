@@ -126,7 +126,8 @@ def _payload_uuid(payload: dict[str, Any], key: str) -> UUID | None:
 
 
 def live_board_key_for(payload: dict[str, Any]) -> str | None:
-    if payload.get("kind") not in {"match_board", "match_result"}:
+    # Results are standalone notifications, including for owners who never watched.
+    if payload.get("kind") != "match_board":
         return None
     fixture = _payload_uuid(payload, "fixture_id")
     ownership = _payload_uuid(payload, "ownership_id")
@@ -222,7 +223,10 @@ def render_text(payload: dict[str, Any]) -> str:
         if kind == "match_result":
             if payload["phase"] == "abandoned":
                 return f"Матч остановлен: {score}. Итоговый результат не присуждён."
-            return f"Финальный свисток: {score}.{stats}{commentary}"
+            return (
+                f"🏁 Финальный свисток: {score}.{stats}{commentary}"
+                "\n\n/match — итог и отчёт о матче"
+            )
         minute = payload.get("game_minute", payload["tick"] * 3)
         suffix = " · Перерыв" if payload["phase"] == "half_time" else ""
         return f"⚽ {minute}′{suffix}\n{score}{stats}{commentary}\n\n/match — управление матчем"
@@ -393,6 +397,8 @@ async def claim_outbox(
             _clear_lease(row)
             continue
         key = live_board_key_for(row.payload)
+        if key is None:
+            row.live_board_key = None  # Also normalize pending legacy final payloads.
         if key is not None:
             await session.execute(
                 insert(OutboxBoard)
@@ -683,7 +689,7 @@ async def deliver_claimed(
     require_utc(now)
     try:
         text = render_text(message.payload)
-        if existing_board_message_id is not None:
+        if message.payload["kind"] == "match_board" and existing_board_message_id is not None:
             try:
                 await transport.edit_text(message.chat_id, existing_board_message_id, text)
                 return Outcome.EDITED, existing_board_message_id, None

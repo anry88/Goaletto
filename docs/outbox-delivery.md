@@ -44,10 +44,10 @@ canonical key, chat, message_id, сохранённую revision и общую d
 outbox rows для этого было бы недостаточно.
 
 Следующие board payloads редактируют сохранённый message_id. `match_result`
-использует тот же stream и обновляет то же сообщение; terminal revision 1000.
-Поздний retry старого тика не откатывает счёт: меньшая/равная revision закрывается
-как superseded либо stale fixture. Начальный backlog может сразу показывать
-результат, а старые live payloads уже не отправляются.
+отправляет отдельное новое уведомление, не используя board stream. Финал получают
+оба действующих владельца, включая тех, кто не смотрел матч и отключил reminders.
+Поздние live payloads завершённой встречи закрываются как stale fixture;
+они не могут изменить отдельное сообщение финала. [Контракт](final-match-notification.md).
 
 Удалённое табло (`message to edit not found`) заменяется новым send под той же
 lease. `message is not modified` считается успешным edit. Blocked/chat unavailable

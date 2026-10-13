@@ -22,6 +22,8 @@ checkpoint/replay и события. Durable [live-worker](docs/match-runtime.md
 циклом worker; по умолчанию выключен (`GOALETTO_OUTBOX_ENABLED=false`).
 В табло и `/match` добавлена компактная [лента событий](docs/live-commentary.md)
 с голами, опасными моментами, карточками, травмами и применёнными командами.
+После завершения [результат приходит отдельным сообщением](docs/final-match-notification.md)
+владельцам; `/match` сохраняет итог и кнопку полного отчёта.
 
 - [Актуальный GDD](football-manager-bot-gdd.md)
 - [Правила и принятые решения](docs/game-rules.md)

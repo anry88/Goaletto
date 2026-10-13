@@ -8,6 +8,7 @@ from aiogram.types import InlineKeyboardMarkup as Keyboard
 
 from goaletto.application.live_commands import LiveScreen
 from goaletto.application.match_commentary import commentary_html
+from goaletto.bot.history_callbacks import match_callback
 from goaletto.bot.lineup_views import MENTALITY_LABELS, TACTIC_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.match_types import Instruction, Mentality, Side, Tactic
@@ -88,7 +89,12 @@ def render(
         )
         if screen.commentary:
             lines.extend(("\nПоследние события:", commentary_html(screen.commentary)))
-        if not screen.open:
+        if state.phase.value in {"full_time", "abandoned"}:
+            lines.append(
+                "🏁 Матч завершён." if state.phase.value == "full_time" else "Матч остановлен."
+            )
+            rows.append([_button("📋 Отчёт о матче", match_callback(screen.fixture_id))])
+        elif not screen.open:
             lines.append("Сейчас действие недоступно. Обновите экран.")
         else:
             assert screen.projected is not None and screen.deadline is not None
@@ -192,5 +198,11 @@ def render(
             lines.append(f"{kinds.get(receipt.kind, 'Команда')}: {labels[receipt.status]}")
     if notice:
         lines.append(escape(notice))
+    if screen.next_fixture:
+        home, away, kickoff = screen.next_fixture
+        lines.append(
+            f"\nСледующий матч: {escape(home)} — {escape(away)}\n"
+            f"{kickoff.strftime('%d.%m.%Y %H:%M UTC')}"
+        )
     rows.append([_button("🔄 Обновить", "lv:open"), _button("🏟 Клуб", "vc:c")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)

@@ -433,16 +433,16 @@ async def test_live_board_stream_serializes_independent_outbox_rows(store):
     assert store.boards[first.live_board_key].telegram_message_id == 90
 
 
-async def test_result_updates_board_and_old_retry_cannot_revert_score(store):
-    first = store.message(tick=1)
+async def test_result_sends_new_notification_and_old_retry_cannot_revert_score(store):
+    store.message(tick=1)
     await process_one_delivery(store, Transport(store), clock=lambda: store.now)
     store.fixture.status = "finished"
     result = store.message("match_result", tick=30, home_goals=3)
     old = store.message(tick=2)
     transport = Transport(store)
     await process_one_delivery(store, transport, clock=lambda: store.now)
-    assert result.status == "sent" and result.telegram_message_id == first.telegram_message_id
-    assert transport.calls[0][0] == "edit" and store.boards[result.live_board_key].revision == 1000
+    assert result.status == "sent" and result.live_board_key is None
+    assert transport.calls[0][0] == "send"
     await process_one_delivery(store, transport, clock=lambda: store.now)
     assert old.status == "failed" and len(transport.calls) == 1
 
@@ -574,7 +574,7 @@ async def test_claim_prioritizes_persisted_result_and_compiles_stream_exclusion(
     assert low.attempts == 0
 
 
-async def test_actual_runtime_producer_writes_priority_and_shared_board_key(store):
+async def test_actual_runtime_producer_writes_result_priority_without_live_board_key(store):
     class ProducerRecorder:
         def __init__(self):
             self.statements = []
@@ -598,7 +598,7 @@ async def test_actual_runtime_producer_writes_priority_and_shared_board_key(stor
     )
     params = recorder.statements[-1].compile().params
     assert params["priority"] == 100
-    assert params["live_board_key"] == f"live:v1:{store.fixture.id}:{store.ownership.id}"
+    assert params["live_board_key"] is None
     assert sender.valid_payload(params["payload"])
     text = sender.render_text(params["payload"])
     assert "Финальный свисток" in text
@@ -713,3 +713,21 @@ async def test_runner_bounds_entire_edit_send_exchange_and_persists_timeout(stor
     await process_one_delivery(store, SlowTransport(store), clock=lambda: store.now)
     assert row.status == "pending" and row.last_error == "unknown_outcome"
     assert store.attempts[row.id, 1].outcome == "unknown"
+
+
+async def test_result_is_sent_even_with_existing_board_and_reminders_disabled(store):
+    store.fixture.status = "finished"
+    store.manager.reminders_enabled = False
+    row = store.message("match_result")
+    transport = Transport(store)
+    outcome, message_id, _ = await sender.deliver_claimed(
+        row, transport, NOW, existing_board_message_id=12345
+    )
+    assert outcome == Outcome.SENT and message_id == 777
+    assert [call[0] for call in transport.calls] == ["send"]
+    async with store.transaction() as session:
+        assert await sender.check_recipient(session, row, NOW) == Decision.DELIVER
+    await process_one_delivery(store, transport, clock=lambda: store.now)
+    count = len(transport.calls)
+    await process_one_delivery(store, transport, clock=lambda: store.now)
+    assert len(transport.calls) == count  # Terminal outbox receipt suppresses retries.

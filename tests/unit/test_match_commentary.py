@@ -128,3 +128,30 @@ def test_sender_backwards_compatibility_and_html_safe_commentary():
     assert "29′" in text and "&lt;Игрок&gt;" in text and "Удары: 2 / 1" in text
     payload["commentary"] = ["x"] * 13
     assert not outbox_delivery.valid_payload(payload)
+
+
+def test_terminal_match_keeps_score_and_working_report_button():
+    from goaletto.bot.history_callbacks import parse_history_callback
+    from goaletto.domain.clock import MatchPhase
+
+    state = replace(sample(), tick=30, game_minute=90, phase=MatchPhase.FULL_TIME)
+    fixture = uuid4()
+    screen = LiveScreen(
+        uuid4(),
+        state.home.snapshot.club_id,
+        "Club",
+        fixture,
+        state.match_id,
+        state,
+        state,
+        Side.HOME,
+        None,
+        False,
+        None,
+        False,
+        (),
+    )
+    text, keyboard = render(screen)
+    assert "Матч завершён" in text and "Сейчас действие недоступно" not in text
+    report = next(b for row in keyboard.inline_keyboard for b in row if "Отчёт" in b.text)
+    assert parse_history_callback(report.callback_data) == ("match", fixture, 1)
