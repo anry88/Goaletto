@@ -17,6 +17,7 @@ from goaletto.application.live_commands import (
 from goaletto.bot import live_views
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
+from goaletto.presentation.i18n import tr
 
 router = Router(name="live-controls")
 
@@ -34,7 +35,7 @@ async def match_command(message: Message, database: Database, event_update: Upda
     except NoFixture:
         text, keyboard = live_views.no_fixture_view()
     except (PermissionDenied, ValueError):
-        await message.answer("Матч недоступен. Откройте /start.")
+        await message.answer(tr("Матч недоступен. Откройте /start."))
         return
     await message.answer(text, reply_markup=keyboard)
 
@@ -63,11 +64,11 @@ async def live_callback(query: CallbackQuery, database: Database, event_update: 
                 text, keyboard = live_views.render(screen)
             elif screen.ownership_id != ownership_id or screen.match_id != match_id:
                 text, keyboard = live_views.render(
-                    screen, notice="Кнопка от другого матча или владения. Команда не принята."
+                    screen, notice=tr("Кнопка от другого матча или владения. Команда не принята.")
                 )
             elif (screen.target, screen.halftime) != (target, halftime) or not screen.open:
                 text, keyboard = live_views.render(
-                    screen, notice="Команда не принята. Показан текущий матч."
+                    screen, notice=tr("Команда не принята. Показан текущий матч.")
                 )
             elif action in {"s", "t", "m", "i"}:
                 kind, payload = button_payload(screen, action, args)
@@ -82,9 +83,9 @@ async def live_callback(query: CallbackQuery, database: Database, event_update: 
                     payload=payload,
                 )
                 screen = await load_live_screen(session, actor, record=False)
-                notice = "Команда принята."
+                notice = tr("Команда принята.")
                 if receipt.status == "applied":
-                    notice = "Команда уже применена."
+                    notice = tr("Команда уже применена.")
                 text, keyboard = live_views.render(screen, notice=notice)
             else:
                 if action == "p" and len(args) == 1 and 0 <= args[0] <= 4:
@@ -104,8 +105,10 @@ async def live_callback(query: CallbackQuery, database: Database, event_update: 
     except (PermissionDenied, ValueError):
         await edit_response(
             query.message,
-            "Команда не может быть применена: лимит исчерпан или действие сейчас недоступно. "
-            "Откройте /match.",
+            tr(
+                "Команда не может быть применена: лимит исчерпан или "
+                "действие сейчас недоступно. Откройте /match."
+            ),
         )
         return
     await edit_response(query.message, text, keyboard)

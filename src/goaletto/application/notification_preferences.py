@@ -42,6 +42,7 @@ class SettingsState:
     club_name: str | None
     expires_at: datetime | None
     last_game_action_at: datetime | None
+    locale: str = "ru"
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,7 @@ async def get_settings(session: AsyncSession, actor: Actor) -> SettingsState:
     )
     if ownership is None or ownership.expires_at <= actor.at:
         return SettingsState(
+            locale=manager.locale,
             manager_id=manager.id,
             telegram_id=manager.telegram_id,
             reminders_enabled=bool(manager.reminders_enabled),
@@ -101,6 +103,7 @@ async def get_settings(session: AsyncSession, actor: Actor) -> SettingsState:
     if club is None or club.owner_telegram_id != actor.telegram_id:
         raise PermissionDenied("Current club ownership does not match the actor")
     return SettingsState(
+        locale=manager.locale,
         manager_id=manager.id,
         telegram_id=manager.telegram_id,
         reminders_enabled=bool(manager.reminders_enabled),

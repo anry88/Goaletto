@@ -8,7 +8,9 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from goaletto.domain.clock import MatchPhase
 from goaletto.domain.match_types import MatchState
+from goaletto.domain.names import latin_name
 from goaletto.domain.standings import LeagueStanding, rank_league
+from goaletto.presentation.i18n import tr
 
 
 def compact_id(value: UUID) -> str:
@@ -52,17 +54,29 @@ def table_view(
         raise ValueError("Invalid table page")
     callback = table_callback(season_id, league_id, 3 - page)
     ranked = rank_league(rows)
-    lines = [f"🏆 <b>Лига {tier}</b> · {page}/2", "И — матчи · О — очки · М — мячи", ""]
+    lines = [
+        tr("🏆 <b>Лига {p0}</b> · {p1}/2", p0=tier, p1=page),
+        tr("И — матчи · О — очки · М — мячи"),
+        "",
+    ]
     for index, row in enumerate(ranked[(page - 1) * 5 : page * 5], start=(page - 1) * 5 + 1):
         marker = " ↑" if index <= 2 and tier > 1 else " ↓" if index >= 9 and tier < 5 else ""
         lines.append(
-            f"<b>{index}. {escape(row.name)}{marker}</b>\n"
-            f"И {row.played} · О {row.points} · М {row.goals_for}:{row.goals_against}"
+            tr(
+                "<b>{p0}. {p1}{p2}</b>\nИ {p3} · О {p4} · М {p5}:{p6}",
+                p0=index,
+                p1=escape(latin_name(row.name)),
+                p2=marker,
+                p3=row.played,
+                p4=row.points,
+                p5=row.goals_for,
+                p6=row.goals_against,
+            )
         )
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="← 1–5" if page == 2 else "6–10 →", callback_data=callback)],
-            [InlineKeyboardButton(text="Мой клуб", callback_data="vc:c")],
+            [InlineKeyboardButton(text=tr("Мой клуб"), callback_data="vc:c")],
         ]
     )
     return "\n".join(lines), keyboard
@@ -72,23 +86,35 @@ def result_view(state: MatchState) -> str:
     if state.phase not in {MatchPhase.FULL_TIME, MatchPhase.ABANDONED}:
         raise ValueError("A result view needs a terminal state")
     h, a = state.home, state.away
-    heading = "Матч остановлен" if state.phase == MatchPhase.ABANDONED else "Финальный свисток"
+    heading = (
+        tr("Матч остановлен") if state.phase == MatchPhase.ABANDONED else tr("Финальный свисток")
+    )
     total = h.stats.possession_units + a.stats.possession_units
     share = round(h.stats.possession_units * 100 / total) if total else 50
-    return (
-        f"⚽ <b>{heading} · {state.game_minute}′</b>\n"
-        f"<b>{escape(h.snapshot.name)} {h.stats.goals}:{a.stats.goals} "
-        f"{escape(a.snapshot.name)}</b>\n\n"
-        f"Владение: {share}% / {100 - share}%\n"
-        f"Удары: {h.stats.shots} / {a.stats.shots}\n"
-        f"В створ: {h.stats.on_target} / {a.stats.on_target}\n"
-        f"Угловые: {h.stats.corners} / {a.stats.corners}\n"
-        f"Трибуны: {state.crowd.home_fans:,} / {state.crowd.stadium_capacity:,}"
-        + (
-            "\nОфициальный результат ещё не назначен."
-            if state.phase == MatchPhase.ABANDONED
-            else ""
-        )
+    return tr(
+        "⚽ <b>{p0} · {p1}′</b>\n<b>{p2} {p3}:{p4} {p5}</b>\n\nВладение: "
+        "{p6}% / {p7}%\nУдары: {p8} / {p9}\nВ створ: {p10} / "
+        "{p11}\nУгловые: {p12} / {p13}\nТрибуны: {p14:,} / {p15:,}",
+        p0=heading,
+        p1=state.game_minute,
+        p2=escape(latin_name(h.snapshot.name)),
+        p3=h.stats.goals,
+        p4=a.stats.goals,
+        p5=escape(latin_name(a.snapshot.name)),
+        p6=share,
+        p7=100 - share,
+        p8=h.stats.shots,
+        p9=a.stats.shots,
+        p10=h.stats.on_target,
+        p11=a.stats.on_target,
+        p12=h.stats.corners,
+        p13=a.stats.corners,
+        p14=state.crowd.home_fans,
+        p15=state.crowd.stadium_capacity,
+    ) + (
+        tr("\nОфициальный результат ещё не назначен.")
+        if state.phase == MatchPhase.ABANDONED
+        else ""
     )
 
 
@@ -97,9 +123,9 @@ def result_keyboard(fixture_id: UUID) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="📋 Отчёт о матче", callback_data=f"report:{compact_id(fixture_id)}"
+                    text=tr("📋 Отчёт о матче"), callback_data=f"report:{compact_id(fixture_id)}"
                 )
             ],
-            [InlineKeyboardButton(text="Мой клуб", callback_data="vc:c")],
+            [InlineKeyboardButton(text=tr("Мой клуб"), callback_data="vc:c")],
         ]
     )

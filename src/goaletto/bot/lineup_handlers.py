@@ -32,6 +32,7 @@ from goaletto.domain.lineup import (
     reassign_slots,
 )
 from goaletto.infrastructure.database import Database
+from goaletto.presentation.i18n import tr
 
 router = Router(name="lineup")
 
@@ -63,11 +64,11 @@ async def build_callback_response(
     version = args[-1] if args else str(data.version)
     if args and expand_id(args[-2]) != data.ownership_id:
         return views.render_main(
-            data, "Кнопка от прежнего владения: состав не изменён."
+            data, tr("Кнопка от прежнего владения: состав не изменён.")
         ), views.main_keyboard(data)
     if str(data.version) != version:
         return (
-            views.render_main(data, "Экран устарел — показана актуальная версия."),
+            views.render_main(data, tr("Экран устарел — показана актуальная версия.")),
             views.main_keyboard(data),
         )
     result = await _dispatch(session, actor, data, action, args)
@@ -92,10 +93,10 @@ async def lineup_command(message: Message, database: Database, event_update: Upd
             )
             data = await open_lineup(session, actor)
     except PermissionDenied:
-        await message.answer("Клуб недоступен: нет действующего владения.")
+        await message.answer(tr("Клуб недоступен: нет действующего владения."))
         return
     except (LineupInvalid, ValueError):
-        await message.answer("Состав недоступен. Откройте /start или попробуйте /lineup позже.")
+        await message.answer(tr("Состав недоступен. Откройте /start или попробуйте /lineup позже."))
         return
     await message.answer(views.render_main(data), reply_markup=views.main_keyboard(data))
 
@@ -113,10 +114,10 @@ async def lineup_open(query: CallbackQuery, database: Database, event_update: Up
                 session, user.id, query.id, datetime.now(UTC)
             )
     except PermissionDenied:
-        await edit_response(message, "Нет действующего владения клубом. Откройте /start.")
+        await edit_response(message, tr("Нет действующего владения клубом. Откройте /start."))
         return
     except (LineupInvalid, ValueError):
-        await edit_response(message, "Состав недоступен. Откройте /lineup заново.")
+        await edit_response(message, tr("Состав недоступен. Откройте /lineup заново."))
         return
     await edit_response(message, text, keyboard)
 
@@ -139,13 +140,15 @@ async def lineup_callback(query: CallbackQuery, database: Database, event_update
                 update_id=event_update.update_id,
             )
     except PermissionDenied:
-        await edit_response(message, "Нет действующего владения клубом. Откройте /start.")
+        await edit_response(message, tr("Нет действующего владения клубом. Откройте /start."))
         return
     except (LineupInvalid, ValueError):
         await edit_response(
             message,
-            "Состав не изменён: экран устарел, игрок недоступен или состав уже заблокирован. "
-            "Откройте /lineup заново.",
+            tr(
+                "Состав не изменён: экран устарел, игрок недоступен или "
+                "состав уже заблокирован. Откройте /lineup заново."
+            ),
         )
         return
     await edit_response(message, text, keyboard)

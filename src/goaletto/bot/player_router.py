@@ -40,6 +40,7 @@ from goaletto.portraits.whole import (
     recipe_for_age,
     render_whole,
 )
+from goaletto.presentation.i18n import tr
 
 router = Router(name="player-view")
 
@@ -145,7 +146,7 @@ async def player_card(query: CallbackQuery, database: Database) -> None:
         await edit_response(message, text, keyboard)
     except PermissionDenied:
         await edit_response(
-            message, "Нет доступа: клуб больше не принадлежит вам. Откройте /start."
+            message, tr("Нет доступа: клуб больше не принадлежит вам. Откройте /start.")
         )
     except ValueError:
         text, keyboard = stale_view()

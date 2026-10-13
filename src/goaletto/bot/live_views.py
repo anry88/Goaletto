@@ -12,14 +12,18 @@ from goaletto.bot.history_callbacks import match_callback
 from goaletto.bot.lineup_views import MENTALITY_LABELS, TACTIC_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.match_types import Instruction, Mentality, Side, Tactic
+from goaletto.domain.names import latin_name
+from goaletto.presentation.i18n import LabelMap, tr
 
-INSTRUCTION_LABELS = {
-    Instruction.LONG_SHOTS: "🎯 Бить издалека",
-    Instruction.MOVE_LEFT: "↙️ Смещаться влево",
-    Instruction.MOVE_RIGHT: "↗️ Смещаться вправо",
-    Instruction.DROP_BACK: "⬇️ Оттягиваться назад",
-    Instruction.RUNS_BEHIND: "🏃 Рывки за спину",
-}
+INSTRUCTION_LABELS = LabelMap(
+    {
+        Instruction.LONG_SHOTS: "🎯 Бить издалека",
+        Instruction.MOVE_LEFT: "↙️ Смещаться влево",
+        Instruction.MOVE_RIGHT: "↗️ Смещаться вправо",
+        Instruction.DROP_BACK: "⬇️ Оттягиваться назад",
+        Instruction.RUNS_BEHIND: "🏃 Рывки за спину",
+    }
+)
 
 
 def _button(text: str, data: str) -> Button:
@@ -71,46 +75,63 @@ def parse_callback(value: str) -> tuple[str, tuple[int, ...], UUID, UUID, int, b
 def render(
     screen: LiveScreen, *, panel: int = 0, selected: int = 0, notice: str | None = None
 ) -> tuple[str, Keyboard]:
-    lines = [f"⚽ <b>{escape(screen.club_name)}</b>"]
+    lines = [f"⚽ <b>{escape(latin_name(screen.club_name))}</b>"]
     rows = []
     if screen.state is None:
-        lines.append("Матч ещё не начался.")
+        lines.append(tr("Матч ещё не начался."))
     else:
         state = screen.state
         lines.append(
-            f"{escape(state.home.snapshot.name)} {state.home.stats.goals}:{state.away.stats.goals} "
-            f"{escape(state.away.snapshot.name)} · {state.game_minute}′"
+            f"{escape(latin_name(state.home.snapshot.name))} "
+            f"{state.home.stats.goals}:{state.away.stats.goals} "
+            f"{escape(latin_name(state.away.snapshot.name))} · {state.game_minute}′"
         )
         if state.phase.value == "half_time":
-            lines.append("Перерыв · замены не расходуют окно замен.")
+            lines.append(tr("Перерыв · замены не расходуют окно замен."))
         lines.append(
-            f"Удары: {state.home.stats.shots} / {state.away.stats.shots} · "
-            f"В створ: {state.home.stats.on_target} / {state.away.stats.on_target}"
+            tr(
+                "Удары: {p0} / {p1} · В створ: {p2} / {p3}",
+                p0=state.home.stats.shots,
+                p1=state.away.stats.shots,
+                p2=state.home.stats.on_target,
+                p3=state.away.stats.on_target,
+            )
         )
         if screen.commentary:
-            lines.extend(("\nПоследние события:", commentary_html(screen.commentary)))
+            lines.extend((tr("\nПоследние события:"), commentary_html(screen.commentary)))
         if state.phase.value in {"full_time", "abandoned"}:
             lines.append(
-                "🏁 Матч завершён." if state.phase.value == "full_time" else "Матч остановлен."
+                tr("🏁 Матч завершён.")
+                if state.phase.value == "full_time"
+                else tr("Матч остановлен.")
             )
-            rows.append([_button("📋 Отчёт о матче", match_callback(screen.fixture_id))])
+            rows.append([_button(tr("📋 Отчёт о матче"), match_callback(screen.fixture_id))])
         elif not screen.open:
-            lines.append("Сейчас действие недоступно. Обновите экран.")
+            lines.append(tr("Сейчас действие недоступно. Обновите экран."))
         else:
             assert screen.projected is not None and screen.deadline is not None
             team = screen.projected.home if screen.side == Side.HOME else screen.projected.away
             current = state.home if screen.side == Side.HOME else state.away
             lines.append(
-                f"Сейчас: {TACTIC_LABELS[current.tactic]} · {MENTALITY_LABELS[current.mentality]}"
+                tr(
+                    "Сейчас: {p0} · {p1}",
+                    p0=TACTIC_LABELS[current.tactic],
+                    p1=MENTALITY_LABELS[current.mentality],
+                )
             )
             lines.append(
-                f"С учётом принятых команд: замены {team.substitutions}/5 · "
-                f"окна {len(team.substitution_windows)}/3 · "
-                f"тактика {team.tactic_changes}/3 · инструкции {team.instruction_changes}/3"
+                tr(
+                    "С учётом принятых команд: замены {p0}/5 · окна {p1}/3 · "
+                    "тактика {p2}/3 · инструкции {p3}/3",
+                    p0=team.substitutions,
+                    p1=len(team.substitution_windows),
+                    p2=team.tactic_changes,
+                    p3=team.instruction_changes,
+                )
             )
             players = list(team.snapshot.players)
             index_by_id = {p.id: index for index, p in enumerate(players, 1)}
-            names = {p.id: p.name for p in players}
+            names = {p.id: latin_name(p.name) for p in players}
             if panel == 1:
                 conditions = {c.player_id: c for c in team.conditions}
                 rows = [
@@ -149,15 +170,19 @@ def render(
                 rows = [
                     [
                         _button(
-                            f"{names[p]} · {players[index_by_id[p] - 1].position} · "
-                            f"форма {players[index_by_id[p] - 1].form}",
+                            tr(
+                                "{p0} · {p1} · форма {p2}",
+                                p0=names[p],
+                                p1=players[index_by_id[p] - 1].position,
+                                p2=players[index_by_id[p] - 1].form,
+                            ),
                             callback(screen, "s", selected, index_by_id[p]),
                         )
                     ]
                     for p in team.bench
                     if not conditions[p].injured and not conditions[p].dismissed
                 ]
-                lines.append("Выберите игрока на замену.")
+                lines.append(tr("Выберите игрока на замену."))
             elif panel == 6:
                 player = players[selected - 1] if 1 <= selected <= len(players) else None
                 if player is None or player.id not in {
@@ -175,51 +200,55 @@ def render(
             else:
                 rows = [
                     [
-                        _button("🔄 Замены", callback(screen, "p", 1)),
-                        _button("📋 Тактика", callback(screen, "p", 2)),
+                        _button(tr("🔄 Замены"), callback(screen, "p", 1)),
+                        _button(tr("📋 Тактика"), callback(screen, "p", 2)),
                     ],
-                    [_button("💬 Настрой", callback(screen, "p", 3))],
+                    [_button(tr("💬 Настрой"), callback(screen, "p", 3))],
                 ]
                 if state.engine_version == "regulation-v2":
-                    rows.append([_button("🎯 Инструкция", callback(screen, "p", 4))])
-            rows.append([_button("← Матч", callback(screen, "r"))])
+                    rows.append([_button(tr("🎯 Инструкция"), callback(screen, "p", 4))])
+            rows.append([_button(tr("← Матч"), callback(screen, "r"))])
         labels = {
-            "accepted": "Принято",
-            "applied": "Применено",
-            "cancelled": "Отменено",
+            "accepted": tr("Принято"),
+            "applied": tr("Применено"),
+            "cancelled": tr("Отменено"),
         }
         kinds = {
-            "substitution": "Замена",
-            "tactics": "Тактика",
-            "mentality": "Настрой",
-            "instruction": "Инструкция",
+            "substitution": tr("Замена"),
+            "tactics": tr("Тактика"),
+            "mentality": tr("Настрой"),
+            "instruction": tr("Инструкция"),
         }
         for receipt in screen.recent if state.phase.value not in {"full_time", "abandoned"} else ():
-            lines.append(f"{kinds.get(receipt.kind, 'Команда')}: {labels[receipt.status]}")
+            lines.append(f"{kinds.get(receipt.kind, tr('Команда'))}: {labels[receipt.status]}")
     if notice:
         lines.append(escape(notice))
     if screen.next_fixture:
         home, away, kickoff = screen.next_fixture
         lines.append(
-            f"\nСледующий матч: {escape(home)} — {escape(away)}\n"
-            f"{kickoff.strftime('%d.%m.%Y %H:%M UTC')}"
+            tr(
+                "\nСледующий матч: {p0} — {p1}\n{p2}",
+                p0=escape(latin_name(home)),
+                p1=escape(latin_name(away)),
+                p2=kickoff.strftime("%d.%m.%Y %H:%M UTC"),
+            )
         )
-        lines.append("Вы играете дома." if screen.next_is_home else "Вы играете в гостях.")
+        lines.append(tr("Вы играете дома.") if screen.next_is_home else tr("Вы играете в гостях."))
         if screen.next_lineup_lock_at is not None:
             if screen.next_locked:
-                lines.append("🔒 Состав на эту встречу уже зафиксирован.")
+                lines.append(tr("🔒 Состав на эту встречу уже зафиксирован."))
             else:
                 lines.append(
-                    "Сохраните состав до "
+                    tr("Сохраните состав до ")
                     + screen.next_lineup_lock_at.strftime("%d.%m.%Y %H:%M UTC")
                     + "."
                 )
-        rows.append([_button("📋 Подготовить состав", "ln:open")])
-    rows.append([_button("🔄 Обновить", "lv:open"), _button("🏟 Клуб", "vc:c")])
+        rows.append([_button(tr("📋 Подготовить состав"), "ln:open")])
+    rows.append([_button(tr("🔄 Обновить"), "lv:open"), _button(tr("🏟 Клуб"), "vc:c")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)
 
 
 def no_fixture_view() -> tuple[str, Keyboard]:
-    return "Матчей в расписании пока нет. Подготовьте состав к следующей встрече.", Keyboard(
-        inline_keyboard=[[_button("📋 Расстановка", "ln:open"), _button("🏟 Клуб", "vc:c")]]
+    return tr("Матчей в расписании пока нет. Подготовьте состав к следующей встрече."), Keyboard(
+        inline_keyboard=[[_button(tr("📋 Расстановка"), "ln:open"), _button(tr("🏟 Клуб"), "vc:c")]]
     )

@@ -9,23 +9,29 @@ from goaletto.application.lineup import LineupData
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.lineup import FORMATION_SHAPES
 from goaletto.domain.match_types import Mentality, Tactic
+from goaletto.domain.names import latin_name
+from goaletto.presentation.i18n import LabelMap, tr
 
-TACTIC_LABELS = {
-    Tactic.NORMAL: "Обычная",
-    Tactic.PRESSING: "⚡ Прессинг",
-    Tactic.COUNTER: "🏃 Контратаки",
-    Tactic.WINGS: "↗️ Игра по флангам",
-    Tactic.DEFENCE: "🛡 Оборона",
-    Tactic.LONG_BALLS: "⬆️ Длинные мячи",
-}
+TACTIC_LABELS = LabelMap(
+    {
+        Tactic.NORMAL: "Обычная",
+        Tactic.PRESSING: "⚡ Прессинг",
+        Tactic.COUNTER: "🏃 Контратаки",
+        Tactic.WINGS: "↗️ Игра по флангам",
+        Tactic.DEFENCE: "🛡 Оборона",
+        Tactic.LONG_BALLS: "⬆️ Длинные мячи",
+    }
+)
 
-MENTALITY_LABELS = {
-    Mentality.ULTRA_ATTACK: "🔥 Ультраатака",
-    Mentality.ATTACK: "⚔️ Атака",
-    Mentality.BALANCED: "⚖️ Сбалансированный",
-    Mentality.DEFENCE: "🛡 Защита",
-    Mentality.ULTRA_DEFENCE: "🧱 Ультразащита",
-}
+MENTALITY_LABELS = LabelMap(
+    {
+        Mentality.ULTRA_ATTACK: "🔥 Ультраатака",
+        Mentality.ATTACK: "⚔️ Атака",
+        Mentality.BALANCED: "⚖️ Сбалансированный",
+        Mentality.DEFENCE: "🛡 Защита",
+        Mentality.ULTRA_DEFENCE: "🧱 Ультразащита",
+    }
+)
 
 PANELS = frozenset({"main", "formation", "tactic", "mentality", "swap", "captain"})
 
@@ -51,7 +57,7 @@ def _badges(person_id: UUID, slot: str, data: LineupData) -> str:
 
 
 def render_main(data: LineupData, notice: str | None = None) -> str:
-    lines = [f"📋 <b>{escape(data.club_name)}</b> · {escape(data.formation)}"]
+    lines = [f"📋 <b>{escape(latin_name(data.club_name))}</b> · {escape(data.formation)}"]
     try:
         tactic = TACTIC_LABELS[Tactic(data.tactic)]
     except ValueError:
@@ -60,30 +66,34 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
         mentality = MENTALITY_LABELS[Mentality(data.mentality)]
     except ValueError:
         mentality = data.mentality
-    lines.append(f"Тактика: {escape(tactic)} · Настрой: {escape(mentality)}")
+    lines.append(tr("Тактика: {p0} · Настрой: {p1}", p0=escape(tactic), p1=escape(mentality)))
     captain = next((m for m in data.starters if m.person_id == data.captain_id), None)
-    lines.append(f"Капитан: {escape(captain.name) if captain else '— не выбран'}")
+    lines.append(
+        tr("Капитан: {p0}", p0=escape(latin_name(captain.name)) if captain else tr("— не выбран"))
+    )
     if data.lock_at is not None:
         stamp = data.lock_at.strftime("%d.%m %H:%M UTC")
         lines.append(
-            "🔒 Состав заблокирован перед матчем." if data.locked else f"Блокировка: {stamp}."
+            tr("🔒 Состав заблокирован перед матчем.")
+            if data.locked
+            else tr("Блокировка: {p0}.", p0=stamp)
         )
     lines.append("")
-    lines.append("<b>Основа:</b>")
+    lines.append(tr("<b>Основа:</b>"))
     for index, member in enumerate(data.starters, start=1):
         lines.append(
-            f"{index}. {escape(member.name)} ({escape(member.slot_position)})"
+            f"{index}. {escape(latin_name(member.name))} ({escape(member.slot_position)})"
             f"{_badges(member.person_id, member.slot_position, data)}"
         )
     lines.append("")
-    lines.append("<b>Запас:</b>")
+    lines.append(tr("<b>Запас:</b>"))
     for index, member in enumerate(data.bench, start=12):
         lines.append(
-            f"{index}. {escape(member.name)} ({escape(member.position)})"
+            f"{index}. {escape(latin_name(member.name))} ({escape(member.position)})"
             f"{_badges(member.person_id, member.position, data)}"
         )
     lines.append("")
-    lines.append("🔶 — последний сезон (играет). ⚠️ — не на позиции. 🤕 — травма.")
+    lines.append(tr("🔶 — последний сезон (играет). ⚠️ — не на позиции. 🤕 — травма."))
     if notice:
         lines.append("")
         lines.append(escape(notice))
@@ -101,23 +111,23 @@ def main_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     if data.locked:
         return InlineKeyboardMarkup(
             inline_keyboard=[
-                [_button("🔄 Обновить", f"ln:refresh:{version}")],
-                [_button("🏟 Клуб", "vc:c")],
+                [_button(tr("🔄 Обновить"), f"ln:refresh:{version}")],
+                [_button(tr("🏟 Клуб"), "vc:c")],
             ]
         )
     rows = [
-        [_button("🔄 Замена", f"ln:panel:swap:{version}")],
+        [_button(tr("🔄 Замена"), f"ln:panel:swap:{version}")],
         [
-            _button("Схема", f"ln:panel:formation:{version}"),
-            _button("Тактика", f"ln:panel:tactic:{version}"),
+            _button(tr("Схема"), f"ln:panel:formation:{version}"),
+            _button(tr("Тактика"), f"ln:panel:tactic:{version}"),
         ],
         [
-            _button("Настрой", f"ln:panel:mentality:{version}"),
-            _button("Капитан", f"ln:panel:captain:{version}"),
+            _button(tr("Настрой"), f"ln:panel:mentality:{version}"),
+            _button(tr("Капитан"), f"ln:panel:captain:{version}"),
         ],
-        [_button("🔄 Обновить", f"ln:refresh:{version}")],
+        [_button(tr("🔄 Обновить"), f"ln:refresh:{version}")],
     ]
-    rows.append([_button("🏟 Клуб", "vc:c")])
+    rows.append([_button(tr("🏟 Клуб"), "vc:c")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -128,7 +138,7 @@ def formation_keyboard(data: LineupData) -> InlineKeyboardMarkup:
         for name in sorted(FORMATION_SHAPES)
         if name != data.formation
     ]
-    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -139,7 +149,7 @@ def tactic_keyboard(data: LineupData) -> InlineKeyboardMarkup:
         for tactic, label in TACTIC_LABELS.items()
         if tactic.value != data.tactic
     ]
-    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -150,7 +160,7 @@ def mentality_keyboard(data: LineupData) -> InlineKeyboardMarkup:
         for mentality, label in MENTALITY_LABELS.items()
         if mentality.value != data.mentality
     ]
-    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -159,23 +169,28 @@ def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
     if not 1 <= slot <= len(data.starters):
         raise ValueError("Invalid starter slot")
     rows = [
-        [_button("← Основа", f"ln:panel:main:{version}")],
+        [_button(tr("← Основа"), f"ln:panel:main:{version}")],
     ]
     rows.extend(
-        [_button(f"⇄ {member.name}", f"ln:s:{slot}:{compact_id(member.person_id)}:{version}")]
+        [
+            _button(
+                f"⇄ {latin_name(member.name)}",
+                f"ln:s:{slot}:{compact_id(member.person_id)}:{version}",
+            )
+        ]
         for member in data.bench
     )
-    rows.append([_button("← Назад", f"ln:panel:swap:{version}")])
+    rows.append([_button(tr("← Назад"), f"ln:panel:swap:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def starter_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
     rows = [
-        [_button(f"{index}. {member.name}", f"ln:sel:{index}:{version}")]
+        [_button(f"{index}. {latin_name(member.name)}", f"ln:sel:{index}:{version}")]
         for index, member in enumerate(data.starters, start=1)
     ]
-    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -184,13 +199,13 @@ def captain_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     rows = [
         [
             _button(
-                f"{'© ' if member.person_id == data.captain_id else ''}{member.name}",
+                f"{'© ' if member.person_id == data.captain_id else ''}{latin_name(member.name)}",
                 f"ln:cap:{compact_id(member.person_id)}:{version}",
             )
         ]
         for member in data.starters
     ]
-    rows.append([_button("← Назад", f"ln:panel:main:{version}")])
+    rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

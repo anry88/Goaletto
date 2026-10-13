@@ -17,6 +17,7 @@ from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import expand_id, parse_table_callback, table_view
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import Season, SeasonClub
+from goaletto.presentation.i18n import tr
 
 router = Router(name="navigation")
 
@@ -55,7 +56,7 @@ async def game_command(message: Message, database: Database, event_update: Updat
             else:
                 text, keyboard = club_view(await get_owned_club(session, actor))
     except (PermissionDenied, ValueError):
-        await message.answer("Раздел недоступен. Откройте /start.")
+        await message.answer(tr("Раздел недоступен. Откройте /start."))
         return
     await message.answer(text, reply_markup=keyboard)
 
@@ -81,7 +82,7 @@ async def league_screen(query: CallbackQuery, database: Database) -> None:
                 text, keyboard = table_view(archive.table, season_id, league_id, archive.tier, page)
     except (PermissionDenied, ValueError):
         await edit_response(
-            query.message, "Таблица недоступна или кнопка устарела. Откройте /table."
+            query.message, tr("Таблица недоступна или кнопка устарела. Откройте /table.")
         )
         return
     await edit_response(query.message, text, keyboard)
@@ -102,6 +103,6 @@ async def old_report(query: CallbackQuery, database: Database) -> None:
                 session, query.from_user.id, query.id, "match", fixture_id, 1
             )
     except (IndexError, ValueError, PermissionDenied):
-        await edit_response(query.message, "Отчёт недоступен. Откройте /history.")
+        await edit_response(query.message, tr("Отчёт недоступен. Откройте /history."))
         return
     await edit_response(query.message, text, keyboard)

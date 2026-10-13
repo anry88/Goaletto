@@ -30,6 +30,7 @@ from goaletto.domain.lineup import (
     validate_lineup,
 )
 from goaletto.domain.match_types import FieldSlot, MatchSkills, PlayerSnapshot, TeamSnapshot
+from goaletto.domain.names import latin_name
 from goaletto.infrastructure.models import (
     AcceptedCommand,
     AnalyticsManager,
@@ -549,14 +550,14 @@ async def test_editor_callbacks_fit_limit_and_reject_stale_format():
     with pytest.raises(ValueError):
         views.parse_callback("preview:squad")
     text = views.render_main(data)
-    assert "Аврора" in text and "4-4-2" in text
+    assert "Avrora" in text and "4-4-2" in text
 
 
 async def test_editor_open_change_and_retry_share_business_effect():
     recorder = Recorder()
     session = cast(AsyncSession, recorder)
     text, keyboard = await build_open_response(session, 123, "cb-open-1", NOW)
-    assert "Аврора" in text and keyboard.inline_keyboard
+    assert "Avrora" in text and keyboard.inline_keyboard
     data = await load_lineup(session, recorder.actor)
     text, _ = await build_callback_response(
         session,
@@ -598,7 +599,7 @@ async def test_editor_swap_and_captain_callbacks_save_atomically():
         NOW,
         update_id=42,
     )
-    assert incoming.name in text.split("Запас:")[0]
+    assert latin_name(incoming.name) in text.split("Запас:")[0]
     current = await load_lineup(session, recorder.actor)
     assert outgoing.person_id not in {m.person_id for m in current.starters}
     fresh = await load_lineup(session, recorder.actor)

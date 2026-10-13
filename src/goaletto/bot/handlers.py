@@ -2,6 +2,8 @@ from aiogram import Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from goaletto.presentation.i18n import tr
+
 router = Router(name="prototype")
 MENU = InlineKeyboardMarkup(
     inline_keyboard=[
@@ -24,9 +26,11 @@ MENU = InlineKeyboardMarkup(
 @router.message(CommandStart())
 async def start(message: Message) -> None:
     await message.answer(
-        "⚽ <b>Goaletto · Голетто</b>\n"
-        "Ваш клуб. Ваш состав. Ваш путь к чемпионству.\n\n"
-        "Это предварительный интерфейс: игровые функции ещё разрабатываются.",
+        tr(
+            "⚽ <b>Goaletto · Голетто</b>\nВаш клуб. Ваш состав. Ваш путь "
+            "к чемпионству.\n\nЭто предварительный интерфейс: игровые "
+            "функции ещё разрабатываются."
+        ),
         reply_markup=MENU,
     )
 
@@ -34,12 +38,13 @@ async def start(message: Message) -> None:
 @router.message(Command("help"))
 async def help_command(message: Message) -> None:
     await message.answer(
-        "/start — главное меню\n"
-        "/help — помощь\n\n"
-        "Игра будет работать целиком в Telegram через сообщения и кнопки."
+        tr(
+            "/start — главное меню\n/help — помощь\n\nИгра будет работать "
+            "целиком в Telegram через сообщения и кнопки."
+        )
     )
 
 
 @router.callback_query(lambda query: bool(query.data and query.data.startswith("preview:")))
 async def preview(query: CallbackQuery) -> None:
-    await query.answer("Этот раздел пока в разработке.", show_alert=False)
+    await query.answer(tr("Этот раздел пока в разработке."), show_alert=False)

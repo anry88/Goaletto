@@ -1020,7 +1020,7 @@ class GameActionReceipt(Base):
             "kind IN ('club_claimed','club_opened','club_preview_opened','lineup_opened',"
             "'lineup_saved','match_command_accepted','match_opened','match_report_opened',"
             "'next_fixture_opened','notification_preferences',"
-            "'training_opened','training_plan_saved')",
+            "'training_opened','training_plan_saved','language_preferences')",
             name="ck_action_kind",
         ),
     )

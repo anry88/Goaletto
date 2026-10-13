@@ -17,6 +17,7 @@ from goaletto.bot.club_cards import (
 )
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
+from goaletto.presentation.i18n import tr
 
 router = Router(name="club-view")
 
@@ -46,7 +47,7 @@ async def club_home(query: CallbackQuery, database: Database) -> None:
         await edit_response(message, text, keyboard)
     except PermissionDenied:
         await edit_response(
-            message, "Нет доступа: клуб больше не принадлежит вам. Откройте /start."
+            message, tr("Нет доступа: клуб больше не принадлежит вам. Откройте /start.")
         )
     except ValueError:
         text, keyboard = stale_view()

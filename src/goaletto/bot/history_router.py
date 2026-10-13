@@ -27,6 +27,7 @@ from goaletto.bot.history_cards import (
 )
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
+from goaletto.presentation.i18n import tr
 
 router = Router(name="history-view")
 
@@ -44,7 +45,7 @@ async def history_screen(query: CallbackQuery, database: Database) -> None:
             text, keyboard = await _render(session, user.id, query.id, kind, identity, page)
         await edit_response(message, text, keyboard)
     except PermissionDenied:
-        await edit_response(message, "Нет доступа: история недоступна. Откройте /start.")
+        await edit_response(message, tr("Нет доступа: история недоступна. Откройте /start."))
     except ValueError:
         text, keyboard = stale_view()
         await edit_response(message, text, keyboard)
@@ -96,7 +97,7 @@ async def report_page(query: CallbackQuery, database: Database) -> None:
             text, keyboard = report_view(report, return_page, section=section, page=page)
     except (PermissionDenied, ValueError):
         await edit_response(
-            query.message, "Отчёт недоступен или кнопка устарела. Откройте /history."
+            query.message, tr("Отчёт недоступен или кнопка устарела. Откройте /history.")
         )
         return
     await edit_response(query.message, text, keyboard)

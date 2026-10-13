@@ -58,6 +58,7 @@ from goaletto.infrastructure.models import (
     Player,
     Season,
 )
+from goaletto.presentation.i18n import using_locale
 
 RUNTIME_KINDS = frozenset(
     {
@@ -309,7 +310,11 @@ async def queue_notification(
             )
         )
     ).all()
-    commentary = await load_commentary(session, state) if owners and state is not None else ()
+    timelines: dict[str, list[str]] = {"ru": [], "en": []}
+    if owners and state is not None:
+        for code in timelines:
+            with using_locale(code):
+                timelines[code] = list(await load_commentary(session, state))
     for ownership, manager in owners:
         payload: dict[str, Any] = {
             "version": 1,
@@ -327,7 +332,8 @@ async def queue_notification(
                 home_goals=state.home.stats.goals,
                 away_goals=state.away.stats.goals,
                 game_minute=state.game_minute,
-                commentary=list(commentary),
+                commentary=timelines["ru"],
+                commentary_by_locale=timelines,
                 shots=[state.home.stats.shots, state.away.stats.shots],
                 on_target=[state.home.stats.on_target, state.away.stats.on_target],
             )

@@ -28,7 +28,7 @@ async def test_form_energy_and_substitutes_use_frozen_data() -> None:
     text, _ = report_view(changed, section="home")
     assert "возраст 31 · сыграл 90 мин" in text
     assert "Форма до матча: 5/8 · Энергия после: 61%" in text
-    assert "Вышедший &lt;игрок&gt;" in text and "Вышел на замену" in text
+    assert "Vyshedshiy &lt;igrok&gt;" in text and "Вышел на замену" in text
     assert "Не выходил" in text
 
 
@@ -124,7 +124,7 @@ def test_upcoming_fixture_has_timezone_lock_and_lineup_navigation() -> None:
         next_is_home=True,
     )
     text, kb = render(screen)
-    assert "&lt;Дом&gt; — Гости" in text and "13.10.2026 12:00 UTC" in text
+    assert "&lt;Dom&gt; — Gosti" in text and "13.10.2026 12:00 UTC" in text
     assert "Сохраните состав до 13.10.2026 11:59 UTC" in text and "Вы играете дома" in text
     assert any(b.callback_data == "ln:open" for row in kb.inline_keyboard for b in row)
     text, _ = render(replace(screen, next_locked=True))

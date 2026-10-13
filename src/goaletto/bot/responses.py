@@ -3,6 +3,8 @@
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, Message
 
+from goaletto.presentation.i18n import tr
+
 
 async def edit_response(
     message: Message, text: str, keyboard: InlineKeyboardMarkup | None = None
@@ -14,7 +16,7 @@ async def edit_response(
         try:
             await message.delete()
         except TelegramBadRequest:
-            await message.edit_caption(caption="Карточка закрыта.", reply_markup=None)
+            await message.edit_caption(caption=tr("Карточка закрыта."), reply_markup=None)
         return
     try:
         await message.edit_text(text, reply_markup=keyboard)

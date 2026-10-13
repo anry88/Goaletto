@@ -10,6 +10,7 @@ from random import Random
 from uuid import UUID, uuid5
 
 from goaletto.domain.calendar import validate_kickoff
+from goaletto.domain.names import INTERNATIONAL_CLUBS, NAMING_POLICY, international_catalog
 from goaletto.domain.retirement import RetirementDecision, player_last_season
 
 WORLD_POLICY = "world-seed-v1"
@@ -227,6 +228,7 @@ class WorldOptions:
     seed: int
     first_kickoff: datetime
     initial_budget: int = 0
+    naming_policy: str = NAMING_POLICY
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", self.key):
@@ -235,12 +237,16 @@ class WorldOptions:
             raise ValueError("Seed must fit a nonnegative BIGINT")
         if type(self.initial_budget) is not int or not 0 <= self.initial_budget < 2**63:
             raise ValueError("Budget must be nonnegative integer units")
+        if self.naming_policy not in {NAMING_POLICY, "legacy-v1"}:
+            raise ValueError("Invalid naming policy")
         validate_kickoff(self.first_kickoff)
 
     @property
     def fingerprint(self) -> str:
         data = asdict(self)
         data["first_kickoff"] = self.first_kickoff.isoformat()
+        if self.naming_policy == "legacy-v1":
+            data.pop("naming_policy")
         data["policy"] = WORLD_POLICY
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
@@ -316,7 +322,8 @@ def build_world(options: WorldOptions) -> WorldPlan:
     season_id = uuid5(set_id, "season:1")
     rng = Random(options.seed)
     names = rng.sample(list(product(FIRST_NAMES, LAST_NAMES)), 1000)
-    club_names = list(CLUB_NAMES)
+    international_names = international_catalog(options.seed)
+    club_names = list(CLUB_NAMES if options.naming_policy == "legacy-v1" else INTERNATIONAL_CLUBS)
     rng.shuffle(club_names)
     leagues: list[StartingLeague] = []
     for tier in range(1, 6):
@@ -337,7 +344,9 @@ def build_world(options: WorldOptions) -> WorldPlan:
                         person_id,
                         club_id,
                         slot,
-                        f"{first} {last}",
+                        f"{first} {last}"
+                        if options.naming_policy == "legacy-v1"
+                        else international_names[club_number * 20 + slot - 1][1],
                         age,
                         position,
                         _skills(position, player_rng),

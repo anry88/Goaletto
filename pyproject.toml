@@ -35,6 +35,9 @@ goaletto-diagnostics = "goaletto.diagnostics.cli:main"
 goaletto-portraits = "goaletto.portraits.cli:main"
 goaletto-raster-portraits = "goaletto.portraits.raster_cli:main"
 
+[tool.setuptools.package-data]
+"goaletto.presentation" = ["en.json"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

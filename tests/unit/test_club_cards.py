@@ -126,7 +126,7 @@ def test_callbacks_are_compact_and_parse() -> None:
 
 def test_club_view_escapes_and_has_menu() -> None:
     text, keyboard = club_view(club())
-    assert "&lt;b&gt;Аврора&amp;&lt;/b&gt;" in text
+    assert "&lt;b&gt;Avrora&amp;&lt;/b&gt;" in text
     assert "<b>Аврора&</b>" not in text  # raw markup never leaks unescaped
     assert "1" in format_money(1250000)
     callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
@@ -137,9 +137,9 @@ def test_club_view_escapes_and_has_menu() -> None:
 
 def test_squad_pagination_back_and_return_page() -> None:
     text1, kb1 = squad_view(squad_page(1))
-    assert "1/2" in text1 and "Игрок &lt;1&gt;" in text1 and "Игрок &lt;6&gt;" not in text1
+    assert "1/2" in text1 and "Igrok &lt;1&gt;" in text1 and "Igrok &lt;6&gt;" not in text1
     text2, kb2 = squad_view(squad_page(2))
-    assert "2/2" in text2 and "Игрок &lt;6&gt;" in text2
+    assert "2/2" in text2 and "Igrok &lt;6&gt;" in text2
     flat1 = [b.callback_data for row in kb1.inline_keyboard for b in row]
     flat2 = [b.callback_data for row in kb2.inline_keyboard for b in row]
     assert squad_callback(2) in flat1 and squad_callback(1) in flat2
@@ -159,8 +159,8 @@ def test_player_statuses_and_portrait_notice() -> None:
     text, _ = player_view(player("retired"))
     assert "🏁 Завершил карьеру" in text
     assert "Недоступен для состава" in text
-    assert "Петр" in text and "&quot;Пас&quot;" in text and '"Пас"' not in text
-    assert "&lt;Иванов&gt;" in text and "&lt;Аврора&gt;" in text
+    assert "Petr" in text and "&quot;Pas&quot;" in text and '"Пас"' not in text
+    assert "&lt;Ivanov&gt;" in text and "&lt;Avrora&gt;" in text
     text, _ = player_view(player("active"), portrait_ready=False)
     assert PORTRAIT_UNAVAILABLE_TEXT in text
     # Missing variant never borrows another face: no second identity leaks in.

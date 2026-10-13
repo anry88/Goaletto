@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import JourneyEvent, Origin, Reason, Surface, require_utc
 from goaletto.application.match_commentary import commentary_html
+from goaletto.domain.names import latin_name
 from goaletto.infrastructure.analytics import CoverageNotStarted, record_event
 from goaletto.infrastructure.models import (
     AnalyticsManager,
@@ -32,6 +33,7 @@ from goaletto.infrastructure.models import (
     OutboxMessage,
     OwnershipPeriod,
 )
+from goaletto.presentation.i18n import locale, tr
 
 SUPPORTED_VERSION = 1
 SUPPORTED_KINDS = frozenset(
@@ -177,6 +179,19 @@ def valid_payload(payload: dict[str, Any]) -> bool:
         type(payload["game_minute"]) is not int or not 0 <= payload["game_minute"] <= 90
     ):
         return False
+    if "commentary_by_locale" in payload:
+        timelines = payload["commentary_by_locale"]
+        if (
+            not isinstance(timelines, dict)
+            or set(timelines) != {"ru", "en"}
+            or any(
+                not isinstance(lines, list)
+                or len(lines) > 12
+                or any(not isinstance(line, str) or len(line) > 180 for line in lines)
+                for lines in timelines.values()
+            )
+        ):
+            return False
     if "commentary" in payload and (
         not isinstance(payload["commentary"], list)
         or len(payload["commentary"]) > 12
@@ -204,35 +219,52 @@ def render_text(payload: dict[str, Any]) -> str:
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
     if kind in {"match_board", "match_result"}:
-        # The transport uses Telegram HTML. Names are data, never markup.
-        home, away = escape(payload["home"][:80]), escape(payload["away"][:80])
-        score = f"{home} {payload['home_goals']}:{payload['away_goals']} {away}"
-        commentary = (
-            "\n\nПоследние события:\n" + commentary_html(payload.get("commentary", []))
-            if payload.get("commentary")
-            else ""
+        localized = payload.get("commentary_by_locale", {})
+        timeline = localized.get(
+            locale(), payload.get("commentary", []) if locale() == "ru" else []
         )
+        # The transport uses Telegram HTML. Names are data, never markup.
+        home, away = (
+            escape(latin_name(payload["home"])[:80]),
+            escape(latin_name(payload["away"])[:80]),
+        )
+        score = f"{home} {payload['home_goals']}:{payload['away_goals']} {away}"
+        commentary = tr("\n\nПоследние события:\n") + commentary_html(timeline) if timeline else ""
         stats = (
             (
-                f"\nУдары: {payload['shots'][0]} / {payload['shots'][1]}"
-                f" · В створ: {payload['on_target'][0]} / {payload['on_target'][1]}"
+                tr(
+                    "\nУдары: {p0} / {p1} · В створ: {p2} / {p3}",
+                    p0=payload["shots"][0],
+                    p1=payload["shots"][1],
+                    p2=payload["on_target"][0],
+                    p3=payload["on_target"][1],
+                )
             )
             if "shots" in payload and "on_target" in payload
             else ""
         )
         if kind == "match_result":
             if payload["phase"] == "abandoned":
-                return f"Матч остановлен: {score}. Итоговый результат не присуждён."
-            return (
-                f"🏁 Финальный свисток: {score}.{stats}{commentary}"
-                "\n\n/match — итог и отчёт о матче"
+                return tr("Матч остановлен: {p0}. Итоговый результат не присуждён.", p0=score)
+            return tr(
+                "🏁 Финальный свисток: {p0}.{p1}{p2}\n\n/match — итог и отчёт о матче",
+                p0=score,
+                p1=stats,
+                p2=commentary,
             )
         minute = payload.get("game_minute", payload["tick"] * 3)
-        suffix = " · Перерыв" if payload["phase"] == "half_time" else ""
-        return f"⚽ {minute}′{suffix}\n{score}{stats}{commentary}\n\n/match — управление матчем"
+        suffix = tr(" · Перерыв") if payload["phase"] == "half_time" else ""
+        return tr(
+            "⚽ {p0}′{p1}\n{p2}{p3}{p4}\n\n/match — управление матчем",
+            p0=minute,
+            p1=suffix,
+            p2=score,
+            p3=stats,
+            p4=commentary,
+        )
     if kind == "fixture_reminder":
-        return "Скоро начинается матч вашего клуба. Проверьте состав перед игрой."
-    return "Ваш клуб ждёт вас. Откройте /start, чтобы продолжить управление."
+        return tr("Скоро начинается матч вашего клуба. Проверьте состав перед игрой.")
+    return tr("Ваш клуб ждёт вас. Откройте /start, чтобы продолжить управление.")
 
 
 def compute_backoff(attempts: int, retry_after: float | None = None) -> float:

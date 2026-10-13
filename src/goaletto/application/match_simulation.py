@@ -39,7 +39,12 @@ def club_snapshot(club: StartingClub) -> TeamSnapshot:
 
 def demo_match(seed: int = 7) -> MatchState:
     world = build_world(
-        WorldOptions(key="match-demo", seed=0, first_kickoff=datetime(2000, 1, 1, 18, tzinfo=UTC))
+        WorldOptions(
+            key="match-demo",
+            seed=0,
+            first_kickoff=datetime(2000, 1, 1, 18, tzinfo=UTC),
+            naming_policy="legacy-v1",
+        )
     )
     home, away = world.leagues[0].clubs[:2]
     return start_match(

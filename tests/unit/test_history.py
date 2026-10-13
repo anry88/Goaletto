@@ -38,6 +38,7 @@ from goaletto.bot.history_cards import (
     seasons_view,
 )
 from goaletto.domain.match_codec import state_document, state_hash
+from goaletto.domain.names import latin_name
 from goaletto.infrastructure.models import (
     AnalyticsManager,
     Club,
@@ -600,7 +601,7 @@ async def test_club_results_paginate_and_record_receipt() -> None:
     assert page.entries[0].outcome == "loss"  # owned club is home, lost 1:2
     assert len(recorder.receipt_rows) == 1
     text, keyboard = results_view(page)
-    assert "Янтарь 1:2 Маяк" in text  # list preserves the kickoff names
+    assert "Yantar 1:2 Mayak" in text  # list preserves the kickoff names
     assert any(
         b.callback_data == match_callback(page.entries[0].fixture_id, 1)
         for row in keyboard.inline_keyboard
@@ -635,8 +636,8 @@ async def test_match_report_uses_frozen_snapshot_not_live_names() -> None:
     assert starter.started and starter.minutes == 90 and starter.goals == 1
     assert starter.age == 25 and starter.name == STARTER_NAME
     text, keyboard = report_view(report, 1)
-    assert "Янтарь 1:2 Маяк" in text and "⚽ 15′" in text and "🟨 27′" in text
-    assert STARTER_NAME in text
+    assert "Yantar 1:2 Mayak" in text and "⚽ 15′" in text and "🟨 27′" in text
+    assert latin_name(STARTER_NAME) in text
     assert any(b.callback_data == "hx:r:1" for row in keyboard.inline_keyboard for b in row)
 
 
@@ -842,4 +843,4 @@ async def test_history_router_answers_first_and_handles_stale() -> None:
 
     await history_router.history_screen(query, DatabaseStub())
     assert calls == ["answer"] and touched and len(edits) == 1
-    assert "Янтарь 1:2 Маяк" in edits[0]
+    assert "Yantar 1:2 Mayak" in edits[0]

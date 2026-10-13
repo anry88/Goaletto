@@ -125,7 +125,7 @@ def test_live_callbacks_fit_telegram_limit_and_pin_complete_context():
             False,
         )
     text, keyboard = live_views.render(screen)
-    assert "&lt;Клуб&gt;" in text
+    assert "&lt;Klub&gt;" in text
     for row in keyboard.inline_keyboard:
         for button in row:
             assert len(button.callback_data.encode()) <= 64

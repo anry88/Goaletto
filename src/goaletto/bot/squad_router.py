@@ -11,6 +11,7 @@ from goaletto.application.game_actions import PermissionDenied
 from goaletto.bot.club_cards import parse_view_callback, squad_view, stale_view
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
+from goaletto.presentation.i18n import tr
 
 router = Router(name="squad-view")
 
@@ -43,7 +44,7 @@ async def squad_page(query: CallbackQuery, database: Database) -> None:
         await edit_response(message, text, keyboard)
     except PermissionDenied:
         await edit_response(
-            message, "Нет доступа: клуб больше не принадлежит вам. Откройте /start."
+            message, tr("Нет доступа: клуб больше не принадлежит вам. Откройте /start.")
         )
     except ValueError:
         text, keyboard = stale_view()

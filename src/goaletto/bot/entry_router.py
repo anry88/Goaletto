@@ -21,36 +21,48 @@ from goaletto.application.onboarding import (
 from goaletto.bot.club_cards import club_view, format_money
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.domain.names import latin_name
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import Person, Player
+from goaletto.presentation.i18n import tr
 
 router = Router(name="game-entry")
 
 
 def offer_view(items: tuple[ClubOffer, ...], page: int = 1) -> tuple[str, InlineKeyboardMarkup]:
-    lines = ["⚽ <b>Goaletto</b>\nВыберите свободный клуб лиги 5:"]
+    lines = [tr("⚽ <b>Goaletto</b>\nВыберите свободный клуб лиги 5:")]
     buttons = []
     for item in items:
-        lines.append(f"🏟 {escape(item.name)} · Бюджет {format_money(item.budget)}")
+        lines.append(
+            tr(
+                "🏟 {p0} · Бюджет {p1}",
+                p0=escape(latin_name(item.name)),
+                p1=format_money(item.budget),
+            )
+        )
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=item.name[:60], callback_data=f"en:p:{compact_id(item.id)}:{page}"
+                    text=latin_name(item.name)[:60],
+                    callback_data=f"en:p:{compact_id(item.id)}:{page}",
                 )
             ]
         )
     if not items:
         lines.append(
-            "Сейчас доступных клубов нет. Для нового комплекта нужен запас уникальных внешностей."
+            tr(
+                "Сейчас доступных клубов нет. Для нового комплекта нужен "
+                "запас уникальных внешностей."
+            )
         )
     nav = []
     if page > 1:
-        nav.append(InlineKeyboardButton(text="← Назад", callback_data=f"en:o:{page - 1}"))
+        nav.append(InlineKeyboardButton(text=tr("← Назад"), callback_data=f"en:o:{page - 1}"))
     if len(items) == 5:
-        nav.append(InlineKeyboardButton(text="Далее →", callback_data=f"en:o:{page + 1}"))
+        nav.append(InlineKeyboardButton(text=tr("Далее →"), callback_data=f"en:o:{page + 1}"))
     if nav:
         buttons.append(nav)
-    buttons.append([InlineKeyboardButton(text="Обновить", callback_data=f"en:o:{page}")])
+    buttons.append([InlineKeyboardButton(text=tr("Обновить"), callback_data=f"en:o:{page}")])
     return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -124,24 +136,30 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                     )
                 ).all()
                 lines = [
-                    f"🏟 <b>{escape(item.name)}</b> · Лига 5",
-                    f"Бюджет: {format_money(item.budget)}",
-                    "\nСостав:",
+                    tr("🏟 <b>{p0}</b> · Лига 5", p0=escape(latin_name(item.name))),
+                    tr("Бюджет: {p0}", p0=format_money(item.budget)),
+                    tr("\nСостав:"),
                 ]
                 for player, person in roster:
-                    badge = " · Последний сезон" if player.status == "last_season" else ""
+                    badge = tr(" · Последний сезон") if player.status == "last_season" else ""
                     lines.append(
-                        f"{escape(person.name[:80])} · {person.age} · {player.position}{badge}"
+                        f"{escape(latin_name(person.name)[:80])} · {person.age} · "
+                        f"{player.position}{badge}"
                     )
                 text = "\n".join(lines)
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
                         [
                             InlineKeyboardButton(
-                                text="Получить клуб", callback_data=f"en:c:{compact_id(club_id)}"
+                                text=tr("Получить клуб"),
+                                callback_data=f"en:c:{compact_id(club_id)}",
                             )
                         ],
-                        [InlineKeyboardButton(text="← К списку", callback_data=f"en:o:{parts[3]}")],
+                        [
+                            InlineKeyboardButton(
+                                text=tr("← К списку"), callback_data=f"en:o:{parts[3]}"
+                            )
+                        ],
                     ]
                 )
             elif parts[1] == "c" and len(parts) == 3:
@@ -150,7 +168,9 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
             else:
                 raise ValueError("Stale entry callback")
     except (PermissionDenied, ClubUnavailable, ValueError):
-        await edit_response(message, "Клуб или кнопка больше недоступны. Откройте /start заново.")
+        await edit_response(
+            message, tr("Клуб или кнопка больше недоступны. Откройте /start заново.")
+        )
         return
     await edit_response(message, text, keyboard)
 
@@ -158,9 +178,11 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
 @router.message(Command("help"))
 async def game_help(message: Message) -> None:
     await message.answer(
-        "/start — клуб или выбор клуба\n/squad — состав\n/lineup — расстановка\n"
-        "/match — матч и live-команды\n/table — таблица\n/history — результаты\n"
-        "/train — недельные тренировки\n"
-        "/settings — напоминания\n/help — помощь\n\n"
-        "Развитие клуба и экономика подключаются следующим этапом."
+        tr(
+            "/start — клуб или выбор клуба\n/squad — состав\n/lineup — "
+            "расстановка\n/match — матч и live-команды\n/table — "
+            "таблица\n/history — результаты\n/train — недельные "
+            "тренировки\n/settings — напоминания\n/help — помощь\n\nРазвитие "
+            "клуба и экономика подключаются следующим этапом."
+        )
     )

@@ -7,6 +7,7 @@ from aiogram.enums import ParseMode
 
 from goaletto.bot.access import TelegramAccess
 from goaletto.bot.commands import configure_commands
+from goaletto.bot.language import TelegramLanguage
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
 
@@ -35,6 +36,9 @@ def build_dispatcher(
     access = TelegramAccess(allowed_telegram_ids)
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
+    language = TelegramLanguage(database if game_enabled else None)
+    dispatcher.message.outer_middleware(language)
+    dispatcher.callback_query.outer_middleware(language)
     if not game_enabled:
         from goaletto.bot.handlers import router
 

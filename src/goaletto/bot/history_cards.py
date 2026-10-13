@@ -28,6 +28,8 @@ from goaletto.bot.history_callbacks import (
     seasons_callback,
 )
 from goaletto.bot.result_views import table_view
+from goaletto.domain.names import latin_name
+from goaletto.presentation.i18n import tr
 
 OUTCOME_MARKERS = {"win": "✅", "draw": "➖", "loss": "❌"}
 
@@ -39,16 +41,23 @@ def _nav(
     menu: bool = True,
 ) -> InlineKeyboardMarkup:
     if back is not None:
-        buttons.append([InlineKeyboardButton(text="← Назад", callback_data=back)])
+        buttons.append([InlineKeyboardButton(text=tr("← Назад"), callback_data=back)])
     if menu:
-        buttons.append([InlineKeyboardButton(text="🏠 Главное меню", callback_data=MENU_CALLBACK)])
+        buttons.append(
+            [InlineKeyboardButton(text=tr("🏠 Главное меню"), callback_data=MENU_CALLBACK)]
+        )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
-        f"📜 <b>{escape(page.club_name)}</b> · Матчи {page.page}/{page.total_pages}",
-        f"Всего: {page.total}",
+        tr(
+            "📜 <b>{p0}</b> · Матчи {p1}/{p2}",
+            p0=escape(latin_name(page.club_name)),
+            p1=page.page,
+            p2=page.total_pages,
+        ),
+        tr("Всего: {p0}", p0=page.total),
         "",
     ]
     buttons: list[list[InlineKeyboardButton]] = []
@@ -56,33 +65,45 @@ def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
         marker = OUTCOME_MARKERS.get(entry.outcome, "")
         date = entry.scheduled_start_at.strftime("%d.%m")
         lines.append(
-            f"{marker} Тур {entry.round_number} · {date}\n"
-            f"<b>{escape(entry.home_name)} {entry.home_goals}:{entry.away_goals} "
-            f"{escape(entry.away_name)}</b>"
+            tr(
+                "{p0} Тур {p1} · {p2}\n<b>{p3} {p4}:{p5} {p6}</b>",
+                p0=marker,
+                p1=entry.round_number,
+                p2=date,
+                p3=escape(latin_name(entry.home_name)),
+                p4=entry.home_goals,
+                p5=entry.away_goals,
+                p6=escape(latin_name(entry.away_name)),
+            )
         )
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f"Тур {entry.round_number}: {entry.home_goals}:{entry.away_goals}"[:60],
+                    text=tr(
+                        "Тур {p0}: {p1}:{p2}",
+                        p0=entry.round_number,
+                        p1=entry.home_goals,
+                        p2=entry.away_goals,
+                    )[:60],
                     callback_data=match_callback(entry.fixture_id, page.page),
                 )
             ]
         )
     if not page.entries:
-        lines.append("Сыгранных матчей пока нет.")
+        lines.append(tr("Сыгранных матчей пока нет."))
     nav: list[InlineKeyboardButton] = []
     if page.page > 1:
         nav.append(
-            InlineKeyboardButton(text="← Назад", callback_data=results_callback(page.page - 1))
+            InlineKeyboardButton(text=tr("← Назад"), callback_data=results_callback(page.page - 1))
         )
     if page.page < page.total_pages:
         nav.append(
-            InlineKeyboardButton(text="Вперёд →", callback_data=results_callback(page.page + 1))
+            InlineKeyboardButton(text=tr("Вперёд →"), callback_data=results_callback(page.page + 1))
         )
     if nav:
         buttons.append(nav)
     buttons.append(
-        [InlineKeyboardButton(text="🏟 Клуб", callback_data=CLUB_CALLBACK)],
+        [InlineKeyboardButton(text=tr("🏟 Клуб"), callback_data=CLUB_CALLBACK)],
     )
     return "\n".join(lines), _nav(buttons, back=None)
 
@@ -98,39 +119,46 @@ def _event_line(
     side: str | None,
 ) -> str | None:
     club = home_name if side == "home" else away_name if side == "away" else None
-    who = f"<b>{escape(player)}</b>" if player else "—"
+    who = f"<b>{escape(latin_name(player))}</b>" if player else "—"
     if kind == "goal":
-        extra = " (угловой)" if detail == "corner" else ""
+        extra = tr(" (угловой)") if detail == "corner" else ""
         return f"⚽ {minute}′ {who} ({escape(club or '?')}){extra}"
     if kind == "substitution" and other:
-        return f"🔄 {minute}′ {who} → <b>{escape(other)}</b>"
+        return f"🔄 {minute}′ {who} → <b>{escape(latin_name(other))}</b>"
     if kind == "automatic_substitution" and other:
-        return f"🔄 {minute}′ {who} → <b>{escape(other)}</b> (травма, авто)"
+        return tr(
+            "🔄 {p0}′ {p1} → <b>{p2}</b> (травма, авто)",
+            p0=minute,
+            p1=who,
+            p2=escape(latin_name(other)),
+        )
     if kind in {"save", "wide", "post"}:
-        outcome = {"save": "вратарь спасает", "wide": "мимо ворот", "post": "штанга"}[kind]
+        outcome = {"save": tr("вратарь спасает"), "wide": tr("мимо ворот"), "post": tr("штанга")}[
+            kind
+        ]
         return f"🎯 {minute}′ {who} ({escape(club or '?')}): {outcome}"
     if kind == "corner":
-        return f"🚩 {minute}′ Угловой: {escape(club or '?')}"
+        return tr("🚩 {p0}′ Угловой: {p1}", p0=minute, p1=escape(club or "?"))
     if kind == "second_half_started":
-        return f"⚽ {minute}′ Начался второй тайм"
+        return tr("⚽ {p0}′ Начался второй тайм", p0=minute)
     if kind == "yellow":
         return f"🟨 {minute}′ {who}"
     if kind == "red":
-        extra = " (вторая жёлтая)" if detail == "second_yellow" else ""
+        extra = tr(" (вторая жёлтая)") if detail == "second_yellow" else ""
         return f"🟥 {minute}′ {who}{extra}"
     if kind == "injury":
         return f"🤕 {minute}′ {who}"
     if kind in ("tactic", "mentality") and detail:
-        label = "Тактика" if kind == "tactic" else "Настрой"
+        label = tr("Тактика") if kind == "tactic" else tr("Настрой")
         choices = TACTICS if kind == "tactic" else MENTALITIES
-        return f"📋 {minute}′ {escape(club or '?')}: {label}: {choices.get(detail, 'изменена')}"
+        return f"📋 {minute}′ {escape(club or '?')}: {label}: {choices.get(detail, tr('изменена'))}"
     if kind == "instruction" and detail:
-        label = INSTRUCTIONS.get(detail, "изменена")
-        return f"🎯 {minute}′ {who}: Инструкция: {escape(label)}"
+        label = INSTRUCTIONS.get(detail, tr("изменена"))
+        return tr("🎯 {p0}′ {p1}: Инструкция: {p2}", p0=minute, p1=who, p2=escape(label))
     if kind == "half_time":
-        return f"☕ {minute}′ Перерыв"
+        return tr("☕ {p0}′ Перерыв", p0=minute)
     if kind == "full_time":
-        return f"🏁 {minute}′ Финальный свисток"
+        return tr("🏁 {p0}′ Финальный свисток", p0=minute)
     return None
 
 
@@ -141,14 +169,18 @@ def report_view(
         raise ValueError("Invalid report view")
     date = report.scheduled_start_at.strftime("%d.%m.%Y")
     lines = [
-        f"⚽ <b>{escape(report.home_name)} {report.home_goals}:{report.away_goals} "
-        f"{escape(report.away_name)}</b>",
-        f"Тур {report.round_number} · {date}",
+        f"⚽ <b>{escape(latin_name(report.home_name))} {report.home_goals}:{report.away_goals} "
+        f"{escape(latin_name(report.away_name))}</b>",
+        tr("Тур {p0} · {p1}", p0=report.round_number, p1=date),
         "",
-        f"Владение: {report.possession_home_pct}% / {100 - report.possession_home_pct}%",
-        f"Удары: {report.home_stats.shots} / {report.away_stats.shots}",
-        f"В створ: {report.home_stats.on_target} / {report.away_stats.on_target}",
-        f"Угловые: {report.home_stats.corners} / {report.away_stats.corners}",
+        tr(
+            "Владение: {p0}% / {p1}%",
+            p0=report.possession_home_pct,
+            p1=100 - report.possession_home_pct,
+        ),
+        tr("Удары: {p0} / {p1}", p0=report.home_stats.shots, p1=report.away_stats.shots),
+        tr("В створ: {p0} / {p1}", p0=report.home_stats.on_target, p1=report.away_stats.on_target),
+        tr("Угловые: {p0} / {p1}", p0=report.home_stats.corners, p1=report.away_stats.corners),
         "",
     ]
     entries: list[str] = []
@@ -160,36 +192,49 @@ def report_view(
                 event.player_name,
                 event.other_name,
                 event.detail,
-                report.home_name,
-                report.away_name,
+                latin_name(report.home_name),
+                latin_name(report.away_name),
                 event.side,
             )
             if line is not None:
                 entries.append(line)
-        title = "События"
+        title = tr("События")
         per_page = 10
     else:
         lineup = report.home_lineup if section == "home" else report.away_lineup
-        title = "Игроки: " + (report.home_name if section == "home" else report.away_name)
+        title = tr("Игроки: ") + (
+            latin_name(report.home_name) if section == "home" else latin_name(report.away_name)
+        )
         per_page = 5
         for member in lineup:
             role = (
-                "Старт"
+                tr("Старт")
                 if member.started
-                else "Вышел на замену"
+                else tr("Вышел на замену")
                 if member.appeared or member.minutes
-                else "Не выходил"
+                else tr("Не выходил")
             )
             extra = f" · ⚽ {member.goals}" if member.goals else ""
             extra += " · 🟨" * min(member.yellows, 2) + (" · 🟥" if member.sent_off else "")
             extra += " · 🤕" if member.injured else ""
             energy = (
-                f"{member.energy_bps // 100}%" if member.energy_bps is not None else "нет данных"
+                f"{member.energy_bps // 100}%"
+                if member.energy_bps is not None
+                else tr("нет данных")
             )
             entries.append(
-                f"<b>{escape(member.name)}</b> · {escape(member.position)}{extra}\n"
-                f"{role} · возраст {member.age} · сыграл {member.minutes} мин\n"
-                f"Форма до матча: {member.form}/8 · Энергия после: {energy}"
+                tr(
+                    "<b>{p0}</b> · {p1}{p2}\n{p3} · возраст {p4} · сыграл {p5} "
+                    "мин\nФорма до матча: {p6}/8 · Энергия после: {p7}",
+                    p0=escape(latin_name(member.name)),
+                    p1=escape(member.position),
+                    p2=extra,
+                    p3=role,
+                    p4=member.age,
+                    p5=member.minutes,
+                    p6=member.form,
+                    p7=energy,
+                )
             )
     # Bound whole entries by Telegram's UTF-16 text budget even for long names.
     chunks: list[list[str]] = [[]]
@@ -206,7 +251,7 @@ def report_view(
     if page > total_pages:
         raise ValueError("Report page unavailable")
     lines.append(f"<b>{escape(title)}</b> · {page}/{total_pages}")
-    selected_entries = chunks[page - 1] or ["Событий пока нет."]
+    selected_entries = chunks[page - 1] or [tr("Событий пока нет.")]
     lines.append(("\n" if section == "events" else "\n\n").join(selected_entries))
     buttons: list[list[InlineKeyboardButton]] = [
         [
@@ -214,9 +259,9 @@ def report_view(
                 text=label, callback_data=report_callback(report.fixture_id, tab, 1, return_page)
             )
             for tab, label in (
-                ("events", "⚽ События"),
-                ("home", "🏠 Хозяева"),
-                ("away", "✈️ Гости"),
+                ("events", tr("⚽ События")),
+                ("home", tr("🏠 Хозяева")),
+                ("away", tr("✈️ Гости")),
             )
             if tab != section
         ]
@@ -225,14 +270,14 @@ def report_view(
     if page > 1:
         nav.append(
             InlineKeyboardButton(
-                text="← Предыдущая",
+                text=tr("← Предыдущая"),
                 callback_data=report_callback(report.fixture_id, section, page - 1, return_page),
             )
         )
     if page < total_pages:
         nav.append(
             InlineKeyboardButton(
-                text="Следующая →",
+                text=tr("Следующая →"),
                 callback_data=report_callback(report.fixture_id, section, page + 1, return_page),
             )
         )
@@ -243,8 +288,13 @@ def report_view(
 
 def player_history_view(page: PlayerHistoryPage) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
-        f"📜 <b>{escape(page.person_name)}</b> · Матчи {page.page}/{page.total_pages}",
-        f"Всего: {page.total}",
+        tr(
+            "📜 <b>{p0}</b> · Матчи {p1}/{p2}",
+            p0=escape(latin_name(page.person_name)),
+            p1=page.page,
+            p2=page.total_pages,
+        ),
+        tr("Всего: {p0}", p0=page.total),
         "",
     ]
     buttons: list[list[InlineKeyboardButton]] = []
@@ -258,71 +308,78 @@ def player_history_view(page: PlayerHistoryPage) -> tuple[str, InlineKeyboardMar
         elif entry.yellows:
             extra += " · 🟨"
         lines.append(
-            f"Тур {entry.round_number} · {date}\n"
-            f"<b>{escape(entry.home_name)} {entry.home_goals}:{entry.away_goals} "
-            f"{escape(entry.away_name)}</b>{extra}"
+            tr(
+                "Тур {p0} · {p1}\n<b>{p2} {p3}:{p4} {p5}</b>{p6}",
+                p0=entry.round_number,
+                p1=date,
+                p2=escape(latin_name(entry.home_name)),
+                p3=entry.home_goals,
+                p4=entry.away_goals,
+                p5=escape(latin_name(entry.away_name)),
+                p6=extra,
+            )
         )
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f"Тур {entry.round_number}: отчёт"[:60],
+                    text=tr("Тур {p0}: отчёт", p0=entry.round_number)[:60],
                     callback_data=match_callback(entry.fixture_id, 1),
                 )
             ]
         )
     if not page.entries:
-        lines.append("Матчей в истории пока нет.")
+        lines.append(tr("Матчей в истории пока нет."))
     nav: list[InlineKeyboardButton] = []
     if page.page > 1:
         nav.append(
             InlineKeyboardButton(
-                text="← Назад",
+                text=tr("← Назад"),
                 callback_data=player_history_callback(page.person_id, page.page - 1),
             )
         )
     if page.page < page.total_pages:
         nav.append(
             InlineKeyboardButton(
-                text="Вперёд →",
+                text=tr("Вперёд →"),
                 callback_data=player_history_callback(page.person_id, page.page + 1),
             )
         )
     if nav:
         buttons.append(nav)
-    buttons.append([InlineKeyboardButton(text="🏟 Клуб", callback_data=CLUB_CALLBACK)])
+    buttons.append([InlineKeyboardButton(text=tr("🏟 Клуб"), callback_data=CLUB_CALLBACK)])
     return "\n".join(lines), _nav(buttons, back=None)
 
 
 def seasons_view(
     summaries: tuple[SeasonSummary, ...], *, page: int = 1, total_pages: int = 1
 ) -> tuple[str, InlineKeyboardMarkup]:
-    lines = ["🗂 <b>Сезонный архив</b>", ""]
+    lines = [tr("🗂 <b>Сезонный архив</b>"), ""]
     buttons: list[list[InlineKeyboardButton]] = []
     for summary in summaries:
-        lines.append(f"Сезон {summary.number} · Лига {summary.tier}")
+        lines.append(tr("Сезон {p0} · Лига {p1}", p0=summary.number, p1=summary.tier))
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f"Сезон {summary.number} · Лига {summary.tier}",
+                    text=tr("Сезон {p0} · Лига {p1}", p0=summary.number, p1=summary.tier),
                     callback_data=archive_callback(summary.season_id),
                 )
             ]
         )
     if not summaries:
-        lines.append("Архивных сезонов пока нет.")
+        lines.append(tr("Архивных сезонов пока нет."))
     if total_pages > 1:
-        lines.append(f"Страница {page}/{total_pages}")
+        lines.append(tr("Страница {p0}/{p1}", p0=page, p1=total_pages))
         nav = []
         if page > 1:
             nav.append(
-                InlineKeyboardButton(text="← Назад", callback_data=seasons_callback(page - 1))
+                InlineKeyboardButton(text=tr("← Назад"), callback_data=seasons_callback(page - 1))
             )
         if page < total_pages:
             nav.append(
-                InlineKeyboardButton(text="Далее →", callback_data=seasons_callback(page + 1))
+                InlineKeyboardButton(text=tr("Далее →"), callback_data=seasons_callback(page + 1))
             )
         buttons.append(nav)
-    buttons.append([InlineKeyboardButton(text="🏟 Клуб", callback_data=CLUB_CALLBACK)])
+    buttons.append([InlineKeyboardButton(text=tr("🏟 Клуб"), callback_data=CLUB_CALLBACK)])
     return "\n".join(lines), _nav(buttons, back=None)
 
 
@@ -331,17 +388,24 @@ def archive_view(archive: SeasonArchive) -> tuple[str, InlineKeyboardMarkup]:
     # keyboard rebuilt for archive navigation. Counters are stored, never re-awarded.
     text, _ = table_view(archive.table, archive.season_id, archive.league_id, archive.tier, 1)
     text2, _ = table_view(archive.table, archive.season_id, archive.league_id, archive.tier, 2)
-    position_line = (
-        f"\n🏟 Ваш клуб — <b>{archive.club_position}-е место</b>: "
-        f"{archive.played} матчей · {archive.won}В {archive.drawn}Н {archive.lost}П · "
-        f"мячи {archive.goals_for}:{archive.goals_against} · {archive.points} очков."
+    position_line = tr(
+        "\n🏟 Ваш клуб — <b>{p0}-е место</b>: {p1} матчей · {p2}В "
+        "{p3}Н {p4}П · мячи {p5}:{p6} · {p7} очков.",
+        p0=archive.club_position,
+        p1=archive.played,
+        p2=archive.won,
+        p3=archive.drawn,
+        p4=archive.lost,
+        p5=archive.goals_for,
+        p6=archive.goals_against,
+        p7=archive.points,
     )
     buttons: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton(text="🏟 Клуб", callback_data=CLUB_CALLBACK)],
+        [InlineKeyboardButton(text=tr("🏟 Клуб"), callback_data=CLUB_CALLBACK)],
     ]
     keyboard = _nav(buttons, back=seasons_callback(1))
     return (
-        f"🗂 <b>Сезон {archive.number}</b> · Лига {archive.tier}\n\n"
+        tr("🗂 <b>Сезон {p0}</b> · Лига {p1}\n\n", p0=archive.number, p1=archive.tier)
         + text
         + "\n\n"
         + text2

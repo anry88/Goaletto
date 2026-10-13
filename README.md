@@ -19,6 +19,7 @@ checkpoint/replay и события. Durable [live-worker](docs/match-runtime.md
 Очки и таблицы начисляются атомарно с финальным тиком. Backend регистрации/выдачи клуба/6-месячного владения реализован:
 [club-entry.md](docs/club-entry.md). Игровой `/start` и кнопки подключены при `GOALETTO_GAME_ENABLED=true`.
 [Live-команды](docs/live-commands.md) подключены через `/match`;
+[RU/EN и имена](docs/languages-and-names.md) переключаются через `/settings`;
 [недельные тренировки](docs/training.md) доступны через `/train`; rollover и экономика ещё в разработке. [Outbox sender](docs/outbox-delivery.md) подключён отдельным
 циклом worker; по умолчанию выключен (`GOALETTO_OUTBOX_ENABLED=false`).
 В табло и `/match` добавлена компактная [лента событий](docs/live-commentary.md)

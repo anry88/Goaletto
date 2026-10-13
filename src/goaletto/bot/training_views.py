@@ -10,30 +10,38 @@ from aiogram.types import InlineKeyboardMarkup as Keyboard
 from goaletto.application.training import TrainingScreen
 from goaletto.bot.club_cards import SKILL_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.domain.names import latin_name
 from goaletto.domain.training import Focus, Intensity
 from goaletto.infrastructure.models import TrainingPlan
+from goaletto.presentation.i18n import LabelMap, tr
 
-FOCUS_LABELS = {
-    Focus.GOALKEEPING: "🧤 Вратарская",
-    Focus.DEFENDING: "🛡 Оборонительная",
-    Focus.PLAYMAKING: "🎯 Плеймейкинг",
-    Focus.WINGER: "↗️ Фланговая",
-    Focus.ATTACKING: "⚽ Атакующая",
-    Focus.SET_PIECES: "🚩 Стандарты",
-    Focus.PHYSICAL: "🏃 Физическая",
-    Focus.TEAM: "👥 Общекомандная",
-}
-INTENSITY_LABELS = {Intensity.LOW: "Низкая", Intensity.MEDIUM: "Средняя", Intensity.HIGH: "Высокая"}
-TARGETS = {
-    Focus.GOALKEEPING: "вратари · вратарское мастерство",
-    Focus.DEFENDING: "DC, DL, DR · защита",
-    Focus.PLAYMAKING: "MC · плеймейкинг",
-    Focus.WINGER: "ML, MR, DL, DR · фланговая игра",
-    Focus.ATTACKING: "FC, AMC, AML, AMR · атака",
-    Focus.SET_PIECES: "выбранный исполнитель · стандарты",
-    Focus.PHYSICAL: "вся команда · выносливость и скорость",
-    Focus.TEAM: "вся команда · опыт",
-}
+FOCUS_LABELS = LabelMap(
+    {
+        Focus.GOALKEEPING: "🧤 Вратарская",
+        Focus.DEFENDING: "🛡 Оборонительная",
+        Focus.PLAYMAKING: "🎯 Плеймейкинг",
+        Focus.WINGER: "↗️ Фланговая",
+        Focus.ATTACKING: "⚽ Атакующая",
+        Focus.SET_PIECES: "🚩 Стандарты",
+        Focus.PHYSICAL: "🏃 Физическая",
+        Focus.TEAM: "👥 Общекомандная",
+    }
+)
+INTENSITY_LABELS = LabelMap(
+    {Intensity.LOW: "Низкая", Intensity.MEDIUM: "Средняя", Intensity.HIGH: "Высокая"}
+)
+TARGETS = LabelMap(
+    {
+        Focus.GOALKEEPING: "вратари · вратарское мастерство",
+        Focus.DEFENDING: "DC, DL, DR · защита",
+        Focus.PLAYMAKING: "MC · плеймейкинг",
+        Focus.WINGER: "ML, MR, DL, DR · фланговая игра",
+        Focus.ATTACKING: "FC, AMC, AML, AMR · атака",
+        Focus.SET_PIECES: "выбранный исполнитель · стандарты",
+        Focus.PHYSICAL: "вся команда · выносливость и скорость",
+        Focus.TEAM: "вся команда · опыт",
+    }
+)
 
 
 def choice_callback(
@@ -100,21 +108,21 @@ def training_view(
     notice: str | None = None,
 ) -> tuple[str, Keyboard]:
     lines = [
-        f"🏋️ <b>{escape(screen.club_name)}</b> · Тренировки",
-        f"Неделя с {screen.week_start.strftime('%d.%m.%Y')}",
-        "Результат: " + screen.due_at.strftime("%d.%m.%Y %H:%M UTC"),
+        tr("🏋️ <b>{p0}</b> · Тренировки", p0=escape(latin_name(screen.club_name))),
+        tr("Неделя с {p0}", p0=screen.week_start.strftime("%d.%m.%Y")),
+        tr("Результат: ") + screen.due_at.strftime("%d.%m.%Y %H:%M UTC"),
         "",
     ]
     if screen.plan:
         plan = screen.plan
         lines.append(
-            "Сохранено: "
+            tr("Сохранено: ")
             + FOCUS_LABELS[Focus(plan.focus)]
             + " · "
             + INTENSITY_LABELS[Intensity(plan.intensity)].lower()
         )
     else:
-        lines.append("На эту неделю тренировка ещё не выбрана.")
+        lines.append(tr("На эту неделю тренировка ещё не выбрана."))
     if notice:
         lines.append(escape(notice))
     if focus is None:
@@ -122,20 +130,20 @@ def training_view(
             [_button(label, choice_callback("f", screen, value, Intensity.MEDIUM))]
             for value, label in FOCUS_LABELS.items()
         ]
-        lines.append("Выберите фокус тренировки.")
+        lines.append(tr("Выберите фокус тренировки."))
     else:
         intensity = intensity or Intensity.MEDIUM
         lines.extend(
             (
                 "",
-                "Выбор: " + FOCUS_LABELS[focus],
-                "Кто тренируется: " + TARGETS[focus],
-                "Интенсивность: " + INTENSITY_LABELS[intensity].lower(),
-                "Травмированные пропускают тренировку.",
+                tr("Выбор: ") + FOCUS_LABELS[focus],
+                tr("Кто тренируется: ") + TARGETS[focus],
+                tr("Интенсивность: ") + INTENSITY_LABELS[intensity].lower(),
+                tr("Травмированные пропускают тренировку."),
             )
         )
         if intensity == Intensity.HIGH:
-            lines.append("⚠️ Высокая интенсивность ускоряет прогресс, но повышает риск травмы.")
+            lines.append(tr("⚠️ Высокая интенсивность ускоряет прогресс, но повышает риск травмы."))
         rows = [
             [
                 _button(label, choice_callback("i", screen, focus, value, executor_id))
@@ -144,11 +152,11 @@ def training_view(
         ]
         selected = next((m for m in screen.members if m.id == executor_id), None)
         if focus == Focus.SET_PIECES and selected is None:
-            lines.append("Выберите исполнителя стандартов:")
+            lines.append(tr("Выберите исполнителя стандартов:"))
             rows += [
                 [
                     _button(
-                        m.name + " · " + m.position,
+                        latin_name(m.name) + " · " + m.position,
                         choice_callback("p", screen, focus, intensity, m.id),
                     )
                 ]
@@ -156,22 +164,22 @@ def training_view(
             ]
         else:
             if selected:
-                lines.append("Исполнитель: " + escape(selected.name))
+                lines.append(tr("Исполнитель: ") + escape(latin_name(selected.name)))
             rows.append(
                 [
                     _button(
-                        "✅ Сохранить тренировку",
+                        tr("✅ Сохранить тренировку"),
                         choice_callback("s", screen, focus, intensity, executor_id),
                     )
                 ]
             )
-        rows.append([_button("← Выбрать другой фокус", "tr:open")])
+        rows.append([_button(tr("← Выбрать другой фокус"), "tr:open")])
     if screen.last_result:
         rows.append(
-            [_button("📋 Последний результат", f"tr:r:{compact_id(screen.last_result.id)}:1")]
+            [_button(tr("📋 Последний результат"), f"tr:r:{compact_id(screen.last_result.id)}:1")]
         )
-    lines.append("Выбор можно менять до окончания недели. Без выбора тренировок нет.")
-    rows.append([_button("🏟 Клуб", "vc:c"), _button("🏠 Главное меню", "vc:menu")])
+    lines.append(tr("Выбор можно менять до окончания недели. Без выбора тренировок нет."))
+    rows.append([_button(tr("🏟 Клуб"), "vc:c"), _button(tr("🏠 Главное меню"), "vc:menu")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)
 
 
@@ -180,41 +188,43 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
     if type(page) is not int or not 1 <= page <= pages:
         raise ValueError("Invalid training report page")
     lines = [
-        f"🏋️ <b>{escape(club_name)}</b> · Результат тренировки",
-        plan.week_start.strftime("Неделя с %d.%m.%Y"),
+        tr("🏋️ <b>{p0}</b> · Результат тренировки", p0=escape(latin_name(club_name))),
+        plan.week_start.strftime(tr("Неделя с %d.%m.%Y")),
         FOCUS_LABELS[Focus(plan.focus)]
         + " · "
         + INTENSITY_LABELS[Intensity(plan.intensity)].lower(),
-        f"Игроки · {page}/{pages}",
+        tr("Игроки · {p0}/{p1}", p0=page, p1=pages),
         "",
     ]
-    labels = dict(SKILL_LABELS)
+    labels = LabelMap(dict(SKILL_LABELS))
     for row in plan.results[(page - 1) * 5 : page * 5]:
-        lines.append("<b>" + escape(row["name"]) + "</b>")
+        lines.append("<b>" + escape(latin_name(row["name"])) + "</b>")
         for key, change in row["changes"].items():
             lines.append(f"{labels[key]}: {change['before']} → {change['after']}")
         if not row["changes"]:
             lines.append(
-                "Прогресс накоплен; навыки ещё не выросли на целый балл."
+                tr("Прогресс накоплен; навыки ещё не выросли на целый балл.")
                 if row["progressed"]
-                else "Навыки не изменились."
+                else tr("Навыки не изменились.")
             )
         if row["form_before"] != row["form_after"]:
-            lines.append(f"Форма: {row['form_before']} → {row['form_after']}")
+            lines.append(tr("Форма: {p0} → {p1}", p0=row["form_before"], p1=row["form_after"]))
         if row["experience_before"] != row["experience_after"]:
-            lines.append(f"Опыт: {row['experience_before']} → {row['experience_after']}")
+            lines.append(
+                tr("Опыт: {p0} → {p1}", p0=row["experience_before"], p1=row["experience_after"])
+            )
         if row["injured"]:
-            lines.append("🤕 Травма на тренировке · восстановление 7 дней.")
+            lines.append(tr("🤕 Травма на тренировке · восстановление 7 дней."))
         lines.append("")
     if not plan.results:
-        lines.append("Доступных игроков для выбранного фокуса не было.")
+        lines.append(tr("Доступных игроков для выбранного фокуса не было."))
     rows = []
     nav = []
     if page > 1:
-        nav.append(_button("← Предыдущая", f"tr:r:{compact_id(plan.id)}:{page - 1}"))
+        nav.append(_button(tr("← Предыдущая"), f"tr:r:{compact_id(plan.id)}:{page - 1}"))
     if page < pages:
-        nav.append(_button("Следующая →", f"tr:r:{compact_id(plan.id)}:{page + 1}"))
+        nav.append(_button(tr("Следующая →"), f"tr:r:{compact_id(plan.id)}:{page + 1}"))
     if nav:
         rows.append(nav)
-    rows.append([_button("← Тренировки", "tr:open"), _button("🏟 Клуб", "vc:c")])
+    rows.append([_button(tr("← Тренировки"), "tr:open"), _button(tr("🏟 Клуб"), "vc:c")])
     return "\n".join(lines).rstrip(), Keyboard(inline_keyboard=rows)

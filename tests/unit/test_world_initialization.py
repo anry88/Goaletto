@@ -48,7 +48,7 @@ def receipt() -> WorldSeedReceipt:
         season_id=plan.season_id,
         config_hash=OPTIONS.fingerprint,
         policy_version=WORLD_POLICY,
-        config={},
+        config={"naming_policy": OPTIONS.naming_policy},
         created_at=NOW,
     )
 

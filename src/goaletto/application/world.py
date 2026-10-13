@@ -1,6 +1,6 @@
 """Prepare or atomically initialize a world. Does not start matches or claim clubs."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -133,7 +133,12 @@ async def initialize_world(
     )
     receipt = await session.get(WorldSeedReceipt, options.key)
     if receipt is not None:
-        if receipt.config_hash != options.fingerprint:
+        expected = (
+            options
+            if "naming_policy" in receipt.config
+            else replace(options, naming_policy="legacy-v1")
+        )
+        if receipt.config_hash != expected.fingerprint:
             raise ValueError("World key already has a different seed configuration")
         return SeedResult(receipt.league_set_id, receipt.season_id, False)
     if initialized_at.tzinfo is None or initialized_at.utcoffset() != timedelta(0):
@@ -384,6 +389,7 @@ async def initialize_world(
                     "seed": options.seed,
                     "first_kickoff": options.first_kickoff.isoformat(),
                     "initial_budget": options.initial_budget,
+                    "naming_policy": options.naming_policy,
                 },
                 "created_at": initialized_at,
             }

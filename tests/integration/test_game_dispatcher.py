@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import pytest
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage
+from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage, SetMyCommands
 from aiogram.types import CallbackQuery, Chat, Message, Update, User
 from sqlalchemy import select
 
@@ -48,7 +48,7 @@ class Telegram(BaseSession):
         # Both answerCallbackQuery and message IO happen outside DB transactions.
         assert self.source.depth == 0
         self.calls.append(method)
-        if isinstance(method, AnswerCallbackQuery):
+        if isinstance(method, (AnswerCallbackQuery, SetMyCommands)):
             return True
         assert isinstance(method, (SendMessage, EditMessageText))
         self.last_message = Message(
@@ -124,7 +124,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
             ),
         )
         assert isinstance(telegram.calls[previous], AnswerCallbackQuery)
-        assert isinstance(telegram.calls[-1], EditMessageText)
+        assert any(isinstance(call, EditMessageText) for call in telegram.calls[previous:])
         return telegram.last_message
 
     response = await command("/start")
@@ -142,9 +142,23 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
 
     response = await command("/settings")
     assert "Напоминания" in response.text
-    response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
+    response = await callback(
+        next(
+            b.callback_data
+            for row in response.reply_markup.inline_keyboard
+            for b in row
+            if b.callback_data.startswith("ntf:off:")
+        )
+    )
     assert "выключены" in response.text
-    response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
+    response = await callback(
+        next(
+            b.callback_data
+            for row in response.reply_markup.inline_keyboard
+            for b in row
+            if b.callback_data.startswith("ntf:on:")
+        )
+    )
     assert "включены" in response.text
     async with sessions.begin() as session:
         current = await session.get(OwnershipPeriod, ownership.id)
@@ -176,4 +190,26 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
         assert {r.telegram_update_id for r in rows} == {13, 15}
         lineup = await session.get(ClubLineup, ownership.club_id)
         assert lineup.version == 3
+    await command("/settings")
+    response = await callback("lang:en")
+    assert "Settings" in response.text
+    for cmd in (
+        "/start",
+        "/help",
+        "/club",
+        "/squad",
+        "/lineup",
+        "/match",
+        "/table",
+        "/history",
+        "/train",
+        "/settings",
+    ):
+        response = await command(cmd)
+        assert not any(
+            "А" <= ch <= "я" or ch in "Ёё" for ch in response.text.replace("Язык", "")
+        ), (cmd, response.text)
+    async with sessions.begin() as session:
+        manager = await session.scalar(select(Manager).where(Manager.telegram_id == user.id))
+        assert manager.locale == "en"
     await bot.session.close()

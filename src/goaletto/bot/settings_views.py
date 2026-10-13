@@ -13,6 +13,8 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from goaletto.application.notification_preferences import SettingsState
 from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.domain.names import latin_name
+from goaletto.presentation.i18n import tr
 
 SETTINGS_OPEN = "ntf:open"
 
@@ -56,23 +58,25 @@ def is_settings_callback(value: str | None) -> bool:
 def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
     if not isinstance(state, SettingsState):
         raise ValueError("Invalid settings state")
-    status = "включены 🔔" if state.reminders_enabled else "выключены 🔕"
-    lines = ["🔔 <b>Напоминания</b>", f"Статус: {status}"]
+    status = tr("включены 🔔") if state.reminders_enabled else tr("выключены 🔕")
+    lines = [tr("🔔 <b>Напоминания</b>"), tr("Статус: {p0}", p0=status)]
     if state.has_ownership and state.club_name is not None and state.expires_at is not None:
-        lines.append(f"Клуб: {escape(state.club_name)}")
-        lines.append(f"Владение до: {state.expires_at.strftime('%Y-%m-%d %H:%M UTC')}")
-        lines.append("Напоминания: «Ваш клуб ждёт вас» до истечения владения.")
+        lines.append(tr("Клуб: {p0}", p0=escape(latin_name(state.club_name))))
+        lines.append(tr("Владение до: {p0}", p0=state.expires_at.strftime("%Y-%m-%d %H:%M UTC")))
+        lines.append(tr("Напоминания: «Ваш клуб ждёт вас» до истечения владения."))
     else:
-        lines.append("Клуба пока нет. Откройте /start, чтобы получить клуб лиги 5.")
+        lines.append(tr("Клуба пока нет. Откройте /start, чтобы получить клуб лиги 5."))
     if not state.bot_available:
-        lines.append("Отправка сейчас недоступна; доступность подтверждает /start, а не настройки.")
+        lines.append(
+            tr("Отправка сейчас недоступна; доступность подтверждает /start, а не настройки.")
+        )
     buttons: list[list[InlineKeyboardButton]] = []
     if state.has_ownership and state.ownership_id is not None:
         if state.reminders_enabled:
             buttons.append(
                 [
                     InlineKeyboardButton(
-                        text="🔕 Выключить напоминания",
+                        text=tr("🔕 Выключить напоминания"),
                         callback_data=disable_callback(state.ownership_id),
                     )
                 ]
@@ -81,22 +85,34 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
             buttons.append(
                 [
                     InlineKeyboardButton(
-                        text="🔔 Включить напоминания",
+                        text=tr("🔔 Включить напоминания"),
                         callback_data=enable_callback(state.ownership_id),
                     )
                 ]
             )
-        buttons.append([InlineKeyboardButton(text="🏟 Мой клуб", callback_data="vc:c")])
-    buttons.append([InlineKeyboardButton(text="🏠 Главное меню", callback_data="vc:menu")])
+        buttons.append([InlineKeyboardButton(text=tr("🏟 Мой клуб"), callback_data="vc:c")])
+    buttons.append([InlineKeyboardButton(text=tr("🏠 Главное меню"), callback_data="vc:menu")])
+    lines.append("\n" + tr("Язык / Language"))
+    buttons.insert(
+        0,
+        [
+            InlineKeyboardButton(
+                text=("✓ " if state.locale == "ru" else "") + "Русский", callback_data="lang:ru"
+            ),
+            InlineKeyboardButton(
+                text=("✓ " if state.locale == "en" else "") + "English", callback_data="lang:en"
+            ),
+        ],
+    )
     return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def stale_settings_view() -> tuple[str, InlineKeyboardMarkup]:
-    text = "Кнопка устарела или клуб больше не принадлежит вам. Откройте /settings заново."
+    text = tr("Кнопка устарела или клуб больше не принадлежит вам. Откройте /settings заново.")
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🏟 Мой клуб", callback_data="vc:c")],
-            [InlineKeyboardButton(text="🏠 Главное меню", callback_data="vc:menu")],
+            [InlineKeyboardButton(text=tr("🏟 Мой клуб"), callback_data="vc:c")],
+            [InlineKeyboardButton(text=tr("🏠 Главное меню"), callback_data="vc:menu")],
         ]
     )
     return text, keyboard

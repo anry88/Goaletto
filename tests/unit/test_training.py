@@ -113,7 +113,7 @@ def test_week_callbacks_are_stable_and_fit_with_both_full_uuids():
             assert len(data.encode()) <= 64
             assert parse_choice(data) == ("s", screen.ownership_id, week, f, i, executor)
     text, kb = training_view(screen, focus=Focus.SET_PIECES, intensity=Intensity.HIGH)
-    assert "&lt;Клуб&gt;" in text and "риск травмы" in text
+    assert "&lt;Klub&gt;" in text and "риск травмы" in text
     assert not any(b.text == "✅ Сохранить тренировку" for row in kb.inline_keyboard for b in row)
     for bad in ("tr:s:9:1:id:20261012:-", "tr:s:0:1:id:20260230:-", "tr:s:00:1:id:20261012:-"):
         with pytest.raises(ValueError):
@@ -145,11 +145,11 @@ def test_training_report_keeps_names_changes_and_pagination_readable():
         id=uuid4(), week_start=week, focus="physical", intensity="high", results=rows
     )
     text, kb = training_report(plan, "<Клуб>", 1)
-    assert "&lt;Клуб&gt;" in text and "Игрок &lt;0&gt;&amp;" in text
+    assert "&lt;Klub&gt;" in text and "Igrok &lt;0&gt;&amp;" in text
     assert "Скорость: 10 → 11" in text and "Форма: 6 → 7" in text
     assert "Навыки не изменились" in text and "восстановление 7 дней" in text
-    assert "Игрок &lt;5&gt;" not in text and len(text) < 4096
+    assert "Igrok &lt;5&gt;" not in text and len(text) < 4096
     assert any(b.text == "Следующая →" for row in kb.inline_keyboard for b in row)
-    assert "Игрок &lt;5&gt;" in training_report(plan, "<Клуб>", 2)[0]
+    assert "Igrok &lt;5&gt;" in training_report(plan, "<Клуб>", 2)[0]
     with pytest.raises(ValueError):
         training_report(plan, "<Клуб>", 3)

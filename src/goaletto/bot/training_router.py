@@ -15,6 +15,7 @@ from goaletto.bot.result_views import expand_id
 from goaletto.bot.training_views import parse_choice, training_report, training_view
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import TrainingPlan
+from goaletto.presentation.i18n import tr
 
 router = Router(name="training")
 
@@ -30,7 +31,7 @@ async def train_command(message: Message, database: Database, event_update: Upda
             )
             text, keyboard = training_view(await load_training(session, actor))
     except (PermissionDenied, ValueError):
-        await message.answer("Тренировки недоступны. Откройте /start.")
+        await message.answer(tr("Тренировки недоступны. Откройте /start."))
         return
     await message.answer(text, reply_markup=keyboard)
 
@@ -78,7 +79,7 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
                 screen = await load_training(session, actor, record=False)
                 if ownership_id != screen.ownership_id or week != screen.week_start:
                     text, keyboard = training_view(
-                        screen, notice="Кнопка устарела. Выберите тренировку заново."
+                        screen, notice=tr("Кнопка устарела. Выберите тренировку заново.")
                     )
                 elif action == "s":
                     await select_training(
@@ -92,7 +93,7 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
                     )
                     text, keyboard = training_view(
                         await load_training(session, actor, record=False),
-                        notice="Тренировка сохранена.",
+                        notice=tr("Тренировка сохранена."),
                     )
                 else:
                     if executor_id is not None and (
@@ -106,7 +107,7 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
     except (PermissionDenied, ValueError):
         await edit_response(
             query.message,
-            "Тренировка не сохранена: кнопка устарела или игрок недоступен. Откройте /train.",
+            tr("Тренировка не сохранена: кнопка устарела или игрок недоступен. Откройте /train."),
         )
         return
     await edit_response(query.message, text, keyboard)

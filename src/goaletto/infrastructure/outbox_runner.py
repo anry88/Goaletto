@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.outbox_delivery import (
@@ -19,6 +20,8 @@ from goaletto.application.outbox_delivery import (
     finish_delivery,
     preflight_delivery,
 )
+from goaletto.infrastructure.models import Manager
+from goaletto.presentation.i18n import using_locale
 
 
 class TransactionSource(Protocol):
@@ -53,14 +56,18 @@ async def process_one_delivery(
             ready = await preflight_delivery(
                 session, message_id, clock(), lease_owner=token, attempt=attempt
             )
+            chosen = await session.scalar(
+                select(Manager.locale).where(Manager.telegram_id == row.chat_id)
+            )
         if ready is None:
             return DeliveryStep(True)
         row, board_id = ready
         try:
-            async with asyncio.timeout(30):
-                outcome, telegram_id, retry_after = await deliver_claimed(
-                    row, transport, clock(), existing_board_message_id=board_id
-                )
+            with using_locale(chosen if chosen in {"ru", "en"} else "ru"):
+                async with asyncio.timeout(30):
+                    outcome, telegram_id, retry_after = await deliver_claimed(
+                        row, transport, clock(), existing_board_message_id=board_id
+                    )
         except TimeoutError:
             outcome, telegram_id, retry_after = Outcome.UNKNOWN, None, None
         async with database.transaction() as session:
