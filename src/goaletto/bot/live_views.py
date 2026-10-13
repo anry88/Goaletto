@@ -74,7 +74,7 @@ def render(
     lines = [f"⚽ <b>{escape(screen.club_name)}</b>"]
     rows = []
     if screen.state is None:
-        lines.append("Матч ещё не начался. Состав можно подготовить через /lineup.")
+        lines.append("Матч ещё не начался.")
     else:
         state = screen.state
         lines.append(
@@ -194,7 +194,7 @@ def render(
             "mentality": "Настрой",
             "instruction": "Инструкция",
         }
-        for receipt in screen.recent:
+        for receipt in screen.recent if state.phase.value not in {"full_time", "abandoned"} else ():
             lines.append(f"{kinds.get(receipt.kind, 'Команда')}: {labels[receipt.status]}")
     if notice:
         lines.append(escape(notice))
@@ -204,5 +204,22 @@ def render(
             f"\nСледующий матч: {escape(home)} — {escape(away)}\n"
             f"{kickoff.strftime('%d.%m.%Y %H:%M UTC')}"
         )
+        lines.append("Вы играете дома." if screen.next_is_home else "Вы играете в гостях.")
+        if screen.next_lineup_lock_at is not None:
+            if screen.next_locked:
+                lines.append("🔒 Состав на эту встречу уже зафиксирован.")
+            else:
+                lines.append(
+                    "Сохраните состав до "
+                    + screen.next_lineup_lock_at.strftime("%d.%m.%Y %H:%M UTC")
+                    + "."
+                )
+        rows.append([_button("📋 Подготовить состав", "ln:open")])
     rows.append([_button("🔄 Обновить", "lv:open"), _button("🏟 Клуб", "vc:c")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)
+
+
+def no_fixture_view() -> tuple[str, Keyboard]:
+    return "Матчей в расписании пока нет. Подготовьте состав к следующей встрече.", Keyboard(
+        inline_keyboard=[[_button("📋 Расстановка", "ln:open"), _button("🏟 Клуб", "vc:c")]]
+    )

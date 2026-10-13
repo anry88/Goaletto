@@ -38,7 +38,7 @@ MENTALITIES = {
     "attack": "атака",
     "balanced": "сбалансированный",
     "defence": "защита",
-    "ultra_defence": "глубокая защита",
+    "ultra_defence": "ультразащита",
 }
 INSTRUCTIONS = {
     "long_shots": "бить издалека",

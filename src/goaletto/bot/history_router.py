@@ -17,7 +17,7 @@ from goaletto.application.history import (
     get_season_archive,
 )
 from goaletto.bot.club_cards import stale_view
-from goaletto.bot.history_callbacks import parse_history_callback
+from goaletto.bot.history_callbacks import parse_history_callback, parse_report_callback
 from goaletto.bot.history_cards import (
     archive_view,
     player_history_view,
@@ -79,3 +79,24 @@ async def _render(
 
 
 __all__ = ["router"]
+
+
+@router.callback_query(F.data.startswith("hr:"))
+async def report_page(query: CallbackQuery, database: Database) -> None:
+    await query.answer()
+    if not isinstance(query.message, Message):
+        return
+    try:
+        fixture_id, section, page, return_page = parse_report_callback(query.data or "")
+        async with database.transaction() as session:
+            actor = await actor_for_callback(
+                session, telegram_id=query.from_user.id, callback_id=query.id, at=datetime.now(UTC)
+            )
+            report = await get_match_report(session, actor, fixture_id)
+            text, keyboard = report_view(report, return_page, section=section, page=page)
+    except (PermissionDenied, ValueError):
+        await edit_response(
+            query.message, "Отчёт недоступен или кнопка устарела. Откройте /history."
+        )
+        return
+    await edit_response(query.message, text, keyboard)

@@ -14,7 +14,7 @@ TACTIC_LABELS = {
     Tactic.NORMAL: "Обычная",
     Tactic.PRESSING: "⚡ Прессинг",
     Tactic.COUNTER: "🏃 Контратаки",
-    Tactic.WINGS: "↗️ Фланги",
+    Tactic.WINGS: "↗️ Игра по флангам",
     Tactic.DEFENCE: "🛡 Оборона",
     Tactic.LONG_BALLS: "⬆️ Длинные мячи",
 }
@@ -22,7 +22,7 @@ TACTIC_LABELS = {
 MENTALITY_LABELS = {
     Mentality.ULTRA_ATTACK: "🔥 Ультраатака",
     Mentality.ATTACK: "⚔️ Атака",
-    Mentality.BALANCED: "⚖️ Баланс",
+    Mentality.BALANCED: "⚖️ Сбалансированный",
     Mentality.DEFENCE: "🛡 Защита",
     Mentality.ULTRA_DEFENCE: "🧱 Ультразащита",
 }

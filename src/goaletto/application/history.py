@@ -112,6 +112,8 @@ class ReportLineupPlayer:
     yellows: int  # stored terminal condition
     sent_off: bool  # stored terminal condition
     injured: bool  # stored terminal condition
+    energy_bps: int | None = None  # stored terminal condition, distinct from form
+    appeared: bool = False  # includes a player entering immediately before final whistle
 
 
 @dataclass(frozen=True)
@@ -498,9 +500,18 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     condition.yellows if condition else 0,
                     condition.dismissed if condition else False,
                     condition.injured if condition else False,
+                    condition.energy_bps if condition else None,
+                    snapshot_player.id in starters
+                    or bool(condition and condition.minutes_played)
+                    or any(
+                        raw.get("kind") in {"substitution", "automatic_substitution"}
+                        and raw.get("side") == side
+                        and _raw_person(raw.get("other_player_id")) == snapshot_player.id
+                        for raw in raw_events
+                    ),
                 )
             )
-        rows_out.sort(key=lambda r: (not r.started, r.name, str(r.person_id)))
+        rows_out.sort(key=lambda r: (not r.started, not r.appeared, r.name, str(r.person_id)))
         return tuple(rows_out)
 
     def _stats(side: str) -> TeamReportStats:

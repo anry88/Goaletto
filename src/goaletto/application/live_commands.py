@@ -37,6 +37,10 @@ class CommandUnavailable(ValueError):
     pass
 
 
+class NoFixture(CommandUnavailable):
+    pass
+
+
 @dataclass(frozen=True)
 class CommandReceipt:
     id: UUID
@@ -62,6 +66,9 @@ class LiveScreen:
     recent: tuple[CommandReceipt, ...]
     commentary: tuple[str, ...] = ()
     next_fixture: tuple[str, str, datetime] | None = None
+    next_lineup_lock_at: datetime | None = None
+    next_is_home: bool = False
+    next_locked: bool = False
 
 
 async def _context(
@@ -100,7 +107,7 @@ async def _context(
         query.with_for_update(of=Fixture).execution_options(populate_existing=True)
     )
     if fixture is None:
-        raise CommandUnavailable("No available fixture for this club")
+        raise NoFixture("No available fixture for this club")
     match = await session.scalar(
         select(Match)
         .where(Match.fixture_id == fixture.id)
@@ -175,7 +182,7 @@ async def load_live_screen(
     at = max(actor.at, clock() if clock else datetime.now(UTC))
     if ownership.expires_at <= at:
         raise PermissionDenied("Ownership expired while waiting")
-    state = restore_state(match.state) if match else None
+    state = restore_state(match.state) if match and fixture.status != "scheduled" else None
     side = Side.HOME if fixture.home_club_id == club.id else Side.AWAY
     target, halftime, deadline, opened = (
         _window(match, fixture, state, at) if match and state else (None, False, None, False)
@@ -212,7 +219,14 @@ async def load_live_screen(
             fixture_id=fixture.id,
         )
     next_fixture: tuple[str, str, datetime] | None = None
-    if state is None or state.phase in {MatchPhase.FULL_TIME, MatchPhase.ABANDONED}:
+    next_lineup_lock_at: datetime | None = None
+    next_is_home = False
+    next_locked = False
+    if (
+        state is None
+        or fixture.status == "scheduled"
+        or state.phase in {MatchPhase.FULL_TIME, MatchPhase.ABANDONED}
+    ):
         upcoming = await session.scalar(
             select(Fixture)
             .where(
@@ -227,6 +241,9 @@ async def load_live_screen(
             away = await session.get(Club, upcoming.away_club_id)
             if home is not None and away is not None:
                 next_fixture = (home.name, away.name, upcoming.scheduled_start_at)
+                next_lineup_lock_at = upcoming.lineup_lock_at
+                next_is_home = upcoming.home_club_id == club.id
+                next_locked = at >= upcoming.lineup_lock_at
     return LiveScreen(
         ownership.id,
         club.id,
@@ -243,6 +260,9 @@ async def load_live_screen(
         recent,
         await load_commentary(session, state) if state else (),
         next_fixture,
+        next_lineup_lock_at,
+        next_is_home,
+        next_locked,
     )
 
 

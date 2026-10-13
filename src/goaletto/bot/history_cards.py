@@ -16,11 +16,14 @@ from goaletto.application.history import (
     SeasonArchive,
     SeasonSummary,
 )
+from goaletto.application.match_commentary import INSTRUCTIONS, MENTALITIES, TACTICS
 from goaletto.bot.club_cards import CLUB_CALLBACK, MENU_CALLBACK
 from goaletto.bot.history_callbacks import (
+    REPORT_SECTIONS,
     archive_callback,
     match_callback,
     player_history_callback,
+    report_callback,
     results_callback,
     seasons_callback,
 )
@@ -103,6 +106,13 @@ def _event_line(
         return f"🔄 {minute}′ {who} → <b>{escape(other)}</b>"
     if kind == "automatic_substitution" and other:
         return f"🔄 {minute}′ {who} → <b>{escape(other)}</b> (травма, авто)"
+    if kind in {"save", "wide", "post"}:
+        outcome = {"save": "вратарь спасает", "wide": "мимо ворот", "post": "штанга"}[kind]
+        return f"🎯 {minute}′ {who} ({escape(club or '?')}): {outcome}"
+    if kind == "corner":
+        return f"🚩 {minute}′ Угловой: {escape(club or '?')}"
+    if kind == "second_half_started":
+        return f"⚽ {minute}′ Начался второй тайм"
     if kind == "yellow":
         return f"🟨 {minute}′ {who}"
     if kind == "red":
@@ -111,24 +121,24 @@ def _event_line(
     if kind == "injury":
         return f"🤕 {minute}′ {who}"
     if kind in ("tactic", "mentality") and detail:
-        return f"📋 {minute}′ {escape(club or '?')}: {escape(detail)}"
+        label = "Тактика" if kind == "tactic" else "Настрой"
+        choices = TACTICS if kind == "tactic" else MENTALITIES
+        return f"📋 {minute}′ {escape(club or '?')}: {label}: {choices.get(detail, 'изменена')}"
     if kind == "instruction" and detail:
-        labels = {
-            "long_shots": "Бить издалека",
-            "move_left": "Смещаться влево",
-            "move_right": "Смещаться вправо",
-            "drop_back": "Оттягиваться назад",
-            "runs_behind": "Рывки за спину",
-        }
-        return f"🎯 {minute}′ {who}: {escape(labels.get(detail, detail))}"
+        label = INSTRUCTIONS.get(detail, "изменена")
+        return f"🎯 {minute}′ {who}: Инструкция: {escape(label)}"
     if kind == "half_time":
-        return "— ☕ Перерыв —"
+        return f"☕ {minute}′ Перерыв"
     if kind == "full_time":
-        return "— ⏱ Финальный свисток —"
+        return f"🏁 {minute}′ Финальный свисток"
     return None
 
 
-def report_view(report: MatchReport, return_page: int = 1) -> tuple[str, InlineKeyboardMarkup]:
+def report_view(
+    report: MatchReport, return_page: int = 1, *, section: str = "events", page: int = 1
+) -> tuple[str, InlineKeyboardMarkup]:
+    if section not in REPORT_SECTIONS or type(page) is not int or page < 1:
+        raise ValueError("Invalid report view")
     date = report.scheduled_start_at.strftime("%d.%m.%Y")
     lines = [
         f"⚽ <b>{escape(report.home_name)} {report.home_goals}:{report.away_goals} "
@@ -141,37 +151,93 @@ def report_view(report: MatchReport, return_page: int = 1) -> tuple[str, InlineK
         f"Угловые: {report.home_stats.corners} / {report.away_stats.corners}",
         "",
     ]
-    for event in report.events:
-        line = _event_line(
-            event.kind,
-            event.minute,
-            event.player_name,
-            event.other_name,
-            event.detail,
-            report.home_name,
-            report.away_name,
-            event.side,
-        )
-        if line is not None:
-            lines.append(line)
-    lines.append("")
-    for side_name, lineup in (("Хозяева", report.home_lineup), ("Гости", report.away_lineup)):
-        lines.append(f"<b>{side_name}</b> (старт; возраст и форма — на момент матча):")
-        for member in lineup:
-            if not member.started:
-                continue
-            extra = f" ⚽{member.goals}" if member.goals else ""
-            extra += " 🟨" * min(member.yellows, 2) + (" 🟥" if member.sent_off else "")
-            lines.append(
-                f"• <b>{escape(member.name)}</b> {escape(member.position)} · "
-                f"{member.age} · {member.minutes}′{extra}"
+    entries: list[str] = []
+    if section == "events":
+        for event in sorted(report.events, key=lambda e: e.minute):
+            line = _event_line(
+                event.kind,
+                event.minute,
+                event.player_name,
+                event.other_name,
+                event.detail,
+                report.home_name,
+                report.away_name,
+                event.side,
             )
-        bench = ", ".join(escape(m.name) for m in lineup if not m.started)
-        if bench:
-            lines.append(f"Запас: {bench}")
-        lines.append("")
-    keyboard = _nav([], back=results_callback(return_page))
-    return "\n".join(lines).rstrip(), keyboard
+            if line is not None:
+                entries.append(line)
+        title = "События"
+        per_page = 10
+    else:
+        lineup = report.home_lineup if section == "home" else report.away_lineup
+        title = "Игроки: " + (report.home_name if section == "home" else report.away_name)
+        per_page = 5
+        for member in lineup:
+            role = (
+                "Старт"
+                if member.started
+                else "Вышел на замену"
+                if member.appeared or member.minutes
+                else "Не выходил"
+            )
+            extra = f" · ⚽ {member.goals}" if member.goals else ""
+            extra += " · 🟨" * min(member.yellows, 2) + (" · 🟥" if member.sent_off else "")
+            extra += " · 🤕" if member.injured else ""
+            energy = (
+                f"{member.energy_bps // 100}%" if member.energy_bps is not None else "нет данных"
+            )
+            entries.append(
+                f"<b>{escape(member.name)}</b> · {escape(member.position)}{extra}\n"
+                f"{role} · возраст {member.age} · сыграл {member.minutes} мин\n"
+                f"Форма до матча: {member.form}/8 · Энергия после: {energy}"
+            )
+    # Bound whole entries by Telegram's UTF-16 text budget even for long names.
+    chunks: list[list[str]] = [[]]
+    used = len("\n".join(lines).encode("utf-16-le")) // 2 + len(escape(title)) + 80
+    base_used = used
+    for entry in entries:
+        size = len(entry.encode("utf-16-le")) // 2 + 2
+        if chunks[-1] and (len(chunks[-1]) >= per_page or used + size > 3900):
+            chunks.append([])
+            used = base_used
+        chunks[-1].append(entry)
+        used += size
+    total_pages = len(chunks)
+    if page > total_pages:
+        raise ValueError("Report page unavailable")
+    lines.append(f"<b>{escape(title)}</b> · {page}/{total_pages}")
+    lines.extend(chunks[page - 1] or ["Событий пока нет."])
+    buttons: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(
+                text=label, callback_data=report_callback(report.fixture_id, tab, 1, return_page)
+            )
+            for tab, label in (
+                ("events", "⚽ События"),
+                ("home", "🏠 Хозяева"),
+                ("away", "✈️ Гости"),
+            )
+            if tab != section
+        ]
+    ]
+    nav: list[InlineKeyboardButton] = []
+    if page > 1:
+        nav.append(
+            InlineKeyboardButton(
+                text="← Предыдущая",
+                callback_data=report_callback(report.fixture_id, section, page - 1, return_page),
+            )
+        )
+    if page < total_pages:
+        nav.append(
+            InlineKeyboardButton(
+                text="Следующая →",
+                callback_data=report_callback(report.fixture_id, section, page + 1, return_page),
+            )
+        )
+    if nav:
+        buttons.append(nav)
+    return "\n".join(lines).rstrip(), _nav(buttons, back=results_callback(return_page))
 
 
 def player_history_view(page: PlayerHistoryPage) -> tuple[str, InlineKeyboardMarkup]:

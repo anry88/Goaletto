@@ -8,7 +8,12 @@ from aiogram.types import CallbackQuery, Message, Update
 
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied, actor_for
-from goaletto.application.live_commands import accept_live_command, button_payload, load_live_screen
+from goaletto.application.live_commands import (
+    NoFixture,
+    accept_live_command,
+    button_payload,
+    load_live_screen,
+)
 from goaletto.bot import live_views
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
@@ -26,6 +31,8 @@ async def match_command(message: Message, database: Database, event_update: Upda
                 session, message.from_user.id, event_update.update_id, datetime.now(UTC)
             )
             text, keyboard = live_views.render(await load_live_screen(session, actor))
+    except NoFixture:
+        text, keyboard = live_views.no_fixture_view()
     except (PermissionDenied, ValueError):
         await message.answer("Матч недоступен. Откройте /start.")
         return
@@ -92,6 +99,8 @@ async def live_callback(query: CallbackQuery, database: Database, event_update: 
                     raise ValueError("Unknown panel")
                 screen = await load_live_screen(session, actor)
                 text, keyboard = live_views.render(screen, panel=panel, selected=selected)
+    except NoFixture:
+        text, keyboard = live_views.no_fixture_view()
     except (PermissionDenied, ValueError):
         await edit_response(
             query.message,

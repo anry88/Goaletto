@@ -91,3 +91,31 @@ def parse_history_callback(value: str) -> tuple[str, UUID | None, int]:
 
 def is_history_callback(value: str | None) -> bool:
     return type(value) is str and value.startswith("hx:")
+
+
+REPORT_SECTIONS = frozenset({"events", "home", "away"})
+
+
+def report_callback(fixture_id: UUID, section: str, page: int = 1, return_page: int = 1) -> str:
+    if not isinstance(fixture_id, UUID) or section not in REPORT_SECTIONS:
+        raise ValueError("Invalid report section")
+    if any(type(p) is not int or not 1 <= p <= MAX_PAGE for p in (page, return_page)):
+        raise ValueError("Invalid report page")
+    return f"hr:{compact_id(fixture_id)}:{section}:{page}:{return_page}"
+
+
+def parse_report_callback(value: str) -> tuple[UUID, str, int, int]:
+    parts = value.split(":")
+    if len(parts) != 5 or parts[0] != "hr" or len(value.encode()) > 64:
+        raise ValueError("Invalid report callback")
+    if not all(p.isascii() and p.isdigit() for p in parts[3:]):
+        raise ValueError("Invalid report page")
+    fixture_id, section, page, return_page = (
+        expand_id(parts[1]),
+        parts[2],
+        int(parts[3]),
+        int(parts[4]),
+    )
+    if report_callback(fixture_id, section, page, return_page) != value:
+        raise ValueError("Noncanonical report callback")
+    return fixture_id, section, page, return_page
