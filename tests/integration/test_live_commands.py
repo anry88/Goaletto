@@ -297,7 +297,8 @@ async def test_real_dispatcher_live_controls_ack_before_commit_and_show_applied(
         update={"id": "live-refresh-102", "data": "lv:open", "message": telegram.last_message}
     )
     await dispatcher.feed_update(bot, Update(update_id=102, callback_query=query))
-    assert "Применено" in telegram.last_message.text
+    assert "Настрой: Применено" not in telegram.last_message.text
+    assert "Сейчас:" in telegram.last_message.text
     # A button from the previous window cannot queue another command.
     query = query.model_copy(
         update={"id": "live-stale-103", "data": data, "message": telegram.last_message}

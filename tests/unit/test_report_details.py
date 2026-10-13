@@ -97,7 +97,7 @@ def test_final_screen_has_timeline_without_anonymous_command_duplicates() -> Non
         (CommandReceipt(uuid4(), "substitution", "applied", 1),),
         ("87′ Замена: Игрок → Сменщик",),
     )
-    assert "Замена: Применено" in render(screen)[0]
+    assert "Замена: Применено" not in render(screen)[0]
     final_text, _ = render(replace(screen, state=final, projected=final, open=False))
     assert "87′ Замена: Игрок → Сменщик" in final_text
     assert "Замена: Применено" not in final_text

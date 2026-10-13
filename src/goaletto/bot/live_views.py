@@ -208,11 +208,6 @@ def render(
                 if state.engine_version == "regulation-v2":
                     rows.append([_button(tr("🎯 Инструкция"), callback(screen, "p", 4))])
             rows.append([_button(tr("← Матч"), callback(screen, "r"))])
-        labels = {
-            "accepted": tr("Принято"),
-            "applied": tr("Применено"),
-            "cancelled": tr("Отменено"),
-        }
         kinds = {
             "substitution": tr("Замена"),
             "tactics": tr("Тактика"),
@@ -220,7 +215,8 @@ def render(
             "instruction": tr("Инструкция"),
         }
         for receipt in screen.recent if state.phase.value not in {"full_time", "abandoned"} else ():
-            lines.append(f"{kinds.get(receipt.kind, tr('Команда'))}: {labels[receipt.status]}")
+            if receipt.status == "accepted":
+                lines.append(f"{kinds.get(receipt.kind, tr('Команда'))}: {tr('Принято')}")
     if notice:
         lines.append(escape(notice))
     if screen.next_fixture:
