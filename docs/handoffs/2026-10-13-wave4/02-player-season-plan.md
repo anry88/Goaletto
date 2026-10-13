@@ -56,7 +56,7 @@ rollover. Сейчас domain.retirement.player_last_season уже реализ�
 
 Прочитай docs/player-lifecycle.md, docs/staff-lifecycle.md, docs/bot-clubs.md,
 domain/retirement.py, application/persons.py, application/world.py и модели
-Person/Player/PersonSeasonDecision. Существующие models только читать.
+Person/Player/PersonSeasonEvent. Существующие models только читать.
 
 Сделай новый domain/player_season_plan.py с immutable typed input/output:
 - Вход содержит person_id, текущий завершённый сезон, следующий сезон, возраст,
