@@ -13,7 +13,6 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
 
 from goaletto.infrastructure.analytics_reports_queries import delivery, entry_funnel, retention
 from goaletto.infrastructure.models import (
@@ -88,7 +87,9 @@ async def _event(
     operation=None,
 ):  # type: ignore[no-untyped-def]
     operation = operation or uuid4()
-    envelope: dict[str, object] = {"session_id": str(session_row.id)}
+    envelope: dict[str, object] = {}
+    if origin == "user":
+        envelope["session_id"] = str(session_row.id)
     if ownership is not None:
         envelope["ownership_id"] = str(ownership)
     session.add(
@@ -100,7 +101,7 @@ async def _event(
             name=name,
             origin=origin,
             analytics_manager_id=mapping.id,
-            session_id=session_row.id,
+            session_id=session_row.id if origin == "user" else None,
             occurred_at=occurred,
             recorded_at=recorded,
             user_activity=user_activity,
@@ -193,9 +194,6 @@ async def test_retention_pg_counts_only_user_activity(sessions) -> None:  # type
             "system",
             START + timedelta(days=1, hours=1),
             START + timedelta(days=1, hours=1),
-        )
-        await session.execute(
-            text("UPDATE journey_events SET session_id = NULL WHERE name = 'result_delivered'")
         )
         active_at = START + timedelta(days=1, hours=2)
         row2 = await _session(session, mapping, active_at)

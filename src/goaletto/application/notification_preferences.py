@@ -9,8 +9,9 @@ events: operational dedupe lives in game_action_receipts and works with or
 without analytics coverage/opt-out.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -120,6 +121,7 @@ async def set_reminders_enabled(
     enabled: bool,
     ownership_id: UUID,
     policy: LeasePolicy = DEFAULT_LEASE_POLICY,
+    clock: Callable[[], datetime] | None = None,
 ) -> PreferenceOutcome:
     """Set the desired reminder value explicitly. Retries never toggle it back.
 
@@ -165,6 +167,9 @@ async def set_reminders_enabled(
     club = await session.scalar(select(Club).where(Club.id == ownership.club_id).with_for_update())
     if club is None or club.owner_telegram_id != actor.telegram_id:
         raise PermissionDenied("Current club ownership does not match the actor")
+    checked_at = max(actor.at, clock() if clock is not None else datetime.now(UTC))
+    if ownership.expires_at <= checked_at:
+        raise PermissionDenied("Ownership expired while waiting for settings locks")
     effect = _effect_number(enabled)
     previous = await session.get(GameActionReceipt, (actor.operation_id, effect))
     if previous is not None:
@@ -182,6 +187,8 @@ async def set_reminders_enabled(
             ownership_id=ownership.id,
             club_id=club.id,
         )
+    if await session.get(GameActionReceipt, (actor.operation_id, 1 - effect)) is not None:
+        raise PermissionDenied("Settings operation was reused with a different value")
     session.add(
         GameActionReceipt(
             operation_id=actor.operation_id,

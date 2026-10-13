@@ -22,8 +22,12 @@ from goaletto.application.onboarding import ClubUnavailable, begin_game, claim_c
 from goaletto.application.outbox_delivery import Outcome, SendResult, claim_outbox, finish_delivery
 from goaletto.application.world import initialize_world
 from goaletto.bot.portrait_cache import portrait_cache_key
+from goaletto.config import Settings
+from goaletto.diagnostics.checks import collect_report
+from goaletto.diagnostics.queries import collect_snapshot
 from goaletto.domain.lineup import StarterPick
 from goaletto.domain.world import WorldOptions
+from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import (
     AcceptedCommand,
     Fixture,
@@ -231,6 +235,15 @@ async def test_full_match_report_history_and_immutable_snapshot(sessions):
         assert await session.scalar(select(func.count()).select_from(MatchResult)) == 1
         own = await session.scalar(select(Standing).where(Standing.club_id == club_id))
         assert own.played == 1
+    database = Database(Settings())
+    try:
+        async with database.read_connection() as connection:
+            snapshot = await collect_snapshot(connection, now=actor.at)
+        assert snapshot.matches[0].tick_numbers == tuple(range(1, 31))
+        report = collect_report(snapshot, late_threshold_seconds=180, appearance_low_threshold=0)
+        assert "TICK_GAP_OR_COUNT_MISMATCH" not in {f.code for f in report.findings}
+    finally:
+        await database.close()
     # Replaying the final tick cannot award the match twice.
     await job(sessions, "match.tick", fixture_id, 30)
     async with sessions.begin() as session:

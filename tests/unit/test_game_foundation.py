@@ -25,7 +25,14 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     command.upgrade(config, "head", sql=True)
     sql = normalized(output.getvalue())
     old = {"league_sets", "leagues", "clubs", "jobs", "outbox_messages"}
-    altered = {"fixtures", "matches", "match_ticks", "accepted_commands", "managers"}
+    altered = {
+        "fixtures",
+        "matches",
+        "match_ticks",
+        "accepted_commands",
+        "managers",
+        "game_action_receipts",
+    }
     dialect = postgresql.dialect()
     for table in Base.metadata.sorted_tables:
         if table.name not in old | altered:
@@ -47,6 +54,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 "ck_tick_game_minute",
                 "ck_command_kind",
                 "ck_club_crowd",
+                "ck_action_kind",
             }:
                 assert (
                     normalized(

@@ -217,7 +217,9 @@ def player_history_view(page: PlayerHistoryPage) -> tuple[str, InlineKeyboardMar
     return "\n".join(lines), _nav(buttons, back=None)
 
 
-def seasons_view(summaries: tuple[SeasonSummary, ...]) -> tuple[str, InlineKeyboardMarkup]:
+def seasons_view(
+    summaries: tuple[SeasonSummary, ...], *, page: int = 1, total_pages: int = 1
+) -> tuple[str, InlineKeyboardMarkup]:
     lines = ["🗂 <b>Сезонный архив</b>", ""]
     buttons: list[list[InlineKeyboardButton]] = []
     for summary in summaries:
@@ -232,6 +234,18 @@ def seasons_view(summaries: tuple[SeasonSummary, ...]) -> tuple[str, InlineKeybo
         )
     if not summaries:
         lines.append("Архивных сезонов пока нет.")
+    if total_pages > 1:
+        lines.append(f"Страница {page}/{total_pages}")
+        nav = []
+        if page > 1:
+            nav.append(
+                InlineKeyboardButton(text="← Назад", callback_data=seasons_callback(page - 1))
+            )
+        if page < total_pages:
+            nav.append(
+                InlineKeyboardButton(text="Далее →", callback_data=seasons_callback(page + 1))
+            )
+        buttons.append(nav)
     buttons.append([InlineKeyboardButton(text="🏟 Клуб", callback_data=CLUB_CALLBACK)])
     return "\n".join(lines), _nav(buttons, back=None)
 

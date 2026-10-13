@@ -11,7 +11,7 @@ from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied
 from goaletto.application.history import (
     get_club_results,
-    get_club_seasons,
+    get_club_seasons_page,
     get_match_report,
     get_player_matches,
     get_season_archive,
@@ -70,7 +70,8 @@ async def _render(
         assert identity is not None
         return player_history_view(await get_player_matches(session, actor, identity, page))
     if kind == "seasons":
-        return seasons_view(await get_club_seasons(session, actor))
+        data = await get_club_seasons_page(session, actor, page)
+        return seasons_view(data.entries, page=data.page, total_pages=data.total_pages)
     if kind == "archive":
         assert identity is not None
         return archive_view(await get_season_archive(session, actor, identity))

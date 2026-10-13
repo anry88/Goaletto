@@ -28,7 +28,7 @@ def _utc(value: str) -> datetime:
 async def _apply(args: argparse.Namespace) -> dict[str, Any]:
     database = Database(Settings())
     try:
-        async with database.transaction() as session:
+        async with database.read_transaction() as session:
             if args.command == "entry-funnel":
                 report = await entry_funnel(session, args.cohort_from, args.at)
                 result: dict[str, Any] = report.as_dict()

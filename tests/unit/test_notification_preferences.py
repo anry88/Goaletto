@@ -136,6 +136,31 @@ async def test_explicit_disable_retry_never_toggles_back() -> None:
     assert receipt.kind == SETTINGS_KIND and receipt.ownership_id == fake.ownership.id
 
 
+async def test_same_operation_cannot_set_opposite_preference() -> None:
+    fake = session()
+    await set_reminders_enabled(
+        cast(AsyncSession, fake), fake.actor, enabled=False, ownership_id=fake.ownership.id
+    )
+    with pytest.raises(PermissionDenied, match="different value"):
+        await set_reminders_enabled(
+            cast(AsyncSession, fake), fake.actor, enabled=True, ownership_id=fake.ownership.id
+        )
+    assert fake.manager.reminders_enabled is False
+
+
+async def test_ownership_expiring_while_waiting_for_locks_cannot_change_preferences() -> None:
+    fake = session()
+    with pytest.raises(PermissionDenied, match="waiting"):
+        await set_reminders_enabled(
+            cast(AsyncSession, fake),
+            fake.actor,
+            enabled=False,
+            ownership_id=fake.ownership.id,
+            clock=lambda: fake.ownership.expires_at,
+        )
+    assert fake.manager.reminders_enabled is True and fake.receipts == {}
+
+
 async def test_stale_ownership_button_never_changes_new_state() -> None:
     fake = session()
     old = OwnershipPeriod(

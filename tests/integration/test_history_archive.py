@@ -401,3 +401,48 @@ async def test_synthetic_archive_explain_uses_bounded_plan(sessions):
             )
         ).all()
         assert count_plan and page_plan and player_plan
+
+
+async def test_season_pages_are_bounded_and_callbacks_reach_later_seasons(sessions):
+    from goaletto.application.game_actions import Actor
+    from goaletto.application.history import get_club_seasons_page
+    from goaletto.bot.history_cards import seasons_view
+    from goaletto.infrastructure.models import Season, SeasonClub
+
+    manager_id, club_id = await _build_archive(sessions)
+    async with sessions.begin() as session:
+        membership = await session.scalar(select(SeasonClub).where(SeasonClub.club_id == club_id))
+        for number in range(3, 13):
+            season = Season(
+                id=uuid4(),
+                league_set_id=membership.league_set_id,
+                number=number,
+                seed=7,
+                status="finished",
+                starts_at=NOW - timedelta(weeks=52 * (13 - number)),
+                ends_at=NOW - timedelta(weeks=52 * (13 - number) - 18),
+            )
+            session.add(season)
+            await session.flush()
+            session.add(
+                SeasonClub(
+                    season_id=season.id,
+                    club_id=club_id,
+                    league_id=membership.league_id,
+                    league_set_id=membership.league_set_id,
+                    tie_break_order=1,
+                )
+            )
+    async with sessions.begin() as session:
+        actor = Actor(manager_id, 123, None, uuid4(), NOW)
+        page = await get_club_seasons_page(session, actor, 1)
+        assert (page.total, page.total_pages) == (12, 3)
+        assert [s.number for s in page.entries] == [12, 11, 10, 9, 8]
+        _, keyboard = seasons_view(page.entries, page=page.page, total_pages=page.total_pages)
+        assert any(b.callback_data == "hx:s:2" for row in keyboard.inline_keyboard for b in row)
+    async with sessions.begin() as session:
+        actor = Actor(manager_id, 123, None, uuid4(), NOW)
+        page = await get_club_seasons_page(session, actor, 3)
+        assert [s.number for s in page.entries] == [2, 1]
+        with pytest.raises(ValueError, match="page"):
+            await get_club_seasons_page(session, actor, 4)

@@ -140,6 +140,16 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
         )
         assert ownership is not None
 
+    response = await command("/settings")
+    assert "Напоминания" in response.text
+    response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
+    assert "выключены" in response.text
+    response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
+    assert "включены" in response.text
+    async with sessions.begin() as session:
+        current = await session.get(OwnershipPeriod, ownership.id)
+        assert current.last_game_action_at == ownership.last_game_action_at
+        assert current.expires_at == ownership.expires_at
     for cmd in ("/squad", "/history", "/table", "/club", "/lineup"):
         response = await command(cmd)
         assert "недоступ" not in response.text.lower()
@@ -163,7 +173,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     async with sessions.begin() as session:
         rows = (await session.scalars(select(AcceptedCommand))).all()
         assert len(rows) == 2
-        assert {r.telegram_update_id for r in rows} == {10, 12}
+        assert {r.telegram_update_id for r in rows} == {13, 15}
         lineup = await session.get(ClubLineup, ownership.club_id)
         assert lineup.version == 3
     await bot.session.close()

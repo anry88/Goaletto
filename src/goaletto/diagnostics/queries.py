@@ -264,16 +264,13 @@ async def _collect_matches(
     if fixture_ids is not None:
         statement = statement.where(Match.fixture_id.in_(sorted(fixture_ids)))
     raw, truncated = await _fetch_limited(connection, statement, limit)
-    wanted = {row[1] for row in raw if isinstance(row[1], UUID)}
-    if fixture_ids is not None:
-        wanted &= fixture_ids
+    wanted = {row[0] for row in raw if isinstance(row[0], UUID)}
     tick_statement = (
         select(MatchTick.match_id, MatchTick.tick_number)
         .order_by(MatchTick.match_id.asc(), MatchTick.tick_number.asc())
         .limit(tick_limit + 1)
     )
-    if wanted:
-        tick_statement = tick_statement.where(MatchTick.match_id.in_(sorted(wanted)))
+    tick_statement = tick_statement.where(MatchTick.match_id.in_(sorted(wanted)))
     tick_raw, ticks_truncated = await _fetch_limited(connection, tick_statement, tick_limit)
     ticks_by_match: dict[UUID, list[int]] = {}
     for match_id, tick_number in tick_raw:
@@ -317,12 +314,12 @@ async def _collect_results(
 
 
 async def _collect_seasons(
-    connection: AsyncConnection, season_id: UUID | None
+    connection: AsyncConnection, season_id: UUID | None, limit: int
 ) -> tuple[list[SeasonRow], bool]:
-    statement = select(Season.id, Season.status).order_by(Season.id.asc()).limit(101)
+    statement = select(Season.id, Season.status).order_by(Season.id.asc()).limit(limit + 1)
     if season_id is not None:
         statement = statement.where(Season.id == season_id)
-    raw, truncated = await _fetch_limited(connection, statement, 100)
+    raw, truncated = await _fetch_limited(connection, statement, limit)
     return (
         [SeasonRow(id=row[0], status=str(row[1])) for row in raw if isinstance(row[0], UUID)],
         truncated,
@@ -386,7 +383,7 @@ async def collect_snapshot(
     results, results_truncated = await _collect_results(
         connection, limit, fixture_ids if season_id is not None else None
     )
-    seasons, seasons_truncated = await _collect_seasons(connection, season_id)
+    seasons, seasons_truncated = await _collect_seasons(connection, season_id, limit)
     appearance = await _collect_appearance(connection)
     incomplete = tuple(
         sorted(

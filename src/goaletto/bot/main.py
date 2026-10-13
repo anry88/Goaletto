@@ -38,6 +38,7 @@ def build_dispatcher(database: Database | None, *, game_enabled: bool) -> Dispat
         lineup_handlers,
         navigation,
         player_router,
+        settings_router,
         squad_router,
     )
 
@@ -51,6 +52,7 @@ def build_dispatcher(database: Database | None, *, game_enabled: bool) -> Dispat
         lineup_handlers,
         squad_router,
         player_router,
+        settings_router,
         history_router,
         club_router,
     ):

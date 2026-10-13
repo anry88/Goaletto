@@ -129,6 +129,8 @@ async def test_player_history_empty_for_current_squad_member() -> None:
     # Live squad member with no finished fixtures gets empty history, not denial.
     page = await get_player_matches(session(recorder), recorder.actor, STARTER_ID, 1)
     assert page.total == 0 and page.entries == ()
+    with pytest.raises(ValueError, match="page"):
+        await get_player_matches(session(recorder), recorder.actor, STARTER_ID, 2)
 
 
 async def test_player_history_rejects_foreign_and_requires_page_bounds() -> None:

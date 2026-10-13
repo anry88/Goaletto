@@ -52,3 +52,5 @@
 
 - [Review первой волны агентов и PostgreSQL-проверки](agent-wave1-review.md)
 - [Задания следующей волны внешней разработки](agent-handoff-plan.md)
+
+- [Проверка второй волны агентов](agent-wave2-review.md)

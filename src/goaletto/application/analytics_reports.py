@@ -238,13 +238,16 @@ class DeliveryReport:
             "utc_window": f"[{self.window_from.isoformat()}, {self.report_at.isoformat()}]",
             "window_from": self.window_from.isoformat(),
             "report_at": self.report_at.isoformat(),
+            "state_semantics": "current_message_and_attempt_state_in_consistent_snapshot",
+            "historical_outcomes_available": False,
             "eligibility": (
                 "messages with due_at <= report_at are due; "
                 "pending without a terminal outcome stays waiting"
             ),
             "coverage": (
                 "operational outbox history is independent of journey "
-                "retention/opt-out; no journey clipping applies"
+                "retention/opt-out; no journey clipping applies; the window filters current "
+                "due_at/attempt start times, not a reconstruction of outcomes at report_at"
             ),
             "messages_total_N": self.messages_total_N,
             "messages_delivered_n": self.messages_delivered_n,

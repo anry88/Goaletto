@@ -85,7 +85,7 @@ async def _collect_report_text(
 ) -> str:
     database = Database(Settings())
     try:
-        async with database.engine.connect() as connection:
+        async with database.read_connection() as connection:
             snapshot = await collect_snapshot(
                 connection,
                 now=datetime.now(UTC),

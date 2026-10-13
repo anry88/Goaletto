@@ -295,6 +295,7 @@ class SeasonClub(Base):
         UniqueConstraint("season_id", "league_id", "tie_break_order", name="uq_membership_draw"),
         CheckConstraint("tie_break_order BETWEEN 1 AND 10", name="ck_membership_draw"),
         Index("ix_membership_league", "season_id", "league_id"),
+        Index("ix_membership_club", "club_id"),
     )
     season_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
@@ -564,6 +565,8 @@ class Fixture(Base):
         ),
         Index("ix_fixture_schedule", "status", "scheduled_start_at"),
         Index("ix_fixture_league_round", "season_id", "league_id", "round_number"),
+        Index("ix_fixture_home_history", "home_club_id", "status", "scheduled_start_at", "id"),
+        Index("ix_fixture_away_history", "away_club_id", "status", "scheduled_start_at", "id"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     season_id: Mapped[UUID] = mapped_column(Uuid)
@@ -590,6 +593,12 @@ class Match(Base):
             name="ck_match_phase",
         ),
         CheckConstraint("phase <> 'full_time' OR completed_tick = 30", name="ck_match_full_time"),
+        Index(
+            "ix_match_snapshot_gin",
+            "starting_snapshot",
+            postgresql_using="gin",
+            postgresql_ops={"starting_snapshot": "jsonb_path_ops"},
+        ),
         CheckConstraint(
             "paused_seconds >= 0 AND (phase = 'paused') = (paused_at IS NOT NULL)",
             name="ck_match_pause",
@@ -964,6 +973,12 @@ class GameActionReceipt(Base):
         ),
         CheckConstraint("effect_number BETWEEN 0 AND 32767", name="ck_action_effect"),
         CheckConstraint("ownership_id IS NULL OR club_id IS NOT NULL", name="ck_action_club"),
+        CheckConstraint(
+            "kind IN ('club_claimed','club_opened','club_preview_opened','lineup_opened',"
+            "'lineup_saved','match_command_accepted','match_opened','match_report_opened',"
+            "'next_fixture_opened','notification_preferences')",
+            name="ck_action_kind",
+        ),
     )
     operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     effect_number: Mapped[int] = mapped_column(SmallInteger, primary_key=True)

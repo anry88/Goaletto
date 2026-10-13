@@ -36,17 +36,19 @@ async def build_settings_response(
 async def settings_command(message: Message, database: Database, event_update: Update) -> None:
     if message.from_user is None or message.chat.type != "private":
         return
-    async with database.transaction() as session:
-        actor = await actor_for(
-            session, message.from_user.id, event_update.update_id, datetime.now(UTC)
-        )
-        text, keyboard = settings_view(await get_settings(session, actor))
+    try:
+        async with database.transaction() as session:
+            actor = await actor_for(
+                session, message.from_user.id, event_update.update_id, datetime.now(UTC)
+            )
+            text, keyboard = settings_view(await get_settings(session, actor))
+    except PermissionDenied:
+        await message.answer("Сначала откройте /start, затем /settings.")
+        return
     await message.answer(text, reply_markup=keyboard)
 
 
-@router.callback_query(F.data == "ntf:open")
-@router.callback_query(F.data.startswith("ntf:on:"))
-@router.callback_query(F.data.startswith("ntf:off:"))
+@router.callback_query(F.data.startswith("ntf:"))
 async def settings_callback(query: CallbackQuery, database: Database) -> None:
     await query.answer()
     message = query.message

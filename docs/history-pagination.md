@@ -146,3 +146,12 @@ JSONB фильтром без загрузки лишних снапшотов; 
 `GOALETTO_ALLOW_DEVELOPMENT_RESET=1 pytest -q -m integration -k history_pagination`
 на единственной Goaletto DB (development, без реальных игроков).
 Новых БД не создавалось.
+
+## Интеграция Codex · 2026-10-13
+
+Индексы приняты в общей migration0011_agent_wave2 с правильным parent
+0010_telegram_portrait_files; GIN использует jsonb_path_ops. Устранён приём
+страницы2 пустой истории игрока; повреждённый receipt/checkpoint не скрывается
+пустыми строками. Добавлены get_club_seasons_page и кнопки hx:s:<page>: COUNT
++ joined SELECT с LIMIT5, legacy all-seasons API сохранён для совместимости.
+Сценарий12 сезонов / 3 страниц проверен на рабочей Goaletto DB.

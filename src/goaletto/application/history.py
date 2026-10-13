@@ -173,6 +173,14 @@ class SeasonSummary:
 
 
 @dataclass(frozen=True)
+class SeasonHistoryPage:
+    entries: tuple[SeasonSummary, ...]
+    page: int
+    total_pages: int
+    total: int
+
+
+@dataclass(frozen=True)
 class SeasonArchive:
     season_id: UUID
     number: int
@@ -581,6 +589,8 @@ async def get_player_matches(
     if total == 0:
         if live is None:
             raise PermissionDenied("Player has no history with the current club")
+        if page != 1:
+            raise ValueError("Invalid history page")
         person_row = await session.get(Person, person_id)
         fallback_name = person_row.name if person_row is not None else "Игрок"
         await user_effect(
@@ -623,12 +633,9 @@ async def get_player_matches(
         match = matches_by_fixture.get(fixture.id)
         receipt = receipts_by_fixture.get(fixture.id)
         if match is None or receipt is None:
-            continue
-        try:
-            initial = restore_state(match.starting_snapshot)
-            terminal = restore_state(match.state)
-        except ValueError:
-            continue
+            raise ValueError("Finished fixture has no immutable match result")
+        initial = restore_state(match.starting_snapshot)
+        terminal = restore_state(match.state)
         side, snapshot_name = _player_side_for_club(initial, club.id, person_id)
         if side is None:
             continue
@@ -710,6 +717,40 @@ async def get_club_seasons(session: AsyncSession, actor: Actor) -> tuple[SeasonS
         session, actor, "club_opened", Surface.CLUB, ownership=ownership, club_id=club.id
     )
     return tuple(summaries)
+
+
+async def get_club_seasons_page(
+    session: AsyncSession, actor: Actor, page: int
+) -> SeasonHistoryPage:
+    """Bounded season list for Telegram; the legacy all-seasons API stays compatible."""
+    _validate_page(page)
+    ownership, club = await owned_club(session, actor)
+    total = int(
+        await session.scalar(
+            select(func.count()).select_from(SeasonClub).where(SeasonClub.club_id == club.id)
+        )
+        or 0
+    )
+    pages = _page_count(total)
+    if page > pages:
+        raise ValueError("Invalid history page")
+    rows = (
+        await session.execute(
+            select(Season.id, Season.number, League.tier)
+            .select_from(SeasonClub)
+            .join(Season, Season.id == SeasonClub.season_id)
+            .join(League, League.id == SeasonClub.league_id)
+            .where(SeasonClub.club_id == club.id)
+            .order_by(Season.number.desc(), Season.id)
+            .limit(HISTORY_PAGE_SIZE)
+            .offset((page - 1) * HISTORY_PAGE_SIZE)
+        )
+    ).all()
+    entries = tuple(SeasonSummary(row[0], row[1], row[2]) for row in rows)
+    await user_effect(
+        session, actor, "club_opened", Surface.CLUB, ownership=ownership, club_id=club.id
+    )
+    return SeasonHistoryPage(entries, page, pages, total)
 
 
 async def get_season_archive(session: AsyncSession, actor: Actor, season_id: UUID) -> SeasonArchive:

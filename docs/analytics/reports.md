@@ -180,3 +180,17 @@ python -m goaletto.application.analytics_reports_cli delivery \
 транзакциях (caller-owned, без коммита коллектора), затем прогнать
 `tests/integration/test_analytics_reports_pg.py` на единственной dev DB и
 проверить зрелые матчевые окна отдельно.
+
+## Приёмка и границы текущей сборки · 2026-10-13
+
+SQL проверен на единственной рабочей Goaletto DB. CLI читает server READ ONLY
+REPEATABLE READ snapshot; concurrent worker не меняет знаменатели между SQL.
+Системные события в PG fixtures не имеют пользовательского session_id и не
+исправляются UPDATE после записи: история append-only.
+
+Journey entry/retention honours recorded_at as-of. Delivery показывает **текущее
+состояние** строк/попыток в одном snapshot с фильтром текущего due_at/started_at
+по окну. Историческое восстановление outcome на --at недоступно: due_at/status
+могли измениться после него; поле historical_outcomes_available=false явно это
+указывает. Не интерпретировать этот отчёт как delivery outcome as-of прошлого
+времени. Исходный due_at и все переходы статуса пока не инструментированы.
