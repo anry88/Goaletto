@@ -6,13 +6,21 @@ and historical SeasonClub memberships with stored Standing counters. Points
 are never recomputed or awarded here; league ordering reuses the pure
 ``rank_league`` over stored counters, exactly like the result finalizer.
 No MVP or other derived ratings: new indicators need an approved formula.
+
+Pagination is bounded: club results use COUNT plus LIMIT/OFFSET with stable
+ordering (scheduled_start_at DESC, fixture id), matches/receipts/ticks load
+in batches only for the requested page. Player history filters participation
+by the stored starting snapshot of the currently owned club (opponent
+snapshots never count); minutes come from stored terminal conditions (bench
+presence alone means 0 minutes). Season lists load with IN queries, no N+1.
 """
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import Surface
@@ -24,6 +32,7 @@ from goaletto.application.game_actions import (
 )
 from goaletto.application.results import standing_snapshot
 from goaletto.domain.match_codec import restore_state
+from goaletto.domain.match_types import MatchState
 from goaletto.domain.standings import LeagueStanding, rank_league
 from goaletto.infrastructure.models import (
     Club,
@@ -184,6 +193,11 @@ def _page_count(total: int) -> int:
     return max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
 
 
+def _validate_page(page: int) -> None:
+    if type(page) is not int or page < 1 or page > 10000:
+        raise ValueError("Invalid history page")
+
+
 def _decode_event(raw: object, names: dict[UUID, str]) -> ReportEvent | None:
     if not isinstance(raw, dict):
         return None
@@ -218,51 +232,135 @@ def _decode_event(raw: object, names: dict[UUID, str]) -> ReportEvent | None:
     )
 
 
+def _fixture_filters(club_id: UUID, season_id: UUID | None = None) -> list[Any]:
+    filters: list[Any] = [
+        or_(Fixture.home_club_id == club_id, Fixture.away_club_id == club_id),
+        Fixture.status == "finished",
+    ]
+    if season_id is not None:
+        filters.append(Fixture.season_id == season_id)
+    return filters
+
+
+def _player_snapshot_predicate(club_id: UUID, person_id: UUID) -> Any:
+    """SQL-side participation filter for the owned club snapshot side.
+
+    Uses JSONB containment so COUNT and page queries only touch the requested
+    page snapshots. Python re-checks decoded snapshots afterwards, so test
+    doubles or drift cannot leak opponent appearances.
+    """
+    home_doc = {
+        "home": {
+            "snapshot": {
+                "club_id": str(club_id),
+                "players": [{"id": str(person_id)}],
+            }
+        }
+    }
+    away_doc = {
+        "away": {
+            "snapshot": {
+                "club_id": str(club_id),
+                "players": [{"id": str(person_id)}],
+            }
+        }
+    }
+    return or_(
+        Match.starting_snapshot.contains(home_doc),
+        Match.starting_snapshot.contains(away_doc),
+    )
+
+
+def _merge_event_docs(
+    tick_rows: list[MatchTick],
+    stage_rows: list[MatchStage],
+) -> list[dict[str, object]]:
+    """Merge tick plus stage docs preserving stored order, halftime included."""
+    chunks: list[tuple[int, int, list[dict[str, object]]]] = [
+        (row.tick_number, 0, list(row.events or ())) for row in tick_rows
+    ]
+    for row in stage_rows:
+        for raw in row.events or ():
+            if isinstance(raw, dict) and type(raw.get("tick")) is int:
+                tick_value = raw["tick"]
+                assert isinstance(tick_value, int)
+                chunks.append((tick_value, 1, [raw]))
+    seen: set[str] = set()
+    result: list[dict[str, object]] = []
+    for _, _, docs in sorted(chunks, key=lambda item: (item[0], item[1])):
+        for raw in docs or ():
+            if not isinstance(raw, dict):
+                continue
+            identity = raw.get("id")
+            if isinstance(identity, str):
+                if identity in seen:
+                    continue
+                seen.add(identity)
+            result.append(raw)
+    return result
+
+
+def _merge_grouped_events(
+    ticks_by_match: dict[UUID, list[MatchTick]],
+    stages_by_match: dict[UUID, list[MatchStage]],
+    match_ids: list[UUID],
+) -> dict[UUID, list[dict[str, object]]]:
+    out: dict[UUID, list[dict[str, object]]] = {}
+    for match_id in match_ids:
+        out[match_id] = _merge_event_docs(
+            ticks_by_match.get(match_id, []),
+            stages_by_match.get(match_id, []),
+        )
+    return out
+
+
 async def get_club_results(
     session: AsyncSession, actor: Actor, page: int, *, season_id: UUID | None = None
 ) -> ClubResultsPage:
-    if type(page) is not int or page < 1 or page > 10000:
-        raise ValueError("Invalid history page")
+    _validate_page(page)
     if season_id is not None and not isinstance(season_id, UUID):
         raise ValueError("Invalid season identity")
     if not session.in_transaction():
         raise ValueError("History views need a transaction")
     ownership, club = await owned_club(session, actor)
-    filters = [
-        or_(Fixture.home_club_id == club.id, Fixture.away_club_id == club.id),
-        Fixture.status == "finished",
-    ]
-    if season_id is not None:
-        filters.append(Fixture.season_id == season_id)
-    fixtures = (
-        await session.scalars(
-            select(Fixture).where(*filters).order_by(Fixture.scheduled_start_at.desc(), Fixture.id)
-        )
-    ).all()
-    total = len(fixtures)
+    filters = _fixture_filters(club.id, season_id)
+    total_value = await session.scalar(select(func.count()).select_from(Fixture).where(*filters))
+    total = int(total_value or 0)
     total_pages = _page_count(total)
     if page > total_pages:
         raise ValueError("Invalid history page")
-    chosen = fixtures[(page - 1) * HISTORY_PAGE_SIZE : page * HISTORY_PAGE_SIZE]
-    chosen_ids = [f.id for f in chosen]
-    matches = (
-        (await session.scalars(select(Match).where(Match.fixture_id.in_(chosen_ids)))).all()
-        if chosen_ids
-        else []
-    )
-    match_by_fixture = {m.fixture_id: m for m in matches}
-    receipts: dict[UUID, MatchResult] = {}
-    for fixture_id in chosen_ids:
-        match = match_by_fixture.get(fixture_id)
+    offset = (page - 1) * HISTORY_PAGE_SIZE
+    fixtures = (
+        await session.scalars(
+            select(Fixture)
+            .where(*filters)
+            .order_by(Fixture.scheduled_start_at.desc(), Fixture.id)
+            .limit(HISTORY_PAGE_SIZE)
+            .offset(offset)
+        )
+    ).all()
+    chosen_ids = [f.id for f in fixtures]
+    matches_by_fixture: dict[UUID, Match] = {}
+    if chosen_ids:
+        match_rows = (
+            await session.scalars(select(Match).where(Match.fixture_id.in_(chosen_ids)))
+        ).all()
+        matches_by_fixture = {m.fixture_id: m for m in match_rows}
+    receipts_by_fixture: dict[UUID, MatchResult] = {}
+    if chosen_ids:
+        receipt_rows = (
+            await session.scalars(select(MatchResult).where(MatchResult.fixture_id.in_(chosen_ids)))
+        ).all()
+        receipts_by_fixture = {r.fixture_id: r for r in receipt_rows}
+    entries: list[ClubResultEntry] = []
+    for fixture in fixtures:
+        match = matches_by_fixture.get(fixture.id)
         if match is None:
             raise ValueError("Fixture has no match checkpoint")
-        receipt = await session.get(MatchResult, match.id)
+        receipt = receipts_by_fixture.get(fixture.id)
         if receipt is None:
             raise ValueError("Finished fixture has no immutable result receipt")
-        receipts[fixture_id] = receipt
-    entries: list[ClubResultEntry] = []
-    for fixture in chosen:
-        receipt = receipts[fixture.id]
+        initial = restore_state(match.starting_snapshot)
         mine_home = fixture.home_club_id == club.id
         scored = receipt.home_goals if mine_home else receipt.away_goals
         conceded = receipt.away_goals if mine_home else receipt.home_goals
@@ -275,8 +373,8 @@ async def get_club_results(
                 fixture.scheduled_start_at,
                 fixture.home_club_id,
                 fixture.away_club_id,
-                restore_state(match_by_fixture[fixture.id].starting_snapshot).home.snapshot.name,
-                restore_state(match_by_fixture[fixture.id].starting_snapshot).away.snapshot.name,
+                initial.home.snapshot.name,
+                initial.away.snapshot.name,
                 receipt.home_goals,
                 receipt.away_goals,
                 outcome,
@@ -297,36 +395,38 @@ async def _club_names(session: AsyncSession, club_ids: set[UUID]) -> dict[UUID, 
 
 async def stored_events(session: AsyncSession, match_id: UUID) -> list[dict[str, object]]:
     """Include halftime/stage commands, preserving stored order and event IDs."""
-    ticks = (
+    grouped = await stored_events_batch(session, [match_id])
+    return grouped.get(match_id, [])
+
+
+async def stored_events_batch(
+    session: AsyncSession, match_ids: list[UUID]
+) -> dict[UUID, list[dict[str, object]]]:
+    """Batch variant: two queries for any number of matches on one page."""
+    if not match_ids:
+        return {}
+    unique_ids = list(dict.fromkeys(match_ids))
+    tick_rows = (
         await session.scalars(
-            select(MatchTick).where(MatchTick.match_id == match_id).order_by(MatchTick.tick_number)
+            select(MatchTick)
+            .where(MatchTick.match_id.in_(unique_ids))
+            .order_by(MatchTick.match_id, MatchTick.tick_number)
         )
     ).all()
-    stages = (
+    stage_rows = (
         await session.scalars(
             select(MatchStage)
-            .where(MatchStage.match_id == match_id)
-            .order_by(MatchStage.occurred_at, MatchStage.stage)
+            .where(MatchStage.match_id.in_(unique_ids))
+            .order_by(MatchStage.match_id, MatchStage.occurred_at, MatchStage.stage)
         )
     ).all()
-    chunks = [(row.tick_number, 0, row.events) for row in ticks]
-    for row in stages:
-        for raw in row.events or ():
-            if isinstance(raw, dict) and type(raw.get("tick")) is int:
-                chunks.append((raw["tick"], 1, [raw]))
-    seen = set()
-    result = []
-    for _, _, docs in sorted(chunks, key=lambda item: (item[0], item[1])):
-        for raw in docs or ():
-            if not isinstance(raw, dict):
-                continue
-            identity = raw.get("id")
-            if isinstance(identity, str):
-                if identity in seen:
-                    continue
-                seen.add(identity)
-            result.append(raw)
-    return result
+    ticks_by_match: dict[UUID, list[MatchTick]] = {mid: [] for mid in unique_ids}
+    for tick_row in tick_rows:
+        ticks_by_match.setdefault(tick_row.match_id, []).append(tick_row)
+    stages_by_match: dict[UUID, list[MatchStage]] = {mid: [] for mid in unique_ids}
+    for stage_row in stage_rows:
+        stages_by_match.setdefault(stage_row.match_id, []).append(stage_row)
+    return _merge_grouped_events(ticks_by_match, stages_by_match, unique_ids)
 
 
 async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID) -> MatchReport:
@@ -443,57 +543,100 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
     )
 
 
+def _player_side_for_club(
+    initial: MatchState, club_id: UUID, person_id: UUID
+) -> tuple[str | None, str]:
+    """Return (side, frozen name) for the owned club snapshot side only."""
+    for candidate in ("home", "away"):
+        team = initial.home if candidate == "home" else initial.away
+        if team.snapshot.club_id != club_id:
+            continue
+        for snapshot_player in team.snapshot.players:
+            if snapshot_player.id == person_id:
+                return candidate, snapshot_player.name
+    return None, ""
+
+
 async def get_player_matches(
     session: AsyncSession, actor: Actor, person_id: UUID, page: int
 ) -> PlayerHistoryPage:
     if not isinstance(person_id, UUID):
         raise ValueError("Invalid player identity")
-    if type(page) is not int or page < 1 or page > 10000:
-        raise ValueError("Invalid history page")
+    _validate_page(page)
     if not session.in_transaction():
         raise ValueError("History views need a transaction")
     ownership, club = await owned_club(session, actor)
-    fixtures = (
-        await session.scalars(
-            select(Fixture)
-            .where(
-                or_(Fixture.home_club_id == club.id, Fixture.away_club_id == club.id),
-                Fixture.status == "finished",
-            )
-            .order_by(Fixture.scheduled_start_at.desc(), Fixture.id)
-        )
-    ).all()
     live = await session.scalar(
         select(Player).where(Player.person_id == person_id, Player.club_id == club.id)
     )
+    fixture_filters = _fixture_filters(club.id)
+    player_predicate = _player_snapshot_predicate(club.id, person_id)
+    total_value = await session.scalar(
+        select(func.count())
+        .select_from(Fixture)
+        .join(Match, Match.fixture_id == Fixture.id)
+        .where(*fixture_filters, player_predicate)
+    )
+    total = int(total_value or 0)
+    if total == 0:
+        if live is None:
+            raise PermissionDenied("Player has no history with the current club")
+        person_row = await session.get(Person, person_id)
+        fallback_name = person_row.name if person_row is not None else "Игрок"
+        await user_effect(
+            session, actor, "lineup_opened", Surface.SQUAD, ownership=ownership, club_id=club.id
+        )
+        return PlayerHistoryPage(person_id, fallback_name, (), page, 1, 0)
+    total_pages = _page_count(total)
+    if page > total_pages:
+        raise ValueError("Invalid history page")
+    offset = (page - 1) * HISTORY_PAGE_SIZE
+    page_fixtures = (
+        await session.scalars(
+            select(Fixture)
+            .join(Match, Match.fixture_id == Fixture.id)
+            .where(*fixture_filters, player_predicate)
+            .order_by(Fixture.scheduled_start_at.desc(), Fixture.id)
+            .limit(HISTORY_PAGE_SIZE)
+            .offset(offset)
+        )
+    ).all()
+    fixture_ids = [f.id for f in page_fixtures]
+    matches_by_fixture: dict[UUID, Match] = {}
+    receipts_by_fixture: dict[UUID, MatchResult] = {}
+    if fixture_ids:
+        for match_row in (
+            await session.scalars(select(Match).where(Match.fixture_id.in_(fixture_ids)))
+        ).all():
+            matches_by_fixture[match_row.fixture_id] = match_row
+        for receipt_row in (
+            await session.scalars(
+                select(MatchResult).where(MatchResult.fixture_id.in_(fixture_ids))
+            )
+        ).all():
+            receipts_by_fixture[receipt_row.fixture_id] = receipt_row
+    match_ids = [matches_by_fixture[fid].id for fid in fixture_ids if fid in matches_by_fixture]
+    events_by_match = await stored_events_batch(session, match_ids)
     entries: list[PlayerMatchEntry] = []
     person_name = ""
-    for fixture in fixtures:
-        match = await session.scalar(select(Match).where(Match.fixture_id == fixture.id))
-        if match is None:
+    for fixture in page_fixtures:
+        match = matches_by_fixture.get(fixture.id)
+        receipt = receipts_by_fixture.get(fixture.id)
+        if match is None or receipt is None:
             continue
-        receipt = await session.get(MatchResult, match.id)
-        if receipt is None:
+        try:
+            initial = restore_state(match.starting_snapshot)
+            terminal = restore_state(match.state)
+        except ValueError:
             continue
-        initial = restore_state(match.starting_snapshot)
-        terminal = restore_state(match.state)
-        side: str | None = None
-        snapshot_name = ""
-        for candidate in ("home", "away"):
-            team = initial.home if candidate == "home" else initial.away
-            if team.snapshot.club_id != club.id:
-                continue
-            for snapshot_player in team.snapshot.players:
-                if snapshot_player.id == person_id:
-                    side = candidate
-                    snapshot_name = snapshot_player.name
+        side, snapshot_name = _player_side_for_club(initial, club.id, person_id)
         if side is None:
             continue
         if not person_name:
             person_name = snapshot_name
         final_team = terminal.home if side == "home" else terminal.away
         condition = next((c for c in final_team.conditions if c.player_id == person_id), None)
-        raw_events = await stored_events(session, match.id)
+        raw_events = events_by_match.get(match.id, [])
         goals = sum(
             1
             for raw in raw_events
@@ -517,26 +660,15 @@ async def get_player_matches(
                 condition.dismissed if condition else False,
             )
         )
-    if not entries and live is None:
+    if not entries and not person_name and live is None:
         raise PermissionDenied("Player has no history with the current club")
     if person_name == "":
         person_row = await session.get(Person, person_id)
         person_name = person_row.name if person_row is not None else "Игрок"
-    total = len(entries)
-    total_pages = _page_count(total)
-    if page > total_pages:
-        raise ValueError("Invalid history page")
     await user_effect(
         session, actor, "lineup_opened", Surface.SQUAD, ownership=ownership, club_id=club.id
     )
-    return PlayerHistoryPage(
-        person_id,
-        person_name,
-        tuple(entries[(page - 1) * HISTORY_PAGE_SIZE : page * HISTORY_PAGE_SIZE]),
-        page,
-        total_pages,
-        total,
-    )
+    return PlayerHistoryPage(person_id, person_name, tuple(entries), page, total_pages, total)
 
 
 def _raw_person(value: object) -> UUID | None:
@@ -555,10 +687,21 @@ async def get_club_seasons(session: AsyncSession, actor: Actor) -> tuple[SeasonS
     memberships = (
         await session.scalars(select(SeasonClub).where(SeasonClub.club_id == club.id))
     ).all()
+    if not memberships:
+        await user_effect(
+            session, actor, "club_opened", Surface.CLUB, ownership=ownership, club_id=club.id
+        )
+        return ()
+    season_ids = {m.season_id for m in memberships}
+    league_ids = {m.league_id for m in memberships}
+    season_rows = (await session.scalars(select(Season).where(Season.id.in_(season_ids)))).all()
+    league_rows = (await session.scalars(select(League).where(League.id.in_(league_ids)))).all()
+    seasons_by_id = {s.id: s for s in season_rows}
+    leagues_by_id = {row.id: row for row in league_rows}
     summaries: list[SeasonSummary] = []
     for membership in memberships:
-        season = await session.get(Season, membership.season_id)
-        league = await session.get(League, membership.league_id)
+        season = seasons_by_id.get(membership.season_id)
+        league = leagues_by_id.get(membership.league_id)
         if season is None or league is None:
             raise ValueError("Season membership is missing its season or league")
         summaries.append(SeasonSummary(season.id, season.number, league.tier))

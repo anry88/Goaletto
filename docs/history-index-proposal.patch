@@ -1,0 +1,101 @@
+--- a/src/goaletto/infrastructure/models.py
++++ b/src/goaletto/infrastructure/models.py
+@@ -562,6 +562,20 @@ class Fixture(Base):
+         ),
+         Index("ix_fixture_schedule", "status", "scheduled_start_at"),
+         Index("ix_fixture_league_round", "season_id", "league_id", "round_number"),
++        # History pagination (codex/history-pagination proposal, NOT applied here):
++        # club results page uses OR(home==club, away==club) + status + order.
++        # BitmapOr benefits from per-side composite indexes.
++        Index(
++            "ix_fixture_home_history",
++            "home_club_id",
++            "status",
++            "scheduled_start_at",
++            "id",
++        ),
++        Index(
++            "ix_fixture_away_history",
++            "away_club_id",
++            "status",
++            "scheduled_start_at",
++            "id",
++        ),
+     )
+     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+     season_id: Mapped[UUID] = mapped_column(Uuid)
+@@ -596,6 +610,12 @@ class Match(Base):
+         CheckConstraint(
+             "paused_seconds >= 0 AND (phase = 'paused') = (paused_at IS NOT NULL)",
+             name="ck_match_pause",
+         ),
++        # Player history JSONB containment (@>) needs GIN; seq-filter otherwise.
++        Index(
++            "ix_match_snapshot_gin",
++            "starting_snapshot",
++            postgresql_using="gin",
++        ),
+     )
+     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+     fixture_id: Mapped[UUID] = mapped_column(ForeignKey("fixtures.id"), unique=True)
+@@ -293,6 +303,8 @@ class SeasonClub(Base):
+         UniqueConstraint("season_id", "league_id", "tie_break_order", name="uq_membership_draw"),
+         CheckConstraint("tie_break_order BETWEEN 1 AND 10", name="ck_membership_draw"),
+         Index("ix_membership_league", "season_id", "league_id"),
++        # Season list by club (WHERE club_id == ...) currently seq-scans on big archives.
++        Index("ix_membership_club", "club_id"),
+     )
+     season_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+--- /dev/null
++++ b/migrations/versions/0011_history_pagination_indexes.py
+@@ -0,0 +1,45 @@
++"""History pagination indexes (Codex proposal, not applied in history branch)."""
++
++from collections.abc import Sequence
++
++from alembic import op
++
++revision = "0011_history_pagination_indexes"
++down_revision = "0010_telegram_portrait_cache"
++branch_labels = None
++depends_on = None
++
++
++def upgrade() -> None:
++    op.create_index(
++        "ix_fixture_home_history",
++        "fixtures",
++        ["home_club_id", "status", "scheduled_start_at", "id"],
++    )
++    op.create_index(
++        "ix_fixture_away_history",
++        "fixtures",
++        ["away_club_id", "status", "scheduled_start_at", "id"],
++    )
++    op.create_index(
++        "ix_match_snapshot_gin",
++        "matches",
++        ["starting_snapshot"],
++        postgresql_using="gin",
++    )
++    op.create_index(
++        "ix_membership_club",
++        "season_clubs",
++        ["club_id"],
++    )
++
++
++def downgrade() -> None:
++    op.drop_index("ix_membership_club", table_name="season_clubs")
++    op.drop_index("ix_match_snapshot_gin", table_name="matches")
++    op.drop_index("ix_fixture_away_history", table_name="fixtures")
++    op.drop_index("ix_fixture_home_history", table_name="fixtures")
++
++
++# Suggested EXPLAIN checks for Codex after upgrade:
++# - SELECT COUNT(*) FROM fixtures WHERE (home_club_id=:c OR away_club_id=:c)
++#   AND status='finished';  -- expect BitmapOr over the two per-side indexes.
++# - SELECT ... ORDER BY scheduled_start_at DESC, id LIMIT 5; -- bounded Limit.
++# - SELECT COUNT(*) FROM fixtures JOIN matches ... WHERE starting_snapshot @> ...;
++#   -- expect Bitmap with ix_match_snapshot_gin instead of seq Filter.

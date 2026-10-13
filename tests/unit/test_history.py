@@ -298,11 +298,78 @@ class Recorder:
     async def execute(self, statement: object, params: object = None) -> None:
         self.statements.append(statement)
 
+    def _params(self, statement: object) -> dict[str, object]:
+        try:
+            return dict(statement.compile().params)  # type: ignore[union-attr]
+        except Exception:
+            return {}
+
+    def _extract_person_id(self, params: dict[str, object]) -> UUID | None:
+        for value in params.values():
+            if isinstance(value, dict):
+                for side in ("home", "away"):
+                    try:
+                        nested = value[side]  # type: ignore[literal-required]
+                        pid = nested["snapshot"]["players"][0]["id"]  # type: ignore[index]
+                        return UUID(str(pid))
+                    except Exception:
+                        continue
+        return None
+
+    def _ordered_fixtures(self, fixtures: list[Fixture]) -> list[Fixture]:
+        return sorted(fixtures, key=lambda f: (-f.scheduled_start_at.timestamp(), str(f.id)))
+
+    def _club_filtered_fixtures(self, params: dict[str, object]) -> list[Fixture]:
+        season_wanted = params.get("season_id_1")
+        out = []
+        for fixture in self.fixtures:
+            if fixture.status != "finished":
+                continue
+            if self.club.id not in (fixture.home_club_id, fixture.away_club_id):
+                # Keep foreign fixtures only for direct id lookups, not listings.
+                continue
+            if season_wanted is not None and str(fixture.season_id) != str(season_wanted):
+                continue
+            out.append(fixture)
+        return self._ordered_fixtures(out)
+
+    def _player_filtered_fixtures(self, person_id: UUID) -> list[Fixture]:
+        from goaletto.domain.match_codec import restore_state as _restore
+
+        match_by_fixture = {m.fixture_id: m for m in self.matches}
+        out: list[Fixture] = []
+        for fixture in self._club_filtered_fixtures({}):
+            match = match_by_fixture.get(fixture.id)
+            if match is None:
+                continue
+            try:
+                initial = _restore(match.starting_snapshot)
+            except ValueError:
+                continue
+            for candidate in ("home", "away"):
+                team = initial.home if candidate == "home" else initial.away
+                if team.snapshot.club_id != self.club.id:
+                    continue
+                if any(p.id == person_id for p in team.snapshot.players):
+                    out.append(fixture)
+                    break
+        return self._ordered_fixtures(out)
+
     async def scalar(self, statement: object, params: object = None) -> object:
         self.statements.append(statement)
         if isinstance(statement, TextClause):
             return True
         entity = statement.column_descriptions[0].get("entity")  # type: ignore[union-attr]
+        if entity is None:
+            # COUNT queries for bounded pagination.
+            compiled_params = self._params(statement)
+            text = str(statement)
+            if "matches" in text or "starting_snapshot" in text:
+                person_id = self._extract_person_id(compiled_params)
+                if person_id is None:
+                    return 0
+                return len(self._player_filtered_fixtures(person_id))
+            return len(self._club_filtered_fixtures(compiled_params))
         if entity is Manager:
             return self.manager
         if entity is AnalyticsManager:
@@ -316,13 +383,19 @@ class Recorder:
         if entity is Season:
             return self.season
         if entity is Fixture:
-            wanted = statement.compile().params.get("id_1")  # type: ignore[union-attr]
-            for fixture in self.fixtures:
-                if str(fixture.id) == str(wanted):
-                    return fixture
+            wanted = self._params(statement).get("id_1")
+            if wanted is not None:
+                for fixture in self.fixtures:
+                    if str(fixture.id) == str(wanted):
+                        return fixture
+                return None
             return None
         if entity is Match:
-            wanted = statement.compile().params.get("fixture_id_1")  # type: ignore[union-attr]
+            wanted = self._params(statement).get("fixture_id_1")
+            if wanted is None:
+                return None
+            if isinstance(wanted, (list, tuple, set)):
+                return None
             for match in self.matches:
                 if str(match.fixture_id) == str(wanted):
                     return match
@@ -330,31 +403,106 @@ class Recorder:
         if entity is SeasonClub:
             return self.membership
         if entity is Player:
+            if self.live_player is None:
+                return None
+            wanted_person = self._params(statement).get("person_id_1")
+            wanted_club = self._params(statement).get("club_id_1")
+            if wanted_person is not None and str(self.live_player.person_id) != str(wanted_person):
+                return None
+            if wanted_club is not None and str(self.live_player.club_id) != str(wanted_club):
+                return None
             return self.live_player
         return None
 
     async def scalars(self, statement: object) -> Rows:
         self.statements.append(statement)
         entity = statement.column_descriptions[0].get("entity")  # type: ignore[union-attr]
+        compiled_params = self._params(statement)
+        text = str(statement)
         if entity is Fixture:
-            return Rows(list(self.fixtures))
+            if "matches" in text or "starting_snapshot" in text:
+                person_id = self._extract_person_id(compiled_params)
+                if person_id is None:
+                    return Rows([])
+                filtered = self._player_filtered_fixtures(person_id)
+            else:
+                filtered = self._club_filtered_fixtures(compiled_params)
+            limit = getattr(statement, "_limit", None)  # type: ignore[union-attr]
+            offset = getattr(statement, "_offset", None)  # type: ignore[union-attr]
+            start = int(offset or 0)
+            end = start + int(limit) if limit is not None else None
+            return Rows(filtered[start:end])
         if entity is Match:
+            wanted = compiled_params.get("fixture_id_1")
+            if isinstance(wanted, (list, tuple, set)):
+                wanted_ids = {str(v) for v in wanted}
+                return Rows([m for m in self.matches if str(m.fixture_id) in wanted_ids])
             return Rows(list(self.matches))
+        if entity is MatchResult:
+            wanted = compiled_params.get("fixture_id_1")
+            receipts = list(self.receipts_by_match.values())
+            if isinstance(wanted, (list, tuple, set)):
+                wanted_ids = {str(v) for v in wanted}
+                return Rows([r for r in receipts if str(r.fixture_id) in wanted_ids])
+            return Rows(receipts)
         if entity is MatchTick:
+            wanted = compiled_params.get("match_id_1")
+            if isinstance(wanted, (list, tuple, set)):
+                wanted_ids = {str(v) for v in wanted}
+                return Rows([t for t in self.ticks if str(t.match_id) in wanted_ids])
+            if wanted is not None:
+                return Rows([t for t in self.ticks if str(t.match_id) == str(wanted)])
             return Rows(list(self.ticks))
         if entity is MatchStage:
+            wanted = compiled_params.get("match_id_1")
+            if isinstance(wanted, (list, tuple, set)):
+                wanted_ids = {str(v) for v in wanted}
+                return Rows([s for s in self.stages if str(s.match_id) in wanted_ids])
+            if wanted is not None:
+                return Rows([s for s in self.stages if str(s.match_id) == str(wanted)])
             return Rows(list(self.stages))
         if entity is SeasonClub:
-            params = statement.compile().params  # type: ignore[union-attr]
-            if "club_id_1" in params:
+            if "club_id_1" in compiled_params:
                 return Rows(
-                    [m for m in self.memberships if str(m.club_id) == str(params["club_id_1"])]
+                    [
+                        m
+                        for m in self.memberships
+                        if str(m.club_id) == str(compiled_params["club_id_1"])
+                    ]
                 )
             return Rows(list(self.memberships))
         if entity is Standing:
             return Rows(list(self.standings))
         if entity is Club:
             return Rows(list(self.clubs))
+        if entity is Season:
+            wanted = compiled_params.get("id_1")
+            if isinstance(wanted, (list, tuple, set)):
+                wanted_ids = {str(v) for v in wanted}
+                if hasattr(self, "seasons_list"):
+                    return Rows(
+                        [s for s in self.seasons_list if str(s.id) in wanted_ids]  # type: ignore[attr-defined]
+                    )
+                return Rows(
+                    [self.season]
+                    if str(self.season_id) in wanted_ids or str(self.season.id) in wanted_ids
+                    else []
+                )
+            return Rows([self.season])
+        if entity is League:
+            wanted = compiled_params.get("id_1")
+            if isinstance(wanted, (list, tuple, set)):
+                wanted_ids = {str(v) for v in wanted}
+                if hasattr(self, "leagues_list"):
+                    return Rows(
+                        [s for s in self.leagues_list if str(s.id) in wanted_ids]  # type: ignore[attr-defined]
+                    )
+                return Rows(
+                    [self.league]
+                    if str(self.league_id) in wanted_ids or str(self.league.id) in wanted_ids
+                    else []
+                )
+            return Rows([self.league])
         return Rows([])
 
     async def get(self, model: object, key: object) -> object:
@@ -369,7 +517,9 @@ class Recorder:
         if model is League:
             return self.league
         if model is Person:
-            return self.person_row
+            if self.person_row is None:
+                return None
+            return self.person_row if str(key) == str(self.person_row.id) else None
         return None
 
     def add(self, value: object) -> None:
