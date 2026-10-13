@@ -983,3 +983,51 @@ def test_new_aggregates_and_routing_ids_present() -> None:
     assert report.aggregates["recoveries_total"] == 0
     blob = report_to_dict(report)
     assert blob["aggregates"]["finance_accounts_total"] == 1
+
+
+def test_recovery_checks_the_persisted_checkpoint_hash_and_exact_job():
+    from dataclasses import replace
+
+    snapshot = _recovery_world()
+    bad = replace(snapshot.recoveries[0], checkpoint_hashes=("different-hash",))
+    assert "MATCH_RECOVERY_MISMATCH" in _codes(replace(snapshot, recoveries=(bad,)))
+    wrong_job = replace(snapshot.jobs[0], tick_number=25)
+    assert "MATCH_RECOVERY_MISMATCH" in _codes(replace(snapshot, jobs=(wrong_job,)))
+
+
+def test_market_deferral_uses_highest_bid_not_historical_bid():
+    from dataclasses import replace
+
+    snapshot = _market_world()
+    auction = snapshot.auctions[0]
+    winner = snapshot.bids[0]
+    old_buyer = uuid4()
+    old = replace(winner, id=uuid4(), buyer_club_id=old_buyer, reservation_id=uuid4())
+    busy = FixtureRow(
+        id=FIXTURE,
+        season_id=SEASON,
+        status="live",
+        scheduled_start_at=NOW - timedelta(minutes=20),
+        lineup_lock_at=NOW - timedelta(minutes=21),
+        actual_start_at=NOW - timedelta(minutes=20),
+        actual_finish_at=None,
+        home_club_id=old_buyer,
+        away_club_id=uuid4(),
+    )
+    auction = replace(auction, ends_at=NOW - timedelta(minutes=5))
+    snapshot = replace(snapshot, auctions=(auction,), bids=(winner, old), fixtures=(busy,))
+    assert "MARKET_CLOSE_DEFERRED_BY_MATCH" not in _codes(snapshot)
+    assert "MARKET_CLOSE_DEFERRED_BY_MATCH" in _codes(
+        replace(snapshot, fixtures=(replace(busy, home_club_id=winner.buyer_club_id),))
+    )
+
+
+def test_season_filtered_market_reports_coverage_and_keeps_reservation_checks() -> None:
+    from dataclasses import replace
+
+    snapshot = _market_world(with_close_job=False, reserve_status="released")
+    codes = _codes(replace(snapshot, market_schedule_complete=False))
+    assert codes.get("MARKET_SCHEDULE_SCOPE_LIMITED") == 1
+    assert "MARKET_CLOSE_JOB_MISSING" not in codes
+    assert "MARKET_CLOSE_DEFERRED_BY_MATCH" not in codes
+    assert codes.get("MARKET_RESERVATION_MISMATCH") == 1

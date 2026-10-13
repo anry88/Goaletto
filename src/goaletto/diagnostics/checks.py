@@ -66,6 +66,7 @@ FINANCE_RESERVATION_MISMATCH = "FINANCE_RESERVATION_MISMATCH"
 MARKET_RESERVATION_MISMATCH = "MARKET_RESERVATION_MISMATCH"
 MARKET_CLOSE_DEFERRED_BY_MATCH = "MARKET_CLOSE_DEFERRED_BY_MATCH"
 MARKET_CLOSE_JOB_MISSING = "MARKET_CLOSE_JOB_MISSING"
+MARKET_SCHEDULE_SCOPE_LIMITED = "MARKET_SCHEDULE_SCOPE_LIMITED"
 FIXTURE_LIVE_WITHOUT_MATCH = "FIXTURE_LIVE_WITHOUT_MATCH"
 OUTBOX_LEASE_EXPIRED = "OUTBOX_LEASE_EXPIRED"
 OUTBOX_BACKLOG_OVERDUE = "OUTBOX_BACKLOG_OVERDUE"
@@ -153,6 +154,10 @@ FINDING_CODES: dict[str, tuple[str, str]] = {
     MARKET_CLOSE_DEFERRED_BY_MATCH: (
         SEVERITY_INFO,
         "Open auctions past deadline whose settlement waits for an active match.",
+    ),
+    MARKET_SCHEDULE_SCOPE_LIMITED: (
+        "info",
+        "Global market scheduling requires an unfiltered calendar snapshot.",
     ),
     MARKET_CLOSE_JOB_MISSING: (
         SEVERITY_ALARM,
@@ -533,8 +538,8 @@ def _check_jobs_overdue(snapshot: Snapshot, late_threshold: float) -> list[Findi
     # so the job stays overdue rather than being silently excused.
     busy: set[UUID] = set()
     auction_by_id = {auction.id: auction for auction in snapshot.auctions}
-    bid_by_auction = {bid.auction_id: bid for bid in snapshot.bids}
-    deferral_complete = not (
+    bid_by_id = {bid.id: bid for bid in snapshot.bids}
+    deferral_complete = snapshot.market_schedule_complete and not (
         snapshot.fixtures_truncated or snapshot.auctions_truncated or snapshot.bids_truncated
     )
     if deferral_complete:
@@ -546,7 +551,9 @@ def _check_jobs_overdue(snapshot: Snapshot, late_threshold: float) -> list[Findi
         auction = auction_by_id.get(job.auction_id) if job.auction_id else None
         if auction is None or auction.status != "open" or auction.ends_at > snapshot.now:
             continue
-        bid = bid_by_auction.get(auction.id)
+        bid = bid_by_id.get(auction.highest_bid_id) if auction.highest_bid_id else None
+        if bid is None or bid.auction_id != auction.id:
+            continue
         clubs = {auction.seller_club_id}
         if bid is not None:
             clubs.add(bid.buyer_club_id)
@@ -841,6 +848,10 @@ def _check_recoveries(snapshot: Snapshot, late_threshold: float) -> list[Finding
         # Structural damage is provable from the row alone.
         if (
             not recovery.state_hash
+            or (
+                recovery.checkpoint_hashes is not None
+                and recovery.state_hash not in recovery.checkpoint_hashes
+            )
             or not 0 <= recovery.checkpoint_tick <= 29
             or recovery.next_due_at <= recovery.previous_due_at
             or recovery.next_due_at <= recovery.recovered_at
@@ -882,7 +893,13 @@ def _check_recoveries(snapshot: Snapshot, late_threshold: float) -> list[Finding
             fixture_jobs = jobs_by_fixture.get(match.fixture_id, [])
             live_kinds = {"match.tick", "match.second_half_start", "match.finalize_result"}
             if match.phase in ("first_half", "half_time", "second_half") and not any(
-                job.kind in live_kinds and job.due_at >= recovery.previous_due_at
+                job.kind in live_kinds
+                and job.due_at == match.next_due_at
+                and (
+                    job.kind == "match.second_half_start"
+                    if match.phase == "half_time"
+                    else job.kind == "match.tick" and job.tick_number == match.completed_tick + 1
+                )
                 for job in fixture_jobs
             ):
                 mismatch_matches.append(recovery.match_id)
@@ -978,7 +995,6 @@ def _check_finances(snapshot: Snapshot) -> list[Finding]:
 def _check_market(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
     findings: list[Finding] = []
     bid_by_id = {bid.id: bid for bid in snapshot.bids}
-    bid_by_auction = {bid.auction_id: bid for bid in snapshot.bids}
     reservation_by_id = {reservation.id: reservation for reservation in snapshot.reservations}
     market_complete = not (
         snapshot.auctions_truncated or snapshot.bids_truncated or snapshot.reservations_truncated
@@ -990,7 +1006,7 @@ def _check_market(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
             continue
         if not market_complete:
             continue
-        bid = bid_by_id.get(auction.highest_bid_id)
+        bid = bid_by_id.get(auction.highest_bid_id) if auction.highest_bid_id else None
         if bid is None or bid.auction_id != auction.id:
             mismatched_auctions.append(auction.id)
             continue
@@ -1023,13 +1039,19 @@ def _check_market(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
     # Deferred settlement: an open auction past its deadline is not damage
     # while either club's fixture is locked and unfinished. Uses the actual
     # fixture clocks, never the auction deadline alone.
-    if not snapshot.fixtures_truncated:
+    if (
+        snapshot.market_schedule_complete
+        and not snapshot.fixtures_truncated
+        and not snapshot.bids_truncated
+    ):
         busy = _busy_clubs_at(snapshot, snapshot.now)
         deferred: list[UUID] = []
         for auction in snapshot.auctions:
             if auction.status != "open" or auction.ends_at > snapshot.now:
                 continue
-            bid = bid_by_auction.get(auction.id)
+            bid = bid_by_id.get(auction.highest_bid_id) if auction.highest_bid_id else None
+            if bid is None or bid.auction_id != auction.id:
+                continue
             clubs = {auction.seller_club_id}
             if bid is not None:
                 clubs.add(bid.buyer_club_id)
@@ -1050,7 +1072,19 @@ def _check_market(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
             )
     # Open auctions need a live close job; sold/expired/cancelled are terminal
     # and must not alarm. Only provable with full job + market coverage.
-    if market_complete and not snapshot.jobs_truncated:
+    if not snapshot.market_schedule_complete:
+        findings.append(
+            Finding(
+                code=MARKET_SCHEDULE_SCOPE_LIMITED,
+                severity=SEVERITY_INFO,
+                summary=(
+                    "Market reservations are global; close-job and match-deferral "
+                    "checks require a snapshot without the season filter."
+                ),
+                count=1,
+            )
+        )
+    if snapshot.market_schedule_complete and market_complete and not snapshot.jobs_truncated:
         close_by_auction: dict[UUID, int] = {}
         for job in snapshot.jobs:
             if job.kind == "market.close" and job.status in ("pending", "held"):
@@ -1425,6 +1459,7 @@ __all__ = [
     "JOBS_UNKNOWN_KIND",
     "MARKET_CLOSE_DEFERRED_BY_MATCH",
     "MARKET_CLOSE_JOB_MISSING",
+    "MARKET_SCHEDULE_SCOPE_LIMITED",
     "MARKET_RESERVATION_MISMATCH",
     "MATCH_FULLTIME_FIXTURE_NOT_FINISHED",
     "MATCH_HALFTIME_WAIT_NORMAL",

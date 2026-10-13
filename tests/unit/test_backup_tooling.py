@@ -45,7 +45,7 @@ class FakeRunner:
     """Injectable subprocess double; records argv/env, never touches secrets."""
 
     calls: list[tuple[list[str], dict[str, str]]] = field(default_factory=list)
-    dump_bytes: bytes = b"FAKEPGDUMP" * 64
+    dump_bytes: bytes = b"PGDMP" + b"FAKEPGDUMP" * 64
     version_text: str = "pg_dump (PostgreSQL) 17.4\n"
     fail_returncode: int | None = None
     fail_stderr: str = ""
@@ -60,6 +60,8 @@ class FakeRunner:
                     returncode=self.version_returncode, stdout="", stderr=self.fail_stderr
                 )
             return bt.CommandResult(returncode=0, stdout=self.version_text, stderr="")
+        if "--command" in argv:
+            return bt.CommandResult(0, "goaletto|170004|goaletto-schema", "")
         if self.raise_on_dump is not None:
             raise self.raise_on_dump
         if self.fail_returncode is not None:
@@ -121,11 +123,15 @@ class FakeFileOps:
             raise FileNotFoundError(str(path))
         self.modes[str(path)] = mode
 
-    def replace(self, src: Path, dst: Path) -> None:
+    def publish(self, src: Path, dst: Path) -> None:
+        if self.exists(dst):
+            raise FileExistsError(str(dst))
         data = self.read_bytes(src)
         self.files[str(dst)] = data
         self.modes[str(dst)] = self.modes.get(str(src), 0o600)
-        del self.files[str(src)]
+
+    def read_prefix(self, path: Path, size: int) -> bytes:
+        return self.read_bytes(path)[:size]
 
     def remove(self, path: Path) -> None:
         self.removed.append(str(path))
@@ -272,6 +278,8 @@ def test_interrupted_partial_file_is_removed() -> None:
             self.calls.append((list(argv), dict(env)))
             if len(argv) >= 2 and argv[-1] == "--version":
                 return bt.CommandResult(returncode=0, stdout=self.version_text, stderr="")
+            if "--command" in argv:
+                return FakeRunner.run(self, argv, env)
             target = Path(list(argv)[list(argv).index("--file") + 1])
             files.write_bytes(target, b"PARTIAL-DUMP")
             raise KeyboardInterrupt
@@ -295,7 +303,7 @@ def test_collision_refuses_silent_overwrite() -> None:
     assert files.files[archive] == b"EXISTING-GOOD-BACKUP"
 
 
-def test_explicit_overwrite_replaces_atomically() -> None:
+def test_explicit_overwrite_cannot_destroy_archive() -> None:
     files = FakeFileOps()
     archive = "/backups/goaletto-20261013T120000Z.dump"
     files.files[archive] = b"OLD-BACKUP"
@@ -304,8 +312,8 @@ def test_explicit_overwrite_replaces_atomically() -> None:
     code, _out, _err = run_main(
         base_args() + ["--apply", "--overwrite"], runner=runner, environ={}, file_ops=files
     )
-    assert code == 0
-    assert files.files[archive] == b"NEW-BACKUP"
+    assert code == 16
+    assert files.files[archive] == b"OLD-BACKUP"
 
 
 def test_wrong_database_is_rejected_before_dump() -> None:
@@ -397,7 +405,7 @@ def test_real_filesystem_roundtrip_with_fake_runner(tmp_path: Path) -> None:
         def run(self, argv, env):  # type: ignore[no-untyped-def]
             result = FakeRunner.run(self, argv, env)
             if result.returncode == 0 and "--file" in list(argv):
-                Path(list(argv)[list(argv).index("--file") + 1]).write_bytes(b"REALFS-DUMP")
+                Path(list(argv)[list(argv).index("--file") + 1]).write_bytes(b"PGDMPREALFS-DUMP")
             return result
 
     out, err = io.StringIO(), io.StringIO()
@@ -420,9 +428,58 @@ def test_real_filesystem_roundtrip_with_fake_runner(tmp_path: Path) -> None:
     assert code == 0
     archive = outdir / "goaletto-20261013T120000Z.dump"
     manifest_path = outdir / "goaletto-20261013T120000Z.manifest.json"
-    assert archive.read_bytes() == b"REALFS-DUMP"
+    assert archive.read_bytes() == b"PGDMPREALFS-DUMP"
     manifest = json.loads(manifest_path.read_text())
-    assert manifest["sha256"] == hashlib.sha256(b"REALFS-DUMP").hexdigest()
+    assert manifest["sha256"] == hashlib.sha256(b"PGDMPREALFS-DUMP").hexdigest()
     assert stat.S_IMODE(os.stat(archive).st_mode) == 0o600
     assert stat.S_IMODE(os.stat(manifest_path).st_mode) == 0o600
     assert real_calls == []
+
+
+def test_wrong_actual_schema_is_rejected_before_dump() -> None:
+    class WrongTarget(FakeRunner):
+        def run(self, argv, env):
+            if "--command" in argv:
+                return bt.CommandResult(0, "goaletto|170004|wrong-schema", "")
+            return super().run(argv, env)
+
+    runner = WrongTarget()
+    code, _, err = run_main(base_args() + ["--apply"], runner=runner)
+    assert code == 11 and "WRONG_TARGET" in err
+    assert not any("--format" in argv for argv, env in runner.calls)
+
+
+def test_publication_failure_cleans_only_own_archive() -> None:
+    class FailingPublication(FakeFileOps):
+        def publish(self, src, dst):
+            if dst.name.endswith(".manifest.json"):
+                raise PermissionError("publication failed")
+            super().publish(src, dst)
+
+    files = FailingPublication()
+    code, _, _ = run_main(
+        base_args() + ["--apply"], runner=DumpWritingRunner(files), file_ops=files
+    )
+    assert code == 17 and files.files == {}
+
+
+def test_collision_during_publication_preserves_concurrent_backup() -> None:
+    class RacingPublication(FakeFileOps):
+        def publish(self, src, dst):
+            self.files[str(dst)] = b"OTHER-COMPLETED-BACKUP"
+            super().publish(src, dst)
+
+    files = RacingPublication()
+    code, _, _ = run_main(
+        base_args() + ["--apply"], runner=DumpWritingRunner(files), file_ops=files
+    )
+    assert code == 16
+    assert list(files.files.values()) == [b"OTHER-COMPLETED-BACKUP"]
+
+
+def test_version_output_cannot_leak_secret_and_empty_dump_is_rejected() -> None:
+    files = FakeFileOps()
+    runner = DumpWritingRunner(files, version_text=SECRET, dump_bytes=b"")
+    code, out, err = run_main(base_args() + ["--apply"], runner=runner, file_ops=files)
+    assert code == 13 and SECRET not in out + err and files.files == {}
+    assert bt.pg_dump_version(FakeRunner(version_text=SECRET), "pg_dump", {}) == "unknown"

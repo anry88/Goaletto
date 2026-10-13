@@ -2,9 +2,9 @@
 
 Инструмент: `python scripts/backup_goaletto.py`. Даёт проверяемый `pg_dump`
 одной явно согласованной базы `goaletto` в custom-формате плюс SHA256-манифест.
-Настоящие dump/restore и установка расписания — приёмка Codex на единственной
-development Goaletto DB с backup текущего мира. HDC и реальные
-dump/удаление/restore в этой волне не запускаются.
+Настоящие dump/restore проверяются Codex на единственной development Goaletto DB
+с сохранением текущего мира. Расписание, off-host копия и HDC требуют отдельной
+операторской настройки.
 
 Связь: часть AND-70. Не дублирует read-only diagnostics CLI
 (`goaletto-diagnostics`, см. [runtime-diagnostics-runbook.md](runtime-diagnostics-runbook.md)):
@@ -40,20 +40,24 @@ python scripts/backup_goaletto.py --target local-goaletto --apply \
 Полный список опций: `--help`. Переопределяемый `--timestamp YYYYMMDDTHHMMSSZ`
 делает имена воспроизводимыми; без него используется текущее UTC-время.
 
+Перед dump инструмент выполняет read-only psql-проверку current_database() и
+наличия таблиц Goaletto. Метка target не заменяет проверку подключения.
+`--psql` позволяет явно выбрать executable. Версия сервера попадает в manifest.
+
 ## Пароль
 
 Пароль никогда не передаётся в argv, логах и манифесте:
 
 - `PGPASSWORD='<из host-only секрета>'` в окружении, либо
-- `--password-file <host-only файл>` (первая строка файла).
+- `--password-file <host-only файл>` (один пароль UTF-8; завершающий перевод строки не входит в пароль).
 
-Без пароля (peer/trust) переменную можно не задавать; stdin у `pg_dump` закрыт,
+Без пароля (peer/trust) переменную можно не задавать; stdin закрыт, а pg_dump/psql запускаются с --no-password,
 поэтому вместо зависания на запросе пароля команда быстро завершится ошибкой
 с безопасным кодом. Не печатайте токены и DSN с credentials при диагностике.
 
 ## Что получается
 
-В `--output-dir` атомарно появляются два файла с правами `0600`:
+В `--output-dir` публикуются два файла с правами `0600`:
 
 - `goaletto-<UTC>.dump` — PostgreSQL custom-format архив (`pg_dump -Fc`);
 - `goaletto-<UTC>.manifest.json` — манифест: инструмент и его версия, target,
@@ -61,14 +65,17 @@ python scripts/backup_goaletto.py --target local-goaletto --apply \
   размер. Пароля и DSN в манифесте нет.
 
 Dump пишется во временный `.dump-*.part` в том же каталоге и публикуется через
-атомарный rename только после успешной записи, хеширования и записи манифеста.
+атомарное создание hard link без перезаписи существующего имени только после успешной записи, хеширования и записи манифеста.
 При ошибке или прерывании временные файлы удаляются; файл, похожий на успешный
 backup, не остаётся. Частичные файлы всегда имеют суффикс `.part` и не
 подбираются процедурой восстановления.
 
 Повтор с тем же timestamp без `--overwrite` безопасно завершается
-`OUTPUT_COLLISION`, существующий архив не трогается. `--overwrite` явно
-разрешает атомарную замену после полной записи нового архива.
+`OUTPUT_COLLISION`, существующий архив не трогается. После обычного сбоя публикации удаляются только
+файлы этой попытки. Manifest публикуется последним; успешность означает проверенную
+пару. При жёсткой остановке процесса возможен orphan dump без manifest: он не считается
+backup. Atomic rename пары файлов и гарантированная crash durability не обещаются. `--overwrite` больше не разрешает замену: завершённые архивы неизменяемы,
+выберите новый timestamp. Это сохраняет предыдущую копию при ошибке или гонке.
 
 Коды ошибок (только классы/коды, stderr внешней команды целиком не печатается):
 
@@ -80,7 +87,9 @@ backup, не остаётся. Частичные файлы всегда име
 | `PG_DUMP_FAILED` (13) | `pg_dump` завершился с ошибкой (печатается только returncode) |
 | `INTERRUPTED` (14) | прерывание; частичные файлы удалены |
 | `OUTPUT_NOT_WRITABLE` (15) | каталог недоступен для записи |
-| `OUTPUT_COLLISION` (16) | архив/манифест уже есть, `--overwrite` не задан |
+| `OUTPUT_COLLISION` (16) | архив/манифест уже есть или запрошена перезапись |
+| `TARGET_PROBE_FAILED` (13) | psql не подтвердил подключение/схему |
+| `INVALID_ARCHIVE` (13) | нет custom-format PGDMP header/архив пуст |
 | `PERMISSION_DENIED` (17) | права файловой системы/исполняемого файла |
 
 ## Проверка контрольной суммы
@@ -168,7 +177,7 @@ Unit-покрытие (`tests/unit/test_backup_tooling.py`, всё на fake run
   печатается, только `PG_DUMP_FAILED` + returncode;
 - interrupted/partial: частичный файл удалён, код `INTERRUPTED`;
 - collision: без `--overwrite` — `OUTPUT_COLLISION`, существующий архив цел;
-  с `--overwrite` — атомарная замена;
+  с `--overwrite` — отказ, для нового архива нужен новый timestamp;
 - wrong database/target: отказ до запуска `pg_dump`, runner не вызывается;
 - отсутствие `pg_dump`: `PG_DUMP_NOT_FOUND` без traceback;
 - ошибки прав: `PERMISSION_DENIED`/`OUTPUT_NOT_WRITABLE`;
@@ -178,8 +187,9 @@ Unit-покрытие (`tests/unit/test_backup_tooling.py`, всё на fake run
 
 Реальный drill (Codex, после сохранения мира): dump единственной development
 Goaletto DB, off-host копия, проверка хеша, restore в согласованном окне,
-rollback-готовность. Результат волны — проверяемая готовность к drill, а не
-заявление, что backup уже восстановлен или HDC настроен.
+rollback-готовность. При приёмке 2026-10-13 локальный dump и restore drill выполнены на единственной
+Goaletto development DB; исходный мир восстановлен. См. [отчёт приёмки](agent-wave3-review.md).
+Off-host копия, расписание backup и HDC ещё не настроены.
 
 ## Оставшиеся ограничения
 

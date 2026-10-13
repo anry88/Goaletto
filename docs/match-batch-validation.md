@@ -90,3 +90,7 @@ observations) хэшируется в `content_hash` (SHA-256 каноничес
 нет PostgreSQL, HDC-worker, live-тайминга 33 минут, Telegram-доставки и
 конкурентных транзакций. PG/native проверки выполняет Codex последовательно
 после сохранения мира.
+
+Приёмка Codex: abandoned считается отдельно и не даёт официальные wins/draws;
+полные event payloads и command outcomes входят в replay-сравнение. Пустой список
+сценариев, повторные seeds/scenarios и чрезмерное число seeds отвергаются до симуляции.

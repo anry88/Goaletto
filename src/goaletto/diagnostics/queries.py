@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Executable, func, select
+from sqlalchemy import Executable, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from goaletto.diagnostics.snapshot import (
@@ -51,6 +51,7 @@ from goaletto.infrastructure.models import (
     Match,
     MatchRecovery,
     MatchResult,
+    MatchStage,
     MatchTick,
     MoneyReservation,
     OutboxBoard,
@@ -369,9 +370,28 @@ async def _collect_recoveries(
             MatchRecovery.next_due_at,
             MatchRecovery.recovered_at,
             MatchRecovery.reason,
+            MatchTick.state_hash,
+            MatchStage.state_hash,
         )
         .select_from(MatchRecovery)
         .outerjoin(Match, Match.id == MatchRecovery.match_id)
+        .outerjoin(
+            MatchTick,
+            and_(
+                MatchTick.match_id == MatchRecovery.match_id,
+                MatchTick.tick_number == MatchRecovery.checkpoint_tick,
+            ),
+        )
+        .outerjoin(
+            MatchStage,
+            and_(
+                MatchStage.match_id == MatchRecovery.match_id,
+                or_(
+                    and_(MatchRecovery.checkpoint_tick == 0, MatchStage.stage == "locked"),
+                    and_(MatchRecovery.checkpoint_tick == 15, MatchStage.stage == "second_half"),
+                ),
+            ),
+        )
         .order_by(MatchRecovery.recovered_at.asc(), MatchRecovery.id.asc())
         .limit(limit + 1)
     )
@@ -391,6 +411,7 @@ async def _collect_recoveries(
             next_due_at=row[6],
             recovered_at=row[7],
             reason=str(row[8]),
+            checkpoint_hashes=tuple(h for h in (row[9], row[10]) if isinstance(h, str)),
         )
         for row in raw
         if isinstance(row[0], UUID) and isinstance(row[1], UUID)
@@ -616,6 +637,7 @@ async def collect_snapshot(
         reservations_truncated=reservations_truncated,
         auctions=tuple(auctions),
         auctions_truncated=auctions_truncated,
+        market_schedule_complete=season_id is None,
         bids=tuple(bids),
         bids_truncated=bids_truncated,
         incomplete_scopes=incomplete,

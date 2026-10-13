@@ -104,3 +104,16 @@ def test_cli_smoke_writes_bounded_reports(tmp_path) -> None:  # type: ignore[no-
 def test_cli_rejects_over_budget_batches() -> None:
     code = BATCH.main(["--seeds", "7,8", "--scenarios", "baseline,home_swap", "--max-matches", "1"])
     assert code == 2
+
+
+def test_abandoned_scores_are_not_official_draws():
+    content = BATCH.run_batch([11], [BATCH.SCENARIOS["dismissal_red_storm"]])
+    aggregate = content["scenarios"]["dismissal_red_storm"]["aggregate"]
+    assert aggregate["abandoned"] == 1 and aggregate["full_time"] == 0
+    assert aggregate["draws"] == aggregate["home_wins"] == aggregate["away_wins"] == 0
+
+
+def test_empty_scenarios_and_huge_seed_count_are_rejected_without_simulation(tmp_path):
+    assert BATCH.main(["--scenarios", ",", "--output", str(tmp_path / "empty")]) == 2
+    assert BATCH.main(["--matches", "1000000000", "--output", str(tmp_path / "huge")]) == 2
+    assert not list(tmp_path.iterdir())

@@ -171,6 +171,7 @@ class RecoveryRow:
     next_due_at: datetime
     recovered_at: datetime
     reason: str
+    checkpoint_hashes: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -240,6 +241,7 @@ class Snapshot:
     reservations_truncated: bool = False
     auctions: tuple[AuctionRow, ...] = ()
     auctions_truncated: bool = False
+    market_schedule_complete: bool = True
     bids: tuple[BidRow, ...] = ()
     bids_truncated: bool = False
     incomplete_scopes: tuple[str, ...] = field(default_factory=tuple)

@@ -93,6 +93,7 @@ class BackupConfig:
     timestamp: str
     overwrite: bool
     password_file: Path | None
+    psql_bin: str = "psql"
 
 
 @dataclass(frozen=True)
@@ -122,7 +123,8 @@ class FileOps(Protocol):
     def read_bytes(self, path: Path) -> bytes: ...
     def sha256_and_size(self, path: Path) -> tuple[str, int]: ...
     def chmod(self, path: Path, mode: int) -> None: ...
-    def replace(self, src: Path, dst: Path) -> None: ...
+    def publish(self, src: Path, dst: Path) -> None: ...
+    def read_prefix(self, path: Path, size: int) -> bytes: ...
     def remove(self, path: Path) -> None: ...
 
 
@@ -161,7 +163,7 @@ class UtcClock:
 
 
 class OsFileOps:
-    """Real file operations: owner-only temp files, atomic replace."""
+    """Real file operations: owner-only temp files, atomic no-clobber publication."""
 
     def ensure_dir(self, path: Path) -> None:
         path.mkdir(parents=True, exist_ok=True)
@@ -193,8 +195,13 @@ class OsFileOps:
     def chmod(self, path: Path, mode: int) -> None:
         os.chmod(path, mode)
 
-    def replace(self, src: Path, dst: Path) -> None:
-        os.replace(src, dst)
+    def publish(self, src: Path, dst: Path) -> None:
+        # Atomic create, never clobber another completed/concurrent backup.
+        os.link(src, dst)
+
+    def read_prefix(self, path: Path, size: int) -> bytes:
+        with path.open("rb") as handle:
+            return handle.read(size)
 
     def remove(self, path: Path) -> None:
         try:
@@ -230,6 +237,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="pg_dump executable (resolved via PATH unless a path is given).",
     )
     parser.add_argument(
+        "--psql", default="psql", help="psql executable for read-only target verification"
+    )
+    parser.add_argument(
         "--timestamp",
         default=None,
         help="UTC stamp YYYYMMDDTHHMMSSZ; defaults to the current UTC time. "
@@ -246,8 +256,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Explicitly allow atomically replacing an existing archive with "
-        "the same name. Without it, a name collision fails safely.",
+        help="Deprecated: archives are immutable; use a new timestamp instead.",
     )
     parser.add_argument(
         "--apply",
@@ -259,7 +268,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def validate_target(target: str) -> str:
     cleaned = target.strip()
-    if not cleaned or cleaned.lower() in FORBIDDEN_TARGETS:
+    if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", cleaned) or cleaned.lower() in FORBIDDEN_TARGETS:
         raise BackupError(
             "WRONG_TARGET",
             EXIT_WRONG_TARGET,
@@ -296,6 +305,21 @@ def build_config(args: argparse.Namespace, clock: Clock) -> BackupConfig:
     dbname = validate_dbname(args.dbname)
     if not 1 <= args.port <= 65535:
         raise BackupError("WRONG_PORT", EXIT_USAGE, "Port must be 1-65535.")
+    if args.overwrite:
+        raise BackupError(
+            "OUTPUT_COLLISION",
+            EXIT_OUTPUT_COLLISION,
+            "Use a new timestamp; completed archives are immutable.",
+        )
+    if (
+        not args.host
+        or any(c.isspace() for c in args.host)
+        or "://" in args.host
+        or "@" in args.host
+    ):
+        raise BackupError("WRONG_TARGET", EXIT_WRONG_TARGET)
+    if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_-]*", args.username):
+        raise BackupError("WRONG_TARGET", EXIT_WRONG_TARGET)
     timestamp = resolve_timestamp(args.timestamp, clock)
     return BackupConfig(
         target=target,
@@ -308,6 +332,7 @@ def build_config(args: argparse.Namespace, clock: Clock) -> BackupConfig:
         timestamp=timestamp,
         overwrite=args.overwrite,
         password_file=args.password_file,
+        psql_bin=args.psql,
     )
 
 
@@ -359,7 +384,7 @@ def load_password(
             text = raw.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise BackupError("PASSWORD_FILE_UNREADABLE", EXIT_PERMISSION_DENIED, "") from exc
-        password = text.strip()
+        password = text.rstrip("\r\n")
         if not password:
             raise BackupError("PASSWORD_FILE_EMPTY", EXIT_USAGE, "")
         return password
@@ -382,6 +407,7 @@ def dump_argv(config: BackupConfig, pg_dump_bin: str, tmp_dump: Path) -> list[st
     """Argv for pg_dump: connection flags only, never a password."""
     return [
         pg_dump_bin,
+        "--no-password",
         "--host",
         config.host,
         "--port",
@@ -410,7 +436,49 @@ def pg_dump_version(runner: Runner, pg_dump_bin: str, env: Mapping[str, str]) ->
         raise BackupError("PG_DUMP_NOT_FOUND", EXIT_PG_DUMP_NOT_FOUND, "")
     text = result.stdout.strip() or "unknown"
     match = re.search(r"(\d+(?:\.\d+)+)", text)
-    return match.group(1) if match else text[:64]
+    return match.group(1) if match else "unknown"
+
+
+def verify_target(config: BackupConfig, runner: Runner, env: Mapping[str, str]) -> str:
+    """Check actual database and application schema before pg_dump, no writes."""
+    sql = """SELECT current_database() || '|' || current_setting('server_version_num') || '|' ||
+      CASE WHEN to_regclass('public.clubs') IS NOT NULL
+        AND to_regclass('public.managers') IS NOT NULL
+        AND to_regclass('public.jobs') IS NOT NULL
+        AND to_regclass('public.world_seed_receipts') IS NOT NULL
+        AND to_regclass('public.alembic_version') IS NOT NULL
+      THEN 'goaletto-schema' ELSE 'wrong-schema' END"""
+    argv = [
+        config.psql_bin,
+        "--no-psqlrc",
+        "--no-password",
+        "--host",
+        config.host,
+        "--port",
+        str(config.port),
+        "--username",
+        config.username,
+        "--dbname",
+        config.dbname,
+        "--tuples-only",
+        "--no-align",
+        "--set",
+        "ON_ERROR_STOP=1",
+        "--command",
+        sql,
+    ]
+    result = runner.run(argv, env)
+    if result.returncode != 0:
+        raise BackupError("TARGET_PROBE_FAILED", EXIT_PG_DUMP_FAILED)
+    parts = result.stdout.strip().split("|")
+    if (
+        len(parts) != 3
+        or parts[0] != EXPECTED_DBNAME
+        or parts[2] != "goaletto-schema"
+        or not parts[1].isdigit()
+    ):
+        raise BackupError("WRONG_TARGET", EXIT_WRONG_TARGET)
+    return parts[1]
 
 
 def build_manifest(
@@ -421,6 +489,7 @@ def build_manifest(
     sha256: str,
     size_bytes: int,
     created_utc: str,
+    server_version_num: str,
 ) -> dict[str, object]:
     return {
         "tool": TOOL_NAME,
@@ -437,6 +506,7 @@ def build_manifest(
         "created_utc": created_utc,
         "pg_dump": config.pg_dump_bin,
         "pg_dump_version": pg_version,
+        "server_version_num": server_version_num,
     }
 
 
@@ -445,8 +515,18 @@ def verify_manifest(manifest: Mapping[str, object], file_ops: FileOps, directory
     try:
         archive = str(manifest["archive"])
         expected = str(manifest["sha256"])
-        size = int(manifest["size_bytes"])  # type: ignore[arg-type]
+        size_value = manifest["size_bytes"]
+        if type(size_value) is not int:
+            return False
+        size = size_value
     except (KeyError, TypeError, ValueError):
+        return False
+    if (
+        Path(archive).name != archive
+        or not archive.endswith(ARCHIVE_SUFFIX)
+        or size <= 0
+        or not re.fullmatch(r"[0-9a-f]{64}", expected)
+    ):
         return False
     try:
         actual_sha, actual_size = file_ops.sha256_and_size(directory / archive)
@@ -472,7 +552,7 @@ def perform_backup(
     clock: Clock,
     file_ops: FileOps,
 ) -> dict[str, object]:
-    """Run pg_dump into a temp file, then atomically publish archive+manifest."""
+    """Run pg_dump into a temp file, then publish an immutable archive and completion manifest."""
     try:
         file_ops.ensure_dir(config.output_dir)
     except PermissionError as exc:
@@ -485,13 +565,11 @@ def perform_backup(
     final_dump = config.output_dir / archive_name(config)
     final_manifest = config.output_dir / manifest_name(config)
     if file_ops.exists(final_dump) or file_ops.exists(final_manifest):
-        if not config.overwrite:
-            raise BackupError(
-                "OUTPUT_COLLISION",
-                EXIT_OUTPUT_COLLISION,
-                "Archive or manifest already exists; pass --overwrite to "
-                "explicitly replace it, otherwise pick another timestamp.",
-            )
+        raise BackupError(
+            "OUTPUT_COLLISION",
+            EXIT_OUTPUT_COLLISION,
+            "Archive or manifest already exists; pick another timestamp.",
+        )
 
     try:
         probe = file_ops.create_temp(
@@ -513,7 +591,14 @@ def perform_backup(
     # check. A missing executable surfaces as PG_DUMP_NOT_FOUND from the runner.
 
     pg_version = pg_dump_version(runner, resolved_bin, env)
+    try:
+        server_version_num = verify_target(config, runner, env)
+    except (FileNotFoundError, PermissionError, OSError) as exc:
+        raise BackupError("TARGET_PROBE_FAILED", EXIT_PG_DUMP_FAILED) from exc
 
+    published_dump: Path | None = None
+    published_manifest: Path | None = None
+    succeeded = False
     tmp_dump: Path | None = None
     tmp_manifest: Path | None = None
     try:
@@ -535,6 +620,8 @@ def perform_backup(
                 f"pg_dump exited with returncode={result.returncode}",
             )
         sha256, size = file_ops.sha256_and_size(tmp_dump)
+        if size <= 5 or file_ops.read_prefix(tmp_dump, 5) != b"PGDMP":
+            raise BackupError("INVALID_ARCHIVE", EXIT_PG_DUMP_FAILED)
         created_utc = clock.now().strftime("%Y-%m-%dT%H:%M:%SZ")
         manifest = build_manifest(
             config=config,
@@ -543,6 +630,7 @@ def perform_backup(
             sha256=sha256,
             size_bytes=size,
             created_utc=created_utc,
+            server_version_num=server_version_num,
         )
         payload = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
         tmp_manifest = file_ops.create_temp(
@@ -552,10 +640,10 @@ def perform_backup(
         file_ops.chmod(tmp_manifest, FILE_MODE)
         file_ops.chmod(tmp_dump, FILE_MODE)
         # Publish only after both temp files are complete and hashed.
-        file_ops.replace(tmp_dump, final_dump)
-        published_dump: Path | None = final_dump
-        file_ops.replace(tmp_manifest, final_manifest)
-        published_manifest: Path | None = final_manifest
+        file_ops.publish(tmp_dump, final_dump)
+        published_dump = final_dump
+        file_ops.publish(tmp_manifest, final_manifest)
+        published_manifest = final_manifest
         file_ops.chmod(final_dump, FILE_MODE)
         file_ops.chmod(final_manifest, FILE_MODE)
         # Genuine re-read of the published files: never leave behind a pair
@@ -566,6 +654,9 @@ def perform_backup(
             published_dump = None
             published_manifest = None
             raise BackupError("MANIFEST_MISMATCH", EXIT_PG_DUMP_FAILED, "")
+        succeeded = True
+    except FileExistsError as exc:
+        raise BackupError("OUTPUT_COLLISION", EXIT_OUTPUT_COLLISION) from exc
     except KeyboardInterrupt as exc:
         raise BackupError("INTERRUPTED", EXIT_INTERRUPTED, "") from exc
     except BackupError:
@@ -577,6 +668,10 @@ def perform_backup(
             "OUTPUT_NOT_WRITABLE", EXIT_OUTPUT_NOT_WRITABLE, type(exc).__name__
         ) from exc
     finally:
+        # Remove only paths this attempt created. Never damage an older backup.
+        if not succeeded:
+            _remove_quietly(file_ops, published_manifest)
+            _remove_quietly(file_ops, published_dump)
         # Temp names never resemble a finished backup, and leftovers are removed.
         _remove_quietly(file_ops, tmp_dump)
         _remove_quietly(file_ops, tmp_manifest)

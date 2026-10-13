@@ -360,6 +360,7 @@ async def test_pg_delivery_full_outcome_matrix(sessions) -> None:  # type: ignor
         await _attempt(session, sent, "transient", window_from, attempt=1)
         await _attempt(session, sent, "sent", window_from, attempt=2)
         await _attempt(session, sent, "edited", window_from, attempt=3)
+        await _attempt(session, sent, "duplicate", window_from, attempt=4)
         await _attempt(session, blocked, "blocked", window_from)
         await _attempt(session, stale, "skip_stale", window_from)
         await _attempt(session, unknown, "unknown", window_from)

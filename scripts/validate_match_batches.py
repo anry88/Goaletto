@@ -595,20 +595,21 @@ def check_match_invariants(
 def summarize_scenario(rows: list[dict[str, Any]]) -> dict[str, Any]:
     full = [r for r in rows if r["phase"] == "full_time"]
     abandoned = [r for r in rows if r["phase"] == "abandoned"]
-    home_wins = sum(1 for r in rows if r["score_home"] > r["score_away"])
-    draws = sum(1 for r in rows if r["score_home"] == r["score_away"])
-    away_wins = sum(1 for r in rows if r["score_home"] < r["score_away"])
-    totals = [r["score_home"] + r["score_away"] for r in rows]
+    home_wins = sum(1 for r in full if r["score_home"] > r["score_away"])
+    draws = sum(1 for r in full if r["score_home"] == r["score_away"])
+    away_wins = sum(1 for r in full if r["score_home"] < r["score_away"])
+    totals = [r["score_home"] + r["score_away"] for r in full]
     return {
         "matches": len(rows),
         "full_time": len(full),
         "abandoned": len(abandoned),
+        "abandoned_partial_goals": sum(r["score_home"] + r["score_away"] for r in abandoned),
         "abandoned_share": (len(abandoned) / len(rows)) if rows else 0,
         "home_wins": home_wins,
         "draws": draws,
         "away_wins": away_wins,
-        "goals_home": sum(r["score_home"] for r in rows),
-        "goals_away": sum(r["score_away"] for r in rows),
+        "goals_home": sum(r["score_home"] for r in full),
+        "goals_away": sum(r["score_away"] for r in full),
         "total_goals_quantiles": quantiles(totals),
         "shots": sum(r["home_shots"] + r["away_shots"] for r in rows),
         "on_target": sum(r["home_on_target"] + r["away_on_target"] for r in rows),
@@ -651,6 +652,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def resolve_seeds(args: argparse.Namespace) -> list[int]:
+    if not 1 <= args.max_matches <= 100000:
+        raise ValueError("--max-matches must be from 1 through 100000")
     if args.seeds is not None:
         seeds = [int(part.strip()) for part in args.seeds.split(",") if part.strip()]
         if not seeds:
@@ -658,7 +661,11 @@ def resolve_seeds(args: argparse.Namespace) -> list[int]:
     else:
         if args.matches < 1:
             raise ValueError("--matches must be at least 1")
+        if args.matches > args.max_matches:
+            raise ValueError("--matches exceeds the budget before seed allocation")
         seeds = [args.seed + i for i in range(args.matches)]
+    if len(seeds) > args.max_matches or len(set(seeds)) != len(seeds):
+        raise ValueError("Seeds must be unique and within the match budget")
     for seed in seeds:
         if type(seed) is not int or not 0 <= seed < 2**63:
             raise ValueError("Seeds must be integers from 0 through 2**63 - 1")
@@ -669,6 +676,8 @@ def resolve_scenarios(args: argparse.Namespace) -> list[ScenarioSpec]:
     if args.scenarios is None:
         return list(SCENARIOS.values())
     names = [part.strip() for part in args.scenarios.split(",") if part.strip()]
+    if not names or len(set(names)) != len(names):
+        raise ValueError("Scenarios must be nonempty and unique")
     unknown = [name for name in names if name not in SCENARIOS]
     if unknown:
         raise ValueError(f"Unknown scenarios: {', '.join(unknown)}")
@@ -717,10 +726,15 @@ def run_batch(
             live, halftime = plan_commands(spec.name, initial)
             final, events, accepted, rejected = run_match(initial, live, halftime)
             # Identical inputs must replay bit-for-bit (hash plus event IDs).
-            final_again, events_again, _, _ = run_match(initial, live, halftime)
-            replay_ok = state_hash(final_again) == state_hash(final) and [
-                e.id for e in events_again
-            ] == [e.id for e in events]
+            final_again, events_again, accepted_again, rejected_again = run_match(
+                initial, live, halftime
+            )
+            replay_ok = (
+                state_hash(final_again) == state_hash(final)
+                and events_again == events
+                and accepted_again == accepted
+                and rejected_again == rejected
+            )
             if not replay_ok:
                 replay_mismatches += 1
             check_triples.append(
@@ -801,7 +815,7 @@ def run_batch(
     by_scenario: dict[str, list[dict[str, Any]]] = {}
     for record in matches:
         by_scenario.setdefault(record["scenario"], []).append(record)
-    scenario_reports = {
+    scenario_reports: dict[str, Any] = {
         name: {"matches": len(rows), "aggregate": summarize_scenario(rows)}
         for name, rows in by_scenario.items()
     }
@@ -814,20 +828,22 @@ def run_batch(
     # Statistical observations only: no required goal rates on small samples.
     observations: list[str] = []
     for name, report in scenario_reports.items():
-        agg = report["aggregate"]
+        aggregate = report["aggregate"]
         observations.append(
             f"{name}: {report['matches']} matches, "
-            f"home/draw/away {agg['home_wins']}/{agg['draws']}/{agg['away_wins']}, "
-            f"goals {agg['goals_home']}:{agg['goals_away']}, "
-            f"abandoned {agg['abandoned']}."
+            f"home/draw/away {aggregate['home_wins']}/{aggregate['draws']}/"
+            f"{aggregate['away_wins']}, "
+            f"goals {aggregate['goals_home']}:{aggregate['goals_away']}, "
+            f"abandoned {aggregate['abandoned']}."
         )
     if "baseline" in scenario_reports and "home_swap" in scenario_reports:
         base = scenario_reports["baseline"]["aggregate"]
-        swapped = scenario_reports["home_swap"]["aggregate"]
+        swapped_report = scenario_reports["home_swap"]["aggregate"]
         observations.append(
             "Same-seed baseline vs home_swap (descriptive, not a tactic effect): "
             f"baseline home/draw/away {base['home_wins']}/{base['draws']}/{base['away_wins']}, "
-            f"swapped {swapped['home_wins']}/{swapped['draws']}/{swapped['away_wins']}."
+            f"swapped {swapped_report['home_wins']}/{swapped_report['draws']}/"
+            f"{swapped_report['away_wins']}."
         )
 
     return {
@@ -883,11 +899,12 @@ def render_markdown(content: dict[str, Any], digest: str) -> str:
     ]
     for spec in meta["scenarios"]:
         report = content["scenarios"][spec["name"]]
-        agg = report["aggregate"]
+        aggregate = report["aggregate"]
         lines.append(
-            f"| {spec['name']} | {report['matches']} | {agg['full_time']} | "
-            f"{agg['abandoned']} | {agg['home_wins']}/{agg['draws']}/{agg['away_wins']} | "
-            f"{agg['goals_home']}:{agg['goals_away']} |"
+            f"| {spec['name']} | {report['matches']} | {aggregate['full_time']} | "
+            f"{aggregate['abandoned']} | {aggregate['home_wins']}/{aggregate['draws']}/"
+            f"{aggregate['away_wins']} | "
+            f"{aggregate['goals_home']}:{aggregate['goals_away']} |"
         )
     lines += [
         "",
