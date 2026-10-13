@@ -100,6 +100,8 @@ class FakeDatabase:
 
 
 class FakeMessage:
+    photo = None
+
     def __init__(self, db: FakeDatabase) -> None:
         self.db = db
         self.from_user = SimpleNamespace(id=123)

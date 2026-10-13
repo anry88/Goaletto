@@ -10,8 +10,14 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
+from aiogram.types import (
+    BufferedInputFile,
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    InputMediaPhoto,
+    Message,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.club_view import (
@@ -122,17 +128,21 @@ async def player_card(query: CallbackQuery, database: Database) -> None:
             text, keyboard, card, recipe, key = await build_player_response(
                 session, user.id, query.id, now, person_id, page
             )
-        await edit_response(message, text, keyboard)
-        if recipe is not None and key:
-            await _maybe_send_portrait(
+        if recipe is not None and key and caption_fits(text):
+            shown = await _maybe_edit_portrait(
                 query,
                 recipe,
                 key,
+                text=text,
+                keyboard=keyboard,
                 database=database,
                 kit_version=card.kit_version,
                 kit_primary=card.kit_primary,
                 kit_secondary=card.kit_secondary,
             )
+            if shown:
+                return
+        await edit_response(message, text, keyboard)
     except PermissionDenied:
         await edit_response(
             message, "Нет доступа: клуб больше не принадлежит вам. Откройте /start."
@@ -142,20 +152,22 @@ async def player_card(query: CallbackQuery, database: Database) -> None:
         await edit_response(message, text, keyboard)
 
 
-async def _maybe_send_portrait(
+async def _maybe_edit_portrait(
     query: CallbackQuery,
     recipe: WholePortraitRecipe,
     key: str,
     *,
+    text: str,
+    keyboard: InlineKeyboardMarkup,
     kit_primary: str,
     kit_secondary: str,
     kit_version: int = 1,
     database: Database | None = None,
-) -> None:
-    """Best-effort photo; any failure keeps the text card as the source of truth."""
+) -> bool:
+    """Replace the same message, with caption/buttons; network outside transactions."""
     message = query.message
     if not isinstance(message, Message):
-        return
+        return False
     try:
         if database is not None:
             async with database.transaction() as session:
@@ -164,18 +176,28 @@ async def _maybe_send_portrait(
             file_id = await _store.get(key)
         if file_id is not None:
             try:
-                await message.answer_photo(photo=file_id)
-                return
+                await message.edit_media(
+                    InputMediaPhoto(media=file_id, caption=text, parse_mode="HTML"),
+                    reply_markup=keyboard,
+                )
+                return True
             except TelegramBadRequest as error:
+                if "message is not modified" in error.message.lower():
+                    return True
                 if not any(
                     code in error.message.lower()
                     for code in ("wrong file", "file_id", "file identifier")
                 ):
-                    return
+                    raise
         png = render_portrait_png(
             recipe, kit_primary=kit_primary, kit_secondary=kit_secondary, size=256
         )
-        sent = await message.answer_photo(photo=BufferedInputFile(png, filename="p.png"))
+        sent = await message.edit_media(
+            InputMediaPhoto(
+                media=BufferedInputFile(png, filename="p.png"), caption=text, parse_mode="HTML"
+            ),
+            reply_markup=keyboard,
+        )
         photos = getattr(sent, "photo", None) or []
         if photos:
             if database is not None:
@@ -196,5 +218,17 @@ async def _maybe_send_portrait(
                     )
             else:
                 await _store.put(key, photos[-1].file_id)
-    except Exception:
-        return
+        return True
+    except TelegramBadRequest as error:
+        return "message is not modified" in error.message.lower()
+    except (TelegramAPIError, OSError, ValueError):
+        return False
+
+
+def caption_fits(text: str) -> bool:
+    """Telegram caption budget after parsing our escaped HTML, in UTF-16 units."""
+    import re
+    from html import unescape
+
+    plain = unescape(re.sub(r"</?b>", "", text))
+    return len(plain.encode("utf-16-le")) // 2 <= 1024

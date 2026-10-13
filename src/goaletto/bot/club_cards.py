@@ -26,16 +26,16 @@ CLUB_CALLBACK = "vc:c"
 PAGE_SIZE = 5
 
 SKILL_LABELS = (
-    ("goalkeeping", "ВРТ"),
-    ("defending", "ЗЩТ"),
-    ("playmaking", "ПЛМ"),
-    ("winger", "ФЛН"),
-    ("attacking", "АТК"),
-    ("set_pieces", "СТД"),
-    ("stamina", "ВЫН"),
-    ("pace", "СКР"),
-    ("leadership", "ЛДР"),
-    ("loyalty", "ЛОЯ"),
+    ("goalkeeping", "Вратарское мастерство"),
+    ("defending", "Защита"),
+    ("playmaking", "Плеймейкинг"),
+    ("winger", "Фланговая игра"),
+    ("attacking", "Атака"),
+    ("set_pieces", "Стандарты"),
+    ("stamina", "Выносливость"),
+    ("pace", "Скорость"),
+    ("leadership", "Лидерство"),
+    ("loyalty", "Лояльность"),
 )
 
 STATUS_TEXT = {
@@ -114,8 +114,7 @@ def is_view_callback(value: str | None) -> bool:
 def menu_view() -> tuple[str, InlineKeyboardMarkup]:
     text = (
         "🏠 <b>Главное меню</b>\n\n"
-        "Доступны просмотр клуба, состава и карточек игроков. "
-        "Остальные разделы подключаются по мере готовности игровых use cases."
+        "Управляйте составом и тактикой, следите за матчами и таблицей лиги."
     )
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -226,7 +225,7 @@ def player_view(
         raise ValueError("Invalid player form")
     status = STATUS_TEXT.get(card.status, card.status)
     lines = [
-        f"👤 <b>{escape(card.name)}</b> · {escape(card.position)} · {card.age}",
+        f"👤 <b>{escape(card.name)}</b> · {escape(card.position)} · возраст {card.age}",
         f"Статус: {status}",
     ]
     if card.status == "last_season":
@@ -238,10 +237,10 @@ def player_view(
     if card.alternative_positions:
         lines.append(f"Также: {escape('/'.join(card.alternative_positions))}")
     lines.append("")
-    skill_text = " · ".join(
-        f"{label} {value}" for (_, label), value in zip(SKILL_LABELS, skills, strict=True)
+    skill_text = "\n".join(
+        f"{label}: {value}" for (_, label), value in zip(SKILL_LABELS, skills, strict=True)
     )
-    lines.append(f"Навыки: {skill_text}")
+    lines.append(f"<b>Навыки (1–20)</b>\n{skill_text}")
     lines.append(f"Форма: {card.form}/8 · Опыт: {card.experience} · Мораль: {card.morale}")
     if card.club_name is not None:
         lines.append(f"Клуб: {escape(card.club_name)}")

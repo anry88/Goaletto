@@ -177,3 +177,35 @@ def test_menu_has_no_fake_market_or_hiring() -> None:
     assert "market" not in joined and "hire" not in joined and "transfer" not in joined
     text, keyboard = stale_view()
     assert "устарела" in text
+
+
+def test_player_full_skill_names_and_caption_budget() -> None:
+    from dataclasses import replace
+
+    from goaletto.bot.player_router import caption_fits
+
+    text, _ = player_view(player())
+    for label, value in (
+        ("Вратарское мастерство", 1),
+        ("Защита", 7),
+        ("Плеймейкинг", 10),
+        ("Фланговая игра", 10),
+        ("Атака", 12),
+        ("Стандарты", 10),
+        ("Выносливость", 11),
+        ("Скорость", 12),
+        ("Лидерство", 10),
+        ("Лояльность", 10),
+    ):
+        assert f"\n{label}: {value}\n" in text
+    assert caption_fits(text)
+    longest = replace(
+        player("last_season"),
+        name="😀" * 100,
+        club_name="&" * 100,
+        alternative_positions=("DL", "DR", "MC", "ML", "MR"),
+        injured=True,
+    )
+    assert caption_fits(player_view(longest)[0])
+    assert caption_fits("<b>" + "&amp;" * 1024 + "</b>")
+    assert not caption_fits("😀" * 513)

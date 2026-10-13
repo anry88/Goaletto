@@ -4,6 +4,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from aiogram.types import InlineKeyboardMarkup
 
 from goaletto.bot import player_router, squad_router
 from goaletto.bot.club_cards import player_callback, squad_callback
@@ -124,7 +125,10 @@ def make_message(fail_on: tuple[str, ...] = ()) -> Any:
     async def edit_text(text: str, reply_markup: Any = None) -> None:
         edits.append((text, reply_markup))
 
-    async def answer_photo(photo: Any, **kwargs: Any) -> FakeSent:
+    async def edit_media(media: Any, **kwargs: Any) -> FakeSent:
+        photo = media.media
+        assert media.caption == "card"
+        assert kwargs["reply_markup"] is not None
         if isinstance(photo, str) and photo in fail_on:
             from aiogram.exceptions import TelegramBadRequest
             from aiogram.methods import SendPhoto
@@ -138,7 +142,7 @@ def make_message(fail_on: tuple[str, ...] = ()) -> Any:
     object.__setattr__(message, "edits", edits)
     object.__setattr__(message, "photos", photos)
     object.__setattr__(message, "edit_text", edit_text)
-    object.__setattr__(message, "answer_photo", answer_photo)
+    object.__setattr__(message, "edit_media", edit_media)
     return message
 
 
@@ -235,23 +239,41 @@ async def test_portrait_retry_uses_file_id_and_recovers_from_stale() -> None:
         try:
             message = make_message()
             query = make_query(player_callback(uuid4()), message)
-            await player_router._maybe_send_portrait(
-                query, recipe, key, kit_primary="#743D42", kit_secondary="#F2E9D8"
+            await player_router._maybe_edit_portrait(
+                query,
+                recipe,
+                key,
+                text="card",
+                keyboard=InlineKeyboardMarkup(inline_keyboard=[]),
+                kit_primary="#743D42",
+                kit_secondary="#F2E9D8",
             )
             assert rendered == [("#743D42", "#F2E9D8")]
             assert len(message.photos) == 1
             # Second view reuses the durable file_id without re-rendering.
             rendered.clear()
             query2 = make_query(player_callback(uuid4()), message)
-            await player_router._maybe_send_portrait(
-                query2, recipe, key, kit_primary="#743D42", kit_secondary="#F2E9D8"
+            await player_router._maybe_edit_portrait(
+                query2,
+                recipe,
+                key,
+                text="card",
+                keyboard=InlineKeyboardMarkup(inline_keyboard=[]),
+                kit_primary="#743D42",
+                kit_secondary="#F2E9D8",
             )
             assert rendered == [] and len(message.photos) == 2
             # A stale file_id (e.g. after restart) falls back to same-face render.
             stale_message = make_message(fail_on=("uploaded-id",))
             query3 = make_query(player_callback(uuid4()), stale_message)
-            await player_router._maybe_send_portrait(
-                query3, recipe, key, kit_primary="#743D42", kit_secondary="#F2E9D8"
+            await player_router._maybe_edit_portrait(
+                query3,
+                recipe,
+                key,
+                text="card",
+                keyboard=InlineKeyboardMarkup(inline_keyboard=[]),
+                kit_primary="#743D42",
+                kit_secondary="#F2E9D8",
             )
             assert rendered == [("#743D42", "#F2E9D8")]
         finally:

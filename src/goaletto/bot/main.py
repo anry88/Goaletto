@@ -6,6 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from goaletto.bot.access import TelegramAccess
+from goaletto.bot.commands import configure_commands
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
 
@@ -88,6 +89,7 @@ async def run() -> None:
         internal_telegram_ids=settings.internal_telegram_ids,
     )
     try:
+        await configure_commands(bot, game_enabled=settings.game_enabled)
         await dispatcher.start_polling(bot, close_bot_session=False)
     finally:
         await bot.session.close()
