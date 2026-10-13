@@ -33,8 +33,11 @@ message IDs, содержимого сообщений и raw exceptions. Оши
 | Состояние | Коды (info) | Пояснение |
 |---|---|---|
 | Календарь не активирован | `JOBS_HELD_AWAITING_ACTIVATION`, `JOBS_HELD_ROLLOVER` | Мир создаёт jobs held; pending переводятся только явным `goaletto-runtime --apply`. Rollover всегда held |
+| Worker held по контракту | `JOBS_HELD_FUTURE_NORMAL` | Held `ownership.*`/`training.apply`/`finance.weekly`/`stadium.complete`/`market.close`/`market.cancel_player`/`system.ping` с будущим due: недельный понедельник, дата расширения, дедлайн аукциона. Отсутствие `fixture_id` у них — норма, не повреждение матча |
 | Перерыв матча | `MATCH_HALFTIME_WAIT_NORMAL` | Фаза `half_time`, transition второго тайма ещё не просрочен (нормальные 180с перерыва) |
 | Пауза/перенос | `MATCH_PAUSED_OPERATOR`, `JOBS_DEFERRED_BY_PAUSE` | Явный операторский `pause_match`/`postpone_fixture`; worker пропускает paused fixtures штатно |
+| Восстановленное окно | `MATCH_RECOVERED_WINDOW_NORMAL` | Recovery перенёс deadline; сравнение идёт по `match.next_due_at`/`recovery.next_due_at` с учётом `paused_seconds`, не по исходному kickoff |
+| Отложенный расчёт аукциона | `MARKET_CLOSE_DEFERRED_BY_MATCH` | Открытый лот past `ends_at`, но матч продавца/покупателя locked и не закончен: settlement ждёт финала штатно |
 | Abandoned без результата | (нет finding) | Abandoned никогда не получает очки/3:0; отсутствие receipt — норма |
 | Stale/superseded outbox fails | (нет finding, только агрегаты) | `skip_stale`/`skip_unavailable`/`superseded` — штатная гигиена sender |
 
@@ -62,12 +65,56 @@ message IDs, содержимого сообщений и raw exceptions. Оши
 Supported held jobs при active season. Проверить: `season_ids`, статус сезона;
 сверить с `RUNTIME_KINDS`. Возможно, jobs добавлены после `--apply`.
 Исправление: повторная явная активация — решением оператора, не диагностикой.
+Календарные проверки не применяются к worker jobs: `finance.weekly` несёт
+`club_id`, `training.apply` — `plan_id`, `market.close` — `auction_id`,
+ownership — `ownership_id`; у них нет `fixture_id` по контракту.
+
+### JOBS_UNKNOWN_KIND (warn)
+Pending/held job с kind вне календарных, worker и `system.ping`/`season.rollover`.
+Проверить `job_ids` и версию продюсера; failed с тем же корнем даёт
+`JOBS_FAILED_UNSUPPORTED_KIND` (alarm). Исправление — чинить продюсер и
+перепостановка предложением Codex, не здесь.
 
 ### MATCH_TICK_LATE (alarm)
 Live-матч past `next_due_at + порог`. Проверить: связку с `JOBS_PENDING_OVERDUE`
 по тем же `fixture_ids` (общий корень — вставший worker), фазу матча, отсутствие
-паузы. Исправления: восстановление worker; догон тиков — только по процедуре
-восстановления (Codex), не залпом.
+паузы. После recovery сравнивать с перенесённым `next_due_at` (включая
+`paused_seconds`), не с исходным kickoff. Исправления: восстановление worker;
+догон тиков — только по процедуре восстановления (Codex), не залпом.
+
+### MATCH_RECOVERED_WINDOW_NORMAL (info)
+Live-матч с recovery и будущим перенесённым окном (`recovery.next_due_at`
+и `match.next_due_at` в будущем в пределах порога). Норма: worker сохранил
+checkpoint/hash и сдвинул `tick`/`second_half_start`/`finalize_result` jobs.
+Проверить `match_ids`/`fixture_ids`; новый простой past окно даст обычный
+`MATCH_TICK_LATE`.
+
+### MATCH_RECOVERY_MISMATCH (alarm)
+Recovery не согласуется с матчем при полном покрытии (`recoveries`, `matches`,
+`jobs`, `fixtures`, ticks): пустой hash, `checkpoint_tick` вне 0–29 или впереди
+`completed_tick`, `next_due_at <= previous_due_at/recovered_at`, чужой
+`fixture_id`, live-матч без календарного job на перенесённое окно. Проверить
+`match_ids`, checkpoint и `match_recoveries` read-only; чинить — Codex.
+
+### FINANCE_RESERVE_EXCEEDS_CASH (alarm)
+`FinanceAccount.reserved > clubs.budget` (cash). Доказывается одной строкой,
+полнота не нужна. Проверить `club_ids`; сверка ledger не сканируется целиком.
+
+### FINANCE_RESERVATION_MISMATCH (alarm)
+Сумма активных `money_reservations` != `FinanceAccount.reserved` при полном
+покрытии обоих scopes. При усечении (`finance_accounts`/`reservations` в
+`DIAGNOSTICS_INCOMPLETE_TRUNCATED`) вывод подавлен: повторить с большим
+`--limit`. Проверить `club_ids`.
+
+### MARKET_RESERVATION_MISMATCH (alarm)
+Открытый лот с `highest_bid_id` без активного резерва правильного клуба/суммы:
+нет bid, чужой `auction_id`, резерв не `active`, клуб или сумма не совпадают.
+Требует полного покрытия (`auctions`/`bids`/`reservations`), иначе подавлен.
+Sold/expired/cancelled — терминальные, не проверяются. Проверить `auction_ids`.
+
+### MARKET_CLOSE_JOB_MISSING (alarm)
+Открытый лот без pending/held `market.close` job при полном покрытии jobs и
+рынка. Проверить `auction_ids`; перепостановка — предложением Codex.
 
 ### FIXTURE_LIVE_WITHOUT_MATCH (alarm)
 Kickoff закоммичен, строки матча нет. Проверить: был ли lock_lineup (ищите job
@@ -127,12 +174,17 @@ Scope упёрся в `--limit`. Действие: повторить с бол�
 
 ## Ограничения
 
-* Sender scopes (outbox/boards/attempts) всегда глобальные; `--season`
-  сужает только календарь (jobs/fixtures/matches/ticks/results/seasons).
+* Sender scopes (outbox/boards/attempts), финансы (`finance_accounts`,
+  `reservations`) и рынок (`auctions`/`bids`) всегда глобальные; `--season`
+  сужает только календарь (jobs/fixtures/matches/ticks/results/seasons/recoveries).
 * `MATCH_TICK_LATE` и `JOBS_PENDING_OVERDUE` могут указывать на один корень;
   чинить worker, а не коды по отдельности.
+* Открытый аукцион past `ends_at` сам по себе не авария: settlement ждёт финала
+  матча (`MARKET_CLOSE_DEFERRED_BY_MATCH`). Ledger целиком не сканируется.
 * Диагностика не выполняет restore, deployment, polling и отправку сообщений
   и не заменяет проверки AND-72/AND-82 перед допуском людей.
+* Старый completed `system.ping` не доказывает живой worker; heartbeat-таблица
+  не вводится этим изменением — только отдельное предложение Codex.
 * Интеграционная проверка на живой Goaletto DB — read-only прогоном CLI по
   согласованному времени; новые БД запрещены; read-only диагностика не выполняет reset. Если доступа к DB нет,
   интеграционный прогон передаётся Codex.

@@ -26,6 +26,33 @@ SUPPORTED_JOB_KINDS = frozenset(
     }
 )
 
+#: Worker job kinds handled by ``infrastructure.jobs.process_one_job`` outside
+#: the calendar scope. Kept separate from ``SUPPORTED_JOB_KINDS`` because
+#: calendar checks (fixture linkage, activation, tick lateness) do not apply:
+#: these jobs carry club/plan/auction payloads and never a fixture reference.
+#: Mirrors the ``RUNTIME_KINDS | {...}`` branch in ``infrastructure/jobs.py``.
+WORKER_JOB_KINDS = frozenset(
+    {
+        "ownership.remind",
+        "ownership.expire",
+        "training.apply",
+        "finance.weekly",
+        "stadium.complete",
+        "market.close",
+        "market.cancel_player",
+    }
+)
+
+#: Trivial liveness jobs with an empty payload; never carry season/fixture refs.
+SYSTEM_JOB_KINDS = frozenset({"system.ping"})
+
+#: Every kind the worker claims (calendar + worker + system + rollover).
+#: Unknown kinds are reported as ``JOBS_UNKNOWN_KIND`` instead of being
+#: mistaken for calendar damage.
+ALL_KNOWN_JOB_KINDS = frozenset(
+    SUPPORTED_JOB_KINDS | WORKER_JOB_KINDS | SYSTEM_JOB_KINDS | {"season.rollover"}
+)
+
 #: Outbox attempts after which a row is terminally failed by the sender.
 OUTBOX_MAX_ATTEMPTS = 8
 
@@ -41,6 +68,14 @@ class JobRow:
     season_id: UUID | None
     fixture_id: UUID | None
     tick_number: int | None
+    # Worker routing refs extracted from the job payload (never a fixture).
+    # Absence of fixture_id on these kinds is normal, not match damage.
+    club_id: UUID | None = None
+    auction_id: UUID | None = None
+    plan_id: UUID | None = None
+    expansion_id: UUID | None = None
+    person_id: UUID | None = None
+    ownership_id: UUID | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -83,6 +118,8 @@ class FixtureRow:
     lineup_lock_at: datetime
     actual_start_at: datetime | None
     actual_finish_at: datetime | None
+    home_club_id: UUID | None = None
+    away_club_id: UUID | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -94,6 +131,7 @@ class MatchRow:
     next_due_at: datetime | None
     tick_numbers: tuple[int, ...]
     paused_at: datetime | None
+    paused_seconds: int = 0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -114,6 +152,61 @@ class AppearanceStock:
     total: int
     used: int
     free: int
+
+
+@dataclass(frozen=True, kw_only=True)
+class RecoveryRow:
+    """Bounded projection of one ``match_recoveries`` row.
+
+    ``fixture_id`` is resolved via the recovery match at collection time and
+    is ``None`` for orphan rows (provable mismatch, never silently dropped).
+    """
+
+    id: UUID
+    match_id: UUID
+    fixture_id: UUID | None
+    checkpoint_tick: int
+    state_hash: str
+    previous_due_at: datetime
+    next_due_at: datetime
+    recovered_at: datetime
+    reason: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class FinanceAccountRow:
+    """Cash comes from ``clubs.budget``; reserved/arrears from the account."""
+
+    club_id: UUID
+    cash: int
+    reserved: int
+    arrears: int
+
+
+@dataclass(frozen=True, kw_only=True)
+class ReservationRow:
+    id: UUID
+    club_id: UUID
+    amount: int
+    status: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class AuctionRow:
+    id: UUID
+    seller_club_id: UUID
+    status: str
+    ends_at: datetime
+    highest_bid_id: UUID | None
+
+
+@dataclass(frozen=True, kw_only=True)
+class BidRow:
+    id: UUID
+    auction_id: UUID
+    buyer_club_id: UUID
+    amount: int
+    reservation_id: UUID
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -139,4 +232,14 @@ class Snapshot:
     seasons: tuple[SeasonRow, ...] = ()
     seasons_truncated: bool = False
     appearance: tuple[AppearanceStock, ...] = ()
+    recoveries: tuple[RecoveryRow, ...] = ()
+    recoveries_truncated: bool = False
+    finance_accounts: tuple[FinanceAccountRow, ...] = ()
+    finance_truncated: bool = False
+    reservations: tuple[ReservationRow, ...] = ()
+    reservations_truncated: bool = False
+    auctions: tuple[AuctionRow, ...] = ()
+    auctions_truncated: bool = False
+    bids: tuple[BidRow, ...] = ()
+    bids_truncated: bool = False
     incomplete_scopes: tuple[str, ...] = field(default_factory=tuple)

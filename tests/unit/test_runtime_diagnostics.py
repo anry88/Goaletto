@@ -585,3 +585,401 @@ def test_cli_parser_exposes_explicit_thresholds() -> None:
         Thresholds(appearance_low_threshold=-1)
     with pytest.raises(ValueError):
         Thresholds(row_limit=0)
+
+
+def _worker_job(kind: str, **overrides: object) -> JobRow:
+    base: dict[str, object] = {
+        "kind": kind,
+        "status": "pending",
+        "due_at": NOW + timedelta(minutes=10),
+        "season_id": None,
+        "fixture_id": None,
+        "tick": None,
+    }
+    base.update(overrides)
+    return _job(**base)  # type: ignore[arg-type]
+
+
+def test_worker_kinds_need_no_fixture_id() -> None:
+    from goaletto.diagnostics.snapshot import ALL_KNOWN_JOB_KINDS
+
+    for kind in (
+        "ownership.remind",
+        "ownership.expire",
+        "training.apply",
+        "finance.weekly",
+        "stadium.complete",
+        "market.close",
+        "market.cancel_player",
+        "system.ping",
+    ):
+        assert kind in ALL_KNOWN_JOB_KINDS
+    jobs = tuple(
+        _worker_job(kind)
+        for kind in (
+            "ownership.remind",
+            "training.apply",
+            "finance.weekly",
+            "stadium.complete",
+            "market.close",
+            "market.cancel_player",
+            "system.ping",
+        )
+    )
+    codes = _codes(_snapshot(jobs=jobs))
+    assert "FIXTURE_LIVE_WITHOUT_MATCH" not in codes
+    assert "MATCH_TICK_LATE" not in codes
+    assert "JOBS_PENDING_OVERDUE" not in codes
+    assert "JOBS_UNKNOWN_KIND" not in codes
+
+
+def test_future_held_finance_is_normal() -> None:
+    job = _job(
+        kind="finance.weekly",
+        status="held",
+        due_at=NOW + timedelta(days=2),
+        season_id=None,
+        fixture_id=None,
+        tick=None,
+    )
+    codes = _codes(_snapshot(jobs=(job,)))
+    assert codes.get("JOBS_HELD_FUTURE_NORMAL") == 1
+    assert "JOBS_HELD_AFTER_ACTIVATION" not in codes
+    assert "JOBS_PENDING_OVERDUE" not in codes
+
+
+def test_unknown_kind_is_warn_not_calendar_damage() -> None:
+    job = _job(
+        kind="dragon.fire",
+        status="pending",
+        due_at=NOW + timedelta(minutes=5),
+        season_id=None,
+        fixture_id=None,
+        tick=None,
+    )
+    report = collect_report(_snapshot(jobs=(job,)))
+    by_code = {finding.code: finding for finding in report.findings}
+    assert by_code["JOBS_UNKNOWN_KIND"].severity == "warn"
+    assert "JOBS_PENDING_OVERDUE" not in by_code
+    assert "FIXTURE_LIVE_WITHOUT_MATCH" not in by_code
+
+
+def _recovery_world(*, late: bool = False, same_timestamps: bool = False) -> Snapshot:
+    fixture_id = FIXTURE
+    match_id = MATCH
+    if same_timestamps:
+        moved = NOW + timedelta(seconds=60)
+        previous = NOW - timedelta(seconds=60)
+    elif late:
+        moved = NOW - timedelta(seconds=600)
+        previous = NOW - timedelta(seconds=1200)
+    else:
+        moved = NOW + timedelta(seconds=60)
+        previous = NOW - timedelta(seconds=300)
+    fixture = FixtureRow(
+        id=fixture_id,
+        season_id=SEASON,
+        status="live",
+        scheduled_start_at=NOW - timedelta(minutes=10),
+        lineup_lock_at=NOW - timedelta(minutes=11),
+        actual_start_at=NOW - timedelta(minutes=10),
+        actual_finish_at=None,
+    )
+    match = _match(
+        match_id=match_id,
+        fixture_id=fixture_id,
+        phase="second_half",
+        completed=16,
+        next_due=moved,
+        ticks=tuple(range(1, 17)),
+    )
+    from goaletto.diagnostics.snapshot import RecoveryRow
+
+    recovery = RecoveryRow(
+        id=uuid4(),
+        match_id=match_id,
+        fixture_id=fixture_id,
+        checkpoint_tick=16,
+        state_hash="hash-16",
+        previous_due_at=previous,
+        next_due_at=moved,
+        recovered_at=previous + timedelta(seconds=10),
+        reason="worker_lag",
+    )
+    job = _job(
+        kind="match.tick",
+        status="pending",
+        due_at=moved,
+        season_id=SEASON,
+        fixture_id=fixture_id,
+        tick=17,
+    )
+    return _snapshot(fixtures=(fixture,), matches=(match,), jobs=(job,), recoveries=(recovery,))
+
+
+def test_recovered_future_window_is_normal() -> None:
+    codes = _codes(_recovery_world())
+    assert codes.get("MATCH_RECOVERED_WINDOW_NORMAL") == 1
+    assert "MATCH_TICK_LATE" not in codes
+    assert "MATCH_RECOVERY_MISMATCH" not in codes
+    assert "JOBS_PENDING_OVERDUE" not in codes
+
+
+def test_recovered_window_missed_again_is_late() -> None:
+    codes = _codes(_recovery_world(late=True))
+    assert codes.get("MATCH_TICK_LATE") == 1
+    assert codes.get("JOBS_PENDING_OVERDUE") == 1
+    assert "MATCH_RECOVERED_WINDOW_NORMAL" not in codes
+
+
+def test_identical_moved_timestamps_are_consistent() -> None:
+    codes = _codes(_recovery_world(same_timestamps=True))
+    assert codes.get("MATCH_RECOVERED_WINDOW_NORMAL") == 1
+    assert "MATCH_RECOVERY_MISMATCH" not in codes
+
+
+def test_recovery_future_checkpoint_is_mismatch() -> None:
+    from goaletto.diagnostics.snapshot import RecoveryRow
+
+    snapshot = _recovery_world()
+    bad = RecoveryRow(
+        id=uuid4(),
+        match_id=MATCH,
+        fixture_id=FIXTURE,
+        checkpoint_tick=25,
+        state_hash="hash-25",
+        previous_due_at=NOW - timedelta(seconds=300),
+        next_due_at=NOW + timedelta(seconds=60),
+        recovered_at=NOW - timedelta(seconds=290),
+        reason="worker_lag",
+    )
+    codes = _codes(
+        _snapshot(
+            fixtures=snapshot.fixtures,
+            matches=snapshot.matches,
+            jobs=snapshot.jobs,
+            recoveries=(bad,),
+        )
+    )
+    assert codes.get("MATCH_RECOVERY_MISMATCH") == 1
+
+
+def _market_world(
+    *,
+    reserve_status: str = "active",
+    reserve_amount: int | None = None,
+    auction_status: str = "open",
+    with_close_job: bool = True,
+    past_deadline: bool = False,
+) -> Snapshot:
+    from goaletto.diagnostics.snapshot import AuctionRow, BidRow, FinanceAccountRow, ReservationRow
+
+    seller = uuid4()
+    buyer = uuid4()
+    auction_id = uuid4()
+    bid_id = uuid4()
+    reservation_id = uuid4()
+    amount = 150000
+    ends = NOW - timedelta(hours=1) if past_deadline else NOW + timedelta(hours=1)
+    auction = AuctionRow(
+        id=auction_id,
+        seller_club_id=seller,
+        status=auction_status,
+        ends_at=ends,
+        highest_bid_id=bid_id if auction_status == "open" else None,
+    )
+    bid = BidRow(
+        id=bid_id,
+        auction_id=auction_id,
+        buyer_club_id=buyer,
+        amount=amount,
+        reservation_id=reservation_id,
+    )
+    reservation = ReservationRow(
+        id=reservation_id,
+        club_id=buyer,
+        amount=reserve_amount or amount,
+        status=reserve_status,
+    )
+    account = FinanceAccountRow(club_id=buyer, cash=600000, reserved=amount, arrears=0)
+    bids = (bid,) if auction_status == "open" else ()
+    reservations = (reservation,) if auction_status == "open" else ()
+    accounts = (account,) if auction_status == "open" else ()
+    jobs: tuple[JobRow, ...] = ()
+    if with_close_job and auction_status == "open":
+        jobs = (
+            JobRow(
+                id=uuid4(),
+                kind="market.close",
+                status="pending",
+                due_at=ends + timedelta(seconds=60),
+                attempts=0,
+                last_error=None,
+                season_id=None,
+                fixture_id=None,
+                tick_number=None,
+                auction_id=auction_id,
+            ),
+        )
+    return _snapshot(
+        jobs=jobs,
+        auctions=(auction,),
+        bids=bids,
+        reservations=reservations,
+        finance_accounts=accounts,
+    )
+
+
+def test_open_auction_healthy_has_no_mismatch() -> None:
+    codes = _codes(_market_world())
+    assert "MARKET_RESERVATION_MISMATCH" not in codes
+    assert "MARKET_CLOSE_JOB_MISSING" not in codes
+    assert "FINANCE_RESERVATION_MISMATCH" not in codes
+
+
+def test_sold_and_cancelled_auctions_are_terminal() -> None:
+    from goaletto.diagnostics.snapshot import AuctionRow
+
+    sold = AuctionRow(
+        id=uuid4(),
+        seller_club_id=uuid4(),
+        status="sold",
+        ends_at=NOW - timedelta(hours=2),
+        highest_bid_id=None,
+    )
+    cancelled = AuctionRow(
+        id=uuid4(),
+        seller_club_id=uuid4(),
+        status="cancelled",
+        ends_at=NOW - timedelta(hours=2),
+        highest_bid_id=None,
+    )
+    codes = _codes(_snapshot(auctions=(sold, cancelled)))
+    assert "MARKET_RESERVATION_MISMATCH" not in codes
+    assert "MARKET_CLOSE_JOB_MISSING" not in codes
+
+
+def test_wrong_reserve_is_mismatch() -> None:
+    codes = _codes(_market_world(reserve_amount=120000))
+    assert codes.get("MARKET_RESERVATION_MISMATCH") == 1
+    released = _codes(_market_world(reserve_status="released"))
+    assert released.get("MARKET_RESERVATION_MISMATCH") == 1
+
+
+def test_open_auction_without_close_job_is_missing() -> None:
+    codes = _codes(_market_world(with_close_job=False))
+    assert codes.get("MARKET_CLOSE_JOB_MISSING") == 1
+
+
+def test_finance_reserve_exceeds_cash() -> None:
+    from goaletto.diagnostics.snapshot import FinanceAccountRow
+
+    account = FinanceAccountRow(club_id=uuid4(), cash=50000, reserved=120000, arrears=0)
+    codes = _codes(_snapshot(finance_accounts=(account,)))
+    assert codes.get("FINANCE_RESERVE_EXCEEDS_CASH") == 1
+
+
+def test_finance_sum_mismatch_needs_full_scope() -> None:
+    from goaletto.diagnostics.snapshot import FinanceAccountRow, ReservationRow
+
+    club = uuid4()
+    account = FinanceAccountRow(club_id=club, cash=600000, reserved=100000, arrears=0)
+    reservations = (
+        ReservationRow(id=uuid4(), club_id=club, amount=100000, status="active"),
+        ReservationRow(id=uuid4(), club_id=club, amount=50000, status="active"),
+    )
+    codes = _codes(_snapshot(finance_accounts=(account,), reservations=reservations))
+    assert codes.get("FINANCE_RESERVATION_MISMATCH") == 1
+    truncated = _snapshot(
+        finance_accounts=(account,),
+        reservations=reservations,
+        reservations_truncated=True,
+        incomplete_scopes=("reservations",),
+    )
+    truncated_codes = _codes(truncated)
+    assert truncated_codes.get("DIAGNOSTICS_INCOMPLETE_TRUNCATED") == 1
+    assert "FINANCE_RESERVATION_MISMATCH" not in truncated_codes
+
+
+def test_market_truncation_suppresses_mismatch() -> None:
+    snapshot = _market_world(reserve_amount=120000)
+    truncated = _snapshot(
+        jobs=snapshot.jobs,
+        auctions=snapshot.auctions,
+        bids=snapshot.bids,
+        reservations=snapshot.reservations,
+        finance_accounts=snapshot.finance_accounts,
+        bids_truncated=True,
+        incomplete_scopes=("bids",),
+    )
+    codes = _codes(truncated)
+    assert codes.get("DIAGNOSTICS_INCOMPLETE_TRUNCATED") == 1
+    assert "MARKET_RESERVATION_MISMATCH" not in codes
+
+
+def test_market_deferred_by_active_match_is_normal() -> None:
+    from goaletto.diagnostics.snapshot import AuctionRow, BidRow
+
+    seller = uuid4()
+    buyer = uuid4()
+    auction_id = uuid4()
+    bid_id = uuid4()
+    auction = AuctionRow(
+        id=auction_id,
+        seller_club_id=seller,
+        status="open",
+        ends_at=NOW - timedelta(minutes=30),
+        highest_bid_id=bid_id,
+    )
+    bid = BidRow(
+        id=bid_id, auction_id=auction_id, buyer_club_id=buyer, amount=150000, reservation_id=uuid4()
+    )
+    fixture = FixtureRow(
+        id=FIXTURE,
+        season_id=SEASON,
+        status="live",
+        scheduled_start_at=NOW - timedelta(minutes=20),
+        lineup_lock_at=NOW - timedelta(minutes=21),
+        actual_start_at=NOW - timedelta(minutes=20),
+        actual_finish_at=None,
+        home_club_id=seller,
+        away_club_id=uuid4(),
+    )
+    job = JobRow(
+        id=uuid4(),
+        kind="market.close",
+        status="pending",
+        due_at=NOW + timedelta(seconds=60),
+        attempts=1,
+        last_error=None,
+        season_id=None,
+        fixture_id=None,
+        tick_number=None,
+        auction_id=auction_id,
+    )
+    from goaletto.diagnostics.snapshot import ReservationRow
+
+    reservation = ReservationRow(
+        id=bid.reservation_id, club_id=buyer, amount=150000, status="active"
+    )
+    codes = _codes(
+        _snapshot(
+            fixtures=(fixture,),
+            auctions=(auction,),
+            bids=(bid,),
+            reservations=(reservation,),
+            jobs=(job,),
+        )
+    )
+    assert codes.get("MARKET_CLOSE_DEFERRED_BY_MATCH") == 1
+    assert "JOBS_PENDING_OVERDUE" not in codes
+
+
+def test_new_aggregates_and_routing_ids_present() -> None:
+    snapshot = _market_world()
+    report = collect_report(snapshot)
+    assert report.aggregates["auctions_total"] == 1
+    assert report.aggregates["bids_total"] == 1
+    assert report.aggregates["recoveries_total"] == 0
+    blob = report_to_dict(report)
+    assert blob["aggregates"]["finance_accounts_total"] == 1

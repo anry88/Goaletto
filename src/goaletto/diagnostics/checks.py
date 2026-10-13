@@ -28,7 +28,14 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from goaletto.diagnostics.snapshot import OUTBOX_MAX_ATTEMPTS, SUPPORTED_JOB_KINDS, Snapshot
+from goaletto.diagnostics.snapshot import (
+    ALL_KNOWN_JOB_KINDS,
+    OUTBOX_MAX_ATTEMPTS,
+    SUPPORTED_JOB_KINDS,
+    SYSTEM_JOB_KINDS,
+    WORKER_JOB_KINDS,
+    Snapshot,
+)
 
 #: Hard cap on UUID samples per finding, keeping reports bounded and readable.
 MAX_SAMPLE_IDS = 20
@@ -42,6 +49,8 @@ SEVERITY_ALARM = "alarm"
 JOBS_HELD_AWAITING_ACTIVATION = "JOBS_HELD_AWAITING_ACTIVATION"
 JOBS_HELD_ROLLOVER = "JOBS_HELD_ROLLOVER"
 JOBS_HELD_AFTER_ACTIVATION = "JOBS_HELD_AFTER_ACTIVATION"
+JOBS_HELD_FUTURE_NORMAL = "JOBS_HELD_FUTURE_NORMAL"
+JOBS_UNKNOWN_KIND = "JOBS_UNKNOWN_KIND"
 JOBS_PENDING_OVERDUE = "JOBS_PENDING_OVERDUE"
 JOBS_FAILED_INVALID_STATE = "JOBS_FAILED_INVALID_STATE"
 JOBS_FAILED_UNSUPPORTED_KIND = "JOBS_FAILED_UNSUPPORTED_KIND"
@@ -50,6 +59,13 @@ JOBS_DEFERRED_BY_PAUSE = "JOBS_DEFERRED_BY_PAUSE"
 MATCH_TICK_LATE = "MATCH_TICK_LATE"
 MATCH_HALFTIME_WAIT_NORMAL = "MATCH_HALFTIME_WAIT_NORMAL"
 MATCH_PAUSED_OPERATOR = "MATCH_PAUSED_OPERATOR"
+MATCH_RECOVERED_WINDOW_NORMAL = "MATCH_RECOVERED_WINDOW_NORMAL"
+MATCH_RECOVERY_MISMATCH = "MATCH_RECOVERY_MISMATCH"
+FINANCE_RESERVE_EXCEEDS_CASH = "FINANCE_RESERVE_EXCEEDS_CASH"
+FINANCE_RESERVATION_MISMATCH = "FINANCE_RESERVATION_MISMATCH"
+MARKET_RESERVATION_MISMATCH = "MARKET_RESERVATION_MISMATCH"
+MARKET_CLOSE_DEFERRED_BY_MATCH = "MARKET_CLOSE_DEFERRED_BY_MATCH"
+MARKET_CLOSE_JOB_MISSING = "MARKET_CLOSE_JOB_MISSING"
 FIXTURE_LIVE_WITHOUT_MATCH = "FIXTURE_LIVE_WITHOUT_MATCH"
 OUTBOX_LEASE_EXPIRED = "OUTBOX_LEASE_EXPIRED"
 OUTBOX_BACKLOG_OVERDUE = "OUTBOX_BACKLOG_OVERDUE"
@@ -76,6 +92,14 @@ FINDING_CODES: dict[str, tuple[str, str]] = {
     JOBS_HELD_AFTER_ACTIVATION: (
         SEVERITY_WARN,
         "Supported held jobs remain for an active season; activation looks incomplete.",
+    ),
+    JOBS_HELD_FUTURE_NORMAL: (
+        SEVERITY_INFO,
+        "Held worker/system jobs with a future due moment; not yet released by design.",
+    ),
+    JOBS_UNKNOWN_KIND: (
+        SEVERITY_WARN,
+        "Pending or held jobs with a kind no worker handler claims; needs producer triage.",
     ),
     JOBS_PENDING_OVERDUE: (
         SEVERITY_ALARM,
@@ -105,6 +129,34 @@ FINDING_CODES: dict[str, tuple[str, str]] = {
     MATCH_PAUSED_OPERATOR: (
         SEVERITY_INFO,
         "Fixtures/matches in explicit operator pause; not a runtime accident.",
+    ),
+    MATCH_RECOVERED_WINDOW_NORMAL: (
+        SEVERITY_INFO,
+        "Live matches with a recovery-moved future window; the moved deadline applies.",
+    ),
+    MATCH_RECOVERY_MISMATCH: (
+        SEVERITY_ALARM,
+        "Recovery rows disagree with their match checkpoint or have no live job.",
+    ),
+    FINANCE_RESERVE_EXCEEDS_CASH: (
+        SEVERITY_ALARM,
+        "Finance accounts holding more reserved funds than cash on hand.",
+    ),
+    FINANCE_RESERVATION_MISMATCH: (
+        SEVERITY_ALARM,
+        "Active money reservations do not sum to the account reserved total.",
+    ),
+    MARKET_RESERVATION_MISMATCH: (
+        SEVERITY_ALARM,
+        "Open auctions whose highest bid lacks a matching active reservation.",
+    ),
+    MARKET_CLOSE_DEFERRED_BY_MATCH: (
+        SEVERITY_INFO,
+        "Open auctions past deadline whose settlement waits for an active match.",
+    ),
+    MARKET_CLOSE_JOB_MISSING: (
+        SEVERITY_ALARM,
+        "Open auctions with no pending or held market.close job on full coverage.",
     ),
     FIXTURE_LIVE_WITHOUT_MATCH: (
         SEVERITY_ALARM,
@@ -173,6 +225,9 @@ class Finding:
     match_ids: tuple[str, ...] = ()
     outbox_ids: tuple[str, ...] = ()
     season_ids: tuple[str, ...] = ()
+    club_ids: tuple[str, ...] = ()
+    auction_ids: tuple[str, ...] = ()
+    reservation_ids: tuple[str, ...] = ()
     max_age_seconds: float | None = None
 
 
@@ -237,10 +292,14 @@ def collect_report(
     findings: list[Finding] = []
     findings.extend(_check_incomplete(snapshot))
     findings.extend(_check_jobs_held(snapshot))
+    findings.extend(_check_jobs_unknown_kind(snapshot))
     findings.extend(_check_jobs_failed(snapshot))
     findings.extend(_check_jobs_overdue(snapshot, thresholds.late_threshold_seconds))
     findings.extend(_check_jobs_deferred_by_pause(snapshot))
     findings.extend(_check_matches(snapshot, thresholds.late_threshold_seconds))
+    findings.extend(_check_recoveries(snapshot, thresholds.late_threshold_seconds))
+    findings.extend(_check_finances(snapshot))
+    findings.extend(_check_market(snapshot, thresholds.late_threshold_seconds))
     findings.extend(_check_outbox(snapshot, thresholds.late_threshold_seconds))
     findings.extend(_check_appearance(snapshot, thresholds.appearance_low_threshold))
     aggregates = _aggregates(snapshot, thresholds.late_threshold_seconds)
@@ -283,15 +342,33 @@ def _check_jobs_held(snapshot: Snapshot) -> list[Finding]:
     rest = [job for job in held if job.kind != "season.rollover"]
     status_by_season = {season.id: season.status for season in snapshot.seasons}
     awaiting: list[UUID] = []
+    future_normal: list[UUID] = []
     after_activation: list[UUID] = []
     after_seasons: list[UUID] = []
     for job in rest:
+        if job.kind not in ALL_KNOWN_JOB_KINDS:
+            # Unknown kinds are reported by _check_jobs_unknown_kind, never
+            # mistaken for calendar activation state here.
+            continue
+        if job.kind in WORKER_JOB_KINDS | SYSTEM_JOB_KINDS and job.due_at > snapshot.now:
+            # Held finance/training/stadium/market/ownership work with a future
+            # due moment is released by its own contract (weekly Monday,
+            # expansion date, auction deadline); not an incomplete activation.
+            future_normal.append(job.id)
+            continue
         season_status = status_by_season.get(job.season_id) if job.season_id else None
         if season_status == "active" and job.kind in SUPPORTED_JOB_KINDS:
             after_activation.append(job.id)
             if job.season_id is not None:
                 after_seasons.append(job.season_id)
-        else:
+        elif job.kind in SUPPORTED_JOB_KINDS:
+            awaiting.append(job.id)
+        elif job.kind in WORKER_JOB_KINDS | SYSTEM_JOB_KINDS:
+            # Held worker work without a future window and without calendar
+            # activation context (no season ref by design) stays informational:
+            # the absence of a fixture/season ref is not match damage.
+            future_normal.append(job.id)
+        else:  # pragma: no cover - ALL_KNOWN exhausts kinds here
             awaiting.append(job.id)
     findings: list[Finding] = []
     if awaiting:
@@ -305,6 +382,19 @@ def _check_jobs_held(snapshot: Snapshot) -> list[Finding]:
                 ),
                 count=len(awaiting),
                 job_ids=_sample_ids(tuple(awaiting)),
+            )
+        )
+    if future_normal:
+        findings.append(
+            Finding(
+                code=JOBS_HELD_FUTURE_NORMAL,
+                severity=SEVERITY_INFO,
+                summary=(
+                    f"{len(future_normal)} held worker/system jobs with future or "
+                    "contract-gated due moments; held by design, not an accident."
+                ),
+                count=len(future_normal),
+                job_ids=_sample_ids(tuple(future_normal)),
             )
         )
     if rollover:
@@ -337,6 +427,28 @@ def _check_jobs_held(snapshot: Snapshot) -> list[Finding]:
             )
         )
     return findings
+
+
+def _check_jobs_unknown_kind(snapshot: Snapshot) -> list[Finding]:
+    unknown = [
+        job.id
+        for job in snapshot.jobs
+        if job.status in ("held", "pending") and job.kind not in ALL_KNOWN_JOB_KINDS
+    ]
+    if not unknown:
+        return []
+    return [
+        Finding(
+            code=JOBS_UNKNOWN_KIND,
+            severity=SEVERITY_WARN,
+            summary=(
+                f"{len(unknown)} pending/held jobs carry an unknown kind no handler "
+                "claims; check the producer version before any reschedule."
+            ),
+            count=len(unknown),
+            job_ids=_sample_ids(tuple(unknown)),
+        )
+    ]
 
 
 def _check_jobs_failed(snapshot: Snapshot) -> list[Finding]:
@@ -396,13 +508,57 @@ def _paused_fixture_ids(snapshot: Snapshot) -> frozenset[UUID]:
     return frozenset(fixture.id for fixture in snapshot.fixtures if fixture.status == "paused")
 
 
+def _busy_clubs_at(snapshot: Snapshot, at: datetime) -> set[UUID]:
+    """Clubs whose settlement must wait: locked fixture, no finish yet."""
+    busy: set[UUID] = set()
+    for fixture in snapshot.fixtures:
+        if fixture.status not in ("scheduled", "live", "paused"):
+            continue
+        if fixture.lineup_lock_at > at:
+            continue
+        if fixture.actual_finish_at is not None:
+            continue
+        if fixture.home_club_id is not None:
+            busy.add(fixture.home_club_id)
+        if fixture.away_club_id is not None:
+            busy.add(fixture.away_club_id)
+    return busy
+
+
 def _check_jobs_overdue(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
     paused = _paused_fixture_ids(snapshot)
+    # Deferred auction settlements with a provably busy club are normal and
+    # reported as MARKET_CLOSE_DEFERRED_BY_MATCH instead of an overdue alarm.
+    # Without full fixture/auction/bid coverage we cannot prove the deferral,
+    # so the job stays overdue rather than being silently excused.
+    busy: set[UUID] = set()
+    auction_by_id = {auction.id: auction for auction in snapshot.auctions}
+    bid_by_auction = {bid.auction_id: bid for bid in snapshot.bids}
+    deferral_complete = not (
+        snapshot.fixtures_truncated or snapshot.auctions_truncated or snapshot.bids_truncated
+    )
+    if deferral_complete:
+        busy = _busy_clubs_at(snapshot, snapshot.now)
+    deferred_close_jobs: set[UUID] = set()
+    for job in snapshot.jobs:
+        if job.status != "pending" or job.kind != "market.close":
+            continue
+        auction = auction_by_id.get(job.auction_id) if job.auction_id else None
+        if auction is None or auction.status != "open" or auction.ends_at > snapshot.now:
+            continue
+        bid = bid_by_auction.get(auction.id)
+        clubs = {auction.seller_club_id}
+        if bid is not None:
+            clubs.add(bid.buyer_club_id)
+        if clubs & busy:
+            deferred_close_jobs.add(job.id)
     overdue_jobs: list[UUID] = []
     overdue_fixtures: list[UUID] = []
     worst = 0.0
     for job in snapshot.jobs:
         if job.status != "pending":
+            continue
+        if job.id in deferred_close_jobs:
             continue
         if job.fixture_id is not None and job.fixture_id in paused:
             continue  # Explicit pause explains deferral; reported separately as info.
@@ -413,6 +569,9 @@ def _check_jobs_overdue(snapshot: Snapshot, late_threshold: float) -> list[Findi
             if job.fixture_id not in known and job.fixture_id not in paused:
                 # Cannot exclude an unseen pause; never false-alarm on partial coverage.
                 continue
+        # Non-calendar worker jobs carry no fixture ref by design; their
+        # absence of fixture_id is not match damage and stays an overdue job
+        # only on its own due moment (market deferral already excluded above).
         overdue_jobs.append(job.id)
         if job.fixture_id is not None:
             overdue_fixtures.append(job.fixture_id)
@@ -659,6 +818,264 @@ def _tick_sequence_broken(completed_tick: int, tick_numbers: tuple[int, ...]) ->
     return unique != list(range(1, completed_tick + 1))
 
 
+def _check_recoveries(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
+    if not snapshot.recoveries:
+        return []
+    findings: list[Finding] = []
+    match_by_id = {match.id: match for match in snapshot.matches}
+    jobs_by_fixture: dict[UUID, list[Any]] = {}
+    for job in snapshot.jobs:
+        if job.fixture_id is not None and job.status in ("pending", "held"):
+            jobs_by_fixture.setdefault(job.fixture_id, []).append(job)
+    coverage_complete = not (
+        snapshot.matches_truncated
+        or snapshot.jobs_truncated
+        or snapshot.fixtures_truncated
+        or snapshot.recoveries_truncated
+        or snapshot.ticks_truncated
+    )
+    normal_matches: list[UUID] = []
+    normal_fixtures: list[UUID] = []
+    mismatch_matches: list[UUID] = []
+    for recovery in snapshot.recoveries:
+        # Structural damage is provable from the row alone.
+        if (
+            not recovery.state_hash
+            or not 0 <= recovery.checkpoint_tick <= 29
+            or recovery.next_due_at <= recovery.previous_due_at
+            or recovery.next_due_at <= recovery.recovered_at
+        ):
+            mismatch_matches.append(recovery.match_id)
+            continue
+        match = match_by_id.get(recovery.match_id)
+        if match is None:
+            if coverage_complete:
+                mismatch_matches.append(recovery.match_id)
+            continue
+        # Checkpoint must not claim ticks never committed; the match may have
+        # advanced past the checkpoint since, so only future claims mismatch.
+        # An equal checkpoint (recovery at the exact commit moment) is normal.
+        if recovery.checkpoint_tick > match.completed_tick:
+            mismatch_matches.append(recovery.match_id)
+            continue
+        if recovery.fixture_id is not None and recovery.fixture_id != match.fixture_id:
+            mismatch_matches.append(recovery.match_id)
+            continue
+        # Future moved window: compare against the actual moved clocks
+        # (recovery.next_due_at / match.next_due_at), never against the
+        # original kickoff without paused_seconds.
+        if recovery.next_due_at > snapshot.now and match.phase not in (
+            "full_time",
+            "abandoned",
+        ):
+            if match.next_due_at is not None and (
+                _age_seconds(snapshot.now, match.next_due_at) <= late_threshold
+            ):
+                normal_matches.append(match.id)
+                if recovery.fixture_id is not None:
+                    normal_fixtures.append(recovery.fixture_id)
+                elif match.fixture_id is not None:
+                    normal_fixtures.append(match.fixture_id)
+            if not coverage_complete:
+                continue
+            # The moved window needs a live calendar job carrying it.
+            fixture_jobs = jobs_by_fixture.get(match.fixture_id, [])
+            live_kinds = {"match.tick", "match.second_half_start", "match.finalize_result"}
+            if match.phase in ("first_half", "half_time", "second_half") and not any(
+                job.kind in live_kinds and job.due_at >= recovery.previous_due_at
+                for job in fixture_jobs
+            ):
+                mismatch_matches.append(recovery.match_id)
+                continue
+    if normal_matches:
+        findings.append(
+            Finding(
+                code=MATCH_RECOVERED_WINDOW_NORMAL,
+                severity=SEVERITY_INFO,
+                summary=(
+                    f"{len(normal_matches)} recovered matches wait on a moved future "
+                    "window; the recovery deadline applies, not the original kickoff."
+                ),
+                count=len(normal_matches),
+                match_ids=_sample_ids(tuple(normal_matches)),
+                fixture_ids=_sample_ids(tuple(dict.fromkeys(normal_fixtures))),
+            )
+        )
+    # Missing-job mismatches need full coverage; structural ones above are
+    # already existential from observed rows.
+    if mismatch_matches:
+        findings.append(
+            Finding(
+                code=MATCH_RECOVERY_MISMATCH,
+                severity=SEVERITY_ALARM,
+                summary=(
+                    f"{len(mismatch_matches)} recovery rows disagree with their match "
+                    "checkpoint or moved window."
+                ),
+                count=len(mismatch_matches),
+                match_ids=_sample_ids(tuple(dict.fromkeys(mismatch_matches))),
+            )
+        )
+    return findings
+
+
+def _check_finances(snapshot: Snapshot) -> list[Finding]:
+    findings: list[Finding] = []
+    over_reserved: list[UUID] = []
+    for account in snapshot.finance_accounts:
+        if account.reserved < 0 or account.cash < 0:
+            over_reserved.append(account.club_id)
+        elif account.reserved > account.cash:
+            over_reserved.append(account.club_id)
+    if over_reserved:
+        findings.append(
+            Finding(
+                code=FINANCE_RESERVE_EXCEEDS_CASH,
+                severity=SEVERITY_ALARM,
+                summary=(
+                    f"{len(over_reserved)} finance accounts hold more reserved funds "
+                    "than cash on hand."
+                ),
+                count=len(over_reserved),
+                club_ids=_sample_ids(tuple(dict.fromkeys(over_reserved))),
+            )
+        )
+    # Sum agreement needs both scopes fully observed; a truncated tail must
+    # never be declared a mismatch.
+    if not snapshot.finance_truncated and not snapshot.reservations_truncated:
+        active_by_club: dict[UUID, int] = {}
+        for reservation in snapshot.reservations:
+            if reservation.status == "active":
+                active_by_club[reservation.club_id] = (
+                    active_by_club.get(reservation.club_id, 0) + reservation.amount
+                )
+        mismatched: list[UUID] = []
+        for account in snapshot.finance_accounts:
+            if active_by_club.get(account.club_id, 0) != account.reserved:
+                mismatched.append(account.club_id)
+        # Active reservations for unknown clubs (no account row) are only
+        # provable damage with full account coverage, which we have here.
+        known_clubs = {account.club_id for account in snapshot.finance_accounts}
+        for club_id in active_by_club:
+            if club_id not in known_clubs:
+                mismatched.append(club_id)
+        if mismatched:
+            findings.append(
+                Finding(
+                    code=FINANCE_RESERVATION_MISMATCH,
+                    severity=SEVERITY_ALARM,
+                    summary=(
+                        f"{len(dict.fromkeys(mismatched))} clubs disagree between active "
+                        "reservation sums and the account reserved total."
+                    ),
+                    count=len(dict.fromkeys(mismatched)),
+                    club_ids=_sample_ids(tuple(dict.fromkeys(mismatched))),
+                )
+            )
+    return findings
+
+
+def _check_market(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
+    findings: list[Finding] = []
+    bid_by_id = {bid.id: bid for bid in snapshot.bids}
+    bid_by_auction = {bid.auction_id: bid for bid in snapshot.bids}
+    reservation_by_id = {reservation.id: reservation for reservation in snapshot.reservations}
+    market_complete = not (
+        snapshot.auctions_truncated or snapshot.bids_truncated or snapshot.reservations_truncated
+    )
+    mismatched_auctions: list[UUID] = []
+    mismatched_reservations: list[UUID] = []
+    for auction in snapshot.auctions:
+        if auction.status != "open" or auction.highest_bid_id is None:
+            continue
+        if not market_complete:
+            continue
+        bid = bid_by_id.get(auction.highest_bid_id)
+        if bid is None or bid.auction_id != auction.id:
+            mismatched_auctions.append(auction.id)
+            continue
+        reservation = reservation_by_id.get(bid.reservation_id)
+        if (
+            reservation is None
+            or reservation.status != "active"
+            or reservation.club_id != bid.buyer_club_id
+            or reservation.amount != bid.amount
+        ):
+            mismatched_auctions.append(auction.id)
+            if reservation is not None:
+                mismatched_reservations.append(reservation.id)
+    if mismatched_auctions:
+        findings.append(
+            Finding(
+                code=MARKET_RESERVATION_MISMATCH,
+                severity=SEVERITY_ALARM,
+                summary=(
+                    f"{len(mismatched_auctions)} open auctions lack a matching active "
+                    "reservation for the highest bid."
+                ),
+                count=len(mismatched_auctions),
+                auction_ids=_sample_ids(tuple(dict.fromkeys(mismatched_auctions))),
+                reservation_ids=_sample_ids(tuple(dict.fromkeys(mismatched_reservations)))
+                if mismatched_reservations
+                else (),
+            )
+        )
+    # Deferred settlement: an open auction past its deadline is not damage
+    # while either club's fixture is locked and unfinished. Uses the actual
+    # fixture clocks, never the auction deadline alone.
+    if not snapshot.fixtures_truncated:
+        busy = _busy_clubs_at(snapshot, snapshot.now)
+        deferred: list[UUID] = []
+        for auction in snapshot.auctions:
+            if auction.status != "open" or auction.ends_at > snapshot.now:
+                continue
+            bid = bid_by_auction.get(auction.id)
+            clubs = {auction.seller_club_id}
+            if bid is not None:
+                clubs.add(bid.buyer_club_id)
+            if clubs & busy:
+                deferred.append(auction.id)
+        if deferred:
+            findings.append(
+                Finding(
+                    code=MARKET_CLOSE_DEFERRED_BY_MATCH,
+                    severity=SEVERITY_INFO,
+                    summary=(
+                        f"{len(deferred)} open auctions past deadline wait for an active "
+                        "match final; deferred settlement is normal."
+                    ),
+                    count=len(deferred),
+                    auction_ids=_sample_ids(tuple(dict.fromkeys(deferred))),
+                )
+            )
+    # Open auctions need a live close job; sold/expired/cancelled are terminal
+    # and must not alarm. Only provable with full job + market coverage.
+    if market_complete and not snapshot.jobs_truncated:
+        close_by_auction: dict[UUID, int] = {}
+        for job in snapshot.jobs:
+            if job.kind == "market.close" and job.status in ("pending", "held"):
+                if job.auction_id is not None:
+                    close_by_auction[job.auction_id] = close_by_auction.get(job.auction_id, 0) + 1
+        missing: list[UUID] = []
+        for auction in snapshot.auctions:
+            if auction.status != "open":
+                continue
+            if auction.id not in close_by_auction:
+                missing.append(auction.id)
+        if missing:
+            findings.append(
+                Finding(
+                    code=MARKET_CLOSE_JOB_MISSING,
+                    severity=SEVERITY_ALARM,
+                    summary=(f"{len(missing)} open auctions have no pending market.close job."),
+                    count=len(missing),
+                    auction_ids=_sample_ids(tuple(dict.fromkeys(missing))),
+                )
+            )
+    _ = late_threshold
+    return findings
+
+
 def _check_outbox(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
     findings: list[Finding] = []
     latest_outcome = {attempt.outbox_id: attempt.outcome for attempt in snapshot.attempts}
@@ -834,6 +1251,10 @@ def _aggregates(snapshot: Snapshot, late_threshold: float) -> dict[str, Any]:
     matches_by_phase: dict[str, int] = {}
     for match in snapshot.matches:
         matches_by_phase[match.phase] = matches_by_phase.get(match.phase, 0) + 1
+    auctions_by_status: dict[str, int] = {}
+    for auction in snapshot.auctions:
+        auctions_by_status[auction.status] = auctions_by_status.get(auction.status, 0) + 1
+    reservations_active = sum(1 for row in snapshot.reservations if row.status == "active")
     return {
         "late_threshold_seconds": late_threshold,
         "jobs_total": len(snapshot.jobs),
@@ -850,6 +1271,13 @@ def _aggregates(snapshot: Snapshot, late_threshold: float) -> dict[str, Any]:
         "matches_total": len(snapshot.matches),
         "matches_by_phase": dict(sorted(matches_by_phase.items())),
         "results_total": len(snapshot.results),
+        "recoveries_total": len(snapshot.recoveries),
+        "finance_accounts_total": len(snapshot.finance_accounts),
+        "reservations_total": len(snapshot.reservations),
+        "reservations_active": reservations_active,
+        "auctions_total": len(snapshot.auctions),
+        "auctions_by_status": dict(sorted(auctions_by_status.items())),
+        "bids_total": len(snapshot.bids),
         "appearance_stock": [
             {"bank": stock.bank, "total": stock.total, "used": stock.used, "free": stock.free}
             for stock in sorted(snapshot.appearance, key=lambda item: item.bank)
@@ -875,6 +1303,12 @@ def finding_to_dict(finding: Finding) -> dict[str, Any]:
         payload["outbox_ids"] = list(finding.outbox_ids)
     if finding.season_ids:
         payload["season_ids"] = list(finding.season_ids)
+    if finding.club_ids:
+        payload["club_ids"] = list(finding.club_ids)
+    if finding.auction_ids:
+        payload["auction_ids"] = list(finding.auction_ids)
+    if finding.reservation_ids:
+        payload["reservation_ids"] = list(finding.reservation_ids)
     if finding.max_age_seconds is not None:
         payload["max_age_seconds"] = finding.max_age_seconds
     return payload
@@ -925,6 +1359,14 @@ def render_human(report: Report) -> str:
         f"  matches: total={aggregates['matches_total']} "
         f"by_phase={aggregates['matches_by_phase']} results={aggregates['results_total']}"
     )
+    lines.append(
+        f"  recoveries: total={aggregates['recoveries_total']} "
+        f"finance_accounts={aggregates['finance_accounts_total']} "
+        f"reservations={aggregates['reservations_total']} "
+        f"(active={aggregates['reservations_active']}) "
+        f"auctions={aggregates['auctions_total']} "
+        f"by_status={aggregates['auctions_by_status']} bids={aggregates['bids_total']}"
+    )
     lines.append(f"  appearance stock: {aggregates['appearance_stock']}")
     lines.append("")
     if not report.findings:
@@ -942,6 +1384,9 @@ def render_human(report: Report) -> str:
             ("matches", finding.match_ids),
             ("outbox", finding.outbox_ids),
             ("seasons", finding.season_ids),
+            ("clubs", finding.club_ids),
+            ("auctions", finding.auction_ids),
+            ("reservations", finding.reservation_ids),
         ):
             if ids:
                 shown = ", ".join(ids[:MAX_SAMPLE_IDS])
@@ -962,6 +1407,8 @@ def describe_codes() -> str:
 __all__ = [
     "APPEARANCE_STOCK_LOW",
     "DIAGNOSTICS_INCOMPLETE_TRUNCATED",
+    "FINANCE_RESERVATION_MISMATCH",
+    "FINANCE_RESERVE_EXCEEDS_CASH",
     "FINDING_CODES",
     "FIXTURE_FINISHED_MATCH_NOT_FULLTIME",
     "FIXTURE_FINISHED_WITHOUT_RESULT",
@@ -972,11 +1419,18 @@ __all__ = [
     "JOBS_FAILED_UNSUPPORTED_KIND",
     "JOBS_HELD_AFTER_ACTIVATION",
     "JOBS_HELD_AWAITING_ACTIVATION",
+    "JOBS_HELD_FUTURE_NORMAL",
     "JOBS_HELD_ROLLOVER",
     "JOBS_PENDING_OVERDUE",
+    "JOBS_UNKNOWN_KIND",
+    "MARKET_CLOSE_DEFERRED_BY_MATCH",
+    "MARKET_CLOSE_JOB_MISSING",
+    "MARKET_RESERVATION_MISMATCH",
     "MATCH_FULLTIME_FIXTURE_NOT_FINISHED",
     "MATCH_HALFTIME_WAIT_NORMAL",
     "MATCH_PAUSED_OPERATOR",
+    "MATCH_RECOVERED_WINDOW_NORMAL",
+    "MATCH_RECOVERY_MISMATCH",
     "MATCH_TICK_LATE",
     "OUTBOX_BACKLOG_OVERDUE",
     "OUTBOX_BOARD_ORPHAN_LEASE",

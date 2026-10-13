@@ -26,22 +26,33 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from goaletto.diagnostics.snapshot import (
     AppearanceStock,
     AttemptInfo,
+    AuctionRow,
+    BidRow,
     BoardRow,
+    FinanceAccountRow,
     FixtureRow,
     JobRow,
     MatchRow,
     OutboxRow,
+    RecoveryRow,
+    ReservationRow,
     ResultRow,
     SeasonRow,
     Snapshot,
 )
 from goaletto.infrastructure.models import (
     AppearanceIdentity,
+    Auction,
+    AuctionBid,
+    Club,
+    FinanceAccount,
     Fixture,
     Job,
     Match,
+    MatchRecovery,
     MatchResult,
     MatchTick,
+    MoneyReservation,
     OutboxBoard,
     OutboxDeliveryAttempt,
     OutboxMessage,
@@ -94,9 +105,15 @@ async def _collect_jobs(
             Job.due_at,
             Job.attempts,
             Job.last_error,
-            Job.payload["season_id"].astext.label(_JOB_EXTRACT_LABELS[0]),
-            Job.payload["fixture_id"].astext.label(_JOB_EXTRACT_LABELS[1]),
-            Job.payload["tick_number"].astext.label(_JOB_EXTRACT_LABELS[2]),
+            Job.payload["season_id"].astext.label("season_id"),
+            Job.payload["fixture_id"].astext.label("fixture_id"),
+            Job.payload["tick_number"].astext.label("tick_number"),
+            Job.payload["club_id"].astext.label("club_id"),
+            Job.payload["auction_id"].astext.label("auction_id"),
+            Job.payload["plan_id"].astext.label("plan_id"),
+            Job.payload["expansion_id"].astext.label("expansion_id"),
+            Job.payload["person_id"].astext.label("person_id"),
+            Job.payload["ownership_id"].astext.label("ownership_id"),
         )
         .order_by(Job.due_at.asc(), Job.id.asc())
         .limit(limit + 1)
@@ -115,6 +132,12 @@ async def _collect_jobs(
             season_id=_parse_uuid(row[6]),
             fixture_id=_parse_uuid(row[7]),
             tick_number=_parse_tick(row[8]),
+            club_id=_parse_uuid(row[9]),
+            auction_id=_parse_uuid(row[10]),
+            plan_id=_parse_uuid(row[11]),
+            expansion_id=_parse_uuid(row[12]),
+            person_id=_parse_uuid(row[13]),
+            ownership_id=_parse_uuid(row[14]),
         )
         for row in raw
     ]
@@ -221,6 +244,8 @@ async def _collect_fixtures(
             Fixture.lineup_lock_at,
             Fixture.actual_start_at,
             Fixture.actual_finish_at,
+            Fixture.home_club_id,
+            Fixture.away_club_id,
         )
         .order_by(Fixture.scheduled_start_at.asc(), Fixture.id.asc())
         .limit(limit + 1)
@@ -237,6 +262,8 @@ async def _collect_fixtures(
             lineup_lock_at=row[4],
             actual_start_at=row[5],
             actual_finish_at=row[6],
+            home_club_id=row[7] if isinstance(row[7], UUID) else None,
+            away_club_id=row[8] if isinstance(row[8], UUID) else None,
         )
         for row in raw
     ]
@@ -257,6 +284,7 @@ async def _collect_matches(
             Match.completed_tick,
             Match.next_due_at,
             Match.paused_at,
+            Match.paused_seconds,
         )
         .order_by(Match.fixture_id.asc())
         .limit(limit + 1)
@@ -285,6 +313,7 @@ async def _collect_matches(
             next_due_at=row[4],
             tick_numbers=tuple(ticks_by_match.get(row[0], ())),
             paused_at=row[5],
+            paused_seconds=int(row[6]) if isinstance(row[6], int) else 0,
         )
         for row in raw
         if isinstance(row[0], UUID) and isinstance(row[1], UUID)
@@ -326,6 +355,150 @@ async def _collect_seasons(
     )
 
 
+async def _collect_recoveries(
+    connection: AsyncConnection, limit: int, fixture_ids: set[UUID] | None
+) -> tuple[list[RecoveryRow], bool]:
+    statement = (
+        select(
+            MatchRecovery.id,
+            MatchRecovery.match_id,
+            Match.fixture_id,
+            MatchRecovery.checkpoint_tick,
+            MatchRecovery.state_hash,
+            MatchRecovery.previous_due_at,
+            MatchRecovery.next_due_at,
+            MatchRecovery.recovered_at,
+            MatchRecovery.reason,
+        )
+        .select_from(MatchRecovery)
+        .outerjoin(Match, Match.id == MatchRecovery.match_id)
+        .order_by(MatchRecovery.recovered_at.asc(), MatchRecovery.id.asc())
+        .limit(limit + 1)
+    )
+    if fixture_ids is not None:
+        statement = statement.where(
+            (Match.fixture_id.in_(sorted(fixture_ids))) | (Match.fixture_id.is_(None))
+        )
+    raw, truncated = await _fetch_limited(connection, statement, limit)
+    rows = [
+        RecoveryRow(
+            id=row[0],
+            match_id=row[1],
+            fixture_id=row[2] if isinstance(row[2], UUID) else None,
+            checkpoint_tick=int(row[3]),
+            state_hash=str(row[4]),
+            previous_due_at=row[5],
+            next_due_at=row[6],
+            recovered_at=row[7],
+            reason=str(row[8]),
+        )
+        for row in raw
+        if isinstance(row[0], UUID) and isinstance(row[1], UUID)
+    ]
+    return rows, truncated
+
+
+async def _collect_finance(
+    connection: AsyncConnection, limit: int
+) -> tuple[list[FinanceAccountRow], bool]:
+    statement = (
+        select(Club.id, Club.budget, FinanceAccount.reserved, FinanceAccount.arrears)
+        .join(FinanceAccount, FinanceAccount.club_id == Club.id)
+        .order_by(Club.id.asc())
+        .limit(limit + 1)
+    )
+    raw, truncated = await _fetch_limited(connection, statement, limit)
+    rows = [
+        FinanceAccountRow(
+            club_id=row[0],
+            cash=int(row[1]),
+            reserved=int(row[2]),
+            arrears=int(row[3]),
+        )
+        for row in raw
+        if isinstance(row[0], UUID)
+    ]
+    return rows, truncated
+
+
+async def _collect_reservations(
+    connection: AsyncConnection, limit: int
+) -> tuple[list[ReservationRow], bool]:
+    statement = (
+        select(
+            MoneyReservation.id,
+            MoneyReservation.club_id,
+            MoneyReservation.amount,
+            MoneyReservation.status,
+        )
+        .order_by(MoneyReservation.club_id.asc(), MoneyReservation.id.asc())
+        .limit(limit + 1)
+    )
+    raw, truncated = await _fetch_limited(connection, statement, limit)
+    rows = [
+        ReservationRow(id=row[0], club_id=row[1], amount=int(row[2]), status=str(row[3]))
+        for row in raw
+        if isinstance(row[0], UUID) and isinstance(row[1], UUID)
+    ]
+    return rows, truncated
+
+
+async def _collect_auctions(
+    connection: AsyncConnection, limit: int
+) -> tuple[list[AuctionRow], bool]:
+    statement = (
+        select(
+            Auction.id,
+            Auction.seller_club_id,
+            Auction.status,
+            Auction.ends_at,
+            Auction.highest_bid_id,
+        )
+        .order_by(Auction.ends_at.asc(), Auction.id.asc())
+        .limit(limit + 1)
+    )
+    raw, truncated = await _fetch_limited(connection, statement, limit)
+    rows = [
+        AuctionRow(
+            id=row[0],
+            seller_club_id=row[1],
+            status=str(row[2]),
+            ends_at=row[3],
+            highest_bid_id=row[4] if isinstance(row[4], UUID) else None,
+        )
+        for row in raw
+        if isinstance(row[0], UUID) and isinstance(row[1], UUID)
+    ]
+    return rows, truncated
+
+
+async def _collect_bids(connection: AsyncConnection, limit: int) -> tuple[list[BidRow], bool]:
+    statement = (
+        select(
+            AuctionBid.id,
+            AuctionBid.auction_id,
+            AuctionBid.buyer_club_id,
+            AuctionBid.amount,
+            AuctionBid.reservation_id,
+        )
+        .order_by(AuctionBid.auction_id.asc(), AuctionBid.id.asc())
+        .limit(limit + 1)
+    )
+    raw, truncated = await _fetch_limited(connection, statement, limit)
+    rows = [
+        BidRow(
+            id=row[0],
+            auction_id=row[1],
+            buyer_club_id=row[2],
+            amount=int(row[3]),
+            reservation_id=row[4],
+        )
+        for row in raw
+        if isinstance(row[0], UUID) and isinstance(row[1], UUID) and isinstance(row[4], UUID)
+    ]
+    return rows, truncated
+
+
 async def _collect_appearance(connection: AsyncConnection) -> tuple[AppearanceStock, ...]:
     totals = (
         await connection.execute(
@@ -364,7 +537,8 @@ async def collect_snapshot(
 
     The caller owns the connection; this function never commits, rolls back,
     or writes. ``season_id`` scopes calendar scopes (jobs, fixtures, matches,
-    ticks, results, seasons) to one season; the sender scopes stay global.
+    ticks, results, seasons, recoveries) to one season; the sender, finance
+    and market scopes stay global.
     """
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("now must be timezone-aware UTC")
@@ -384,6 +558,13 @@ async def collect_snapshot(
         connection, limit, fixture_ids if season_id is not None else None
     )
     seasons, seasons_truncated = await _collect_seasons(connection, season_id, limit)
+    recoveries, recoveries_truncated = await _collect_recoveries(
+        connection, limit, fixture_ids if season_id is not None else None
+    )
+    finance_accounts, finance_truncated = await _collect_finance(connection, limit)
+    reservations, reservations_truncated = await _collect_reservations(connection, limit)
+    auctions, auctions_truncated = await _collect_auctions(connection, limit)
+    bids, bids_truncated = await _collect_bids(connection, limit)
     appearance = await _collect_appearance(connection)
     incomplete = tuple(
         sorted(
@@ -398,6 +579,11 @@ async def collect_snapshot(
                 ("match_ticks", ticks_truncated),
                 ("results", results_truncated),
                 ("seasons", seasons_truncated),
+                ("recoveries", recoveries_truncated),
+                ("finance_accounts", finance_truncated),
+                ("reservations", reservations_truncated),
+                ("auctions", auctions_truncated),
+                ("bids", bids_truncated),
             )
             if flag
         )
@@ -422,6 +608,16 @@ async def collect_snapshot(
         seasons=tuple(seasons),
         seasons_truncated=seasons_truncated,
         appearance=appearance,
+        recoveries=tuple(recoveries),
+        recoveries_truncated=recoveries_truncated,
+        finance_accounts=tuple(finance_accounts),
+        finance_truncated=finance_truncated,
+        reservations=tuple(reservations),
+        reservations_truncated=reservations_truncated,
+        auctions=tuple(auctions),
+        auctions_truncated=auctions_truncated,
+        bids=tuple(bids),
+        bids_truncated=bids_truncated,
         incomplete_scopes=incomplete,
     )
 
