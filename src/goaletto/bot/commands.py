@@ -20,6 +20,7 @@ COMMANDS = (
     ("match", "Матч и ближайшая встреча", "Live match and next fixture"),
     ("table", "Таблица лиги", "League table"),
     ("history", "Результаты и отчёты матчей", "Match results and reports"),
+    ("feedback", "Оставить отзыв", "Leave feedback"),
     ("settings", "Язык и напоминания", "Language and reminders"),
     ("help", "Помощь по игре", "Game help"),
 )

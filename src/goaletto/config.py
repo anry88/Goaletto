@@ -21,3 +21,8 @@ class Settings(BaseSettings):
     # JSON array in the host-only environment; empty preserves unrestricted access.
     allowed_telegram_ids: frozenset[Annotated[int, Field(gt=0)]] = frozenset()
     internal_telegram_ids: frozenset[Annotated[int, Field(gt=0)]] = frozenset()
+    # Voluntary feedback (AND-78, manual/internal cohort only). Collection stays
+    # disabled until an explicit comment retention is configured.
+    feedback_enabled: bool = False
+    feedback_comment_retention_days: int | None = Field(default=None, gt=0, le=730)
+    feedback_cooldown_days: int = Field(default=7, ge=7, le=730)

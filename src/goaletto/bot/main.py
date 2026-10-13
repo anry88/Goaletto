@@ -51,6 +51,7 @@ def build_dispatcher(
     from goaletto.bot import (
         club_router,
         entry_router,
+        feedback_router,
         finance_router,
         history_router,
         lineup_handlers,
@@ -70,6 +71,7 @@ def build_dispatcher(
     root.callback_query.filter(F.message.chat.type == "private")
     for module in (
         entry_router,
+        feedback_router,
         finance_router,
         navigation,
         lineup_handlers,

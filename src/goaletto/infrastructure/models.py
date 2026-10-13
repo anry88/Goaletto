@@ -1387,3 +1387,96 @@ class TransferReceipt(Base):
     price: Mapped[int] = mapped_column(BigInteger)
     transferred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+FEEDBACK_REASON_CODES = (
+    "unclear_next_step",
+    "difficult_lineup",
+    "long_wait",
+    "inconvenient_time",
+    "uninteresting_game",
+    "technical_problem",
+    "other",
+)
+
+
+class FeedbackCampaign(Base):
+    """Voluntary feedback campaign registry. Append-only; no game rules."""
+
+    __tablename__ = "feedback_campaigns"
+    __table_args__ = (
+        CheckConstraint("slug ~ '^[a-z0-9_-]{1,64}$'", name="ck_feedback_campaign_slug"),
+        UniqueConstraint("slug", name="uq_feedback_campaign_slug"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    slug: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class FeedbackResponse(Base):
+    """Durable voluntary-feedback session. One row per manager/campaign.
+
+    Free text lives in feedback_comments only; this table stores bounded codes.
+    Operational dedupe (operation_id) and cooldown (prompted_at) are independent
+    of journey retention/opt-out deletion.
+    """
+
+    __tablename__ = "feedback_responses"
+    __table_args__ = (
+        UniqueConstraint("manager_id", "campaign_id", name="uq_feedback_manager_campaign"),
+        UniqueConstraint("operation_id", name="uq_feedback_operation"),
+        CheckConstraint(
+            "status IN ('prompted','answered','skipped','opted_out')",
+            name="ck_feedback_status",
+        ),
+        CheckConstraint(
+            "reason IS NULL OR reason IN "
+            "('unclear_next_step','difficult_lineup','long_wait','inconvenient_time',"
+            "'uninteresting_game','technical_problem','other')",
+            name="ck_feedback_reason",
+        ),
+        CheckConstraint(
+            "(status = 'prompted') = (responded_at IS NULL)",
+            name="ck_feedback_responded",
+        ),
+        CheckConstraint(
+            "(status = 'answered') = (reason IS NOT NULL AND responded_at IS NOT NULL)",
+            name="ck_feedback_answer",
+        ),
+        CheckConstraint(
+            "responded_at IS NULL OR responded_at >= prompted_at",
+            name="ck_feedback_response_time",
+        ),
+        CheckConstraint(
+            "comment_due_at IS NULL OR comment_due_at >= responded_at",
+            name="ck_feedback_comment_due",
+        ),
+        Index("ix_feedback_manager_prompted", "manager_id", "prompted_at"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    campaign_id: Mapped[UUID] = mapped_column(ForeignKey("feedback_campaigns.id"))
+    manager_id: Mapped[UUID] = mapped_column(ForeignKey("managers.id"))
+    operation_id: Mapped[UUID] = mapped_column(Uuid)
+    status: Mapped[str] = mapped_column(String(16))
+    reason: Mapped[str | None] = mapped_column(String(32))
+    prompted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    comment_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class FeedbackComment(Base):
+    """Restricted free-text storage. Never mirrored into journey envelopes."""
+
+    __tablename__ = "feedback_comments"
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(text) BETWEEN 1 AND 500",
+            name="ck_feedback_comment_length",
+        ),
+        Index("ix_feedback_comment_created", "created_at"),
+    )
+    response_id: Mapped[UUID] = mapped_column(
+        ForeignKey("feedback_responses.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    text: Mapped[str] = mapped_column(String(500))

@@ -106,6 +106,9 @@ def render(
                 else tr("Матч остановлен.")
             )
             rows.append([_button(tr("📋 Отчёт о матче"), match_callback(screen.fixture_id))])
+            from goaletto.bot.feedback_views import secondary_button
+
+            rows.append([secondary_button()])
         elif not screen.open:
             lines.append(tr("Сейчас действие недоступно. Обновите экран."))
         else:
