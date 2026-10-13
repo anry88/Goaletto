@@ -7,6 +7,7 @@ Feedback is explicit analytic activity but never extends the six-month ownership
 Free text lives in feedback_comments only, never in journey envelopes/logs.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID, uuid5
@@ -123,7 +124,7 @@ def _check_session(session: AsyncSession) -> None:
 
 
 def _check_slug(slug: str) -> None:
-    if type(slug) is not str or not slug or len(slug) > 64:
+    if type(slug) is not str or not re.fullmatch(r"[a-z0-9_-]{1,64}", slug):
         raise ValueError("Invalid feedback campaign")
 
 
@@ -163,11 +164,12 @@ async def ensure_campaign(session: AsyncSession, slug: str, at: datetime) -> Fee
     existing = await session.scalar(select(FeedbackCampaign).where(FeedbackCampaign.slug == slug))
     if existing is not None:
         return existing
-    row = FeedbackCampaign(slug=slug, created_at=at)
-    # Deterministic id keeps concurrent creators on the same campaign row.
-    row.id = uuid5(UUID("00000000-0000-0000-0000-000000000000"), f"feedback-campaign:v1:{slug}")
-    session.add(row)
-    await session.flush()
+    campaign_id = uuid5(UUID(int=0), f"feedback-campaign:v1:{slug}")
+    await session.execute(
+        insert(FeedbackCampaign)
+        .values(id=campaign_id, slug=slug, created_at=at)
+        .on_conflict_do_nothing(index_elements=["slug"])
+    )
     created = await session.scalar(select(FeedbackCampaign).where(FeedbackCampaign.slug == slug))
     if created is None:
         raise ValueError("Feedback campaign was not persisted")
@@ -391,11 +393,13 @@ async def opt_out(
     if response.status in {"skipped", "answered"}:
         # Terminal answers stay terminal; opting out still erases text and mapping.
         response.status = "opted_out"
+        response.reason = None
         response.responded_at = response.responded_at or at
         response.comment_due_at = None
         await session.flush()
     else:
         response.status = "opted_out"
+        response.reason = None
         response.responded_at = at
         response.comment_due_at = None
         await session.flush()
@@ -455,7 +459,7 @@ async def save_comment(
     if type(text) is not str:
         raise ValueError("Invalid feedback comment")
     cleaned = text.strip()
-    if not 1 <= len(cleaned) <= COMMENT_MAX_CHARS or len(text) > 2000:
+    if not 1 <= len(cleaned) <= COMMENT_MAX_CHARS or len(text) > COMMENT_MAX_CHARS:
         raise ValueError("Comment must be 1..500 characters")
     manager = await _locked_manager(session, actor)
     await _check_eligibility(session, manager)
@@ -486,19 +490,31 @@ async def record_prompt_delivered(
     )
     if response is None:
         return False
-    analytics_id = await session.scalar(
-        select(AnalyticsManager.id).where(AnalyticsManager.manager_id == response.manager_id)
+    manager = await session.scalar(
+        select(Manager).where(Manager.id == response.manager_id).with_for_update()
     )
-    if analytics_id is None:
-        return False
-    manager = await session.scalar(select(Manager).where(Manager.id == response.manager_id))
     if manager is None or not bool(manager.is_internal) or not bool(manager.bot_available):
+        return False
+    response = await session.scalar(
+        select(FeedbackResponse)
+        .where(FeedbackResponse.id == response_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if response is None or response.status != "prompted" or response.delivered_at is not None:
         return False
     exclusion = await session.scalar(
         select(AnalyticsExclusion).where(AnalyticsExclusion.manager_id == response.manager_id)
     )
-    if exclusion is not None:
+    if exclusion is not None and exclusion.kind in {"opt_out", "operator"}:
         return False
+    response.delivered_at = at
+    await session.flush()
+    analytics_id = await session.scalar(
+        select(AnalyticsManager.id).where(AnalyticsManager.manager_id == response.manager_id)
+    )
+    if analytics_id is None:
+        return True
     operation = uuid5(response.id, "prompt-delivery:v1")
     try:
         return await record_event(
@@ -538,3 +554,67 @@ def prompt_outbox_id(response_id: UUID) -> UUID:
     if not isinstance(response_id, UUID):
         raise ValueError("Invalid feedback response")
     return uuid5(response_id, "prompt-outbox:v1")
+
+
+async def skip_comment(
+    session: AsyncSession, actor: Actor, *, response_id: UUID, at: datetime
+) -> bool:
+    _check_session(session)
+    require_utc(at)
+    manager = await _locked_manager(session, actor)
+    await _check_eligibility(session, manager)
+    response = await _locked_response(session, actor, response_id)
+    if response.status != "answered":
+        raise PermissionDenied("No comment session")
+    if response.comment_due_at is None:
+        return False
+    response.comment_due_at = None
+    await session.flush()
+    return True
+
+
+async def offer_feedback(session: AsyncSession, actor: Actor, at: datetime) -> bool:
+    manager = await session.get(Manager, actor.manager_id)
+    if manager is None or not manager.is_internal or not manager.bot_available:
+        return False
+    exclusion = await session.get(AnalyticsExclusion, manager.id)
+    if exclusion is not None and exclusion.kind in {"opt_out", "operator"}:
+        return False
+    campaign_id = uuid5(UUID(int=0), f"feedback-campaign:v1:{MANUAL_CAMPAIGN_SLUG}")
+    previous = await session.scalar(
+        select(FeedbackResponse.id).where(
+            FeedbackResponse.manager_id == manager.id,
+            FeedbackResponse.campaign_id == campaign_id,
+        )
+    )
+    return previous is None
+
+
+async def schedule_comment_cleanup(
+    session: AsyncSession, *, at: datetime, retention_days: int
+) -> None:
+    from goaletto.infrastructure.models import Job
+
+    _check_session(session)
+    require_utc(at)
+    if type(retention_days) is not int or not 1 <= retention_days <= 730:
+        raise ValueError("Invalid comment retention")
+    await session.execute(
+        insert(Job)
+        .values(
+            dedupe_key="feedback.cleanup:v1",
+            kind="feedback.cleanup",
+            payload={"version": 1, "retention_days": retention_days},
+            due_at=at,
+            status="pending",
+            attempts=0,
+        )
+        .on_conflict_do_update(
+            index_elements=["dedupe_key"],
+            set_={
+                "payload": {"version": 1, "retention_days": retention_days},
+                "status": "pending",
+                "last_error": None,
+            },
+        )
+    )

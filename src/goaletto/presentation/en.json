@@ -432,7 +432,6 @@
   "⏸ Аукцион за {player} отменён: объявлен последний сезон. Резерв ставок освобождён.": "⏸ Auction for {player} cancelled: his last season was announced. Bid reservations released.",
   "⏸ Аукцион за {player} отменён. Резерв ставок освобождён. Откройте /market.": "⏸ Auction for {player} cancelled. Bid reservations released. Open /market.",
   "Расчёт ожидается": "Awaiting settlement",
-  "/start — клуб или выбор клуба\n/squad — состав\n/lineup — расстановка\n/match — матч и live-команды\n/table — таблица\n/history — результаты\n/train — недельные тренировки\n/finance — финансы клуба\n/stadium — стадион и посещаемость\n/market — аукционы и продажа игроков\n/settings — язык и напоминания\n/help — помощь": "/start — club or club selection\n/squad — squad\n/lineup — lineup\n/match — match and live commands\n/table — league table\n/history — match results\n/train — weekly training\n/finance — club finances\n/stadium — stadium and attendance\n/market — auctions and player sales\n/settings — language and reminders\n/help — help",
   "Непонятно, что дальше": "Unclear what to do next",
   "Сложно настроить состав": "Lineup is hard to set up",
   "Долго ждать матч": "Long wait for the match",
@@ -452,5 +451,6 @@
   "Время для комментария вышло. Спасибо за ответ!": "The comment window has closed. Thank you for answering!",
   "✍️ Оставить отзыв": "✍️ Leave feedback",
   "Комментарий слишком длинный: максимум 500 символов.": "Comment is too long: 500 characters maximum.",
-  "Оставить отзыв": "Leave feedback"
+  "Оставить отзыв": "Leave feedback",
+  "/start — клуб или выбор клуба\n/squad — состав\n/lineup — расстановка\n/match — матч и live-команды\n/table — таблица\n/history — результаты\n/train — недельные тренировки\n/finance — финансы клуба\n/stadium — стадион и посещаемость\n/market — аукционы и продажа игроков\n/feedback — добровольный отзыв\n/settings — язык и напоминания\n/help — помощь": "/start — club or club selection\n/squad — squad\n/lineup — lineup\n/match — match and live commands\n/table — league table\n/history — match results\n/train — weekly training\n/finance — club finances\n/stadium — stadium and attendance\n/market — auctions and player sales\n/feedback — voluntary feedback\n/settings — language and reminders\n/help — help"
 }

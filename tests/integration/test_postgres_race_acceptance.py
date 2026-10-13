@@ -457,6 +457,7 @@ async def test_late_bid_extension_vs_taken_close_job_defers_with_single_reserve(
 
     bid_acquired = asyncio.Event()
     close_started = asyncio.Event()
+    bid_committed = asyncio.Event()
 
     async def bid_task() -> bool:
         async with sessions.begin() as session:
@@ -478,19 +479,22 @@ async def test_late_bid_extension_vs_taken_close_job_defers_with_single_reserve(
             assert result.accepted
             bid_auction = await session.get(Auction, auction_id)
             assert bid_auction is not None and bid_auction.ends_at == new_ends
+        bid_committed.set()
         return True
 
     async def close_task() -> bool:
         await asyncio.wait_for(bid_acquired.wait(), 10)
         assert await auction_row_locked_elsewhere(sessions, auction_id)
-        close_started.set()
         async with sessions.begin() as session:
             job = await close_job_for(session, auction_id)
+            await session.refresh(job, with_for_update=True)
+            close_started.set()
             try:
                 rescheduled = await close_auction(session, job, old_ends)
             except NotReady:
                 rescheduled = True
             assert rescheduled
+        await asyncio.wait_for(bid_committed.wait(), 10)
         async with sessions.begin() as session:
             job = await close_job_for(session, auction_id)
             # After the bid commits the close must observe the extended deadline.
@@ -625,12 +629,12 @@ async def test_sender_lease_takeover_old_finish_preserves_unknown(
 
     # The new owner completes honestly; the old unknown is preserved, never sent.
     new_transport = _FakeTransport(777)
-    await new_transport.send_text(1, "board")
     async with sessions.begin() as session:
         ready = await preflight_delivery(
             session, row_id, t1, lease_owner="sender-b-new", attempt=attempt_one + 1
         )
         assert ready is not None
+    await new_transport.send_text(1, "board")
     async with sessions.begin() as session:
         finished = await finish_delivery(
             session,

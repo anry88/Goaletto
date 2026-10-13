@@ -73,7 +73,12 @@ def parse_callback(value: str) -> tuple[str, tuple[int, ...], UUID, UUID, int, b
 
 
 def render(
-    screen: LiveScreen, *, panel: int = 0, selected: int = 0, notice: str | None = None
+    screen: LiveScreen,
+    *,
+    panel: int = 0,
+    selected: int = 0,
+    notice: str | None = None,
+    feedback_available: bool = False,
 ) -> tuple[str, Keyboard]:
     lines = [f"⚽ <b>{escape(latin_name(screen.club_name))}</b>"]
     rows = []
@@ -108,7 +113,8 @@ def render(
             rows.append([_button(tr("📋 Отчёт о матче"), match_callback(screen.fixture_id))])
             from goaletto.bot.feedback_views import secondary_button
 
-            rows.append([secondary_button()])
+            if feedback_available:
+                rows.append([secondary_button()])
         elif not screen.open:
             lines.append(tr("Сейчас действие недоступно. Обновите экран."))
         else:

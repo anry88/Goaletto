@@ -19,7 +19,7 @@ Definitions mirror ``docs/analytics/measurement-plan.md`` and
   ``unsupported``/``unavailable`` until a central mapping proves an official
   result; they never produce a false KPI.
 * Earlier unfinished candidates block later mature ones: the first candidate in
-  ``(lineup_lock, scheduled_start, fixture_id)`` order determines the status.
+  ``(actual_start or scheduled_start, lineup_lock, fixture_id)`` order determines the status.
 * ``n`` counts distinct managers with an eligible visible effect
   (``match_opened`` / ``match_report_opened`` / ``match_command_accepted``,
   ``origin=user``) for their own fixture/ownership inside the mature window.
@@ -42,6 +42,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from math import isfinite
 from typing import Any
 from uuid import UUID
 
@@ -363,7 +364,7 @@ class OpportunityCounts:
         if not 0 <= self.unknown_late <= self.eligible_N - self.participated_n:
             raise ValueError("Late unknown exceeds mature non-participants")
         if self.rate is not None:
-            if not isinstance(self.rate, float):
+            if not isinstance(self.rate, float) or not isfinite(self.rate):
                 raise ValueError("Rate must be a float or None")
             if self.eligible_N == 0:
                 raise ValueError("Rate must be None without a mature cohort")
@@ -442,8 +443,27 @@ def _dedupe_effects(
             e.fixture_id.hex,
         ),
     ):
-        if effect.effect_key not in seen:
+        prior = seen.get(effect.effect_key)
+        if prior is None:
             seen[effect.effect_key] = effect
+        elif (
+            prior.manager_id,
+            prior.fixture_id,
+            prior.ownership_id,
+            prior.name,
+            prior.origin,
+            prior.occurred_at,
+            prior.version,
+        ) != (
+            effect.manager_id,
+            effect.fixture_id,
+            effect.ownership_id,
+            effect.name,
+            effect.origin,
+            effect.occurred_at,
+            effect.version,
+        ):
+            raise ValueError("Conflicting duplicate effect key")
     return tuple(seen[key] for key in sorted(seen))
 
 
@@ -453,7 +473,11 @@ def _qualifying_ownership(
     lineup_lock: datetime,
 ) -> OwnershipProjection | None:
     candidates = [
-        own for own in ownerships if own.club_id == club_id and own.claimed_at <= lineup_lock
+        own
+        for own in ownerships
+        if own.club_id == club_id
+        and own.claimed_at <= lineup_lock
+        and (own.ended_at is None or own.ended_at > lineup_lock)
     ]
     if not candidates:
         return None
@@ -483,8 +507,8 @@ def _candidate_fixtures(
         picked.append((fixture, ownership))
     picked.sort(
         key=lambda item: (
+            item[0].actual_start or item[0].scheduled_start,
             item[0].lineup_lock,
-            item[0].scheduled_start,
             item[0].fixture_id.hex,
         )
     )
@@ -497,6 +521,7 @@ def _participation(
     manager_id: UUID,
     fixture_id: UUID,
     ownership_id: UUID,
+    claimed_at: datetime,
     window_start: datetime,
     window_end: datetime,
     report_at: datetime,
@@ -516,7 +541,7 @@ def _participation(
             continue
         if effect.version != 1:
             continue
-        if not window_start <= effect.occurred_at < window_end:
+        if not max(window_start, claimed_at) <= effect.occurred_at < window_end:
             continue
         if effect.recorded_at <= report_at:
             visible = True
@@ -600,10 +625,26 @@ def evaluate_match_opportunities(
     ownership_ids = [o.ownership_id for o in ownerships]
     if len(set(ownership_ids)) != len(ownership_ids):
         raise ValueError("Duplicate ownership_id")
-    fixture_ids = [f.fixture_id for f in fixtures]
+    fixture_ids = [(f.fixture_id, f.club_id) for f in fixtures]
     if len(set(fixture_ids)) != len(fixture_ids):
-        raise ValueError("Duplicate fixture_id")
+        raise ValueError("Duplicate fixture_id/club_id projection")
 
+    fixture_versions: dict[UUID, FixtureProjection] = {}
+    for fixture in fixtures:
+        prior = fixture_versions.get(fixture.fixture_id)
+        if prior is not None:
+            fields = (
+                "fixture_type",
+                "status",
+                "scheduled_start",
+                "lineup_lock",
+                "actual_start",
+                "actual_finish",
+                "has_official_result",
+            )
+            if any(getattr(prior, key) != getattr(fixture, key) for key in fields):
+                raise ValueError("Conflicting fixture projections")
+        fixture_versions[fixture.fixture_id] = fixture
     manager_index = {m.manager_id: m for m in managers}
     ownerships_by_manager: dict[UUID, list[OwnershipProjection]] = {
         m.manager_id: [] for m in managers
@@ -718,6 +759,7 @@ def evaluate_match_opportunities(
                 manager_id=manager.manager_id,
                 fixture_id=first_fixture.fixture_id,
                 ownership_id=first_ownership.ownership_id,
+                claimed_at=first_ownership.claimed_at,
                 window_start=first_window[0],
                 window_end=first_window[1],
                 report_at=report_at,
@@ -790,6 +832,7 @@ def evaluate_match_opportunities(
                 manager_id=manager.manager_id,
                 fixture_id=second_fixture.fixture_id,
                 ownership_id=second_ownership.ownership_id,
+                claimed_at=second_ownership.claimed_at,
                 window_start=swstart,
                 window_end=swend,
                 report_at=report_at,
@@ -918,3 +961,22 @@ def validate_match_opportunity_report(data: dict[str, Any]) -> None:
         raise ValueError("excluded_managers must be a nonnegative integer")
     if type(no_first) is not int or no_first < 0:
         raise ValueError("second_no_first must be a nonnegative integer")
+
+    group_keys = (
+        "eligible_N",
+        "waiting",
+        "interrupted",
+        "coverage",
+        "unsupported",
+        "unavailable",
+        "no_calendar",
+    )
+    if sum(first_raw[key] for key in group_keys) + excluded != total:
+        raise ValueError("First groups do not reconcile with total_managers")
+    if sum(second_raw[key] for key in group_keys) + no_first != total:
+        raise ValueError("Second groups do not reconcile with total_managers")
+    for section in (first_raw, second_raw):
+        OpportunityCounts(
+            **{key: section[key] for key in (*group_keys, "participated_n", "unknown_late")},
+            rate=section.get("rate"),
+        )

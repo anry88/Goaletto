@@ -189,6 +189,7 @@ async def game_help(message: Message) -> None:
             "/finance — финансы клуба\n"
             "/stadium — стадион и посещаемость\n"
             "/market — аукционы и продажа игроков\n"
+            "/feedback — добровольный отзыв\n"
             "/settings — язык и напоминания\n"
             "/help — помощь"
         )

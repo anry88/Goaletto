@@ -18,6 +18,7 @@ Python, сообщения и inline-кнопки; без Mini App и JavaScript
 checkpoint/replay и события. Durable [live-worker](docs/match-runtime.md) реализован, но календарь ещё не активирован.
 Очки и таблицы начисляются атомарно с финальным тиком. Backend регистрации/выдачи клуба/6-месячного владения реализован:
 [club-entry.md](docs/club-entry.md). Игровой `/start` и кнопки подключены при `GOALETTO_GAME_ENABLED=true`.
+[Добровольные отзывы](docs/feedback.md) включаются отдельно для internal/test через `/feedback`;
 [Live-команды](docs/live-commands.md) подключены через `/match`;
 [RU/EN и имена](docs/languages-and-names.md) переключаются через `/settings`;
 [недельные тренировки](docs/training.md) доступны через `/train`; [экономика и денежный журнал](docs/club-finances.md) — через `/finance`; [стадион и посещаемость](docs/stadium.md) — через `/stadium`; [аукционный рынок](docs/transfer-auctions.md) — через `/market`; rollover ещё в разработке. [Outbox sender](docs/outbox-delivery.md) подключён отдельным

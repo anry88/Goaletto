@@ -1460,6 +1460,7 @@ class FeedbackResponse(Base):
     status: Mapped[str] = mapped_column(String(16))
     reason: Mapped[str | None] = mapped_column(String(32))
     prompted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     comment_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

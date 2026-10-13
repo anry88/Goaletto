@@ -40,6 +40,7 @@ WORKER_JOB_KINDS = frozenset(
         "stadium.complete",
         "market.close",
         "market.cancel_player",
+        "feedback.cleanup",
     }
 )
 

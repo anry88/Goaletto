@@ -142,7 +142,7 @@ def test_first_participation_two_of_four() -> None:
             fixes[1],
             owns[1],
             name="match_command_accepted",
-            occurred=start + timedelta(hours=2, minutes=6),
+            occurred=start + timedelta(hours=2, minutes=5),
             key=effects_dup_key,
         ),
         # C only gets delivery: system event, never activity.
@@ -823,3 +823,90 @@ def test_strict_inputs_and_determinism() -> None:
     )
     assert [d.manager_id for d in first.details] == [d.manager_id for d in second.details]
     assert first.first.eligible_N == second.first.eligible_N == 2
+
+
+def test_both_clubs_share_fixture_and_preclaim_activity_is_excluded() -> None:
+    from dataclasses import replace
+
+    start = dt(2026, 10, 11, 18)
+    a, b = manager(), manager()
+    ca, cb = uuid4(), uuid4()
+    oa = ownership(a, ca, start - timedelta(hours=1))
+    ob = ownership(b, cb, start - timedelta(days=2))
+    fa = mature_fixture(ca, start)
+    fb = replace(fa, club_id=cb)
+    result = evaluate_match_opportunities(
+        managers=(a, b),
+        ownerships=(oa, ob),
+        fixtures=(fa, fb),
+        effects=(
+            effect(a, fa, oa, occurred=start - timedelta(hours=2)),
+            effect(b, fb, ob, occurred=start),
+        ),
+        coverage=FULL,
+        report_at=start + timedelta(days=2),
+    )
+    assert (result.first.participated_n, result.first.eligible_N) == (1, 2)
+
+
+def test_ended_ownership_does_not_admit_later_fixture() -> None:
+    start = dt(2026, 10, 11, 18)
+    m, club = manager(), uuid4()
+    own = ownership(m, club, start - timedelta(days=4), start - timedelta(days=2))
+    result = evaluate_match_opportunities(
+        managers=(m,),
+        ownerships=(own,),
+        fixtures=(mature_fixture(club, start),),
+        effects=(),
+        coverage=FULL,
+        report_at=start + timedelta(days=2),
+    )
+    assert result.first.eligible_N == 0 and result.first.interrupted == 0
+    assert result.first.no_calendar == 1
+
+
+def test_postponed_fixture_order_uses_actual_start() -> None:
+    from dataclasses import replace
+
+    m, club = manager(), uuid4()
+    early, later = dt(2026, 10, 11, 18), dt(2026, 10, 18, 18)
+    own = ownership(m, club, early - timedelta(days=2))
+    postponed = replace(
+        mature_fixture(club, early), actual_start=later, actual_finish=later + timedelta(minutes=33)
+    )
+    other = mature_fixture(club, early + timedelta(days=1))
+    result = evaluate_match_opportunities(
+        managers=(m,),
+        ownerships=(own,),
+        fixtures=(postponed, other),
+        effects=(),
+        coverage=FULL,
+        report_at=later + timedelta(days=2),
+    )
+    assert result.details[0].first_fixture_id == other.fixture_id
+
+
+def test_report_validator_rejects_unreconciled_groups_and_nan_rate() -> None:
+    from dataclasses import asdict
+
+    from goaletto.application.match_opportunities import validate_match_opportunity_report
+
+    m, club = manager(), uuid4()
+    start = dt(2026, 10, 11, 18)
+    report = evaluate_match_opportunities(
+        managers=(m,),
+        ownerships=(ownership(m, club, start - timedelta(days=2)),),
+        fixtures=(mature_fixture(club, start),),
+        effects=(),
+        coverage=FULL,
+        report_at=start + timedelta(days=2),
+    )
+    valid = asdict(report)
+    validate_match_opportunity_report(valid)
+    valid["first"]["waiting"] = 1
+    with pytest.raises(ValueError, match="reconcile"):
+        validate_match_opportunity_report(valid)
+    valid = asdict(report)
+    valid["first"]["rate"] = float("nan")
+    with pytest.raises(ValueError, match="Rate"):
+        validate_match_opportunity_report(valid)

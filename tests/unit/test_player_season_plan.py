@@ -233,3 +233,12 @@ def test_identical_seasons_raise() -> None:
     same = replace(entry, next_season_id=COMPLETED)
     with pytest.raises(ValueError):
         plan_player_season(same)
+
+
+def test_retry_rejects_non_boolean_decision_outcome() -> None:
+    entry = make_entry(age=30)
+    prior = plan_player_season(entry)
+    assert prior.decision is not None
+    corrupt = replace(prior, decision=replace(prior.decision, is_last_season=0))
+    with pytest.raises(ValueError, match="boolean"):
+        plan_player_season(entry, prior=corrupt)

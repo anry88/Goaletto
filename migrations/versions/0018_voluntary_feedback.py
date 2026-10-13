@@ -28,6 +28,7 @@ def upgrade() -> None:
         "\tstatus VARCHAR(16) NOT NULL, \n"
         "\treason VARCHAR(32), \n"
         "\tprompted_at TIMESTAMP WITH TIME ZONE NOT NULL, \n"
+        "\tdelivered_at TIMESTAMP WITH TIME ZONE, \n"
         "\tresponded_at TIMESTAMP WITH TIME ZONE, \n"
         "\tcomment_due_at TIMESTAMP WITH TIME ZONE, \n"
         "\tPRIMARY KEY (id), \n"

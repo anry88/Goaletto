@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from aiogram import F, Router
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.exceptions import TelegramForbiddenError, TelegramNotFound
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message, Update
@@ -28,6 +29,7 @@ from goaletto.application.feedback import (
     prompt_outbox_id,
     record_prompt_delivered,
     save_comment,
+    skip_comment,
 )
 from goaletto.application.feedback import (
     answer_with_reason as _answer,
@@ -240,6 +242,11 @@ async def feedback_callback(query: CallbackQuery, database: Database) -> None:
                 await opt_out(session, actor, response_id=response_id, at=at)
             text, keyboard = feedback_views.opted_out_view()
         elif action == "k":
+            async with database.transaction() as session:
+                actor = await actor_for_callback(
+                    session, telegram_id=user.id, callback_id=query.id, at=at
+                )
+                await skip_comment(session, actor, response_id=response_id, at=at)
             text, keyboard = feedback_views.thanks_view()
         else:
             raise ValueError("Stale feedback button")
@@ -261,15 +268,18 @@ async def feedback_comment_message(
     if message.from_user is None or message.chat.type != "private":
         return
     text = message.text
-    if not isinstance(text, str) or not text.strip():
-        return
+    if not isinstance(text, str) or not text.strip() or text.startswith("/"):
+        raise SkipHandler()
+    settings = feedback_settings_from_config()
+    if not settings.enabled:
+        raise SkipHandler()
     at = datetime.now(UTC)
     try:
         async with database.transaction() as session:
             actor = await actor_for(session, message.from_user.id, event_update.update_id, at)
             target = await find_open_comment(session, actor.manager_id, at)
             if target is None:
-                return
+                raise SkipHandler()
             response_id = target.id
             try:
                 await save_comment(session, actor, response_id=response_id, text=text, at=at)
@@ -285,7 +295,7 @@ async def feedback_comment_message(
         await message.answer(text, reply_markup=keyboard)
         return
     except PermissionDenied:
-        return
+        raise SkipHandler() from None
     except ValueError as error:
         message_text = str(error)
         if message_text == "Invalid comment" and len(text.strip()) > COMMENT_MAX_CHARS:

@@ -1,8 +1,10 @@
 import asyncio
 import logging
+from datetime import UTC, datetime
 
 from aiogram import Bot
 
+from goaletto.application.feedback import schedule_comment_cleanup
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.jobs import process_one_job
@@ -50,6 +52,13 @@ async def run() -> None:
             raise SystemExit("Set GOALETTO_BOT_TOKEN before enabling GOALETTO_OUTBOX_ENABLED")
         bot = Bot(token)  # Sends only; polling remains in the bot process.
     database = Database(settings)
+    if settings.feedback_comment_retention_days is not None:
+        async with database.transaction() as session:
+            await schedule_comment_cleanup(
+                session,
+                at=datetime.now(UTC),
+                retention_days=settings.feedback_comment_retention_days,
+            )
     logger.info("Worker started; match calendar activation remains explicit")
     logger.info("Outbox sender %s", "enabled" if bot else "disabled")
     try:

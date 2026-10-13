@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message, Update
 
 from goaletto.application.club_view import actor_for_callback
+from goaletto.application.feedback import offer_feedback
 from goaletto.application.game_actions import PermissionDenied, actor_for
 from goaletto.application.live_commands import (
     NoFixture,
@@ -16,6 +17,7 @@ from goaletto.application.live_commands import (
 )
 from goaletto.bot import live_views
 from goaletto.bot.responses import edit_response
+from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
 from goaletto.presentation.i18n import tr
 
@@ -31,7 +33,11 @@ async def match_command(message: Message, database: Database, event_update: Upda
             actor = await actor_for(
                 session, message.from_user.id, event_update.update_id, datetime.now(UTC)
             )
-            text, keyboard = live_views.render(await load_live_screen(session, actor))
+            screen = await load_live_screen(session, actor)
+            feedback_available = Settings().feedback_enabled and await offer_feedback(
+                session, actor, actor.at
+            )
+            text, keyboard = live_views.render(screen, feedback_available=feedback_available)
     except NoFixture:
         text, keyboard = live_views.no_fixture_view()
     except (PermissionDenied, ValueError):

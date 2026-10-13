@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid5
 
 from sqlalchemy import String, cast, select
@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
+from goaletto.application.feedback import cleanup_comments
 from goaletto.application.finances import weekly_finances
 from goaletto.application.game_actions import allocation_lock, handle_lease_job
 from goaletto.application.market import close_auction, prohibit_player_trades
@@ -74,12 +75,25 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         "stadium.complete",
         "market.close",
         "market.cancel_player",
+        "feedback.cleanup",
     }:
         try:
             async with session.begin_nested():
                 if job.kind in RUNTIME_KINDS:
                     rescheduled = await handle_calendar_job(session, job, at) == "rescheduled"
                     _, fixture_id, _ = job_refs(job)
+                elif job.kind == "feedback.cleanup":
+                    if (
+                        set(job.payload) != {"version", "retention_days"}
+                        or type(job.payload["version"]) is not int
+                        or job.payload["version"] != 1
+                    ):
+                        raise ValueError("Invalid feedback cleanup job")
+                    await cleanup_comments(
+                        session, at=at, retention_days=job.payload["retention_days"]
+                    )
+                    job.due_at = at + timedelta(days=1)
+                    rescheduled = True
                 elif job.kind == "market.close":
                     rescheduled = await close_auction(session, job, at)
                 elif job.kind == "market.cancel_player":

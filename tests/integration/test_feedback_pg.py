@@ -188,7 +188,11 @@ async def test_boundaries_skip_optout_cooldown_and_cleanup(sessions):  # type: i
             )
     async with sessions.begin() as session:
         later = await open_prompt(
-            session, actor, slug="extra-v1", settings=SETTINGS, at=NOW + timedelta(days=8)
+            session,
+            replace(actor, operation_id=uuid4()),
+            slug="extra-v1",
+            settings=SETTINGS,
+            at=NOW + timedelta(days=8),
         )
         assert later.created
         skipped = await skip_prompt(
@@ -255,3 +259,64 @@ async def test_comment_window_lookup_for_router(sessions):  # type: ignore[no-un
             session, actor, response_id=prompt.response_id, text="ok", at=NOW + timedelta(minutes=5)
         )
         assert await find_open_comment(session, manager_id, NOW + timedelta(minutes=6)) is None
+
+
+async def test_campaign_creation_is_safe_across_managers(sessions):
+    import asyncio
+
+    from goaletto.infrastructure.models import FeedbackCampaign
+
+    one_id, _, _, _ = await _internal_owner(sessions)
+    async with sessions.begin() as session:
+        two = await begin_game(
+            session, telegram_id=9005, update_id=500, payload=None, at=NOW, internal=True
+        )
+    one = await _actor(sessions, one_id, 9001)
+    two_actor = two.actor
+
+    async def create(actor):
+        async with sessions.begin() as session:
+            return await open_prompt(session, actor, slug="race-v1", settings=SETTINGS, at=NOW)
+
+    prompts = await asyncio.wait_for(asyncio.gather(create(one), create(two_actor)), 10)
+    assert prompts[0].campaign_id == prompts[1].campaign_id
+    async with sessions.begin() as session:
+        campaigns = (await session.scalars(select(FeedbackCampaign))).all()
+        assert len(campaigns) == 1
+
+
+async def test_comment_skip_closes_durable_window_and_cleanup_runs_as_job(sessions):
+    from goaletto.application.feedback import schedule_comment_cleanup, skip_comment
+    from goaletto.infrastructure.jobs import process_one_job
+    from goaletto.infrastructure.models import Job
+
+    manager_id, _, _, _ = await _internal_owner(sessions)
+    actor = await _actor(sessions, manager_id, 9001)
+    async with sessions.begin() as session:
+        prompt = await open_prompt(session, actor, slug="manual-v1", settings=SETTINGS, at=NOW)
+        await answer_with_reason(
+            session, actor, response_id=prompt.response_id, reason_code="other", at=NOW
+        )
+        assert await skip_comment(session, actor, response_id=prompt.response_id, at=NOW)
+        assert not await skip_comment(session, actor, response_id=prompt.response_id, at=NOW)
+        assert await find_open_comment(session, manager_id, NOW) is None
+        with pytest.raises(PermissionDenied):
+            await save_comment(session, actor, response_id=prompt.response_id, text="late", at=NOW)
+        # Insert only fixture text, never private user content.
+        session.add(FeedbackComment(response_id=prompt.response_id, created_at=NOW, text="fixture"))
+        # Hold unrelated reminder jobs so this test proves the cleanup handler.
+        from sqlalchemy import update
+
+        await session.execute(
+            update(Job).where(Job.kind != "feedback.cleanup").values(status="held")
+        )
+        await schedule_comment_cleanup(session, at=NOW + timedelta(days=30), retention_days=30)
+    async with sessions.begin() as session:
+        assert await process_one_job(session, at=NOW + timedelta(days=30))
+        assert await session.get(FeedbackComment, prompt.response_id) is not None
+        cleanup = await session.scalar(select(Job).where(Job.kind == "feedback.cleanup"))
+        assert cleanup.status == "pending" and cleanup.due_at == NOW + timedelta(days=31)
+    async with sessions.begin() as session:
+        assert await process_one_job(session, at=NOW + timedelta(days=31))
+        assert await session.get(FeedbackComment, prompt.response_id) is None
+        assert await session.get(FeedbackResponse, prompt.response_id) is not None

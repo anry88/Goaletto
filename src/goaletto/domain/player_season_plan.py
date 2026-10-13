@@ -145,6 +145,8 @@ def _validate_entry(entry: PlayerSeasonEntry) -> None:
         raise ValueError("completed and next seasons must differ")
     _require_age(entry.current_age, "current_age")
     _require_draw(entry.draw)
+    if entry.current_status == "last_season" and entry.current_age < 32:
+        raise ValueError("Last season cannot be announced before age 32")
     _check_status_refs(
         entry.current_status, entry.current_last_season_id, entry.current_retired_after_season_id
     )
@@ -167,6 +169,12 @@ def _expected_probability(age: int) -> int:
 
 
 def _check_decision(decision: RetirementDecision, next_age: int, *, must_warn: bool) -> None:
+    if not isinstance(decision, RetirementDecision):
+        raise ValueError("Invalid decision type")
+    if type(decision.age) is not int or type(decision.probability_bps) is not int:
+        raise ValueError("Decision age and probability must be integers")
+    if type(decision.is_last_season) is not bool:
+        raise ValueError("Decision outcome must be a boolean")
     if decision.age != next_age:
         raise ValueError("Decision age must equal the next season age")
     if decision.policy_version != PLAYER_RETIREMENT_POLICY:

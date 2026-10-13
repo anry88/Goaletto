@@ -188,7 +188,7 @@ def test_final_live_screen_keeps_report_primary() -> None:
         open=False,
         recent=(),
     )
-    text, keyboard = live_views.render(screen)
+    text, keyboard = live_views.render(screen, feedback_available=True)
     assert "Матч завершён" in text or "finished" in text.lower() or "🏁" in text
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     report = next(i for i, c in enumerate(callbacks) if c and c.startswith("hx:m:"))
@@ -278,9 +278,12 @@ async def test_comment_route_ignores_commands_and_messages_without_window(
 
     monkeypatch.setattr(feedback_router, "find_open_comment", no_window)
     plain = _FakeMessage(db, text="hello ordinary message")
-    await feedback_router.feedback_comment_message(
-        cast(object, plain),
-        cast(object, db),
-        cast(object, SimpleNamespace(update_id=5)),  # type: ignore[arg-type]
-    )
+    from aiogram.dispatcher.event.bases import SkipHandler
+
+    with pytest.raises(SkipHandler):
+        await feedback_router.feedback_comment_message(
+            cast(object, plain),
+            cast(object, db),
+            cast(object, SimpleNamespace(update_id=5)),  # type: ignore[arg-type]
+        )
     assert plain.answers == []
