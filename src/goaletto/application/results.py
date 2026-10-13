@@ -50,7 +50,7 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
         or state.match_id != match.id
         or state.seed != match.seed
         or state.engine_version != match.engine_version
-        or match.state_version != 1
+        or match.state_version != (1 if state.engine_version == "regulation-v1" else 2)
         or state.home.snapshot.club_id != fixture.home_club_id
         or state.away.snapshot.club_id != fixture.away_club_id
         or state.home.stats.goals != match.home_goals

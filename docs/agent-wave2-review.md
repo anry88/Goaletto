@@ -41,3 +41,7 @@ snapshot и отсутствие false tick gap на full match. Telegram fake; 
 
 После общей приёмки — main, затем portrait quota check. Если Imagegen ещё
 ограничен, следующая необходимая задача AND-53: live admission/UI.
+
+GitHub CI исходного9734c4fe обнаружил ModuleNotFoundError tests.unit при запуске
+pytest executable (локально python -m pytest проходил). Итоговая сборка добавляет
+явные tests/unit/integration packages и проверяет также прямой pytest CLI.

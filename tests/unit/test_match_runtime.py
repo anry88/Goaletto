@@ -63,13 +63,35 @@ class Recorder:
     def in_transaction(self):
         return True
 
-    async def scalar(self, statement):
+    async def scalar(self, statement, params=None):
         self.statements.append(statement)
+        if not hasattr(statement, "column_descriptions"):
+            return True
         entity = statement.column_descriptions[0]["entity"]
         return self.fixture if entity is Fixture else self.match if entity is Match else self.season
 
     async def scalars(self, statement):
         self.statements.append(statement)
+        entity = statement.column_descriptions[0]["entity"]
+        if entity is AcceptedCommand and statement.column_descriptions[0]["name"] == "ownership_id":
+            return Rows(list({c.ownership_id for c in self.commands}))
+        if entity is OwnershipPeriod:
+            return Rows(
+                [
+                    OwnershipPeriod(
+                        id=c.ownership_id,
+                        club_id=c.club_id,
+                        manager_id=c.manager_id,
+                        expires_at=NOW + timedelta(days=365),
+                        ended_at=None,
+                    )
+                    for c in self.commands
+                ]
+            )
+        if entity is Club:
+            return Rows([Club(id=c.club_id, owner_telegram_id=123) for c in self.commands])
+        if entity is Manager:
+            return Rows([Manager(id=c.manager_id, telegram_id=123) for c in self.commands])
         return Rows(self.commands)
 
     async def execute(self, statement):

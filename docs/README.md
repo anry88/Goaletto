@@ -54,3 +54,5 @@
 - [Задания следующей волны внешней разработки](agent-handoff-plan.md)
 
 - [Проверка второй волны агентов](agent-wave2-review.md)
+
+- [Live-команды, admission и версии checkpoint](live-commands.md)

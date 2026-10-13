@@ -140,3 +140,68 @@ async def test_settings_retry_stale_expiry_and_reenable_on_postgres(sessions):  
         )
         state = await get_settings(session, actor)
         assert state.reminders_enabled is True
+
+
+async def test_return_races_expiry_without_losing_active_ownership_or_club_data(sessions):
+    import asyncio
+
+    from goaletto.application.club_view import get_owned_club
+    from goaletto.application.game_actions import handle_lease_job
+    from goaletto.application.match_runtime import NotReady
+    from goaletto.infrastructure.models import Club, Player
+
+    ownership_id, club_id, manager_id, (_, expires) = await setup_owner(sessions)
+    async with sessions.begin() as session:
+        expiry_job = await session.scalar(
+            select(Job).where(
+                Job.kind == "ownership.expire",
+                Job.payload["ownership_id"].astext == str(ownership_id),
+            )
+        )
+        job_id = expiry_job.id
+        old_payload = dict(expiry_job.payload)
+        budget = (await session.get(Club, club_id)).budget
+
+    async def returning():
+        try:
+            async with sessions.begin() as session:
+                actor = Actor(manager_id, 1001, None, uuid4(), expires - timedelta(seconds=1), 200)
+                await get_owned_club(session, actor)
+                return True
+        except PermissionDenied:
+            return False
+
+    async def expiring():
+        for _ in range(100):
+            try:
+                async with sessions.begin() as session:
+                    row = await session.get(Job, job_id)
+                    await handle_lease_job(session, row, expires)
+                return
+            except NotReady:
+                async with sessions() as session:
+                    current = await session.get(Job, job_id)
+                    if current.due_at > expires:
+                        return  # Return refreshed the durable lease into the future.
+                await asyncio.sleep(0.02)
+        raise AssertionError("expiry never obtained a short ownership gate")
+
+    returned, _ = await asyncio.wait_for(asyncio.gather(returning(), expiring()), timeout=15)
+    async with sessions.begin() as session:
+        ownership = await session.get(OwnershipPeriod, ownership_id)
+        club = await session.get(Club, club_id)
+        assert club.budget == budget
+        assert (
+            len((await session.scalars(select(Player).where(Player.club_id == club_id))).all())
+            == 20
+        )
+        if returned:
+            assert ownership.ended_at is None and ownership.expires_at > expires
+            assert club.owner_telegram_id == 1001
+            # Replaying the old expiry job cannot release the returned club.
+            await handle_lease_job(
+                session, Job(kind="ownership.expire", payload=old_payload), expires
+            )
+            assert ownership.ended_at is None
+        else:
+            assert ownership.ended_at is not None and club.owner_telegram_id is None

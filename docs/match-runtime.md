@@ -62,7 +62,9 @@ Regulation MatchTick вставляется/flush до applied-command UPDATE с
 Halftime application хранит applied_at и stage, applied_tick_number=NULL: tick16 ещё
 не существует. Command-applied analytics содержит command_id/fixture_id, origin=system,
 без user session. При завершении остающиеся принятые команды cancelled.
-Telegram owner/deadline admission/UI и индивидуальные инструкции — AND-53.
+Telegram owner/deadline admission/UI и индивидуальные инструкции подключены:
+[live-commands.md](live-commands.md). Новые matches regulation-v2/state_version2;
+старые v1 checkpoint и replay сохранены.
 
 Checkpoint/projections, неизменяемые tick/stage events/hash, accepted effects,
 journey lifecycle, outbox и отметка Job done коммитятся вместе. Это единственная
@@ -97,3 +99,9 @@ abandoned, outbox вместо delivery, controlled activation, worker savepoint
 Offline upgrade/downgrade SQL/CREATE/index/ALTER checks; real PostgreSQL locks/rollback/
 triggers/competition не проверены. Тестовые БД/контейнеры по указанию пользователя
 не создаются. Не запускались game seed --apply, runtime --apply, polling или HDC deployment.
+
+## Общий gate · 2026-10-13
+
+Runtime берёт short allocation try-lock до Fixture/Match для сериализации с
+ownership expiry/admission/settings. Busy gate даёт NotReady/deferred и не
+сдвигает absolute deadlines. Pending owner guards перепроверяются при apply.

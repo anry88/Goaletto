@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid5
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,10 +20,12 @@ from goaletto.domain.match_codec import restore_state, state_document, state_has
 from goaletto.domain.match_engine import advance_tick, start_match, start_second_half
 from goaletto.domain.match_types import (
     ENGINE_VERSION,
+    LIVE_ENGINE_VERSION,
     CommandKind,
     EnginePolicy,
     FieldSlot,
     HomeCrowd,
+    Instruction,
     MatchCommand,
     MatchEvent,
     MatchSkills,
@@ -36,6 +38,7 @@ from goaletto.domain.match_types import (
 )
 from goaletto.domain.world import stable_seed
 from goaletto.infrastructure.analytics import record_event, start_coverage
+from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
 from goaletto.infrastructure.models import (
     AcceptedCommand,
     AppearanceIdentity,
@@ -350,6 +353,7 @@ def domain_command(command: AcceptedCommand, state: MatchState, *, halftime: boo
         "substitution": {"outgoing_id", "incoming_id"},
         "tactics": {"tactic"},
         "mentality": {"mentality"},
+        "instruction": {"player_id", "instruction"},
     }
     if command.kind not in fields or set(payload) != fields[command.kind]:
         raise ValueError("Unsupported closed command payload")
@@ -360,6 +364,8 @@ def domain_command(command: AcceptedCommand, state: MatchState, *, halftime: boo
             if key.endswith("_id")
             else Tactic(value)
             if key == "tactic"
+            else Instruction(value)
+            if key == "instruction"
             else Mentality(value)
         )
     kind = CommandKind.TACTIC if command.kind == "tactics" else CommandKind(command.kind)
@@ -378,6 +384,39 @@ async def apply_commands(
     *,
     halftime: bool,
 ) -> tuple[MatchState, tuple[MatchEvent, ...]]:
+    # Match is already locked. Match expiry's Ownership -> Club -> Command order
+    # before locking command rows; never acquire the global allocation lock here.
+    ownership_ids = (
+        await session.scalars(
+            select(AcceptedCommand.ownership_id)
+            .where(AcceptedCommand.match_id == match.id, AcceptedCommand.status == "accepted")
+            .distinct()
+        )
+    ).all()
+    owners = (
+        await session.scalars(
+            select(OwnershipPeriod)
+            .where(OwnershipPeriod.id.in_(ownership_ids))
+            .order_by(OwnershipPeriod.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).all()
+    clubs = (
+        await session.scalars(
+            select(Club)
+            .where(Club.id.in_([o.club_id for o in owners]))
+            .order_by(Club.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).all()
+    managers = (
+        await session.scalars(select(Manager).where(Manager.id.in_([o.manager_id for o in owners])))
+    ).all()
+    owner_by_id = {o.id: o for o in owners}
+    club_by_id = {c.id: c for c in clubs}
+    telegram_by_manager = {m.id: m.telegram_id for m in managers}
     rows = (
         await session.scalars(
             select(AcceptedCommand)
@@ -401,6 +440,19 @@ async def apply_commands(
         rows = [c for c in rows if c.accepted_at < due_for(match, fixture)]
     valid = []
     for row in rows:
+        owner = owner_by_id.get(row.ownership_id)
+        club = club_by_id.get(row.club_id)
+        if (
+            owner is None
+            or club is None
+            or owner.ended_at is not None
+            or owner.expires_at <= at
+            or owner.manager_id != row.manager_id
+            or owner.club_id != row.club_id
+            or club.owner_telegram_id != telegram_by_manager.get(row.manager_id)
+        ):
+            row.status = "cancelled"
+            continue
         if row.accepted_at >= due_for(match, fixture, None if halftime else tick):
             row.status = "cancelled"
             continue
@@ -458,6 +510,13 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             raise ValueError("Invalid season opening")
         season.status = "active"
         return
+    # The same short ownership gate used by admission/expiry/settings, acquired
+    # before fixture locks. Try-lock defers workers instead of deadlocking an owner.
+    if not await session.scalar(
+        text("SELECT pg_try_advisory_xact_lock(:key)"),
+        {"key": APPEARANCE_ALLOCATION_LOCK},
+    ):
+        raise NotReady("Ownership allocation is busy")
     fixture = await session.scalar(
         select(Fixture)
         .where(Fixture.id == fixture_id)
@@ -508,15 +567,16 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             seed,
             await team_snapshot(session, home, fixture.scheduled_start_at),
             await team_snapshot(session, away, fixture.scheduled_start_at),
-            policy=EnginePolicy(),
+            policy=EnginePolicy(version="match-policy-v2"),
+            engine_version=LIVE_ENGINE_VERSION,
             crowd=HomeCrowd(home.stadium_capacity, min(home.supporters, home.stadium_capacity)),
         )
         match = Match(
             id=state.match_id,
             fixture_id=fixture.id,
             seed=seed,
-            engine_version=ENGINE_VERSION,
-            state_version=1,
+            engine_version=state.engine_version,
+            state_version=2,
             state=state_document(state),
             starting_snapshot=state_document(state),
             completed_tick=0,
@@ -569,7 +629,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         or state.engine_version != match.engine_version
         or state.tick != match.completed_tick
         or state.phase.value != match.phase
-        or match.state_version != 1
+        or match.state_version != (1 if state.engine_version == ENGINE_VERSION else 2)
         or state.home.stats.goals != match.home_goals
         or state.away.stats.goals != match.away_goals
         or state.home.snapshot.club_id != fixture.home_club_id

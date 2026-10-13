@@ -194,7 +194,7 @@ def render_text(payload: dict[str, Any]) -> str:
             return f"Финальный свисток: {score}."
         minute = payload["tick"] * 3
         suffix = " · Перерыв" if payload["phase"] == "half_time" else ""
-        return f"⚽ {minute}′{suffix}\n{score}"
+        return f"⚽ {minute}′{suffix}\n{score}\n/match — управление матчем"
     if kind == "fixture_reminder":
         return "Скоро начинается матч вашего клуба. Проверьте состав перед игрой."
     return "Ваш клуб ждёт вас. Откройте /start, чтобы продолжить управление."

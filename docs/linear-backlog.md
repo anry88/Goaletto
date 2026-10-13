@@ -1,5 +1,11 @@
 # Задачи Goaletto в Linear
 
+Обновление2026-10-13: A-D новой волны объединены в main9734c4fe; settings
+подключены, history bounded/season pages, read-only analytics/diagnostics.
+После подтверждённого Imagegen429 реализован AND-53 (включая instructions v2
+с сохранённым replay v1). Проверки docs/agent-wave2-review.md, docs/live-commands.md.
+AND-66/MVP, AND-79/full opportunities и AND-69/70/HDC остаются частичными.
+
 Текущая сборка 2026-10-12: sender AND-68, состав AND-49 и routed results AND-56
 реализованы и проверены на единственной рабочей Goaletto DB. Карточки AND-48 и
 история AND-66 приняты в объёме внешних заданий, parent ещё не полностью готов.

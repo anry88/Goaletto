@@ -7,6 +7,7 @@ from uuid import UUID
 from goaletto.domain.clock import MatchPhase
 
 ENGINE_VERSION = "regulation-v1"
+LIVE_ENGINE_VERSION = "regulation-v2"
 POSITIONS = frozenset({"GK", "DL", "DC", "DR", "DM", "ML", "MC", "MR", "AMC", "AML", "AMR", "FC"})
 
 
@@ -34,6 +35,14 @@ class Mentality(StrEnum):
     BALANCED = "balanced"
     DEFENCE = "defence"
     ULTRA_DEFENCE = "ultra_defence"
+
+
+class Instruction(StrEnum):
+    LONG_SHOTS = "long_shots"
+    MOVE_LEFT = "move_left"
+    MOVE_RIGHT = "move_right"
+    DROP_BACK = "drop_back"
+    RUNS_BEHIND = "runs_behind"
 
 
 @dataclass(frozen=True)
@@ -179,10 +188,24 @@ class EnginePolicy:
     minimum_players: int = 7
     max_support_morale: int = 12
     full_support_fans: int = 10000
+    max_instruction_changes: int = 3
+    instruction_bonus_bps: int = 1500
+    long_shot_extra_miss_bps: int = 1000
 
     def __post_init__(self) -> None:
-        if self.version != "match-policy-v1":
+        if self.version not in {"match-policy-v1", "match-policy-v2"}:
             raise ValueError("Unsupported policy")
+        if self.version == "match-policy-v1" and (
+            self.max_instruction_changes,
+            self.instruction_bonus_bps,
+            self.long_shot_extra_miss_bps,
+        ) != (3, 1500, 1000):
+            raise ValueError("Legacy policy cannot carry instruction tuning")
+        if self.max_instruction_changes != 3 or type(self.max_instruction_changes) is not int:
+            raise ValueError("Instruction limit must be three")
+        for value in (self.instruction_bonus_bps, self.long_shot_extra_miss_bps):
+            if type(value) is not int or not 0 <= value <= 3000:
+                raise ValueError("Instruction modifiers must be bounded basis points")
         if type(self.max_support_morale) is not int or not 0 <= self.max_support_morale <= 20:
             raise ValueError("Support morale must be an integer from 0 through 20")
         if type(self.full_support_fans) is not int or self.full_support_fans < 1:
@@ -240,6 +263,16 @@ class TeamStats:
 
 
 @dataclass(frozen=True)
+class PlayerInstruction:
+    player_id: UUID
+    instruction: Instruction
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.player_id, UUID) or not isinstance(self.instruction, Instruction):
+            raise ValueError("Invalid individual instruction")
+
+
+@dataclass(frozen=True)
 class TeamState:
     snapshot: TeamSnapshot
     lineup: tuple[FieldSlot, ...]
@@ -254,6 +287,8 @@ class TeamState:
     tactic_changes: int = 0
     counter_ready: bool = False
     support_morale_points: int = 0
+    instructions: tuple[PlayerInstruction, ...] = ()
+    instruction_changes: int = 0
 
 
 @dataclass(frozen=True)
@@ -288,6 +323,7 @@ class CommandKind(StrEnum):
     SUBSTITUTION = "substitution"
     TACTIC = "tactic"
     MENTALITY = "mentality"
+    INSTRUCTION = "instruction"
 
 
 @dataclass(frozen=True)
@@ -301,6 +337,8 @@ class MatchCommand:
     tactic: Tactic | None = None
     mentality: Mentality | None = None
     halftime: bool = False
+    player_id: UUID | None = None
+    instruction: Instruction | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, UUID) or not isinstance(self.side, Side):
@@ -311,6 +349,19 @@ class MatchCommand:
             raise ValueError("Unknown match command")
         if type(self.halftime) is not bool:
             raise ValueError("Command window must be explicit")
+        if self.kind == CommandKind.INSTRUCTION:
+            if (
+                not isinstance(self.player_id, UUID)
+                or not isinstance(self.instruction, Instruction)
+                or any(
+                    x is not None
+                    for x in (self.outgoing_id, self.incoming_id, self.tactic, self.mentality)
+                )
+            ):
+                raise ValueError("Instruction needs one player and a closed instruction")
+            return
+        if self.player_id is not None or self.instruction is not None:
+            raise ValueError("Unrelated instruction fields")
         if any(
             value is not None and not isinstance(value, UUID)
             for value in (self.outgoing_id, self.incoming_id)

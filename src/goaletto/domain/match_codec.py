@@ -12,10 +12,12 @@ from goaletto.domain.match_types import (
     EnginePolicy,
     FieldSlot,
     HomeCrowd,
+    Instruction,
     MatchSkills,
     MatchState,
     Mentality,
     PlayerCondition,
+    PlayerInstruction,
     PlayerSnapshot,
     Tactic,
     TeamSnapshot,
@@ -68,7 +70,11 @@ def _snapshot(value: Any) -> TeamSnapshot:
     return TeamSnapshot(**data)
 
 
-def _team(value: Any) -> TeamState:
+def _team(value: Any, *, legacy: bool) -> TeamState:
+    if legacy and isinstance(value, dict):
+        if set(value) & {"instructions", "instruction_changes"}:
+            raise ValueError("Legacy checkpoint has new fields")
+        value = dict(value, instructions=[], instruction_changes=0)
     data = _record(value, TeamState)
     data["snapshot"] = _snapshot(data["snapshot"])
     data["lineup"] = tuple(_slot(p) for p in data["lineup"])
@@ -86,6 +92,10 @@ def _team(value: Any) -> TeamState:
     data["tactic"], data["mentality"] = Tactic(data["tactic"]), Mentality(data["mentality"])
     data["substitution_windows"] = tuple(data["substitution_windows"])
     data["counter_ready"] = _boolean(data["counter_ready"])
+    data["instructions"] = tuple(
+        PlayerInstruction(_uuid(p["player_id"]), Instruction(p["instruction"]))
+        for p in (_record(raw, PlayerInstruction) for raw in data["instructions"])
+    )
     return TeamState(**data)
 
 
@@ -98,6 +108,12 @@ def state_document(state: MatchState) -> dict[str, Any]:
         raise ValueError("Unsupported checkpoint value")
 
     result: dict[str, Any] = json.loads(json.dumps(asdict(state), default=encode))
+    if state.engine_version == "regulation-v1":
+        for side in ("home", "away"):
+            del result[side]["instructions"]
+            del result[side]["instruction_changes"]
+        for key in ("max_instruction_changes", "instruction_bonus_bps", "long_shot_extra_miss_bps"):
+            del result["policy"][key]
     return result
 
 
@@ -115,7 +131,22 @@ def restore_state(value: str | dict[str, Any]) -> MatchState:
     try:
         data = _record(json.loads(value) if isinstance(value, str) else value, MatchState)
         data["match_id"] = _uuid(data["match_id"])
-        data["home"], data["away"] = _team(data["home"]), _team(data["away"])
+        legacy = data["engine_version"] == "regulation-v1"
+        data["home"], data["away"] = (
+            _team(data["home"], legacy=legacy),
+            _team(data["away"], legacy=legacy),
+        )
+        if legacy:
+            raw_policy = data["policy"]
+            extra = {"max_instruction_changes", "instruction_bonus_bps", "long_shot_extra_miss_bps"}
+            if not isinstance(raw_policy, dict) or set(raw_policy) & extra:
+                raise ValueError("Invalid legacy policy fields")
+            data["policy"] = dict(
+                raw_policy,
+                max_instruction_changes=3,
+                instruction_bonus_bps=1500,
+                long_shot_extra_miss_bps=1000,
+            )
         data["policy"] = EnginePolicy(**_record(data["policy"], EnginePolicy))
         data["crowd"] = HomeCrowd(**_record(data["crowd"], HomeCrowd))
         data["phase"] = MatchPhase(data["phase"])

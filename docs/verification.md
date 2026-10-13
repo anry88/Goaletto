@@ -1,5 +1,13 @@
 # Проверка начального каркаса · 2026-10-11
 
+## Вторая волна + live admission · 2026-10-13
+
+Четыре ветки сведены в main9734c4fe: settings, bounded history, analytics reports,
+read-only diagnostics. Исправления, миграция0011 и372 unit/16 PG —
+[agent-wave2-review.md](agent-wave2-review.md). После Imagegen429 продолжен AND-53;
+[v1 compatibility и live-приёмка](live-commands.md). PostgreSQL одна основная
+Goaletto DB; новых test DB нет, HDC/polling/Telegram не запускались.
+
 ## Текущая общая сборка первой волны · 2026-10-12
 
 305 unit/offline passed; 8 real PostgreSQL integration passed. Ruff/format (178

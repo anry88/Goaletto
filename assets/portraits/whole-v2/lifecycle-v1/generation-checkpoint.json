@@ -78,5 +78,7 @@
     "players-50-staff-senior"
   ],
   "resume_policy": "Generate only missing atlas names with the saved prompts and original base source. Native imagegen; no automatic API fallback.",
-  "resume_after_utc": "2026-10-13T11:57:51Z"
+  "resume_after_utc": "2026-10-13T11:57:51Z",
+  "last_quota_check_utc": "2026-10-13T09:08:41Z",
+  "last_quota_check_result": "usage_limit_reached"
 }

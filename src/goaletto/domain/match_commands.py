@@ -8,6 +8,7 @@ from goaletto.domain.match_types import (
     FieldSlot,
     MatchCommand,
     MatchState,
+    PlayerInstruction,
     Side,
     TeamState,
 )
@@ -92,6 +93,28 @@ def apply_commands(
                 else:
                     team = replace(
                         team, tactic=command.tactic, tactic_changes=team.tactic_changes + 1
+                    )
+        elif command.kind == CommandKind.INSTRUCTION:
+            assert command.player_id is not None and command.instruction is not None
+            slot = next((s for s in team.lineup if s.player_id == command.player_id), None)
+            current = next(
+                (p.instruction for p in team.instructions if p.player_id == command.player_id), None
+            )
+            if state.engine_version != "regulation-v2":
+                reason = "unsupported_instruction"
+            elif slot is None or slot.position == "GK":
+                reason = "player_unavailable"
+            elif current != command.instruction:
+                if team.instruction_changes >= state.policy.max_instruction_changes:
+                    reason = "instruction_limit"
+                else:
+                    team = replace(
+                        team,
+                        instructions=tuple(
+                            p for p in team.instructions if p.player_id != command.player_id
+                        )
+                        + (PlayerInstruction(command.player_id, command.instruction),),
+                        instruction_changes=team.instruction_changes + 1,
                     )
         else:
             assert command.mentality is not None

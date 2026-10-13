@@ -112,6 +112,15 @@ def _event_line(
         return f"🤕 {minute}′ {who}"
     if kind in ("tactic", "mentality") and detail:
         return f"📋 {minute}′ {escape(club or '?')}: {escape(detail)}"
+    if kind == "instruction" and detail:
+        labels = {
+            "long_shots": "Бить издалека",
+            "move_left": "Смещаться влево",
+            "move_right": "Смещаться вправо",
+            "drop_back": "Оттягиваться назад",
+            "runs_behind": "Рывки за спину",
+        }
+        return f"🎯 {minute}′ {who}: {escape(labels.get(detail, detail))}"
     if kind == "half_time":
         return "— ☕ Перерыв —"
     if kind == "full_time":

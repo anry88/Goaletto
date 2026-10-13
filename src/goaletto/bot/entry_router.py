@@ -154,6 +154,7 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
 async def game_help(message: Message) -> None:
     await message.answer(
         "/start — клуб или выбор клуба\n/squad — состав\n/lineup — расстановка\n"
-        "/table — таблица\n/history — результаты\n/settings — напоминания\n/help — помощь\n\n"
-        "Live-команды и развитие клуба подключаются следующим этапом."
+        "/match — матч и live-команды\n/table — таблица\n/history — результаты\n"
+        "/settings — напоминания\n/help — помощь\n\n"
+        "Развитие клуба и экономика подключаются следующим этапом."
     )

@@ -11,9 +11,11 @@ from goaletto.domain.match_commands import apply_commands, substitute
 from goaletto.domain.match_ratings import SectorRatings, effective_skill, sector_ratings
 from goaletto.domain.match_types import (
     ENGINE_VERSION,
+    LIVE_ENGINE_VERSION,
     EnginePolicy,
     FieldSlot,
     HomeCrowd,
+    Instruction,
     MatchCommand,
     MatchEvent,
     MatchState,
@@ -29,8 +31,13 @@ from goaletto.domain.match_types import (
 
 
 def validate_state(state: MatchState) -> None:
-    if state.engine_version != ENGINE_VERSION:
+    if state.engine_version not in {ENGINE_VERSION, LIVE_ENGINE_VERSION}:
         raise ValueError("Unsupported engine version; never replay with another implementation")
+    expected_policy = (
+        "match-policy-v1" if state.engine_version == ENGINE_VERSION else "match-policy-v2"
+    )
+    if state.policy.version != expected_policy:
+        raise ValueError("Engine and policy versions disagree")
     if (
         not isinstance(state.match_id, UUID)
         or type(state.seed) is not int
@@ -71,6 +78,20 @@ def validate_state(state: MatchState) -> None:
         raise ValueError("Support morale must match the pinned crowd and policy")
     for team in (state.home, state.away):
         snapshot_ids = {p.id for p in team.snapshot.players}
+        instruction_ids = [i.player_id for i in team.instructions]
+        if (
+            len(set(instruction_ids)) != len(instruction_ids)
+            or not set(instruction_ids) <= snapshot_ids
+        ):
+            raise ValueError("Instruction references must be unique snapshot players")
+        if type(team.instruction_changes) is not int or not 0 <= team.instruction_changes <= 3:
+            raise ValueError("Invalid instruction count")
+        if len(team.instructions) > team.instruction_changes:
+            raise ValueError("Instruction assignments exceed the change counter")
+        if state.engine_version == ENGINE_VERSION and (
+            team.instructions or team.instruction_changes
+        ):
+            raise ValueError("Legacy engine has no individual instructions")
         conditions = {p.player_id: p for p in team.conditions}
         membership = [s.player_id for s in team.lineup] + list(team.bench) + list(team.removed)
         if len(conditions) != len(team.conditions) or set(conditions) != snapshot_ids:
@@ -159,6 +180,7 @@ def start_match(
     *,
     policy: EnginePolicy | None = None,
     crowd: HomeCrowd | None = None,
+    engine_version: str = ENGINE_VERSION,
 ) -> MatchState:
     def team(snapshot: TeamSnapshot) -> TeamState:
         return TeamState(
@@ -172,9 +194,14 @@ def start_match(
             snapshot.mentality,
         )
 
-    policy, crowd = policy or EnginePolicy(), crowd or HomeCrowd()
+    policy = policy or EnginePolicy(
+        version="match-policy-v2" if engine_version == LIVE_ENGINE_VERSION else "match-policy-v1"
+    )
+    crowd = crowd or HomeCrowd()
     home_team = replace(team(home), support_morale_points=crowd_morale(crowd, policy))
-    state = MatchState(match_id, seed, home_team, team(away), policy, crowd)
+    state = MatchState(
+        match_id, seed, home_team, team(away), policy, crowd, engine_version=engine_version
+    )
     validate_state(state)
     return state
 
@@ -266,12 +293,14 @@ def _command_events(
             tick,
             minute,
             command.side,
-            command.outgoing_id,
+            command.player_id or command.outgoing_id,
             command.incoming_id,
             command.tactic.value
             if command.tactic
             else command.mentality.value
             if command.mentality
+            else command.instruction.value
+            if command.instruction
             else None,
         )
         for command in accepted
@@ -361,7 +390,10 @@ def advance_tick(
     def chance(side: Side, rng: Random, *, set_piece: bool = False) -> None:
         nonlocal state
         attacking, defending = _team(state, side), _team(state, side.opponent)
-        attack_rates, defence_rates = sector_ratings(attacking), sector_ratings(defending)
+        attack_rates, defence_rates = (
+            sector_ratings(attacking, state.policy),
+            sector_ratings(defending, state.policy),
+        )
         channel = rng.randrange(100)
         if attacking.tactic == Tactic.WINGS:
             channel = rng.randrange(40) if rng.randrange(100) < 70 else rng.randrange(40, 100)
@@ -389,6 +421,12 @@ def advance_tick(
             )
             for s in candidates
         ]
+        instructions = {i.player_id: i.instruction for i in attacking.instructions}
+        for index, slot in enumerate(candidates):
+            if instructions.get(slot.player_id) == Instruction.LONG_SHOTS and not set_piece:
+                weights[index] = (
+                    weights[index] * (10000 + state.policy.instruction_bonus_bps) // 10000
+                )
         selected = rng.randrange(sum(weights))
         shooter = candidates[-1]
         for candidate, weight in zip(candidates, weights, strict=True):
@@ -418,7 +456,10 @@ def advance_tick(
         else:
             attacking = _stat(attacking, shots=1)
             accuracy = rng.randrange(10000)
-            if accuracy < 1300:
+            miss_threshold = 1300
+            if instructions.get(shooter.player_id) == Instruction.LONG_SHOTS and not set_piece:
+                miss_threshold += state.policy.long_shot_extra_miss_bps
+            if accuracy < miss_threshold:
                 outcome = "wide"
             elif accuracy < 1600:
                 outcome = "post"
@@ -445,7 +486,9 @@ def advance_tick(
             emit("corner", side)
             chance(side, rng, set_piece=True)  # At most one extra chance; no recursive corners.
 
-    initial_possession = _possession(sector_ratings(state.home), sector_ratings(state.away))
+    initial_possession = _possession(
+        sector_ratings(state.home, state.policy), sector_ratings(state.away, state.policy)
+    )
     weights_home, weights_away = _chance_weights(state, initial_possession)
     rate = state.policy.base_chance_rate_bps * (weights_home + weights_away) // 10000
     count = _poisson(rate, _random(state, tick_number, "chance-count"))
@@ -474,7 +517,9 @@ def advance_tick(
             incidents[side].append((rng.randint(1, 3), "injury"))
     for step in range(1, 4):
         minute = state.tick * 3 + step
-        possession = _possession(sector_ratings(state.home), sector_ratings(state.away))
+        possession = _possession(
+            sector_ratings(state.home, state.policy), sector_ratings(state.away, state.policy)
+        )
         state = _with_team(state, Side.HOME, _stat(state.home, possession_units=possession))
         state = _with_team(state, Side.AWAY, _stat(state.away, possession_units=10000 - possession))
         for side in Side:

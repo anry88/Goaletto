@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 
 from goaletto.domain.match_types import (
+    EnginePolicy,
+    Instruction,
     Mentality,
     PlayerCondition,
     PlayerSnapshot,
@@ -49,7 +51,9 @@ def effective_skill(
     )
 
 
-def sector_ratings(team: TeamState) -> SectorRatings:
+def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> SectorRatings:
+    policy = policy or EnginePolicy()
+    instructions = {i.player_id: i.instruction for i in team.instructions}
     players = {p.id: p for p in team.snapshot.players}
     conditions = {p.player_id: p for p in team.conditions}
     midfield = center = left = right = dc = dl = dr = keeper = 0
@@ -102,6 +106,20 @@ def sector_ratings(team: TeamState) -> SectorRatings:
             dc += skill("defending") * 15 // 100
         if position == "GK":
             keeper = skill("goalkeeping")
+        else:
+            instruction = instructions.get(slot.player_id)
+            shift = skill("attacking") * policy.instruction_bonus_bps // 10000
+            if instruction == Instruction.MOVE_LEFT:
+                center -= shift
+                left += shift
+            elif instruction == Instruction.MOVE_RIGHT:
+                center -= shift
+                right += shift
+            elif instruction == Instruction.DROP_BACK:
+                center -= shift
+                dc += skill("defending") * policy.instruction_bonus_bps // 10000
+            elif instruction == Instruction.RUNS_BEHIND:
+                center += skill("pace") * policy.instruction_bonus_bps // 10000
     if team.tactic == Tactic.PRESSING:
         midfield = midfield * 11000 // 10000
         dc, dl, dr = (value * 9500 // 10000 for value in (dc, dl, dr))
