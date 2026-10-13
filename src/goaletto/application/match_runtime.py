@@ -131,6 +131,21 @@ async def activate_season(session: AsyncSession, season_id: UUID, at: datetime) 
         )
         .values(status="pending")
     )
+    from sqlalchemy import String, cast
+
+    from goaletto.infrastructure.models import SeasonClub
+
+    await session.execute(
+        update(Job)
+        .where(
+            Job.status == "held",
+            Job.kind == "finance.weekly",
+            Job.payload["club_id"].astext.in_(
+                select(cast(SeasonClub.club_id, String)).where(SeasonClub.season_id == season_id)
+            ),
+        )
+        .values(status="pending")
+    )
     # Rollover remains held until its own implementation. No unsupported work is released.
 
 

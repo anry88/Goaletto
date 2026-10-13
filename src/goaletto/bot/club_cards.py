@@ -126,7 +126,10 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
             [InlineKeyboardButton(text=tr("👥 Состав"), callback_data=squad_callback(1))],
             [InlineKeyboardButton(text=tr("📋 Расстановка"), callback_data="ln:open")],
             [InlineKeyboardButton(text=tr("⚽ Матч"), callback_data="lv:open")],
-            [InlineKeyboardButton(text=tr("🏋️ Тренировки"), callback_data="tr:open")],
+            [
+                InlineKeyboardButton(text=tr("🏋️ Тренировки"), callback_data="tr:open"),
+                InlineKeyboardButton(text=tr("📈 Финансы"), callback_data="fi:open"),
+            ],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
             [InlineKeyboardButton(text=tr("🔔 Напоминания"), callback_data="ntf:open")],
@@ -153,7 +156,10 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
             [InlineKeyboardButton(text=tr("👥 Состав"), callback_data=squad_callback(1))],
             [InlineKeyboardButton(text=tr("📋 Расстановка"), callback_data="ln:open")],
             [InlineKeyboardButton(text=tr("⚽ Матч"), callback_data="lv:open")],
-            [InlineKeyboardButton(text=tr("🏋️ Тренировки"), callback_data="tr:open")],
+            [
+                InlineKeyboardButton(text=tr("🏋️ Тренировки"), callback_data="tr:open"),
+                InlineKeyboardButton(text=tr("📈 Финансы"), callback_data="fi:open"),
+            ],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
             [InlineKeyboardButton(text=tr("🗂 Сезоны"), callback_data=seasons_callback(1))],

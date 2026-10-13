@@ -808,6 +808,7 @@ JOURNEY_NAMES = (
     "feedback_answered",
     "feedback_prompt_delivered",
     "feedback_skipped",
+    "finances_opened",
     "fixture_abandoned",
     "fixture_finished",
     "fixture_started",
@@ -1040,7 +1041,7 @@ class GameActionReceipt(Base):
             "kind IN ('club_claimed','club_opened','club_preview_opened','lineup_opened',"
             "'lineup_saved','match_command_accepted','match_opened','match_report_opened',"
             "'next_fixture_opened','notification_preferences',"
-            "'training_opened','training_plan_saved','language_preferences')",
+            "'training_opened','training_plan_saved','language_preferences','finances_opened')",
             name="ck_action_kind",
         ),
     )
@@ -1138,3 +1139,105 @@ class TrainingDecision(Base):
     plan_id: Mapped[UUID] = mapped_column(ForeignKey("training_plans.id"))
     ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+class FinanceAccount(Base):
+    __tablename__ = "finance_accounts"
+    __table_args__ = (
+        CheckConstraint(
+            "reserved >= 0 AND arrears >= 0 AND sequence >= 1", name="ck_finance_account"
+        ),
+    )
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+    reserved: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    arrears: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    sequence: Mapped[int] = mapped_column(Integer, server_default="1")
+
+
+class LedgerEntry(Base):
+    __tablename__ = "ledger_entries"
+    __table_args__ = (
+        UniqueConstraint("club_id", "operation_key", name="uq_ledger_operation"),
+        UniqueConstraint("club_id", "sequence", name="uq_ledger_sequence"),
+        CheckConstraint("sequence >= 1", name="ck_ledger_sequence"),
+        CheckConstraint(
+            "balance_after >= 0 AND reserved_after >= 0 AND "
+            "reserved_after <= balance_after AND arrears_after >= 0",
+            name="ck_ledger_balances",
+        ),
+        CheckConstraint(
+            "cash_delta <> 0 OR reserved_delta <> 0 OR arrears_delta <> 0 OR kind = 'opening'",
+            name="ck_ledger_effect",
+        ),
+        CheckConstraint(
+            "kind IN ('opening','grant','tickets','sponsor','merchandise',"
+            "'player_salary','staff_salary','stadium_upkeep','prize','reserve','release',"
+            "'transfer_in','transfer_out','arrears_paid','stadium_upgrade')",
+            name="ck_ledger_kind",
+        ),
+        Index("ix_ledger_club_page", "club_id", "sequence"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    operation_key: Mapped[str] = mapped_column(String(180))
+    sequence: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(32))
+    cash_delta: Mapped[int] = mapped_column(BigInteger)
+    reserved_delta: Mapped[int] = mapped_column(BigInteger)
+    arrears_delta: Mapped[int] = mapped_column(BigInteger)
+    balance_after: Mapped[int] = mapped_column(BigInteger)
+    reserved_after: Mapped[int] = mapped_column(BigInteger)
+    arrears_after: Mapped[int] = mapped_column(BigInteger)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    request: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+class MoneyReservation(Base):
+    __tablename__ = "money_reservations"
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_reservation_amount"),
+        CheckConstraint("status IN ('active','released','settled')", name="ck_reservation_status"),
+        CheckConstraint("(status = 'active') = (closed_at IS NULL)", name="ck_reservation_closed"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    amount: Mapped[int] = mapped_column(BigInteger)
+    purpose: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SalaryContract(Base):
+    __tablename__ = "salary_contracts"
+    __table_args__ = (
+        CheckConstraint("weekly_rate >= 0", name="ck_salary_rate"),
+        CheckConstraint("ended_at IS NULL OR ended_at >= started_at", name="ck_salary_dates"),
+        CheckConstraint("role IN ('player'," + STAFF_ROLES_SQL + ")", name="ck_salary_role"),
+        Index(
+            "uq_salary_active_person", "person_id", unique=True, postgresql_where="ended_at IS NULL"
+        ),
+        Index("ix_salary_club_period", "club_id", "started_at"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"))
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    role: Mapped[str] = mapped_column(String(32))
+    weekly_rate: Mapped[int] = mapped_column(BigInteger)
+    policy_version: Mapped[str] = mapped_column(String(32), server_default="economy-v1")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class FinanceCycle(Base):
+    __tablename__ = "finance_cycles"
+    __table_args__ = (
+        UniqueConstraint("club_id", "week_start", name="uq_finance_week"),
+        CheckConstraint("policy_version = 'economy-v1'", name="ck_finance_policy"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    week_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    policy_version: Mapped[str] = mapped_column(String(32))
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)

@@ -105,7 +105,7 @@ async def test_seed_batch_reserves_unique_people_and_keeps_all_jobs_held(monkeyp
             )
         assert statement.table.name not in {"managers", "staff", "matches", "outbox_messages"}
     assert len(people) == len(set(people)) == 1000
-    assert len(job_statuses) == 15302 and set(job_statuses) == {"held"}
+    assert len(job_statuses) == 15352 and set(job_statuses) == {"held"}
 
 
 async def test_closed_preparation_window_is_rejected_before_any_population_write() -> None:

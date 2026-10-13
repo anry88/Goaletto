@@ -56,3 +56,5 @@
 - [Проверка второй волны агентов](agent-wave2-review.md)
 
 - [Live-команды, admission и версии checkpoint](live-commands.md)
+
+- [Экономика клуба и ledger](club-finances.md), [расчёт стартового капитала](economy-calculation.md).

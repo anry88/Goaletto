@@ -98,7 +98,7 @@ def test_prepared_world_has_no_owners_or_extra_staff_population() -> None:
     summary = world_summary(world)
     assert summary["players"] == summary["unique_faces"] == 1000
     assert summary["fixtures"] == 450
-    assert summary["held_jobs"] == 450 * 34 + 2
+    assert summary["held_jobs"] == 450 * 34 + 52
     assert summary["core_skill_spread"] == 0
     assert all(p.retirement.is_last_season for p in world.plan.players if p.age == 38)
 

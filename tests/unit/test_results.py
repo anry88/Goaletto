@@ -54,6 +54,14 @@ def test_order_uses_points_difference_scored_then_persisted_preseason_draw():
         rank_league((rows[0], *rows[:9]))
 
 
+@pytest.fixture(autouse=True)
+def money_io(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr("goaletto.application.game_actions.allocation_lock", AsyncMock())
+    monkeypatch.setattr("goaletto.application.finances.match_income", AsyncMock())
+
+
 class Rows:
     def __init__(self, values):
         self.values = values

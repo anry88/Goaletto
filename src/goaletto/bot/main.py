@@ -4,12 +4,14 @@ import logging
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from sqlalchemy import select
 
 from goaletto.bot.access import TelegramAccess
 from goaletto.bot.commands import configure_commands
 from goaletto.bot.language import TelegramLanguage
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
+from goaletto.infrastructure.models import Manager
 
 
 def fresh_router(source: Router) -> Router:
@@ -49,6 +51,7 @@ def build_dispatcher(
     from goaletto.bot import (
         club_router,
         entry_router,
+        finance_router,
         history_router,
         lineup_handlers,
         live_router,
@@ -65,6 +68,7 @@ def build_dispatcher(
     root.callback_query.filter(F.message.chat.type == "private")
     for module in (
         entry_router,
+        finance_router,
         navigation,
         lineup_handlers,
         live_router,
@@ -95,7 +99,24 @@ async def run() -> None:
         internal_telegram_ids=settings.internal_telegram_ids,
     )
     try:
-        await configure_commands(bot, game_enabled=settings.game_enabled)
+        saved_locales = {}
+        if database is not None:
+            async with database.transaction() as session:
+                rows = (
+                    await session.execute(
+                        select(Manager.telegram_id, Manager.locale).where(
+                            Manager.bot_available.is_(True)
+                        )
+                    )
+                ).all()
+                saved_locales = {
+                    uid: locale
+                    for uid, locale in rows
+                    if not settings.allowed_telegram_ids or uid in settings.allowed_telegram_ids
+                }
+        await configure_commands(
+            bot, game_enabled=settings.game_enabled, saved_locales=saved_locales
+        )
         await dispatcher.start_polling(bot, close_bot_session=False)
     finally:
         await bot.session.close()

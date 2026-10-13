@@ -34,6 +34,9 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
     require_utc(at)
     if not session.in_transaction():
         raise ValueError("Result needs the caller's transaction")
+    from goaletto.application.game_actions import allocation_lock
+
+    await allocation_lock(session)
     fixture = await session.scalar(
         select(Fixture).where(Fixture.id == fixture_id).with_for_update(key_share=True)
     )
@@ -127,6 +130,9 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
         )
     )
     await session.flush()
+    from goaletto.application.finances import match_income
+
+    await match_income(session, fixture, state, at)
     return True
 
 

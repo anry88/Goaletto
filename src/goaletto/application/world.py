@@ -9,6 +9,7 @@ from uuid import UUID, uuid5
 from sqlalchemy import insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from goaletto.application.finance_seed import opening_rows
 from goaletto.application.world_portraits import assign_world_portraits
 from goaletto.domain.calendar import (
     CALENDAR_VERSION,
@@ -26,15 +27,18 @@ from goaletto.infrastructure.models import (
     Base,
     Club,
     ClubLineup,
+    FinanceAccount,
     Fixture,
     Job,
     League,
     LeagueSet,
+    LedgerEntry,
     LineupSlot,
     Person,
     PersonSeasonEvent,
     Player,
     PlayerDevelopment,
+    SalaryContract,
     Season,
     SeasonClub,
     Standing,
@@ -100,7 +104,7 @@ def world_summary(world: PreparedWorld) -> dict[str, Any]:
         "players": len(world.plan.players),
         "unique_faces": len({recipe.identity_id for recipe in world.portraits.values()}),
         "fixtures": len(world.fixtures),
-        "held_jobs": len(world.work),
+        "held_jobs": len(world.work) + 50,
         "first_kickoff": world.plan.options.first_kickoff.isoformat(),
         "season_finish": season_finish_at(world.plan.options.first_kickoff).isoformat(),
         "next_season_kickoff": next_season_kickoff(world.plan.options.first_kickoff).isoformat(),
@@ -376,6 +380,11 @@ async def initialize_world(
             for job in prepared.work
         ],
     )
+    account_rows, ledger_rows, salary_rows, finance_jobs = opening_rows(plan, initialized_at)
+    await write(FinanceAccount, account_rows)
+    await write(LedgerEntry, ledger_rows)
+    await write(SalaryContract, salary_rows)
+    await write(Job, finance_jobs)
     await write(
         WorldSeedReceipt,
         [

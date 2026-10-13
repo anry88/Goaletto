@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
+from goaletto.application.finances import weekly_finances
 from goaletto.application.game_actions import handle_lease_job
 from goaletto.application.match_runtime import (
     RUNTIME_KINDS,
@@ -63,12 +64,19 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
     if job.kind == "system.ping":
         job.status = "done"
         job.last_error = None
-    elif job.kind in RUNTIME_KINDS | {"ownership.remind", "ownership.expire", "training.apply"}:
+    elif job.kind in RUNTIME_KINDS | {
+        "ownership.remind",
+        "ownership.expire",
+        "training.apply",
+        "finance.weekly",
+    }:
         try:
             async with session.begin_nested():
                 if job.kind in RUNTIME_KINDS:
                     rescheduled = await handle_calendar_job(session, job, at) == "rescheduled"
                     _, fixture_id, _ = job_refs(job)
+                elif job.kind == "finance.weekly":
+                    await weekly_finances(session, job, at)
                 elif job.kind == "training.apply":
                     await apply_training(session, job, at)
                 else:

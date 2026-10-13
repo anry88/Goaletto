@@ -10,6 +10,7 @@ from typing import Any
 
 from goaletto.application.world import PreparedWorld, initialize_world, prepare_world, world_summary
 from goaletto.config import Settings
+from goaletto.domain.finances import INITIAL_CAPITAL
 from goaletto.domain.world import SKILL_NAMES, WorldOptions
 from goaletto.infrastructure.database import Database
 
@@ -81,7 +82,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--first-kickoff", required=True, help="Saturday 18:00 UTC, ISO 8601")
     parser.add_argument(
-        "--budget", type=int, default=0, help="Common starting budget, integer units"
+        "--budget", type=int, default=INITIAL_CAPITAL, help="Common starting budget, integer units"
     )
     parser.add_argument("--portrait-root", type=Path)
     parser.add_argument("--output", type=Path, help="Write complete offline preview JSON")

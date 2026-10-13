@@ -22,6 +22,7 @@ from goaletto.application.game_actions import (
 from goaletto.application.match_runtime import activate_season
 from goaletto.application.persons import AppearanceExhausted
 from goaletto.application.world import initialize_world
+from goaletto.domain.finances import INITIAL_CAPITAL
 from goaletto.domain.ownership import ownership_deadline
 from goaletto.domain.world import WorldOptions, stable_seed
 from goaletto.infrastructure.analytics import start_coverage
@@ -97,6 +98,7 @@ async def ensure_entry_capacity(session: AsyncSession, at: datetime) -> bool:
         key=key,
         seed=0 if count == 0 else stable_seed(0, key),
         first_kickoff=next_initial_kickoff(at),
+        initial_budget=INITIAL_CAPITAL,
     )
     try:
         async with session.begin_nested():

@@ -70,6 +70,7 @@ class PermissionDenied(ValueError):
 DEFAULT_LEASE_POLICY = LeasePolicy()
 GAME_ACTIONS = frozenset(
     {
+        "finances_opened",
         "training_opened",
         "training_plan_saved",
         "club_claimed",

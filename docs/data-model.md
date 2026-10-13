@@ -208,3 +208,7 @@ opaque codes, immutable first attribution, pseudonym FK/CASCADE и retention ind
 Миграция0008: GameActionReceipt operation/effect scope dedupe independent от
 analytics retention; reminder/availability flags Manager. Миграция не выдаёт клубы,
 не создаёт periods/jobs и не меняет существующего владельца.
+
+## Финансы
+
+FinanceAccount и immutable LedgerEntry сверяют cash/reserved/arrears. SalaryContract сохраняет фиксированную ставку и employment intervals; FinanceCycle — единственный расчёт клуба за неделю. MoneyReservation обеспечивает held bids. [Контракт](club-finances.md).
