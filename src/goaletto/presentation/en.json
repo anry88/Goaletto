@@ -309,5 +309,6 @@
   "Матч остановлен: {p0}. Итоговый результат не присуждён.": "Match abandoned: {p0}. No official result has been awarded.",
   "🏟 <b>{p0}</b> · Лига {p1}\n💰 Бюджет: {p2}\n🏟 Стадион: {p3:,} · 👥 Болельщики: {p4:,}\n🎽 Форма: {p5}/{p6} (v{p7})": "🏟 <b>{p0}</b> · League {p1}\n💰 Budget: {p2}\n🏟 Stadium: {p3:,} · 👥 Supporters: {p4:,}\n🎽 Kit: {p5}/{p6} (v{p7})",
   "⚽ <b>{p0} · {p1}′</b>\n<b>{p2} {p3}:{p4} {p5}</b>\n\nВладение: {p6}% / {p7}%\nУдары: {p8} / {p9}\nВ створ: {p10} / {p11}\nУгловые: {p12} / {p13}\nТрибуны: {p14:,} / {p15:,}": "⚽ <b>{p0} · {p1}′</b>\n<b>{p2} {p3}:{p4} {p5}</b>\n\nPossession: {p6}% / {p7}%\nShots: {p8} / {p9}\nOn target: {p10} / {p11}\nCorners: {p12} / {p13}\nAttendance: {p14:,} / {p15:,}",
-  "Язык / Language": "Language / Язык"
+  "Язык / Language": "Language / Язык",
+  "⏸ Матч продолжится с {p0}′ в {p1}. Счёт и принятые команды сохранены. До этого можно отправить команды через /match.": "⏸ The match will resume from {p0}′ at {p1}. The score and accepted commands are preserved. You can send commands through /match until then."
 }

@@ -28,6 +28,7 @@ from goaletto.infrastructure.models import (
     Club,
     Fixture,
     Manager,
+    Match,
     OutboxBoard,
     OutboxDeliveryAttempt,
     OutboxMessage,
@@ -37,7 +38,7 @@ from goaletto.presentation.i18n import locale, tr
 
 SUPPORTED_VERSION = 1
 SUPPORTED_KINDS = frozenset(
-    {"fixture_reminder", "match_board", "match_result", "ownership_reminder"}
+    {"fixture_reminder", "match_board", "match_result", "ownership_reminder", "match_recovery"}
 )
 LEASE_SECONDS = 120.0
 MAX_ATTEMPTS = 8
@@ -45,6 +46,7 @@ BACKOFF_BASE_SECONDS = 5.0
 BACKOFF_CAP_SECONDS = 600.0
 PRIORITY_BY_KIND = {
     "match_result": 100,
+    "match_recovery": 90,
     "match_board": 50,
     "fixture_reminder": 30,
     "ownership_reminder": 10,
@@ -175,6 +177,20 @@ def valid_payload(payload: dict[str, Any]) -> bool:
         return True
     if _payload_uuid(payload, "match_id") is None:
         return False
+    if kind == "match_recovery":
+        try:
+            deadline = payload.get("resume_deadline")
+            if not isinstance(deadline, str):
+                return False
+            require_utc(datetime.fromisoformat(deadline))
+        except ValueError:
+            return False
+        return (
+            type(payload.get("tick")) is int
+            and 0 <= payload["tick"] < 30
+            and type(payload.get("game_minute")) is int
+            and 0 <= payload["game_minute"] < 90
+        )
     if "game_minute" in payload and (
         type(payload["game_minute"]) is not int or not 0 <= payload["game_minute"] <= 90
     ):
@@ -218,6 +234,14 @@ def render_text(payload: dict[str, Any]) -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "match_recovery":
+        deadline = datetime.fromisoformat(payload["resume_deadline"]).strftime("%H:%M:%S UTC")
+        return tr(
+            "⏸ Матч продолжится с {p0}′ в {p1}. Счёт и принятые команды сохранены. "
+            "До этого можно отправить команды через /match.",
+            p0=payload["game_minute"],
+            p1=deadline,
+        )
     if kind in {"match_board", "match_result"}:
         localized = payload.get("commentary_by_locale", {})
         timeline = localized.get(
@@ -352,6 +376,20 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
             or fixture.scheduled_start_at <= now
         ):
             return Decision.SKIP_STALE
+        if kind == "match_recovery":
+            match = await session.get(
+                Match, _payload_uuid(payload, "match_id"), populate_existing=True
+            )
+            deadline = datetime.fromisoformat(payload["resume_deadline"])
+            if (
+                fixture.status != "live"
+                or now >= deadline
+                or match is None
+                or match.fixture_id != fixture.id
+                or match.completed_tick != payload["tick"]
+                or match.next_due_at != deadline
+            ):
+                return Decision.SKIP_STALE
         if kind == "match_board" and fixture.status not in {"live", "paused"}:
             return Decision.SKIP_STALE
         if kind == "match_result" and fixture.status not in {"finished", "abandoned"}:

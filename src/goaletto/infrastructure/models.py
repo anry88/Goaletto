@@ -620,6 +620,26 @@ class Match(Base):
     paused_seconds: Mapped[int] = mapped_column(Integer, server_default="0")
 
 
+class MatchRecovery(Base):
+    __tablename__ = "match_recoveries"
+    __table_args__ = (
+        UniqueConstraint("match_id", "previous_due_at", name="uq_recovery_window"),
+        CheckConstraint("checkpoint_tick BETWEEN 0 AND 29", name="ck_recovery_tick"),
+        CheckConstraint(
+            "next_due_at > previous_due_at AND next_due_at > recovered_at", name="ck_recovery_due"
+        ),
+        CheckConstraint("reason IN ('worker_lag','late_resume')", name="ck_recovery_reason"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"))
+    checkpoint_tick: Mapped[int] = mapped_column(SmallInteger)
+    state_hash: Mapped[str] = mapped_column(String(64))
+    previous_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    next_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    recovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str] = mapped_column(String(24))
+
+
 class MatchTick(Base):
     __tablename__ = "match_ticks"
     __table_args__ = (

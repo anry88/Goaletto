@@ -46,7 +46,8 @@ committed_at, позволяя измерять lateness без подмены �
 state не меняется. Worker не выбирает paused fixtures. Resume суммирует pause seconds,
 сдвигает только оставшиеся deadlines и восстанавливает прежнюю phase; повтор безопасен.
 Дробная пауза округляется вверх до секунды. Это явные operator use cases, не
-автоматическое решение о матчах после длительного простоя (AND-69).
+автоматическое решение о повреждённых матчах. Долгий простой рабочего live
+transition восстанавливает окно по [live-recovery.md](live-recovery.md).
 `postpone_fixture` до lineup lock сдвигает schedule/lock/jobs в одной транзакции;
 после lock отказывает, не стирает immutable snapshot. actual dates сохраняются отдельно.
 

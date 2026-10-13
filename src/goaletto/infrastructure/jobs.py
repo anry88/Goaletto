@@ -54,6 +54,8 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
     job = await session.scalar(statement)
     if job is None:
         return False
+    original_due = job.due_at
+    rescheduled = False
     job.attempts += 1
     outcome, failure = "committed", None
     fixture_id = None
@@ -65,7 +67,7 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         try:
             async with session.begin_nested():
                 if job.kind in RUNTIME_KINDS:
-                    await handle_calendar_job(session, job, at)
+                    rescheduled = await handle_calendar_job(session, job, at) == "rescheduled"
                     _, fixture_id, _ = job_refs(job)
                 elif job.kind == "training.apply":
                     await apply_training(session, job, at)
@@ -81,7 +83,8 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
                         "match.tick": f"tick:{job.payload['tick_number']}",
                     }[job.kind]
                     operation_id = uuid5(fixture_id, f"runtime:v1:{stage}")
-            job.status = "done"
+            job.status = "pending" if rescheduled else "done"
+            outcome = "deferred" if rescheduled else "committed"
             job.last_error = None
         except NotReady:
             outcome, failure = "deferred", "not_ready"
@@ -104,9 +107,9 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
             stage=job.kind,
             started_at=at,
             finished_at=max(at, datetime.now(UTC)),
-            due_at=job.due_at,
+            due_at=original_due,
             outcome=outcome,
             failure_class=failure,
         )
     )
-    return outcome != "deferred"
+    return rescheduled or outcome != "deferred"

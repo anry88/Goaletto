@@ -94,7 +94,7 @@ class Recorder:
             return Rows([Manager(id=c.manager_id, telegram_id=123) for c in self.commands])
         return Rows(self.commands)
 
-    async def execute(self, statement):
+    async def execute(self, statement, params=None):
         self.statements.append(statement)
         if hasattr(statement, "column_descriptions"):
             entity = statement.column_descriptions[0]["entity"]
@@ -221,11 +221,11 @@ async def test_late_start_rebases_once_but_late_ticks_do_not_drift():
     update = next(s for s in recorder.statements if getattr(s, "is_update", False))
     assert "jobs.due_at +" in str(update.compile(dialect=postgresql.dialect()))
     assert update.compile().params["due_at_1"] == timedelta(minutes=5)
-    await run(recorder, "match.tick", 1, at=NOW + timedelta(minutes=8))
+    await run(recorder, "match.tick", 1, at=NOW + timedelta(minutes=6, seconds=5))
     assert match.next_due_at == NOW + timedelta(minutes=7)
     receipt = next(t for t in recorder.added if isinstance(t, MatchTick))
     assert receipt.due_at == NOW + timedelta(minutes=6)
-    assert receipt.committed_at == NOW + timedelta(minutes=8)
+    assert receipt.committed_at == NOW + timedelta(minutes=6, seconds=5)
 
 
 async def test_lock_pins_crowd_and_start_never_reads_changed_stadium(monkeypatch):
@@ -345,9 +345,9 @@ async def test_pause_resume_preserves_original_snapshot_and_adds_only_explicit_p
     await resume_match(cast(AsyncSession, recorder), fixture.id, NOW + timedelta(seconds=390))
     assert match.paused_seconds == 300 and match.state == before
     assert due_for(match, fixture, 2) == NOW + timedelta(minutes=7)
-    counts = len(recorder.statements)
+    counts = len(recorder.added)
     await resume_match(cast(AsyncSession, recorder), fixture.id, NOW + timedelta(minutes=10))
-    assert len(recorder.statements) == counts + 2 and match.paused_seconds == 300
+    assert len(recorder.added) == counts and match.paused_seconds == 300
 
 
 async def test_command_application_inserts_tick_before_foreign_key_and_correlates_event():

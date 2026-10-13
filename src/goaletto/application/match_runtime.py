@@ -50,6 +50,7 @@ from goaletto.infrastructure.models import (
     LineupSlot,
     Manager,
     Match,
+    MatchRecovery,
     MatchStage,
     MatchTick,
     OutboxMessage,
@@ -298,6 +299,8 @@ async def queue_notification(
     stage: str,
     at: datetime,
     state: MatchState | None = None,
+    *,
+    resume_deadline: datetime | None = None,
 ) -> None:
     owners = (
         await session.execute(
@@ -337,6 +340,8 @@ async def queue_notification(
                 shots=[state.home.stats.shots, state.away.stats.shots],
                 on_target=[state.home.stats.on_target, state.away.stats.on_target],
             )
+        if resume_deadline is not None:
+            payload["resume_deadline"] = resume_deadline.isoformat()
         await session.execute(
             insert(OutboxMessage)
             .values(
@@ -509,7 +514,7 @@ async def apply_commands(
     return result.state, result.events
 
 
-async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> None:
+async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> str | None:
     require_utc(at)
     if not session.in_transaction():
         raise ValueError("Runtime needs a caller-owned transaction")
@@ -521,7 +526,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         if season is None or season.status not in {"scheduled", "active"}:
             raise ValueError("Invalid season opening")
         season.status = "active"
-        return
+        return None
     # The same short ownership gate used by admission/expiry/settings, acquired
     # before fixture locks. Try-lock defers workers instead of deadlocking an owner.
     if not await session.scalar(
@@ -543,15 +548,15 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
     if job.kind == "match.finalize_result":
         if await finalize_result(session, fixture.id, at):
             await lifecycle_event(session, fixture, "result_finalized", "result", at)
-        return
+        return None
     if fixture.status in {"finished", "abandoned", "cancelled"}:
-        return
+        return None
     if fixture.status == "paused":
         raise NotReady("Explicitly paused")
     if job.kind == "match.remind":
         if at < fixture.scheduled_start_at:
             await queue_notification(session, fixture, "fixture_reminder", "reminder", at)
-        return
+        return None
     match = await session.scalar(
         select(Match).where(Match.fixture_id == fixture.id).with_for_update()
     )
@@ -559,7 +564,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         if at < fixture.lineup_lock_at:
             raise NotReady("Lineup deadline is not due")
         if match is not None:
-            return
+            return None
         clubs = (
             await session.scalars(
                 select(Club)
@@ -603,26 +608,29 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         await session.flush()
         await stage_receipt(session, match, "locked", at, fixture.lineup_lock_at)
         await lifecycle_event(session, fixture, "match_lineup_locked", "locked", at)
-        return
+        return None
     if match is None:
         raise NotReady("Lineup lock has not committed")
     if job.kind == "match.start":
         if at < fixture.scheduled_start_at:
             raise NotReady("Kickoff is not due")
         if fixture.actual_start_at is not None:
-            return
+            return None
         fixture.actual_start_at = at
         fixture.status = "live"
         match.next_due_at = at + timedelta(seconds=60)
-        # A delayed first whistle shifts future deadlines once; recovery after kickoff does not.
+        # A delayed first whistle shifts future deadlines once. Subsequent long
+        # interruptions restore a decision window through a recovery receipt.
         delta = at - fixture.scheduled_start_at
         if delta != timedelta(0):
             await session.execute(
                 update(Job)
                 .where(
                     Job.payload["fixture_id"].astext == str(fixture.id),
-                    Job.status == "pending",
-                    Job.kind.in_(("match.tick", "match.second_half_start")),
+                    Job.status.in_(("pending", "held")),
+                    Job.kind.in_(
+                        ("match.tick", "match.second_half_start", "match.finalize_result")
+                    ),
                 )
                 .values(due_at=Job.due_at + delta)
             )
@@ -631,7 +639,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         await queue_notification(
             session, fixture, "match_board", "started", at, restore_state(match.state)
         )
-        return
+        return None
     if fixture.actual_start_at is None:
         raise NotReady("Kickoff has not committed")
     state = restore_state(match.state)
@@ -651,7 +659,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
     halftime = job.kind == "match.second_half_start"
     if halftime:
         if state.phase in {MatchPhase.SECOND_HALF, MatchPhase.FULL_TIME}:
-            return
+            return None
         if state.phase != MatchPhase.HALF_TIME:
             raise NotReady("First half has not committed")
         due = due_for(match, fixture)
@@ -660,13 +668,18 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         if tick is None:
             raise ValueError("Tick is missing")
         if tick <= state.tick:
-            return
+            return None
         if tick != state.tick + 1 or state.phase == MatchPhase.HALF_TIME:
             raise NotReady("Prior transition has not committed")
         due = due_for(match, fixture, tick)
         target = tick
     if at < due:
         raise NotReady("Absolute deadline is not due")
+    # Fifteen seconds of lag is beyond ordinary scheduling jitter.
+    # Rebase once under the same locks; leave the pending job for its new deadline.
+    if (at - due).total_seconds() >= 15:
+        await restore_decision_window(session, fixture, match, state, due, at, "worker_lag")
+        return "rescheduled"
     new, events = await apply_commands(
         session, match, fixture, state, target, at, halftime=halftime
     )
@@ -710,12 +723,86 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         await queue_notification(
             session, fixture, "match_board", f"tick:{new.tick}:{new.phase.value}", at, new
         )
+    return None
+
+
+async def restore_decision_window(
+    session: AsyncSession,
+    fixture: Fixture,
+    match: Match,
+    state: MatchState,
+    previous_due: datetime,
+    at: datetime,
+    reason: str,
+) -> None:
+    """Caller holds allocation/fixture/match locks. No engine or command mutation."""
+    seconds = 180 if state.phase == MatchPhase.HALF_TIME else 60
+    delay = math.ceil((at + timedelta(seconds=seconds) - previous_due).total_seconds())
+    # Invalid imported/legacy rows accepted after their original deadline do not
+    # gain validity merely because the clock is restored. Valid commands survive.
+    expired_rows = (
+        await session.scalars(
+            select(AcceptedCommand)
+            .where(
+                AcceptedCommand.match_id == match.id,
+                AcceptedCommand.status == "accepted",
+                AcceptedCommand.target_tick_number <= state.tick + 1,
+                AcceptedCommand.accepted_at >= previous_due,
+            )
+            .with_for_update()
+        )
+    ).all()
+    for command in expired_rows:
+        if (
+            command.target_tick_number is not None
+            and command.target_tick_number <= state.tick + 1
+            and command.accepted_at >= previous_due
+        ):
+            command.status = "cancelled"
+    match.paused_seconds += delay
+    match.next_due_at = next_due(state, match, fixture)
+    assert match.next_due_at is not None and match.next_due_at >= at + timedelta(seconds=seconds)
+    recovery_id = uuid5(match.id, f"recovery:v1:{previous_due.isoformat()}")
+    session.add(
+        MatchRecovery(
+            id=recovery_id,
+            match_id=match.id,
+            checkpoint_tick=state.tick,
+            state_hash=state_hash(state),
+            previous_due_at=previous_due,
+            next_due_at=match.next_due_at,
+            recovered_at=at,
+            reason=reason,
+        )
+    )
+    await session.execute(
+        update(Job)
+        .where(
+            Job.payload["fixture_id"].astext == str(fixture.id),
+            Job.status.in_(("pending", "held")),
+            Job.kind.in_(("match.tick", "match.second_half_start", "match.finalize_result")),
+            Job.due_at >= previous_due,
+        )
+        .values(due_at=Job.due_at + timedelta(seconds=delay))
+    )
+    await queue_notification(
+        session,
+        fixture,
+        "match_recovery",
+        f"recovery:{recovery_id}",
+        at,
+        state,
+        resume_deadline=match.next_due_at,
+    )
 
 
 async def pause_match(session: AsyncSession, fixture_id: UUID, at: datetime) -> None:
     require_utc(at)
     if not session.in_transaction():
         raise ValueError("Pause requires a transaction")
+    from goaletto.application.game_actions import allocation_lock
+
+    await allocation_lock(session)
     fixture = await session.scalar(
         select(Fixture).where(Fixture.id == fixture_id).with_for_update(key_share=True)
     )
@@ -737,6 +824,9 @@ async def resume_match(session: AsyncSession, fixture_id: UUID, at: datetime) ->
     require_utc(at)
     if not session.in_transaction():
         raise ValueError("Resume requires a transaction")
+    from goaletto.application.game_actions import allocation_lock
+
+    await allocation_lock(session)
     fixture = await session.scalar(
         select(Fixture).where(Fixture.id == fixture_id).with_for_update(key_share=True)
     )
@@ -749,6 +839,18 @@ async def resume_match(session: AsyncSession, fixture_id: UUID, at: datetime) ->
         return
     if match.paused_at is None or at < match.paused_at:
         raise ValueError("Invalid pause interval")
+    state = restore_state(match.state)
+    previous_due = next_due(state, match, fixture)
+    if previous_due is None:
+        raise ValueError("Paused match has no decision window")
+    if previous_due <= match.paused_at:
+        await restore_decision_window(
+            session, fixture, match, state, previous_due, at, "late_resume"
+        )
+        match.paused_at = None
+        match.phase = state.phase.value
+        fixture.status = "live"
+        return
     duration = math.ceil((at - match.paused_at).total_seconds())
     match.paused_seconds += duration
     match.paused_at = None
@@ -760,8 +862,9 @@ async def resume_match(session: AsyncSession, fixture_id: UUID, at: datetime) ->
         update(Job)
         .where(
             Job.payload["fixture_id"].astext == str(fixture.id),
-            Job.status == "pending",
-            Job.kind.in_(("match.tick", "match.second_half_start")),
+            Job.status.in_(("pending", "held")),
+            Job.due_at >= previous_due,
+            Job.kind.in_(("match.tick", "match.second_half_start", "match.finalize_result")),
         )
         .values(due_at=Job.due_at + timedelta(seconds=duration))
     )
