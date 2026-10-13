@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
 from goaletto.application.finances import weekly_finances
-from goaletto.application.game_actions import handle_lease_job
+from goaletto.application.game_actions import allocation_lock, handle_lease_job
+from goaletto.application.market import close_auction, prohibit_player_trades
 from goaletto.application.match_runtime import (
     RUNTIME_KINDS,
     NotReady,
@@ -71,12 +72,28 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         "training.apply",
         "finance.weekly",
         "stadium.complete",
+        "market.close",
+        "market.cancel_player",
     }:
         try:
             async with session.begin_nested():
                 if job.kind in RUNTIME_KINDS:
                     rescheduled = await handle_calendar_job(session, job, at) == "rescheduled"
                     _, fixture_id, _ = job_refs(job)
+                elif job.kind == "market.close":
+                    rescheduled = await close_auction(session, job, at)
+                elif job.kind == "market.cancel_player":
+                    from uuid import UUID
+
+                    if (
+                        set(job.payload) != {"version", "person_id"}
+                        or type(job.payload["version"]) is not int
+                        or job.payload["version"] != 1
+                    ):
+                        raise ValueError("Invalid retirement cancellation job")
+                    if not await allocation_lock(session, try_lock=True):
+                        raise NotReady("Busy retirement cancellation")
+                    await prohibit_player_trades(session, UUID(job.payload["person_id"]), at)
                 elif job.kind == "stadium.complete":
                     await complete_expansion(session, job, at)
                 elif job.kind == "finance.weekly":

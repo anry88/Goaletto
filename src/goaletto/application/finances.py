@@ -45,7 +45,13 @@ from goaletto.infrastructure.models import (
 
 
 async def salary_contract(
-    session: AsyncSession, person_id: UUID, club_id: UUID, role: str, at: datetime
+    session: AsyncSession,
+    person_id: UUID,
+    club_id: UUID,
+    role: str,
+    at: datetime,
+    *,
+    quoted_player_wage: int | None = None,
 ) -> SalaryContract:
     """After a hire/transfer, bind a fixed wage. Caller owns the full transaction."""
     require_utc(at)
@@ -70,7 +76,12 @@ async def salary_contract(
     ):
         raise ValueError("Salary requires current employment")
     if row is not None:
-        if row.club_id != club_id or row.role != role:
+        if (
+            row.club_id != club_id
+            or row.role != role
+            or quoted_player_wage is not None
+            and row.weekly_rate != quoted_player_wage
+        ):
             raise ValueError("Close previous salary before changing employer")
         return row
     if await session.scalar(
@@ -92,6 +103,14 @@ async def salary_contract(
         if role == "player"
         else staff_wage(role)
     )
+    if quoted_player_wage is not None:
+        if (
+            role != "player"
+            or type(quoted_player_wage) is not int
+            or not 180 <= quoted_player_wage <= 1700
+        ):
+            raise ValueError("Invalid agreed player wage")
+        rate = quoted_player_wage
     row = SalaryContract(
         id=uuid5(person_id, f"salary:v1:{club_id}:{at.isoformat()}"),
         person_id=person_id,

@@ -187,6 +187,8 @@ async def game_help(message: Message) -> None:
             "/history — результаты\n"
             "/train — недельные тренировки\n"
             "/finance — финансы клуба\n"
+            "/stadium — стадион и посещаемость\n"
+            "/market — аукционы и продажа игроков\n"
             "/settings — язык и напоминания\n"
             "/help — помощь"
         )

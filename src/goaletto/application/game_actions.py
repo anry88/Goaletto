@@ -71,6 +71,10 @@ DEFAULT_LEASE_POLICY = LeasePolicy()
 GAME_ACTIONS = frozenset(
     {
         "finances_opened",
+        "market_opened",
+        "market_listing_created",
+        "market_bid_accepted",
+        "market_listing_cancelled",
         "stadium_opened",
         "stadium_expansion_ordered",
         "training_opened",
@@ -189,6 +193,9 @@ async def end_expired(
     ownership.ended_at = ownership.expires_at
     ownership.end_reason = "inactive"
     club.owner_telegram_id = None
+    from goaletto.application.market import cancel_ownership_auctions
+
+    await cancel_ownership_auctions(session, ownership.id, at)
     await session.execute(
         update(AcceptedCommand)
         .where(AcceptedCommand.ownership_id == ownership.id, AcceptedCommand.status == "accepted")

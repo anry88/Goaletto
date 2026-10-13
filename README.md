@@ -20,7 +20,7 @@ checkpoint/replay и события. Durable [live-worker](docs/match-runtime.md
 [club-entry.md](docs/club-entry.md). Игровой `/start` и кнопки подключены при `GOALETTO_GAME_ENABLED=true`.
 [Live-команды](docs/live-commands.md) подключены через `/match`;
 [RU/EN и имена](docs/languages-and-names.md) переключаются через `/settings`;
-[недельные тренировки](docs/training.md) доступны через `/train`; [экономика и денежный журнал](docs/club-finances.md) — через `/finance`; [стадион и посещаемость](docs/stadium.md) — через `/stadium`; rollover ещё в разработке. [Outbox sender](docs/outbox-delivery.md) подключён отдельным
+[недельные тренировки](docs/training.md) доступны через `/train`; [экономика и денежный журнал](docs/club-finances.md) — через `/finance`; [стадион и посещаемость](docs/stadium.md) — через `/stadium`; [аукционный рынок](docs/transfer-auctions.md) — через `/market`; rollover ещё в разработке. [Outbox sender](docs/outbox-delivery.md) подключён отдельным
 циклом worker; по умолчанию выключен (`GOALETTO_OUTBOX_ENABLED=false`).
 В табло и `/match` добавлена компактная [лента событий](docs/live-commentary.md)
 с голами, опасными моментами, карточками, травмами и применёнными командами.

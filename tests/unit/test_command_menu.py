@@ -22,6 +22,7 @@ async def test_private_menu_refreshes_all_languages_and_game_mode() -> None:
         "club",
         "squad",
         "lineup",
+        "market",
         "stadium",
         "finance",
         "train",

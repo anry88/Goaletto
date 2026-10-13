@@ -816,6 +816,10 @@ JOURNEY_NAMES = (
     "lineup_opened",
     "lineup_saved",
     "manager_started",
+    "market_bid_accepted",
+    "market_listing_cancelled",
+    "market_listing_created",
+    "market_opened",
     "match_command_accepted",
     "match_command_applied",
     "match_lineup_locked",
@@ -1043,7 +1047,8 @@ class GameActionReceipt(Base):
             "kind IN ('club_claimed','club_opened','club_preview_opened','lineup_opened',"
             "'lineup_saved','match_command_accepted','match_opened','match_report_opened',"
             "'next_fixture_opened','notification_preferences',"
-            "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered')",
+            "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered','market_opened',"
+            "'market_listing_created','market_bid_accepted','market_listing_cancelled')",
             name="ck_action_kind",
         ),
     )
@@ -1293,3 +1298,92 @@ class MatchCrowd(Base):
     policy_version: Mapped[str] = mapped_column(String(32))
     locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     basis: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+class Auction(Base):
+    __tablename__ = "auctions"
+    __table_args__ = (
+        UniqueConstraint("operation_id", name="uq_auction_operation"),
+        CheckConstraint("policy_version = 'auction-v1'", name="ck_auction_policy"),
+        CheckConstraint(
+            "initial_price >= 100000 AND weekly_rate BETWEEN 180 AND 1700", name="ck_auction_money"
+        ),
+        CheckConstraint(
+            "player_age BETWEEN 17 AND 38 AND ends_at >= created_at + interval '48 hours'",
+            name="ck_auction_dates",
+        ),
+        CheckConstraint(
+            "status IN ('open','sold','expired','cancelled') AND "
+            "(status = 'open') = (closed_at IS NULL)",
+            name="ck_auction_status",
+        ),
+        CheckConstraint(
+            "(status = 'open') = (close_reason IS NULL)", name="ck_auction_reason_state"
+        ),
+        CheckConstraint(
+            "close_reason IS NULL OR close_reason IN ('sold','no_bids','last_season','retired',"
+            "'ownership_changed','roster_changed','calendar_changed','withdrawn','operator',"
+            "'funds_changed')",
+            name="ck_auction_reason",
+        ),
+        Index(
+            "uq_auction_open_player", "person_id", unique=True, postgresql_where="status = 'open'"
+        ),
+        ForeignKeyConstraint(
+            ["id", "highest_bid_id"],
+            ["auction_bids.auction_id", "auction_bids.id"],
+            name="fk_auction_highest_bid",
+            use_alter=True,
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    operation_id: Mapped[UUID] = mapped_column(Uuid)
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("players.person_id"))
+    seller_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    seller_ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    league_set_id: Mapped[UUID] = mapped_column(ForeignKey("league_sets.id"))
+    policy_version: Mapped[str] = mapped_column(String(32), server_default="auction-v1")
+    player_age: Mapped[int] = mapped_column(SmallInteger)
+    initial_price: Mapped[int] = mapped_column(BigInteger)
+    weekly_rate: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16))
+    highest_bid_id: Mapped[UUID | None] = mapped_column(Uuid)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    close_reason: Mapped[str | None] = mapped_column(String(32))
+
+
+class AuctionBid(Base):
+    __tablename__ = "auction_bids"
+    __table_args__ = (
+        UniqueConstraint("operation_id", name="uq_bid_operation"),
+        UniqueConstraint("auction_id", "id", name="uq_bid_auction_identity"),
+        UniqueConstraint("reservation_id", name="uq_bid_reservation"),
+        CheckConstraint("amount >= 100000", name="ck_bid_amount"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    operation_id: Mapped[UUID] = mapped_column(Uuid)
+    auction_id: Mapped[UUID] = mapped_column(ForeignKey("auctions.id"))
+    buyer_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    buyer_ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    reservation_id: Mapped[UUID] = mapped_column(ForeignKey("money_reservations.id"))
+    amount: Mapped[int] = mapped_column(BigInteger)
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TransferReceipt(Base):
+    __tablename__ = "transfer_receipts"
+    __table_args__ = (
+        UniqueConstraint("auction_id", name="uq_transfer_auction"),
+        CheckConstraint("price >= 100000", name="ck_transfer_price"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    auction_id: Mapped[UUID] = mapped_column(ForeignKey("auctions.id"))
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"))
+    seller_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    buyer_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    price: Mapped[int] = mapped_column(BigInteger)
+    transferred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)

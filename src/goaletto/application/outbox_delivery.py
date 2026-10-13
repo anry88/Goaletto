@@ -38,7 +38,14 @@ from goaletto.presentation.i18n import locale, tr
 
 SUPPORTED_VERSION = 1
 SUPPORTED_KINDS = frozenset(
-    {"fixture_reminder", "match_board", "match_result", "ownership_reminder", "match_recovery"}
+    {
+        "fixture_reminder",
+        "match_board",
+        "match_result",
+        "ownership_reminder",
+        "match_recovery",
+        "market_notice",
+    }
 )
 LEASE_SECONDS = 120.0
 MAX_ATTEMPTS = 8
@@ -46,6 +53,7 @@ BACKOFF_BASE_SECONDS = 5.0
 BACKOFF_CAP_SECONDS = 600.0
 PRIORITY_BY_KIND = {
     "match_result": 100,
+    "market_notice": 70,
     "match_recovery": 90,
     "match_board": 50,
     "fixture_reminder": 30,
@@ -162,6 +170,26 @@ def valid_payload(payload: dict[str, Any]) -> bool:
         or _payload_uuid(payload, "ownership_id") is None
     ):
         return False
+    if kind == "market_notice":
+        return (
+            _payload_uuid(payload, "auction_id") is not None
+            and _payload_uuid(payload, "club_id") is not None
+            and _payload_uuid(payload, "person_id") is not None
+            and isinstance(payload.get("event"), str)
+            and payload.get("event") in {"bid", "outbid", "sold", "bought", "cancelled", "expired"}
+            and isinstance(payload.get("player_name"), str)
+            and len(payload["player_name"]) <= 120
+            and type(payload.get("amount")) is int
+            and 0 <= payload["amount"] < 2**63
+            and type(payload.get("weekly_rate")) is int
+            and 180 <= payload["weekly_rate"] <= 1700
+            and (payload.get("bid_id") is None or _payload_uuid(payload, "bid_id") is not None)
+            and (
+                payload.get("event") not in {"bid", "outbid", "sold", "bought"}
+                or payload.get("bid_id") is not None
+                and payload["amount"] >= 100000
+            )
+        )
     if kind == "ownership_reminder":
         try:
             stamp = payload.get("last_action_at")
@@ -234,6 +262,51 @@ def render_text(payload: dict[str, Any]) -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "market_notice":
+        player = escape(latin_name(payload["player_name"]))
+        amount = f"{payload['amount']:,}".replace(",", " ")
+        wage = f"{payload['weekly_rate']:,}".replace(",", " ")
+        event = payload["event"]
+        if event == "bid":
+            return tr(
+                "💰 Новая ставка: {player} · {amount}. Откройте /market.",
+                player=player,
+                amount=amount,
+            )
+        if event == "outbid":
+            return tr(
+                "↗️ Ваша ставка за {player} перебита. Резерв освобождён. Откройте /market.",
+                player=player,
+            )
+        if event == "sold":
+            return tr(
+                "✅ {player} продан за {amount}. Проверьте /lineup перед матчем.",
+                player=player,
+                amount=amount,
+            )
+        if event == "bought":
+            return tr(
+                "✅ Вы выиграли аукцион: {player} · {amount}. Зарплата: {wage}/неде"
+                "лю. Выберите заявку в /lineup.",
+                player=player,
+                amount=amount,
+                wage=wage,
+            )
+        if event == "expired":
+            return tr(
+                "⏱ Аукцион за {player} завершился без ставок. Игрок остался в клубе.", player=player
+            )
+        reason = payload.get("reason")
+        if reason == "last_season":
+            return tr(
+                "⏸ Аукцион за {player} отменён: объявлен последний сезон. Резерв с"
+                "тавок освобождён.",
+                player=player,
+            )
+        return tr(
+            "⏸ Аукцион за {player} отменён. Резерв ставок освобождён. Откройте /market.",
+            player=player,
+        )
     if kind == "match_recovery":
         deadline = datetime.fromisoformat(payload["resume_deadline"]).strftime("%H:%M:%S UTC")
         return tr(
@@ -357,6 +430,70 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     if not manager.bot_available:
         return Decision.SKIP_UNAVAILABLE
     kind = payload["kind"]
+    if kind == "market_notice":
+        from goaletto.infrastructure.models import Auction, AuctionBid, TransferReceipt
+
+        auction = await session.get(
+            Auction, _payload_uuid(payload, "auction_id"), populate_existing=True
+        )
+        if (
+            auction is None
+            or _payload_uuid(payload, "club_id") != club.id
+            or auction.person_id != _payload_uuid(payload, "person_id")
+        ):
+            return Decision.SKIP_STALE
+        bid = (
+            await session.get(AuctionBid, _payload_uuid(payload, "bid_id"))
+            if payload.get("bid_id")
+            else None
+        )
+        if payload.get("bid_id") and (
+            bid is None or bid.auction_id != auction.id or bid.amount != payload["amount"]
+        ):
+            return Decision.SKIP_STALE
+        seller = auction.seller_club_id == club.id and auction.seller_ownership_id == ownership.id
+        buyer = (
+            bid is not None
+            and bid.buyer_club_id == club.id
+            and bid.buyer_ownership_id == ownership.id
+        )
+        event = payload["event"]
+        if event == "bid" and not (
+            seller
+            and auction.status == "open"
+            and auction.highest_bid_id == (bid.id if bid else None)
+        ):
+            return Decision.SKIP_STALE
+        if event == "outbid" and not (
+            buyer
+            and auction.status == "open"
+            and auction.highest_bid_id != (bid.id if bid else None)
+        ):
+            return Decision.SKIP_STALE
+        if event == "outbid" and auction.highest_bid_id:
+            current = await session.get(AuctionBid, auction.highest_bid_id)
+            if current is None or current.buyer_club_id == club.id:
+                return Decision.SKIP_STALE
+        if event in {"sold", "bought"}:
+            receipt = await session.scalar(
+                select(TransferReceipt).where(TransferReceipt.auction_id == auction.id)
+            )
+            if (
+                auction.status != "sold"
+                or receipt is None
+                or receipt.price != payload["amount"]
+                or not (seller if event == "sold" else buyer)
+            ):
+                return Decision.SKIP_STALE
+        if event == "cancelled" and not (
+            auction.status == "cancelled"
+            and auction.close_reason == payload.get("reason")
+            and (seller or buyer)
+        ):
+            return Decision.SKIP_STALE
+        if event == "expired" and not (auction.status == "expired" and seller):
+            return Decision.SKIP_STALE
+        return Decision.DELIVER
     if kind == "ownership_reminder":
         if (
             not manager.reminders_enabled
