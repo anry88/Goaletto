@@ -16,6 +16,7 @@ from goaletto.application.game_actions import (
     owned_club,
     user_effect,
 )
+from goaletto.application.match_commentary import load_commentary
 from goaletto.application.match_runtime import domain_command, due_for
 from goaletto.domain.clock import MatchPhase
 from goaletto.domain.match_codec import restore_state
@@ -59,6 +60,7 @@ class LiveScreen:
     deadline: datetime | None
     open: bool
     recent: tuple[CommandReceipt, ...]
+    commentary: tuple[str, ...] = ()
 
 
 async def _context(
@@ -214,6 +216,7 @@ async def load_live_screen(
         deadline,
         opened,
         recent,
+        await load_commentary(session, state) if state else (),
     )
 
 

@@ -60,7 +60,7 @@ async def live_callback(query: CallbackQuery, database: Database, event_update: 
                 )
             elif (screen.target, screen.halftime) != (target, halftime) or not screen.open:
                 text, keyboard = live_views.render(
-                    screen, notice="Окно устарело. Показан текущий матч."
+                    screen, notice="Команда не принята. Показан текущий матч."
                 )
             elif action in {"s", "t", "m", "i"}:
                 kind, payload = button_payload(screen, action, args)
@@ -75,7 +75,7 @@ async def live_callback(query: CallbackQuery, database: Database, event_update: 
                     payload=payload,
                 )
                 screen = await load_live_screen(session, actor, record=False)
-                notice = "Принято. Применится на следующем этапе, если команда остаётся допустимой."
+                notice = "Команда принята."
                 if receipt.status == "applied":
                     notice = "Команда уже применена."
                 text, keyboard = live_views.render(screen, notice=notice)
@@ -95,7 +95,7 @@ async def live_callback(query: CallbackQuery, database: Database, event_update: 
     except (PermissionDenied, ValueError):
         await edit_response(
             query.message,
-            "Команда не принята: окно устарело, лимит исчерпан или игрок недоступен. "
+            "Команда не может быть применена: лимит исчерпан или действие сейчас недоступно. "
             "Откройте /match.",
         )
         return

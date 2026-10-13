@@ -7,6 +7,7 @@ from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup as Keyboard
 
 from goaletto.application.live_commands import LiveScreen
+from goaletto.application.match_commentary import commentary_html
 from goaletto.bot.lineup_views import MENTALITY_LABELS, TACTIC_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.match_types import Instruction, Mentality, Side, Tactic
@@ -80,9 +81,15 @@ def render(
             f"{escape(state.away.snapshot.name)} · {state.game_minute}′"
         )
         if state.phase.value == "half_time":
-            lines.append("Перерыв · замены без расхода окна до дедлайна.")
+            lines.append("Перерыв · замены не расходуют окно замен.")
+        lines.append(
+            f"Удары: {state.home.stats.shots} / {state.away.stats.shots} · "
+            f"В створ: {state.home.stats.on_target} / {state.away.stats.on_target}"
+        )
+        if screen.commentary:
+            lines.extend(("\nПоследние события:", commentary_html(screen.commentary)))
         if not screen.open:
-            lines.append("Окно команд закрыто: ожидаем следующий этап матча. Обновите экран.")
+            lines.append("Сейчас действие недоступно. Обновите экран.")
         else:
             assert screen.projected is not None and screen.deadline is not None
             team = screen.projected.home if screen.side == Side.HOME else screen.projected.away
@@ -90,11 +97,6 @@ def render(
             lines.append(
                 f"Сейчас: {TACTIC_LABELS[current.tactic]} · {MENTALITY_LABELS[current.mentality]}"
             )
-            lines.append(
-                f"Принятое применяется на тик {screen.target}"
-                + (" в перерыве." if screen.halftime else ".")
-            )
-            lines.append(f"Дедлайн: {screen.deadline.strftime('%H:%M:%S UTC')}")
             lines.append(
                 f"С учётом принятых команд: замены {team.substitutions}/5 · "
                 f"окна {len(team.substitution_windows)}/3 · "
@@ -149,7 +151,7 @@ def render(
                     for p in team.bench
                     if not conditions[p].injured and not conditions[p].dismissed
                 ]
-                lines.append("Выберите запасного: нажатие принимает замену, применение — позже.")
+                lines.append("Выберите игрока на замену.")
             elif panel == 6:
                 player = players[selected - 1] if 1 <= selected <= len(players) else None
                 if player is None or player.id not in {
@@ -170,27 +172,24 @@ def render(
                         _button("🔄 Замены", callback(screen, "p", 1)),
                         _button("📋 Тактика", callback(screen, "p", 2)),
                     ],
-                    [_button("💬 Менталитет", callback(screen, "p", 3))],
+                    [_button("💬 Настрой", callback(screen, "p", 3))],
                 ]
                 if state.engine_version == "regulation-v2":
                     rows.append([_button("🎯 Инструкция", callback(screen, "p", 4))])
             rows.append([_button("← Матч", callback(screen, "r"))])
         labels = {
-            "accepted": "Принято, ожидает применения",
+            "accepted": "Принято",
             "applied": "Применено",
             "cancelled": "Отменено",
         }
         kinds = {
             "substitution": "Замена",
             "tactics": "Тактика",
-            "mentality": "Менталитет",
+            "mentality": "Настрой",
             "instruction": "Инструкция",
         }
         for receipt in screen.recent:
-            lines.append(
-                f"{kinds.get(receipt.kind, 'Команда')}: {labels[receipt.status]} "
-                f"· тик {receipt.tick}"
-            )
+            lines.append(f"{kinds.get(receipt.kind, 'Команда')}: {labels[receipt.status]}")
     if notice:
         lines.append(escape(notice))
     rows.append([_button("🔄 Обновить", "lv:open"), _button("🏟 Клуб", "vc:c")])

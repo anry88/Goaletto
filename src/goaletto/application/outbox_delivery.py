@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import JourneyEvent, Origin, Reason, Surface, require_utc
+from goaletto.application.match_commentary import commentary_html
 from goaletto.infrastructure.analytics import CoverageNotStarted, record_event
 from goaletto.infrastructure.models import (
     AnalyticsManager,
@@ -171,6 +172,23 @@ def valid_payload(payload: dict[str, Any]) -> bool:
         return True
     if _payload_uuid(payload, "match_id") is None:
         return False
+    if "game_minute" in payload and (
+        type(payload["game_minute"]) is not int or not 0 <= payload["game_minute"] <= 90
+    ):
+        return False
+    if "commentary" in payload and (
+        not isinstance(payload["commentary"], list)
+        or len(payload["commentary"]) > 12
+        or any(not isinstance(line, str) or len(line) > 180 for line in payload["commentary"])
+    ):
+        return False
+    for key in ("shots", "on_target"):
+        if key in payload and (
+            not isinstance(payload[key], list)
+            or len(payload[key]) != 2
+            or any(type(n) is not int or n < 0 for n in payload[key])
+        ):
+            return False
     try:
         board_revision(payload)
     except ValueError:
@@ -188,13 +206,26 @@ def render_text(payload: dict[str, Any]) -> str:
         # The transport uses Telegram HTML. Names are data, never markup.
         home, away = escape(payload["home"][:80]), escape(payload["away"][:80])
         score = f"{home} {payload['home_goals']}:{payload['away_goals']} {away}"
+        commentary = (
+            "\n\nПоследние события:\n" + commentary_html(payload.get("commentary", []))
+            if payload.get("commentary")
+            else ""
+        )
+        stats = (
+            (
+                f"\nУдары: {payload['shots'][0]} / {payload['shots'][1]}"
+                f" · В створ: {payload['on_target'][0]} / {payload['on_target'][1]}"
+            )
+            if "shots" in payload and "on_target" in payload
+            else ""
+        )
         if kind == "match_result":
             if payload["phase"] == "abandoned":
                 return f"Матч остановлен: {score}. Итоговый результат не присуждён."
-            return f"Финальный свисток: {score}."
-        minute = payload["tick"] * 3
+            return f"Финальный свисток: {score}.{stats}{commentary}"
+        minute = payload.get("game_minute", payload["tick"] * 3)
         suffix = " · Перерыв" if payload["phase"] == "half_time" else ""
-        return f"⚽ {minute}′{suffix}\n{score}\n/match — управление матчем"
+        return f"⚽ {minute}′{suffix}\n{score}{stats}{commentary}\n\n/match — управление матчем"
     if kind == "fixture_reminder":
         return "Скоро начинается матч вашего клуба. Проверьте состав перед игрой."
     return "Ваш клуб ждёт вас. Откройте /start, чтобы продолжить управление."

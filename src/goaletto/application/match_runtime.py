@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import JourneyEvent, Origin, Surface, require_utc
+from goaletto.application.match_commentary import load_commentary
 from goaletto.application.outbox_delivery import live_board_key_for, priority_for
 from goaletto.application.results import finalize_result
 from goaletto.domain.calendar import CALENDAR_VERSION
@@ -308,6 +309,7 @@ async def queue_notification(
             )
         )
     ).all()
+    commentary = await load_commentary(session, state) if owners and state is not None else ()
     for ownership, manager in owners:
         payload: dict[str, Any] = {
             "version": 1,
@@ -324,6 +326,10 @@ async def queue_notification(
                 away=state.away.snapshot.name,
                 home_goals=state.home.stats.goals,
                 away_goals=state.away.stats.goals,
+                game_minute=state.game_minute,
+                commentary=list(commentary),
+                shots=[state.home.stats.shots, state.away.stats.shots],
+                on_target=[state.home.stats.on_target, state.away.stats.on_target],
             )
         await session.execute(
             insert(OutboxMessage)

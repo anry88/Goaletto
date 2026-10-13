@@ -20,6 +20,8 @@ checkpoint/replay и события. Durable [live-worker](docs/match-runtime.md
 [club-entry.md](docs/club-entry.md). Игровой `/start` и кнопки подключены при `GOALETTO_GAME_ENABLED=true`.
 [Live-команды](docs/live-commands.md) подключены через `/match`; rollover и экономика ещё в разработке. [Outbox sender](docs/outbox-delivery.md) подключён отдельным
 циклом worker; по умолчанию выключен (`GOALETTO_OUTBOX_ENABLED=false`).
+В табло и `/match` добавлена компактная [лента событий](docs/live-commentary.md)
+с голами, опасными моментами, карточками, травмами и применёнными командами.
 
 - [Актуальный GDD](football-manager-bot-gdd.md)
 - [Правила и принятые решения](docs/game-rules.md)

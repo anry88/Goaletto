@@ -581,6 +581,12 @@ async def test_actual_runtime_producer_writes_priority_and_shared_board_key(stor
 
         async def execute(self, statement):
             self.statements.append(statement)
+            from goaletto.infrastructure.models import MatchStage, MatchTick
+
+            if hasattr(statement, "column_descriptions") and statement.column_descriptions[0][
+                "entity"
+            ] in {MatchTick, MatchStage}:
+                return Rows([])
             return Rows([(store.ownership, store.manager)])
 
     from goaletto.application.match_simulation import demo_match, simulate_match

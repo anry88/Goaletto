@@ -96,6 +96,10 @@ class Recorder:
 
     async def execute(self, statement):
         self.statements.append(statement)
+        if hasattr(statement, "column_descriptions"):
+            entity = statement.column_descriptions[0]["entity"]
+            if entity in {MatchTick, MatchStage}:
+                return Rows([(r.events,) for r in self.added if isinstance(r, entity)])
         return Rows(self.owners)
 
     def add(self, value):
