@@ -110,3 +110,5 @@ ownership expiry/admission/settings. Busy gate даёт NotReady/deferred и н�
 ## Посещаемость · stadium-demand-v1
 
 На lineup lock до kickoff runtime сохраняет HomeCrowd и immutable MatchCrowd basis по фанбазе, tier/place и последним пяти результатам. При повторе lock/движка crowd не пересчитывается; расширение после lock не меняет трибуны текущего матча. Ticket receipt использует те же зафиксированные fans/capacity. [Контракт](stadium.md).
+
+Матчевый snapshot включает XI и выбранную скамейку до9; остальные игроки клубного roster (до25) остаются вне заявки. [Контракт заявки](matchday-squad.md).

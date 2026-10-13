@@ -33,7 +33,7 @@ MENTALITY_LABELS = LabelMap(
     }
 )
 
-PANELS = frozenset({"main", "formation", "tactic", "mentality", "swap", "captain"})
+PANELS = frozenset({"main", "formation", "tactic", "mentality", "swap", "captain", "bench"})
 
 
 def _version_text(value: int) -> str:
@@ -46,7 +46,9 @@ def _badges(person_id: UUID, slot: str, data: LineupData) -> str:
     marks = ""
     if data.captain_id == person_id:
         marks += " ©"
-    member = next((m for m in (*data.starters, *data.bench) if m.person_id == person_id), None)
+    member = next(
+        (m for m in (*data.starters, *data.bench, *data.reserves) if m.person_id == person_id), None
+    )
     if member is not None and member.last_season:
         marks += " 🔶"
     if member is not None and member.injured:
@@ -93,6 +95,20 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
             f"{_badges(member.person_id, member.position, data)}"
         )
     lines.append("")
+    if data.reserves:
+        lines.extend(("", tr("<b>Вне заявки:</b>")))
+        for member in data.reserves:
+            lines.append(
+                f"{escape(latin_name(member.name))} ({escape(member.position)})"
+                f"{_badges(member.person_id, member.position, data)}"
+            )
+    lines.append(
+        tr(
+            "Заявка: {selected}/{roster} игроков",
+            selected=len(data.starters) + len(data.bench),
+            roster=len(data.starters) + len(data.bench) + len(data.reserves),
+        )
+    )
     lines.append(tr("🔶 — последний сезон (играет). ⚠️ — не на позиции. 🤕 — травма."))
     if notice:
         lines.append("")
@@ -116,7 +132,10 @@ def main_keyboard(data: LineupData) -> InlineKeyboardMarkup:
             ]
         )
     rows = [
-        [_button(tr("🔄 Замена"), f"ln:panel:swap:{version}")],
+        [
+            _button(tr("🔄 Замена"), f"ln:panel:swap:{version}"),
+            _button(tr("Скамейка"), f"ln:panel:bench:{version}"),
+        ],
         [
             _button(tr("Схема"), f"ln:panel:formation:{version}"),
             _button(tr("Тактика"), f"ln:panel:tactic:{version}"),
@@ -178,9 +197,35 @@ def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
                 f"ln:s:{slot}:{compact_id(member.person_id)}:{version}",
             )
         ]
-        for member in data.bench
+        for member in (*data.bench, *data.reserves)
     )
     rows.append([_button(tr("← Назад"), f"ln:panel:swap:{version}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def bench_slots_keyboard(data: LineupData) -> InlineKeyboardMarkup:
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    rows = [
+        [_button(f"{index}. {latin_name(member.name)}", f"ln:bsel:{index}:{version}")]
+        for index, member in enumerate(data.bench, 12)
+    ]
+    if len(data.bench) < 9 and data.reserves:
+        rows.append([_button(tr("Добавить в запас"), f"ln:bsel:{12 + len(data.bench)}:{version}")])
+    rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def bench_choices_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
+    if not 12 <= slot <= min(20, 12 + len(data.bench)):
+        raise ValueError("Invalid bench slot")
+    version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
+    rows = [
+        [_button(latin_name(m.name), f"ln:b:{slot}:{compact_id(m.person_id)}:{version}")]
+        for m in data.reserves
+    ]
+    if slot < 12 + len(data.bench):
+        rows.append([_button(tr("Оставить вне заявки"), f"ln:br:{slot}:{version}")])
+    rows.append([_button(tr("← Назад"), f"ln:panel:bench:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -243,6 +288,23 @@ def parse_callback(value: str) -> tuple[str, tuple[str, ...]]:
     if action == "s" and len(values) == 2 and values[0].isdigit() and 1 <= int(values[0]) <= 11:
         expand_id(values[1])
         return "sw", args
+    if (
+        action in {"bsel", "br"}
+        and len(values) == 1
+        and values[0].isascii()
+        and values[0].isdigit()
+        and 12 <= int(values[0]) <= 20
+    ):
+        return action, args
+    if (
+        action == "b"
+        and len(values) == 2
+        and values[0].isascii()
+        and values[0].isdigit()
+        and 12 <= int(values[0]) <= 20
+    ):
+        expand_id(values[1])
+        return "bs", args
     if action == "cap" and len(values) == 1:
         expand_id(values[0])
         return action, args

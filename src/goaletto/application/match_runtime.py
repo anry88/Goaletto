@@ -200,10 +200,12 @@ async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> Team
             select(LineupSlot).where(LineupSlot.club_id == club.id).order_by(LineupSlot.slot)
         )
     ).all()
-    if len(slots) != len(players) or [s.slot for s in slots] != list(range(1, len(players) + 1)):
-        raise ValueError("Saved lineup must cover the roster in stable slot order")
+    if not 11 <= len(slots) <= 20 or [s.slot for s in slots] != list(range(1, len(slots) + 1)):
+        raise ValueError("Saved match squad must have XI and up to nine bench slots")
+    if len(players) > 25:
+        raise ValueError("Club roster exceeds twenty-five players")
     by_id = {p.id: p for p in players}
-    if set(by_id) != {s.person_id for s in slots}:
+    if not {s.person_id for s in slots}.issubset(by_id):
         raise ValueError("Lineup contains a different roster")
     starters = [FieldSlot(s.person_id, s.position) for s in slots[:11]]
     bench = [s.person_id for s in slots[11:]]
@@ -248,7 +250,7 @@ async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> Team
     return TeamSnapshot(
         club.id,
         club.name,
-        players,
+        tuple(p for p in players if p.id in {s.person_id for s in slots}),
         tuple(starters),
         tuple(bench),
         tactic=tactic,

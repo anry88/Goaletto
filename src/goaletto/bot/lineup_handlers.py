@@ -76,6 +76,8 @@ async def build_callback_response(
         data = await load_lineup(session, actor)
     if action == "panel":
         return views.render_main(data), _panel_keyboard(args[0], data)
+    if action == "bsel":
+        return views.render_main(data), views.bench_choices_keyboard(data, int(args[0]))
     if action == "sel":
         return views.render_main(data), views.swap_keyboard(data, int(args[0]))
     return views.render_main(data), views.main_keyboard(data)
@@ -163,6 +165,8 @@ def _panel_keyboard(panel: str, data: LineupData) -> InlineKeyboardMarkup:
         return views.mentality_keyboard(data)
     if panel == "swap":
         return views.starter_keyboard(data)
+    if panel == "bench":
+        return views.bench_slots_keyboard(data)
     if panel == "captain":
         return views.captain_keyboard(data)
     return views.main_keyboard(data)
@@ -171,7 +175,7 @@ def _panel_keyboard(panel: str, data: LineupData) -> InlineKeyboardMarkup:
 async def _dispatch(
     session: AsyncSession, actor: Actor, data: LineupData, action: str, args: tuple[str, ...]
 ) -> SaveResult | None:
-    if action in {"open", "refresh", "panel", "sel"}:
+    if action in {"open", "refresh", "panel", "sel", "bsel"}:
         return None
     if action == "f":
         candidates = tuple(
@@ -227,8 +231,8 @@ async def _dispatch(
         incoming = expand_id(args[1])
         outgoing = data.starters[slot - 1]
         bench_ids = tuple(m.person_id for m in data.bench)
-        if incoming not in bench_ids:
-            raise LineupInvalid("foreign", "Swap needs a bench player")
+        if incoming not in (*bench_ids, *(m.person_id for m in data.reserves)):
+            raise LineupInvalid("foreign", "Swap needs a bench or reserve player")
         starters = tuple(
             StarterPick(
                 incoming if m.person_id == outgoing.person_id else m.person_id,
@@ -248,6 +252,36 @@ async def _dispatch(
                 bench,
                 data.formation,
                 swapped_captain,
+                data.tactic,
+                data.mentality,
+                data.version,
+            ),
+        )
+    if action in {"bs", "br"}:
+        index = int(args[0]) - 12
+        bench_selection = [m.person_id for m in data.bench]
+        if not 0 <= index <= min(8, len(bench_selection)):
+            raise LineupInvalid("count", "Invalid bench position")
+        if action == "br":
+            if index == len(bench_selection):
+                raise LineupInvalid("count", "Empty bench position")
+            del bench_selection[index]
+        else:
+            incoming = expand_id(args[1])
+            if incoming not in {m.person_id for m in data.reserves}:
+                raise LineupInvalid("foreign", "Choose a club reserve")
+            if index == len(bench_selection):
+                bench_selection.append(incoming)
+            else:
+                bench_selection[index] = incoming
+        return await save_lineup(
+            session,
+            actor,
+            LineupInput(
+                _current_picks(data),
+                tuple(bench_selection),
+                data.formation,
+                data.captain_id or data.starters[0].person_id,
                 data.tactic,
                 data.mentality,
                 data.version,

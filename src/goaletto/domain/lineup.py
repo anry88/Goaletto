@@ -132,11 +132,10 @@ def validate_lineup(
     picked = [p.person_id for p in starters] + list(bench)
     if len(set(picked)) != len(picked):
         raise LineupInvalid("duplicate", "XI and bench must not repeat a player")
-    if set(picked) != set(eligible):
-        unknown = [p for p in picked if p not in eligible]
-        if unknown:
-            raise LineupInvalid("foreign", "XI and bench must be current club players")
-        raise LineupInvalid("coverage", "XI and bench must cover the eligible roster")
+    if len(eligible) > 25:
+        raise LineupInvalid("count", "The club roster holds at most twenty-five players")
+    if not set(picked).issubset(eligible):
+        raise LineupInvalid("foreign", "XI and bench must be current club players")
 
     if sum(p.slot_position == "GK" for p in starters) != 1:
         raise LineupInvalid("goalkeeper", "The XI needs exactly one goalkeeper slot")

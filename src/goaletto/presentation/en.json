@@ -368,5 +368,10 @@
   "Стадион недоступен. Откройте /start.": "The stadium is unavailable. Open /start.",
   "Расширение заказано.": "Expansion ordered.",
   "Расширение не заказано: кнопка устарела, уже идёт стройка или недостаточно средств. Откройте /stadium.": "Expansion was not ordered: the quote has expired, construction is in progress or funds are insufficient. Open /stadium.",
-  "🏟 Стадион": "🏟 Stadium"
+  "🏟 Стадион": "🏟 Stadium",
+  "<b>Вне заявки:</b>": "<b>Outside the match squad:</b>",
+  "Заявка: {selected}/{roster} игроков": "Match squad: {selected}/{roster} players",
+  "Скамейка": "Bench",
+  "Добавить в запас": "Add to bench",
+  "Оставить вне заявки": "Leave out of the match squad"
 }

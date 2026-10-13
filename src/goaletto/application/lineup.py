@@ -81,6 +81,7 @@ class LineupData:
     locked: bool
     lock_at: datetime | None
     ownership_id: UUID
+    reserves: tuple[SquadMember, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -272,6 +273,20 @@ async def _assemble(
             starters.append(member)
         else:
             bench.append(member)
+    selected = {m.person_id for m in (*starters, *bench)}
+    reserves = tuple(
+        SquadMember(
+            p.person_id,
+            persons[p.person_id].name,
+            p.position,
+            tuple(p.alternative_positions),
+            p.position,
+            p.status == "last_season",
+            p.injured_until is not None and p.injured_until > actor.at,
+        )
+        for p in players
+        if p.person_id not in selected
+    )
     tactics = lineup.tactics if isinstance(lineup.tactics, dict) else {}
     captain = await _latest_captain(session, club.id)
     if captain is not None and captain not in {m.person_id for m in starters}:
@@ -294,6 +309,7 @@ async def _assemble(
         locked=locked,
         lock_at=lock_at,
         ownership_id=ownership.id,
+        reserves=reserves,
     )
 
 
