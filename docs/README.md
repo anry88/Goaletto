@@ -58,3 +58,5 @@
 - [Live-команды, admission и версии checkpoint](live-commands.md)
 
 - [Экономика клуба и ledger](club-finances.md), [расчёт стартового капитала](economy-calculation.md).
+
+- [Стадион и прогноз посещаемости](stadium.md), [экономика на 450 матчах](economy-season-validation.md).

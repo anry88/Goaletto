@@ -14,6 +14,7 @@ from goaletto.application.match_runtime import (
     handle_calendar_job,
     job_refs,
 )
+from goaletto.application.stadium import complete_expansion
 from goaletto.application.training import apply_training
 from goaletto.infrastructure.models import Fixture, Job, OperationAttempt
 
@@ -69,12 +70,15 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         "ownership.expire",
         "training.apply",
         "finance.weekly",
+        "stadium.complete",
     }:
         try:
             async with session.begin_nested():
                 if job.kind in RUNTIME_KINDS:
                     rescheduled = await handle_calendar_job(session, job, at) == "rescheduled"
                     _, fixture_id, _ = job_refs(job)
+                elif job.kind == "stadium.complete":
+                    await complete_expansion(session, job, at)
                 elif job.kind == "finance.weekly":
                     await weekly_finances(session, job, at)
                 elif job.kind == "training.apply":

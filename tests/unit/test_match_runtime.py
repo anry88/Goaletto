@@ -40,6 +40,27 @@ from goaletto.infrastructure.models import (
 NOW = datetime(2026, 10, 17, 18, tzinfo=UTC)
 
 
+@pytest.fixture(autouse=True)
+def demand_io(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from goaletto.domain.stadium import Attendance
+
+    async def demand(session, fixture, home, at):
+        return Attendance(
+            home.supporters,
+            home.stadium_capacity,
+            5,
+            1,
+            (),
+            10000,
+            min(home.supporters, home.stadium_capacity),
+        )
+
+    monkeypatch.setattr("goaletto.application.stadium.crowd_for_fixture", demand)
+    monkeypatch.setattr("goaletto.application.stadium.pin_crowd", AsyncMock())
+
+
 class Rows:
     def __init__(self, rows=()):
         self.rows = rows

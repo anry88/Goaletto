@@ -593,6 +593,9 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         season = await session.get(Season, fixture.season_id)
         if season is None or season.status != "active":
             raise NotReady("Season has not opened")
+        from goaletto.application.stadium import crowd_for_fixture, pin_crowd
+
+        demand = await crowd_for_fixture(session, fixture, home, at)
         seed = stable_seed(season.seed, f"match:{fixture.id}")
         state = start_match(
             uuid5(fixture.id, "match:v1"),
@@ -601,7 +604,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             await team_snapshot(session, away, fixture.scheduled_start_at),
             policy=EnginePolicy(version="match-policy-v2"),
             engine_version=LIVE_ENGINE_VERSION,
-            crowd=HomeCrowd(home.stadium_capacity, min(home.supporters, home.stadium_capacity)),
+            crowd=HomeCrowd(demand.capacity, demand.fans),
         )
         match = Match(
             id=state.match_id,
@@ -621,6 +624,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         )
         session.add(match)
         await session.flush()
+        await pin_crowd(session, match, demand, at)
         await stage_receipt(session, match, "locked", at, fixture.lineup_lock_at)
         await lifecycle_event(session, fixture, "match_lineup_locked", "locked", at)
         return None

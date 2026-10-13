@@ -59,6 +59,7 @@ def build_dispatcher(
         player_router,
         settings_router,
         squad_router,
+        stadium_router,
         training_router,
     )
 
@@ -73,6 +74,7 @@ def build_dispatcher(
         lineup_handlers,
         live_router,
         squad_router,
+        stadium_router,
         training_router,
         player_router,
         settings_router,

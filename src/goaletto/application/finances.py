@@ -127,14 +127,21 @@ async def close_salary(session: AsyncSession, person_id: UUID, at: datetime) -> 
     await session.flush()
 
 
-async def ranking_at(session: AsyncSession, club_id: UUID, at: datetime) -> tuple[UUID, int, int]:
+async def ranking_at(
+    session: AsyncSession, club_id: UUID, at: datetime, *, season_id: UUID | None = None
+) -> tuple[UUID, int, int]:
     # Historical results only: a delayed invoice cannot use future league points.
     memberships = (
         await session.execute(
             select(SeasonClub, Season, League.tier)
             .join(Season, Season.id == SeasonClub.season_id)
             .join(League, League.id == SeasonClub.league_id)
-            .where(SeasonClub.club_id == club_id)
+            .where(
+                SeasonClub.club_id == club_id,
+                SeasonClub.season_id == season_id
+                if season_id is not None
+                else SeasonClub.club_id == club_id,
+            )
             .order_by(Season.starts_at.desc())
         )
     ).all()
@@ -242,11 +249,14 @@ async def weekly_finances(session: AsyncSession, job: Job, at: datetime) -> None
                 }
             )
         season_id, tier, place = await ranking_at(session, club_id, week)
+        from goaletto.application.stadium import upkeep_for_week
+
+        upkeep, capacity_periods = await upkeep_for_week(session, account.club, week)
         amounts = {
             "sponsor": sponsor_income(tier, place),
             "merchandise": merchandise_income(account.club.supporters),
             **wages,
-            "stadium_upkeep": stadium_upkeep(account.club.stadium_capacity),
+            "stadium_upkeep": upkeep,
         }
         key = "week:" + week.isoformat()
         details = {"week_start": week.isoformat(), "policy": POLICY_VERSION}
@@ -277,11 +287,14 @@ async def weekly_finances(session: AsyncSession, job: Job, at: datetime) -> None
                 snapshot={
                     "amounts": amounts,
                     "contracts": contract_snapshot,
+                    "capacity_periods": capacity_periods,
                     "season_id": str(season_id),
                     "tier": tier,
                     "place": place,
                     "supporters": account.club.supporters,
-                    "capacity": account.club.stadium_capacity,
+                    "capacity": capacity_periods[-1]["capacity"]
+                    if capacity_periods
+                    else account.club.stadium_capacity,
                 },
             )
         )

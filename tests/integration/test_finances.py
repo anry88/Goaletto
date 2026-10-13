@@ -26,6 +26,7 @@ from goaletto.application.money import (
 )
 from goaletto.application.results import finalize_result
 from goaletto.domain.finances import season_prize
+from goaletto.domain.match_codec import restore_state
 from goaletto.infrastructure.models import (
     Club,
     FinanceCycle,
@@ -201,10 +202,12 @@ async def test_match_income_atomic_once_with_final_result(sessions):
         income = await session.scalar(
             select(LedgerEntry).where(LedgerEntry.operation_key == f"tickets:{fixture_id}")
         )
-        assert income.cash_delta == 12500
-        assert account.club.budget == 62500
+        match = await session.scalar(select(Match).where(Match.fixture_id == fixture_id))
+        expected = restore_state(match.state).crowd.home_fans * 5
+        assert income.cash_delta == expected
+        assert account.club.budget == 50000 + expected
         assert not await finalize_result(session, fixture_id, at + timedelta(minutes=1))
-        assert account.club.budget == 62500
+        assert account.club.budget == 50000 + expected
         assert (
             await session.scalar(
                 select(func.count())

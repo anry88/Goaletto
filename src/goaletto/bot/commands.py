@@ -13,6 +13,7 @@ COMMANDS = (
     ("club", "Мой клуб", "My club"),
     ("squad", "Состав и карточки игроков", "Squad and player cards"),
     ("lineup", "Расстановка и тактика", "Lineup and tactics"),
+    ("stadium", "Стадион и посещаемость", "Stadium and attendance"),
     ("finance", "Финансы клуба", "Club finances"),
     ("train", "Недельные тренировки", "Weekly training"),
     ("match", "Матч и ближайшая встреча", "Live match and next fixture"),

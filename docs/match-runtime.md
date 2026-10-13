@@ -106,3 +106,7 @@ triggers/competition не проверены. Тестовые БД/контей
 Runtime берёт short allocation try-lock до Fixture/Match для сериализации с
 ownership expiry/admission/settings. Busy gate даёт NotReady/deferred и не
 сдвигает absolute deadlines. Pending owner guards перепроверяются при apply.
+
+## Посещаемость · stadium-demand-v1
+
+На lineup lock до kickoff runtime сохраняет HomeCrowd и immutable MatchCrowd basis по фанбазе, tier/place и последним пяти результатам. При повторе lock/движка crowd не пересчитывается; расширение после lock не меняет трибуны текущего матча. Ticket receipt использует те же зафиксированные fans/capacity. [Контракт](stadium.md).

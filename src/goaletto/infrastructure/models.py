@@ -829,6 +829,8 @@ JOURNEY_NAMES = (
     "player_retired",
     "result_delivered",
     "result_finalized",
+    "stadium_expansion_ordered",
+    "stadium_opened",
     "start_accepted",
     "training_opened",
     "training_plan_saved",
@@ -1041,7 +1043,7 @@ class GameActionReceipt(Base):
             "kind IN ('club_claimed','club_opened','club_preview_opened','lineup_opened',"
             "'lineup_saved','match_command_accepted','match_opened','match_report_opened',"
             "'next_fixture_opened','notification_preferences',"
-            "'training_opened','training_plan_saved','language_preferences','finances_opened')",
+            "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered')",
             name="ck_action_kind",
         ),
     )
@@ -1241,3 +1243,53 @@ class FinanceCycle(Base):
     applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     policy_version: Mapped[str] = mapped_column(String(32))
     snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+class StadiumExpansion(Base):
+    __tablename__ = "stadium_expansions"
+    __table_args__ = (
+        CheckConstraint(
+            "from_capacity IN (5000,10000,20000,35000) AND "
+            "to_capacity IN (10000,20000,35000,50000) AND "
+            "to_capacity > from_capacity AND cost > 0",
+            name="ck_expansion_dimensions",
+        ),
+        CheckConstraint(
+            "due_at > started_at AND (completed_at IS NULL OR completed_at >= due_at)",
+            name="ck_expansion_dates",
+        ),
+        CheckConstraint(
+            "status IN ('queued','finished') AND "
+            "(status = 'finished') = (completed_at IS NOT NULL)",
+            name="ck_expansion_state",
+        ),
+        UniqueConstraint("operation_id", name="uq_expansion_operation"),
+        Index(
+            "uq_expansion_pending_club",
+            "club_id",
+            unique=True,
+            postgresql_where="status = 'queued'",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    operation_id: Mapped[UUID] = mapped_column(Uuid)
+    from_capacity: Mapped[int] = mapped_column(Integer)
+    to_capacity: Mapped[int] = mapped_column(Integer)
+    cost: Mapped[int] = mapped_column(BigInteger)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16))
+
+
+class MatchCrowd(Base):
+    __tablename__ = "match_crowds"
+    __table_args__ = (
+        CheckConstraint("policy_version = 'stadium-demand-v1'", name="ck_crowd_policy"),
+    )
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    policy_version: Mapped[str] = mapped_column(String(32))
+    locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    basis: Mapped[dict[str, Any]] = mapped_column(JSONB)

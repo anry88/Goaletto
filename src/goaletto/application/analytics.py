@@ -91,6 +91,8 @@ EVENT_SPECS = MappingProxyType(
         "club_offer_delivered": EventSpec(Origin.SYSTEM, ("analytics_manager_id", "outbox_id")),
         "club_preview_opened": _user("club_id"),
         "club_claimed": _user("club_id", "ownership_id", ownership=True),
+        "stadium_opened": _user("club_id", "ownership_id", ownership=True),
+        "stadium_expansion_ordered": _user("club_id", "ownership_id", ownership=True),
         "finances_opened": _user("club_id", "ownership_id", ownership=True),
         "club_opened": _user("club_id", "ownership_id", ownership=True),
         "lineup_opened": _user("club_id", "ownership_id", ownership=True),

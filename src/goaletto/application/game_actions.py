@@ -71,6 +71,8 @@ DEFAULT_LEASE_POLICY = LeasePolicy()
 GAME_ACTIONS = frozenset(
     {
         "finances_opened",
+        "stadium_opened",
+        "stadium_expansion_ordered",
         "training_opened",
         "training_plan_saved",
         "club_claimed",
