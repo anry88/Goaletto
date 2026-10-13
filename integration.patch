@@ -1,0 +1,46 @@
+diff --git a/src/goaletto/bot/commands.py b/src/goaletto/bot/commands.py
+index ac71f619..32d78c9c 100644
+--- a/src/goaletto/bot/commands.py
++++ b/src/goaletto/bot/commands.py
+@@ -20,6 +20,7 @@ COMMANDS = (
+     ("match", "Матч и ближайшая встреча", "Live match and next fixture"),
+     ("table", "Таблица лиги", "League table"),
+     ("history", "Результаты и отчёты матчей", "Match results and reports"),
++    ("feedback", "Оставить отзыв", "Leave feedback"),
+     ("settings", "Язык и напоминания", "Language and reminders"),
+     ("help", "Помощь по игре", "Game help"),
+ )
+diff --git a/src/goaletto/bot/live_views.py b/src/goaletto/bot/live_views.py
+index fac116db..79c6a4a4 100644
+--- a/src/goaletto/bot/live_views.py
++++ b/src/goaletto/bot/live_views.py
+@@ -106,6 +106,9 @@ def render(
+                 else tr("Матч остановлен.")
+             )
+             rows.append([_button(tr("📋 Отчёт о матче"), match_callback(screen.fixture_id))])
++            from goaletto.bot.feedback_views import secondary_button
++
++            rows.append([secondary_button()])
+         elif not screen.open:
+             lines.append(tr("Сейчас действие недоступно. Обновите экран."))
+         else:
+diff --git a/src/goaletto/bot/main.py b/src/goaletto/bot/main.py
+index 16a23e05..dd0757d1 100644
+--- a/src/goaletto/bot/main.py
++++ b/src/goaletto/bot/main.py
+@@ -51,6 +51,7 @@ def build_dispatcher(
+     from goaletto.bot import (
+         club_router,
+         entry_router,
++        feedback_router,
+         finance_router,
+         history_router,
+         lineup_handlers,
+@@ -70,6 +71,7 @@ def build_dispatcher(
+     root.callback_query.filter(F.message.chat.type == "private")
+     for module in (
+         entry_router,
++        feedback_router,
+         finance_router,
+         navigation,
+         lineup_handlers,
