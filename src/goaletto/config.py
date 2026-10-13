@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,3 +18,6 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = Field(default=1, ge=0.1, le=60)
     outbox_enabled: bool = False
     game_enabled: bool = False
+    # JSON array in the host-only environment; empty preserves unrestricted access.
+    allowed_telegram_ids: frozenset[Annotated[int, Field(gt=0)]] = frozenset()
+    internal_telegram_ids: frozenset[Annotated[int, Field(gt=0)]] = frozenset()

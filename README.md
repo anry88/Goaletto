@@ -78,6 +78,8 @@ polling и не удерживает DB-транзакцию во время Tel
 на PostgreSQL с fake Telegram; реальные отправки и polling не запускались.
 Локальная БД использует постоянный volume и порт 5433; 5432 занят другим проектом.
 Для игры включите `GOALETTO_GAME_ENABLED=true`; календарь активируется отдельно.
+Для закрытого теста задайте host-only списки `GOALETTO_ALLOWED_TELEGRAM_IDS` и
+`GOALETTO_INTERNAL_TELEGRAM_IDS` (JSON arrays). [Сценарий двух аккаунтов](docs/closed-telegram-test.md).
 
 Весь стек локально:
 1. В .env задайте URL с хостом **postgres**, а не localhost:

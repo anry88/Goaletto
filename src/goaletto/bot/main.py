@@ -5,6 +5,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+from goaletto.bot.access import TelegramAccess
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
 
@@ -22,8 +23,17 @@ def fresh_router(source: Router) -> Router:
     return result
 
 
-def build_dispatcher(database: Database | None, *, game_enabled: bool) -> Dispatcher:
-    dispatcher = Dispatcher(database=database)
+def build_dispatcher(
+    database: Database | None,
+    *,
+    game_enabled: bool,
+    allowed_telegram_ids: frozenset[int] = frozenset(),
+    internal_telegram_ids: frozenset[int] = frozenset(),
+) -> Dispatcher:
+    dispatcher = Dispatcher(database=database, internal_telegram_ids=internal_telegram_ids)
+    access = TelegramAccess(allowed_telegram_ids)
+    dispatcher.message.outer_middleware(access)
+    dispatcher.callback_query.outer_middleware(access)
     if not game_enabled:
         from goaletto.bot.handlers import router
 
@@ -71,7 +81,12 @@ async def run() -> None:
         raise SystemExit("Set GOALETTO_BOT_TOKEN in .env before starting the bot")
     bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     database = Database(settings) if settings.game_enabled else None
-    dispatcher = build_dispatcher(database, game_enabled=settings.game_enabled)
+    dispatcher = build_dispatcher(
+        database,
+        game_enabled=settings.game_enabled,
+        allowed_telegram_ids=settings.allowed_telegram_ids,
+        internal_telegram_ids=settings.internal_telegram_ids,
+    )
     try:
         await dispatcher.start_polling(bot, close_bot_session=False)
     finally:

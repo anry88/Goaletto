@@ -104,6 +104,7 @@ async def accept_start(
     payload: str | None,
     at: datetime,
     locale: str = "ru",
+    internal: bool = False,
 ) -> StartResult:
     require_utc(at)
     if not session.in_transaction():
@@ -117,7 +118,7 @@ async def accept_start(
             id=uuid4(),
             telegram_id=telegram_id,
             locale=locale,
-            is_internal=False,
+            is_internal=internal,
             created_at=at,
             first_game_start_at=None,
         )
@@ -128,6 +129,8 @@ async def accept_start(
     )
     if manager is None:
         raise ValueError("Manager was not persisted")
+    if internal:
+        manager.is_internal = True
     analytics_id = await pseudonym_for(session, manager.id, at)
     if analytics_id is None:
         # Internal/opted-out accounts can still play, but contribute no attribution/cohort.

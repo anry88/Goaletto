@@ -115,12 +115,18 @@ async def begin_game(
     payload: str | None,
     at: datetime,
     policy: LeasePolicy = DEFAULT_LEASE_POLICY,
+    internal: bool = False,
 ) -> Entry:
     # This lock precedes Manager, season, club and ownership locks in every entry mutation.
     await allocation_lock(session)
     await start_coverage(session, at)  # Explicit game-enabled entry, never the preview router.
     start = await accept_start(
-        session, telegram_id=telegram_id, update_id=update_id, payload=payload, at=at
+        session,
+        telegram_id=telegram_id,
+        update_id=update_id,
+        payload=payload,
+        at=at,
+        internal=internal,
     )
     actor = Actor(
         start.manager_id, telegram_id, start.analytics_manager_id, start.operation_id, at, update_id

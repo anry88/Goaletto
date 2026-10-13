@@ -39,7 +39,7 @@ def main() -> None:
                 "supported_jobs": sorted(RUNTIME_KINDS),
                 "database_written": args.apply,
                 "rollover": "held",
-                "sender": "not implemented",
+                "sender": "enabled separately through GOALETTO_OUTBOX_ENABLED",
             },
             indent=2,
         )

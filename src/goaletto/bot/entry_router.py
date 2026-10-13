@@ -56,7 +56,11 @@ def offer_view(items: tuple[ClubOffer, ...], page: int = 1) -> tuple[str, Inline
 
 @router.message(CommandStart())
 async def game_start(
-    message: Message, database: Database, event_update: Update, command: CommandObject
+    message: Message,
+    database: Database,
+    event_update: Update,
+    command: CommandObject,
+    internal_telegram_ids: frozenset[int] = frozenset(),
 ) -> None:
     if message.from_user is None or message.chat.type != "private":
         return
@@ -67,6 +71,7 @@ async def game_start(
             update_id=event_update.update_id,
             payload=command.args,
             at=datetime.now(UTC),
+            internal=message.from_user.id in internal_telegram_ids,
         )
         if entry.club_id is not None:
             text, keyboard = club_view(await get_owned_club(session, entry.actor, record=False))
