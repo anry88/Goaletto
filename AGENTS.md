@@ -16,7 +16,9 @@
 - Match ticks are 60 seconds. Regulation: 30 ticks, 3 game minutes each, 3-minute
   halftime. Wall-clock duration is 33 minutes.
 - Each league set has 5 leagues of exactly 10 clubs. New managers enter only tier 5.
-  Promotion/relegation happens simultaneously, within a set, with two clubs each way.
+  User update 2026-10-14: promotion/relegation happens simultaneously across
+  compatible completed seasons, with two clubs each way between adjacent tiers.
+  Destination leagues may belong to any set; there is no fixed 5-1 -> 4-1 ladder.
   Tier 1 has no promotion; tier 5 has no relegation; no playoffs.
 - Unowned clubs use comparable baseline squads, fixed lineups, no training or AI/LLM
   integration. Automatic substitutions are injury-only; retirements receive youth
@@ -61,10 +63,23 @@
   A weak head coach starts in each club: one tactic, one instruction change and
   one mentality change per match; substitution limits are equal for all coaches.
   Specialists unlock training; modest match growth depends on minutes, age and
-  staff. Scouts offer a private player age 17-21 weekly; unsigned discoveries
+  staff. Scouts offer a private player age 17-21 per four-day game cycle; unsigned discoveries
   never enter the public market. Renew sponsorship after each season using final
   place, supporters and league level. Recalculate starting money and coefficients.
   These are pending gameplay tasks, not claims of implemented functionality.
+- Further user update 2026-10-14: docs/calendar-cups-update-2026-10-14.md defines
+  18 four-day cycles per season: cup, champions cups, training/friendlies, league.
+  Wages, scouts and training use the four-day cycle, not seven calendar days.
+  Time settings use an IANA zone and local preferred kickoff; human-vs-bot uses
+  the human preference, human-vs-human the midpoint of the shortest UTC clock arc
+  (23:00 and 01:00 -> 00:00), rounded to 30 minutes within the assigned UTC day.
+  Against a bot preserve the chosen local time, including fractional UTC offsets.
+  Materialize kickoff/jobs only ten days ahead; announced fixtures stay fixed.
+  Cup uses 50 clubs with staged entry, two legs until a single neutral final,
+  split ticket income, aggregate scores without away goals, extra time/penalties.
+  Champions cups qualify top eight per league separately by tier. Calibrate
+  durable inter-match energy so an average player/physio recovers in 24 hours;
+  adjacent UTC dates do not necessarily provide 24 hours of rest.
 - The r1 PNG small-part faces were rejected for visual quality on 2026-10-11.
   See docs/portrait-feasibility.md. Preserve them as experiments; do not mass-produce
   or claim accepted art from rendering tests. Whole portraits are the chosen approach;
