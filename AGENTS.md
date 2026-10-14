@@ -49,8 +49,22 @@
 - Candidate pools are global to the game, not per league/set: target 12 footballer
   offers (free agents + open available auctions), 2 staff per profession. Generate
   only a deficit; sale/hire replenishes at most one. At/above target generate none.
-  Prefer qualified retired footballers for staff vacancies, preserving the same
-  person/history/face. Never automatically qualify a footballer as physiotherapist.
+  Natural returns/declined former-player offers may exceed the target: preserve
+  people, generate none at/above the target. Never silently qualify a footballer
+  as physiotherapist without an explicit qualification.
+- User update 2026-10-14 is specified in docs/gameplay-update-2026-10-14.md:
+  new market footballers age 26-30, varied quality, age/quality-based prices and
+  wages; some have 2-3 adjacent positions and a versatility premium. Fresh staff
+  age 50-56 with varied quality; former players retain actual age/history/face.
+  Retirement assigns a persisted random staff career, rare high quality, first
+  offer to the former club, 20% wage discount there; rejection enters the market.
+  A weak head coach starts in each club: one tactic, one instruction change and
+  one mentality change per match; substitution limits are equal for all coaches.
+  Specialists unlock training; modest match growth depends on minutes, age and
+  staff. Scouts offer a private player age 17-21 weekly; unsigned discoveries
+  never enter the public market. Renew sponsorship after each season using final
+  place, supporters and league level. Recalculate starting money and coefficients.
+  These are pending gameplay tasks, not claims of implemented functionality.
 - The r1 PNG small-part faces were rejected for visual quality on 2026-10-11.
   See docs/portrait-feasibility.md. Preserve them as experiments; do not mass-produce
   or claim accepted art from rendering tests. Whole portraits are the chosen approach;
