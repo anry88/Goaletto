@@ -69,7 +69,11 @@
   These are pending gameplay tasks, not claims of implemented functionality.
 - Further user update 2026-10-14: docs/calendar-cups-update-2026-10-14.md defines
   18 four-day cycles per season: cup, champions cups, training/friendlies, league.
-  Wages, scouts and training use the four-day cycle, not seven calendar days.
+  Wages and scouts use the four-day cycle, not seven calendar days.
+  Latest clarification: managers may schedule training on any UTC day without
+  a match for their club, including unused cup/champions days. Friendlies also
+  exclude training that day. Training is not restricted to day 3 or once/cycle;
+  plans/receipts use club+UTC date. Rebalance daily effects and seasonal growth.
   Time settings use an IANA zone and local preferred kickoff; human-vs-bot uses
   the human preference, human-vs-human the midpoint of the shortest UTC clock arc
   (23:00 and 01:00 -> 00:00), rounded to 30 minutes within the assigned UTC day.
