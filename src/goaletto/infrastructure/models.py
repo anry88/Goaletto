@@ -276,6 +276,26 @@ class Season(Base):
     rollover_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class SeasonRolloverReceipt(Base):
+    """Immutable proof of the entire committed offseason transition."""
+
+    __tablename__ = "season_rollover_receipts"
+    __table_args__ = (
+        CheckConstraint("season_id <> next_season_id", name="ck_rollover_distinct_seasons"),
+        CheckConstraint("policy_version = 'season-rollover-v1'", name="ck_rollover_policy"),
+        CheckConstraint(
+            "jsonb_typeof(counts) = 'object' AND jsonb_typeof(movements) = 'object'",
+            name="ck_rollover_objects",
+        ),
+    )
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
+    next_season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), unique=True)
+    policy_version: Mapped[str] = mapped_column(String(80))
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    counts: Mapped[dict[str, int]] = mapped_column(JSONB)
+    movements: Mapped[dict[str, str]] = mapped_column(JSONB)
+
+
 class SeasonClub(Base):
     """Historical membership; never inferred from a club's current league."""
 
@@ -346,7 +366,7 @@ class Person(Base):
     age: Mapped[int] = mapped_column(SmallInteger)
     career: Mapped[str] = mapped_column(String(16))
     appearance_identity_id: Mapped[str] = mapped_column(
-        ForeignKey("appearance_identities.id"), unique=True
+        ForeignKey("appearance_identities.id"), index=True
     )
     appearance_variant_id: Mapped[str] = mapped_column(String(100))
     # Nullable until the home-calendar policy is decided; no second staff age counter.
@@ -461,6 +481,64 @@ class StaffQualification(Base):
     role: Mapped[str] = mapped_column(String(32), primary_key=True)
     skill: Mapped[int] = mapped_column(SmallInteger)
     qualified_for_season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
+
+
+class CandidatePool(Base):
+    """Global supply counter, serialized with appearance/market allocation."""
+
+    __tablename__ = "candidate_pools"
+    __table_args__ = (
+        CheckConstraint(
+            "(kind = 'player' AND profile = 'player' AND target = 12) OR "
+            f"(kind = 'staff' AND profile IN ({STAFF_ROLES_SQL}) AND target = 2)",
+            name="ck_candidate_pool_scope",
+        ),
+        CheckConstraint("generation >= 0", name="ck_candidate_generation"),
+    )
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    profile: Mapped[str] = mapped_column(String(32), primary_key=True)
+    home_league_set_id: Mapped[UUID] = mapped_column(ForeignKey("league_sets.id"))
+    target: Mapped[int] = mapped_column(SmallInteger)
+    generation: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class CandidateOffer(Base):
+    __tablename__ = "candidate_offers"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["kind", "pool_profile"],
+            ["candidate_pools.kind", "candidate_pools.profile"],
+            name="fk_candidate_pool",
+        ),
+        CheckConstraint("status IN ('available','signed','retired')", name="ck_candidate_status"),
+        CheckConstraint("fee > 0 AND weekly_rate > 0", name="ck_candidate_price"),
+    )
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    pool_profile: Mapped[str] = mapped_column(String(32))
+    profile: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="available")
+    fee: Mapped[int] = mapped_column(BigInteger)
+    weekly_rate: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class CandidateSigning(Base):
+    __tablename__ = "candidate_signings"
+    __table_args__ = (
+        CheckConstraint("fee > 0 AND weekly_rate > 0", name="ck_signing_price"),
+        CheckConstraint("kind IN ('player','staff')", name="ck_signing_kind"),
+        UniqueConstraint("person_id", "kind", name="uq_candidate_signing_career"),
+    )
+    operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("candidate_offers.person_id"))
+    kind: Mapped[str] = mapped_column(String(16))
+    profile: Mapped[str] = mapped_column(String(32))
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    fee: Mapped[int] = mapped_column(BigInteger)
+    weekly_rate: Mapped[int] = mapped_column(Integer)
+    signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class PersonSeasonEvent(Base):
@@ -799,6 +877,7 @@ JOURNEY_NAMES = (
     "bot_unavailable",
     "bot_youth_replacement_created",
     "campaign_touched",
+    "candidate_signed",
     "club_claimed",
     "club_offer_delivered",
     "club_opened",
@@ -1048,7 +1127,7 @@ class GameActionReceipt(Base):
             "'lineup_saved','match_command_accepted','match_opened','match_report_opened',"
             "'next_fixture_opened','notification_preferences',"
             "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered','market_opened',"
-            "'market_listing_created','market_bid_accepted','market_listing_cancelled')",
+            "'market_listing_created','market_bid_accepted','market_listing_cancelled','candidate_signed')",
             name="ck_action_kind",
         ),
     )
@@ -1179,7 +1258,7 @@ class LedgerEntry(Base):
         CheckConstraint(
             "kind IN ('opening','grant','tickets','sponsor','merchandise',"
             "'player_salary','staff_salary','stadium_upkeep','prize','reserve','release',"
-            "'transfer_in','transfer_out','arrears_paid','stadium_upgrade')",
+            "'transfer_in','transfer_out','arrears_paid','stadium_upgrade','signing_fee')",
             name="ck_ledger_kind",
         ),
         Index("ix_ledger_club_page", "club_id", "sequence"),

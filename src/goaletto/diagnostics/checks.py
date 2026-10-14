@@ -88,7 +88,7 @@ FINDING_CODES: dict[str, tuple[str, str]] = {
     ),
     JOBS_HELD_ROLLOVER: (
         SEVERITY_INFO,
-        "Held season.rollover jobs; rollover stays held until its own implementation.",
+        "Held season.rollover jobs; explicit season activation has not released rollover.",
     ),
     JOBS_HELD_AFTER_ACTIVATION: (
         SEVERITY_WARN,
@@ -205,7 +205,7 @@ FINDING_CODES: dict[str, tuple[str, str]] = {
     ),
     APPEARANCE_STOCK_LOW: (
         SEVERITY_WARN,
-        "Free unique appearance identities below the explicit low-stock threshold.",
+        "Reusable catalog variety below the explicit low-stock threshold.",
     ),
     DIAGNOSTICS_INCOMPLETE_TRUNCATED: (
         SEVERITY_WARN,
@@ -251,7 +251,7 @@ class Report:
 @dataclass(frozen=True, kw_only=True)
 class Thresholds:
     late_threshold_seconds: float = 180.0
-    appearance_low_threshold: int = 100
+    appearance_low_threshold: int = 14
     row_limit: int = 2000
 
     def __post_init__(self) -> None:
@@ -284,7 +284,7 @@ def collect_report(
     snapshot: Snapshot,
     *,
     late_threshold_seconds: float = 180.0,
-    appearance_low_threshold: int = 100,
+    appearance_low_threshold: int = 14,
     row_limit: int = 2000,
 ) -> Report:
     """Evaluate every diagnostic check over ``snapshot`` with explicit thresholds."""
@@ -408,8 +408,8 @@ def _check_jobs_held(snapshot: Snapshot) -> list[Finding]:
                 code=JOBS_HELD_ROLLOVER,
                 severity=SEVERITY_INFO,
                 summary=(
-                    f"{len(rollover)} held season.rollover jobs; rollover stays held until "
-                    "its own implementation lands."
+                    f"{len(rollover)} held season.rollover jobs; rollover awaits "
+                    "explicit season activation."
                 ),
                 count=len(rollover),
                 job_ids=_sample_ids(tuple(job.id for job in rollover)),
@@ -1241,18 +1241,17 @@ def _check_outbox(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
 def _check_appearance(snapshot: Snapshot, low_threshold: int) -> list[Finding]:
     findings: list[Finding] = []
     for stock in snapshot.appearance:
-        if stock.free < low_threshold:
+        if stock.total < low_threshold:
             findings.append(
                 Finding(
                     code=APPEARANCE_STOCK_LOW,
                     severity=SEVERITY_WARN,
                     summary=(
-                        f"Appearance bank {stock.bank!r} has {stock.free} free unique "
-                        f"identities of {stock.total} (used {stock.used}); below the "
-                        f"explicit threshold {low_threshold}. Publish more faces, "
-                        "never reuse identities."
+                        f"Reusable appearance bank {stock.bank!r} has {stock.total} identities; "
+                        f"below the catalog variety threshold {low_threshold}. "
+                        "Assignments remain reusable; existing people keep their faces."
                     ),
-                    count=stock.free,
+                    count=stock.total,
                 )
             )
     return findings

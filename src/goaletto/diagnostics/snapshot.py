@@ -41,6 +41,7 @@ WORKER_JOB_KINDS = frozenset(
         "market.close",
         "market.cancel_player",
         "feedback.cleanup",
+        "season.rollover",
     }
 )
 

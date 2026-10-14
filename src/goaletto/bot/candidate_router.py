@@ -1,0 +1,93 @@
+"""Free-agent and staff market; commit hiring and replenishment before delivery."""
+
+from datetime import UTC, datetime
+
+from aiogram import F, Router
+from aiogram.filters import Command
+from aiogram.types import CallbackQuery, Message, Update
+
+from goaletto.application.candidates import load_candidates, sign_candidate
+from goaletto.application.club_view import actor_for_callback
+from goaletto.application.game_actions import PermissionDenied, actor_for
+from goaletto.bot.candidate_views import candidate_list, candidate_quote, parse_candidate
+from goaletto.bot.responses import edit_response
+from goaletto.infrastructure.database import Database
+from goaletto.infrastructure.models import CandidateOffer
+from goaletto.presentation.i18n import tr
+
+router = Router(name="candidates")
+
+
+@router.message(Command("freeagents", "staff"))
+async def candidates_command(message: Message, database: Database, event_update: Update) -> None:
+    if message.from_user is None:
+        return
+    kind = "staff" if (message.text or "").split()[0].split("@")[0] == "/staff" else "player"
+    try:
+        async with database.transaction() as session:
+            actor = await actor_for(
+                session, message.from_user.id, event_update.update_id, datetime.now(UTC)
+            )
+            text, keyboard = candidate_list(await load_candidates(session, actor, kind), kind)
+    except (PermissionDenied, ValueError):
+        await message.answer(tr("Раздел недоступен. Откройте /start."))
+        return
+    await message.answer(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("cg:"))
+async def candidates_callback(
+    query: CallbackQuery, database: Database, event_update: Update
+) -> None:
+    await query.answer()
+    if not isinstance(query.message, Message):
+        return
+    try:
+        async with database.transaction() as session:
+            actor = await actor_for_callback(
+                session,
+                telegram_id=query.from_user.id,
+                callback_id=query.id,
+                at=datetime.now(UTC),
+                update_id=event_update.update_id,
+            )
+            action, person_id, owner_id, value = parse_candidate(query.data or "")
+            if action in {"p", "s"}:
+                kind = "player" if action == "p" else "staff"
+                text, keyboard = candidate_list(
+                    await load_candidates(session, actor, kind), kind, value
+                )
+            else:
+                offer = await session.get(CandidateOffer, person_id)
+                if offer is None or person_id is None or owner_id is None:
+                    raise ValueError("Unknown candidate")
+                kind = offer.kind
+                if action == "b":
+                    receipt = await sign_candidate(
+                        session, actor, owner_id, person_id, value, at=datetime.now(UTC)
+                    )
+                    kind = receipt.kind
+                    text, keyboard = candidate_list(
+                        await load_candidates(
+                            session, actor, kind, record=False, refresh_supply=False
+                        ),
+                        kind,
+                        notice=tr("Контракт подписан. Проверьте состав и расходы клуба."),
+                    )
+                else:
+                    screen = await load_candidates(session, actor, kind)
+                    item = next((i for i in screen.items if i.person.id == person_id), None)
+                    if screen.ownership_id != owner_id or item is None or item.offer.fee != value:
+                        raise ValueError("Old quote")
+                    text, keyboard = candidate_quote(item, owner_id)
+    except (PermissionDenied, ValueError):
+        await edit_response(
+            query.message,
+            tr(
+                "Подписание недоступно: кандидат занят, кнопка устарела, роль уже занята "
+                "или не хватает денег/места. Для игроков нужно открытое трансферное "
+                "окно. Откройте /market или /staff."
+            ),
+        )
+        return
+    await edit_response(query.message, text, keyboard)

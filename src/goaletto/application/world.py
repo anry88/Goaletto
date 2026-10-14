@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
 
-from sqlalchemy import insert, select, text
+from sqlalchemy import insert, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.finance_seed import opening_rows
@@ -153,8 +153,8 @@ async def initialize_world(
     if await session.get(LeagueSet, plan_id) is not None:
         raise ValueError("World exists without its receipt; reconcile rather than reseed it")
     await register_catalog(session, root=root)
-    reserved = frozenset((await session.scalars(select(Person.appearance_identity_id))).all())
-    prepared = prepare_world(options, root=root, reserved=reserved)
+    # The reviewed bank is reusable across people/worlds (user decision 2026-10-13).
+    prepared = prepare_world(options, root=root)
     plan = prepared.plan
 
     async def write(model: type[Base], rows: list[dict[str, Any]]) -> None:

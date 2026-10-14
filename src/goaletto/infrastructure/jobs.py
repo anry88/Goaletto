@@ -16,6 +16,8 @@ from goaletto.application.match_runtime import (
     handle_calendar_job,
     job_refs,
 )
+from goaletto.application.persons import AppearanceExhausted
+from goaletto.application.season_rollover import rollover_season
 from goaletto.application.stadium import complete_expansion
 from goaletto.application.training import apply_training
 from goaletto.infrastructure.models import Fixture, Job, OperationAttempt
@@ -76,12 +78,16 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         "market.close",
         "market.cancel_player",
         "feedback.cleanup",
+        "season.rollover",
     }:
         try:
             async with session.begin_nested():
                 if job.kind in RUNTIME_KINDS:
                     rescheduled = await handle_calendar_job(session, job, at) == "rescheduled"
                     _, fixture_id, _ = job_refs(job)
+                elif job.kind == "season.rollover":
+                    season_id, _, _ = job_refs(job)
+                    await rollover_season(session, season_id, at)
                 elif job.kind == "feedback.cleanup":
                     if (
                         set(job.payload) != {"version", "retention_days"}
@@ -129,9 +135,11 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
             job.status = "pending" if rescheduled else "done"
             outcome = "deferred" if rescheduled else "committed"
             job.last_error = None
-        except NotReady:
+        except (NotReady, AppearanceExhausted):
             outcome, failure = "deferred", "not_ready"
             job.last_error = "not_ready"
+            if job.kind == "season.rollover":
+                job.due_at = at + timedelta(seconds=60)
         except (ValueError, TypeError, KeyError):
             outcome, failure = "failed", "invalid_state"
             job.status = "failed"

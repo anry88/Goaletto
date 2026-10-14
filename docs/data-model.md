@@ -39,7 +39,7 @@ erDiagram
     OWNERSHIP_PERIODS ||--o{ ACCEPTED_COMMANDS : authorizes
     MATCHES ||--o{ ACCEPTED_COMMANDS : applies
     APPEARANCE_IDENTITIES ||--|{ APPEARANCE_VARIANTS : ages
-    APPEARANCE_IDENTITIES ||--o| PERSONS : reserved
+    APPEARANCE_IDENTITIES ||--o{ PERSONS : assigned
     PERSONS ||--o| PLAYERS : football
     PERSONS ||--o| STAFF : work
     STAFF ||--o{ STAFF_QUALIFICATIONS : roles
@@ -75,7 +75,7 @@ CHECK срока рассчитывает ровно шесть месяцев �
 
 `persons` — единственный person ID, имя, игровой возраст, текущая карьера,
 home calendar и сезон последнего начисленного года. Для свободного персонала
-home calendar может быть NULL: его политика пока не утверждена. Нет второго
+home calendar первоначально мог быть NULL; свободные кандидаты теперь следуют первому комплекту. Нет второго
 независимого счётчика staff age. Числовая граница хранения 0–150 не утверждает
 возраст найма; новый футболист в application допускается только в 17–38.
 
@@ -212,3 +212,12 @@ analytics retention; reminder/availability flags Manager. Миграция не 
 ## Финансы
 
 FinanceAccount и immutable LedgerEntry сверяют cash/reserved/arrears. SalaryContract сохраняет фиксированную ставку и employment intervals; FinanceCycle — единственный расчёт клуба за неделю. MoneyReservation обеспечивает held bids. [Контракт](club-finances.md).
+
+Миграции 0019/0020: immutable season_rollover_receipts, общий кандидатный
+pool counter/offer/signing receipt и signing_fee в денежном журнале. Уникальность
+appearance identity между людьми снята решением 2026-10-13; same-face variant FK
+сохранён. [Rollover](season-rollover.md), [пулы](candidate-pools.md).
+
+Миграция 0021 разделяет candidate_signings по person + career kind и сохраняет
+профессию в каждой receipt. Бывший свободный футболист может быть позже нанят
+как сотрудник без потери записи первой покупки.

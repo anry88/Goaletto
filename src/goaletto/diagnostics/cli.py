@@ -28,7 +28,7 @@ from goaletto.diagnostics.queries import collect_snapshot
 from goaletto.infrastructure.database import Database
 
 DEFAULT_LATE_THRESHOLD_SECONDS = 180.0
-DEFAULT_APPEARANCE_LOW_THRESHOLD = 100
+DEFAULT_APPEARANCE_LOW_THRESHOLD = 14
 DEFAULT_ROW_LIMIT = 2000
 
 
@@ -47,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--appearance-low-threshold",
         type=int,
         default=DEFAULT_APPEARANCE_LOW_THRESHOLD,
-        help="Explicit low-stock threshold for free unique appearance identities.",
+        help="Explicit variety threshold for each reusable portrait catalog.",
     )
     parser.add_argument(
         "--format",

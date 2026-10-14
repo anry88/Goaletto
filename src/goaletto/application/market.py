@@ -741,6 +741,12 @@ async def close_auction(session: AsyncSession, job: Job, at: datetime) -> bool:
     )
     await notify(session, auction, "bought", bid.buyer_ownership_id, bid.buyer_club_id, at, bid)
     await session.flush()
+    # The global market counts club auctions too. Only refill a remaining deficit.
+    from goaletto.application.candidates import replenish_pool
+    from goaletto.infrastructure.models import CandidatePool
+
+    if await session.get(CandidatePool, ("player", "player")) is not None:
+        await replenish_pool(session, "player", "player", at, limit=1)
     return False
 
 

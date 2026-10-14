@@ -41,18 +41,24 @@
   Preserve separate male player/staff banks, stable appearance IDs and rejected pilot IDs.
   Direction C — Dugout stays approved. Export 256px/96px, retain sources separately,
   recolor only garment material masks, preserve person identity across player/staff careers.
-- First set: 20 players per club, 1,000 unique player appearances for 50 clubs, no reuse
-  across people. A small repeated bank is insufficient. Reserve unique appearance IDs
-  durably; exhausted catalog must not silently repeat. Staff last work season is 60-70,
-  guaranteed last at 70; exact probabilities are not yet approved.
+- User update 2026-10-13: reuse the existing portrait pool across different people.
+  First set keeps 20 players per club and its existing 1,000 illustrations. Keep each
+  person's assigned face/history stable; assign new people least-used eligible faces.
+  No new image generation is needed. Staff last-season probabilities at ages 60..70
+  are approved: 5/8/12/18/25/35/45/60/75/90/100%; certainty at 70.
+- Candidate pools are global to the game, not per league/set: target 12 footballer
+  offers (free agents + open available auctions), 2 staff per profession. Generate
+  only a deficit; sale/hire replenishes at most one. At/above target generate none.
+  Prefer qualified retired footballers for staff vacancies, preserving the same
+  person/history/face. Never automatically qualify a footballer as physiotherapist.
 - The r1 PNG small-part faces were rejected for visual quality on 2026-10-11.
   See docs/portrait-feasibility.md. Preserve them as experiments; do not mass-produce
   or claim accepted art from rendering tests. Whole portraits are the chosen approach;
   individual new illustrations still need quality review. Preserve aspect ratio and clothing masks.
 - Staff age and retire; retired players may enter qualified staff pools with the same
-  person/history/appearance. See docs/staff-lifecycle.md; do not assume unsettled probabilities.
+  person/history/appearance. See docs/staff-lifecycle.md and docs/candidate-pools.md.
 - Slight likeness between different faces is acceptable per the user's clarification.
-  Never reuse an appearance identity between people. Lifecycle variants preserve the
+  The catalog may be reused across people; lifecycle variants preserve the
   same identity; see docs/portrait-lifecycle.md. Visual bands do not decide retirement.
 - This repository is proprietary; do not change licensing without user instruction.
 - Keep Linear tasks aligned with meaningful completed work. Do not close unimplemented

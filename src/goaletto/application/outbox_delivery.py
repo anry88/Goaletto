@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 from html import escape
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from uuid import UUID, uuid5
 
 from sqlalchemy import case, or_, select, update
@@ -45,6 +45,8 @@ SUPPORTED_KINDS = frozenset(
         "ownership_reminder",
         "match_recovery",
         "market_notice",
+        "player_lifecycle",
+        "staff_lifecycle",
     }
 )
 LEASE_SECONDS = 120.0
@@ -54,6 +56,8 @@ BACKOFF_CAP_SECONDS = 600.0
 PRIORITY_BY_KIND = {
     "match_result": 100,
     "market_notice": 70,
+    "player_lifecycle": 80,
+    "staff_lifecycle": 80,
     "match_recovery": 90,
     "match_board": 50,
     "fixture_reminder": 30,
@@ -170,6 +174,15 @@ def valid_payload(payload: dict[str, Any]) -> bool:
         or _payload_uuid(payload, "ownership_id") is None
     ):
         return False
+    if kind in {"player_lifecycle", "staff_lifecycle"}:
+        return (
+            all(
+                _payload_uuid(payload, k) is not None for k in ("person_id", "season_id", "club_id")
+            )
+            and payload.get("action") in ("last_season", "retired")
+            and isinstance(payload.get("player_name"), str)
+            and 0 < len(payload["player_name"]) <= 120
+        )
     if kind == "market_notice":
         return (
             _payload_uuid(payload, "auction_id") is not None
@@ -262,6 +275,30 @@ def render_text(payload: dict[str, Any]) -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind in {"player_lifecycle", "staff_lifecycle"}:
+        if kind == "staff_lifecycle":
+            person = escape(latin_name(payload["player_name"]))
+            return (
+                tr(
+                    "⚠️ {person}: объявлен последний рабочий сезон. "
+                    "После него сотрудник выйдет на пенсию.",
+                    person=person,
+                )
+                if payload["action"] == "last_season"
+                else tr(
+                    "🏁 {person} вышел на пенсию. Подберите сотрудника в /staff.", person=person
+                )
+            )
+        player = escape(latin_name(payload["player_name"]))
+        if payload["action"] == "last_season":
+            return tr(
+                "⚠️ {player}: объявлен последний сезон. После него игрок завершит карьеру. "
+                "Трансфер недоступен.",
+                player=player,
+            )
+        return tr(
+            "🏁 {player} завершил игровую карьеру. Проверьте состав в /lineup.", player=player
+        )
     if kind == "market_notice":
         player = escape(latin_name(payload["player_name"]))
         amount = f"{payload['amount']:,}".replace(",", " ")
@@ -430,6 +467,38 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     if not manager.bot_available:
         return Decision.SKIP_UNAVAILABLE
     kind = payload["kind"]
+    if kind in {"player_lifecycle", "staff_lifecycle"}:
+        from goaletto.infrastructure.models import PersonSeasonEvent, Player, Staff
+
+        player = await session.get(
+            Player if kind == "player_lifecycle" else Staff,
+            _payload_uuid(payload, "person_id"),
+            populate_existing=True,
+        )
+        player = cast(Player | Staff | None, player)
+        prefix = "player" if kind == "player_lifecycle" else "staff"
+        stage = prefix + ("_last_decision" if payload["action"] == "last_season" else "_retired")
+        event = await session.scalar(
+            select(PersonSeasonEvent).where(
+                PersonSeasonEvent.person_id == _payload_uuid(payload, "person_id"),
+                PersonSeasonEvent.season_id == _payload_uuid(payload, "season_id"),
+                PersonSeasonEvent.stage == stage,
+            )
+        )
+        if _payload_uuid(payload, "club_id") != club.id or player is None or event is None:
+            return Decision.SKIP_STALE
+        if payload["action"] == "last_season" and (
+            player.club_id != club.id
+            or player.status != "last_season"
+            or player.last_season_id != event.season_id
+            or not event.is_last_season
+        ):
+            return Decision.SKIP_STALE
+        if payload["action"] == "retired" and (
+            player.status != "retired" or player.retired_after_season_id != event.season_id
+        ):
+            return Decision.SKIP_STALE
+        return Decision.DELIVER
     if kind == "market_notice":
         from goaletto.infrastructure.models import Auction, AuctionBid, TransferReceipt
 

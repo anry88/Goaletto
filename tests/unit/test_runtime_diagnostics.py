@@ -400,7 +400,7 @@ def test_live_without_match_after_kickoff() -> None:
 
 def test_appearance_stock_threshold_and_aggregates() -> None:
     stocks = (
-        AppearanceStock(bank="players", total=1000, used=950, free=50),
+        AppearanceStock(bank="players", total=50, used=50, free=0),
         AppearanceStock(bank="staff", total=80, used=10, free=70),
     )
     report = collect_report(_snapshot(appearance=stocks), appearance_low_threshold=60)
@@ -408,15 +408,15 @@ def test_appearance_stock_threshold_and_aggregates() -> None:
     assert by_code["APPEARANCE_STOCK_LOW"].count == 50
     assert "players" in by_code["APPEARANCE_STOCK_LOW"].summary
     assert report.aggregates["appearance_stock"] == [
-        {"bank": "players", "total": 1000, "used": 950, "free": 50},
+        {"bank": "players", "total": 50, "used": 50, "free": 0},
         {"bank": "staff", "total": 80, "used": 10, "free": 70},
     ]
     healthy = collect_report(
-        _snapshot(appearance=(AppearanceStock(bank="players", total=1000, used=100, free=900),)),
+        _snapshot(appearance=(AppearanceStock(bank="players", total=1000, used=1000, free=0),)),
         appearance_low_threshold=100,
     )
     assert "APPEARANCE_STOCK_LOW" not in {finding.code for finding in healthy.findings}
-    assert healthy.aggregates["appearance_stock"][0]["free"] == 900
+    assert healthy.aggregates["appearance_stock"][0]["free"] == 0
 
 
 def test_truncated_coverage_suppresses_proof_findings() -> None:

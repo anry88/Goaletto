@@ -85,7 +85,7 @@ def job_refs(job: Job) -> tuple[UUID, UUID | None, int | None]:
         or type(p["version"]) is not int
         or p["version"] != 1
         or p["calendar_version"] != CALENDAR_VERSION
-        or job.kind not in RUNTIME_KINDS
+        or job.kind not in RUNTIME_KINDS | {"season.rollover"}
     ):
         raise ValueError("Unsupported calendar job")
     season = UUID(p["season_id"])
@@ -96,7 +96,7 @@ def job_refs(job: Job) -> tuple[UUID, UUID | None, int | None]:
             raise ValueError("Invalid tick job")
     elif tick is not None:
         raise ValueError("Unexpected tick")
-    if (job.kind == "season.open") != (fixture is None):
+    if (job.kind in {"season.open", "season.rollover"}) != (fixture is None):
         raise ValueError("Invalid fixture reference")
     return season, fixture, tick
 
@@ -126,7 +126,7 @@ async def activate_season(session: AsyncSession, season_id: UUID, at: datetime) 
         update(Job)
         .where(
             Job.status == "held",
-            Job.kind.in_(RUNTIME_KINDS),
+            Job.kind.in_(RUNTIME_KINDS | {"season.rollover"}),
             Job.payload["season_id"].astext == str(season_id),
         )
         .values(status="pending")
@@ -146,7 +146,6 @@ async def activate_season(session: AsyncSession, season_id: UUID, at: datetime) 
         )
         .values(status="pending")
     )
-    # Rollover remains held until its own implementation. No unsupported work is released.
 
 
 async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> TeamSnapshot:
@@ -917,7 +916,7 @@ async def postpone_fixture(
         update(Job)
         .where(
             Job.payload["fixture_id"].astext == str(fixture.id),
-            Job.kind.in_(RUNTIME_KINDS),
+            Job.kind.in_(RUNTIME_KINDS | {"season.rollover"}),
             Job.status.in_(("held", "pending")),
         )
         .values(due_at=Job.due_at + delta)

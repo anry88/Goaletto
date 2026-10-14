@@ -530,7 +530,7 @@ async def _collect_appearance(connection: AsyncConnection) -> tuple[AppearanceSt
     ).all()
     used = (
         await connection.execute(
-            select(AppearanceIdentity.origin_bank, func.count())
+            select(AppearanceIdentity.origin_bank, func.count(func.distinct(AppearanceIdentity.id)))
             .join(Person, Person.appearance_identity_id == AppearanceIdentity.id)
             .group_by(AppearanceIdentity.origin_bank)
         )

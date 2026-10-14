@@ -13,6 +13,8 @@ COMMANDS = (
     ("club", "Мой клуб", "My club"),
     ("squad", "Состав и карточки игроков", "Squad and player cards"),
     ("lineup", "Расстановка и тактика", "Lineup and tactics"),
+    ("freeagents", "Свободные футболисты", "Free agents"),
+    ("staff", "Персонал и найм", "Staff and hiring"),
     ("market", "Аукционы и продажа игроков", "Auctions and player sales"),
     ("stadium", "Стадион и посещаемость", "Stadium and attendance"),
     ("finance", "Финансы клуба", "Club finances"),

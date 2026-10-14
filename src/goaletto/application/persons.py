@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import exists, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
@@ -63,7 +63,12 @@ async def create_person(session: AsyncSession, request: NewPerson) -> Person:
         if existing.id != request.id:
             raise ValueError("Creation key belongs to a different person")
         return existing
-    used = exists().where(Person.appearance_identity_id == AppearanceIdentity.id)
+    usage = (
+        select(func.count(Person.id))
+        .where(Person.appearance_identity_id == AppearanceIdentity.id)
+        .correlate(AppearanceIdentity)
+        .scalar_subquery()
+    )
     variant = await session.scalar(
         select(AppearanceVariant)
         .join(AppearanceIdentity, AppearanceIdentity.id == AppearanceVariant.identity_id)
@@ -71,13 +76,12 @@ async def create_person(session: AsyncSession, request: NewPerson) -> Person:
             AppearanceIdentity.origin_bank == request.origin_bank,
             AppearanceVariant.bank == request.origin_bank,
             AppearanceVariant.id.in_(request.eligible_variant_ids),
-            ~used,
         )
-        .order_by(AppearanceIdentity.id, AppearanceVariant.id)
+        .order_by(usage, AppearanceIdentity.id, AppearanceVariant.id)
         .limit(1)
     )
     if variant is None:
-        raise AppearanceExhausted("No unused eligible portrait; publish more identities first")
+        raise AppearanceExhausted("No eligible portrait in the approved catalog")
     person = Person(
         id=request.id,
         creation_key=request.creation_key,
