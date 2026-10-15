@@ -4,7 +4,7 @@
     "Fixed seasonal sponsor: opening tenth-place base for cycles 1-18, renewal by final place/destination tier for cycles 19-20; the season prize lands with cycle 18 only, never earlier.",
     "Expenses are charged before income each cycle; a negative pre-income minimum is a liquidity shortfall forecast, the runtime keeps cash >= 0 with debt instead.",
     "Scout discoveries are private: declined/unsigned people never enter the public market and earn no resale income in this audit.",
-    "Development runs use train_player/develop_appearance/grant_growth directly; only the 18 official league appearances grant match growth, cup load days and friendlies grant none.",
+    "Development runs use train_player/develop_appearance/grant_growth directly; only the 18 official league appearances grant match growth, cup growth/friendly growth and match form are implementation gaps, NOT target rules; these rows cannot validate the target busy-calendar balance.",
     "Training injuries are discarded to upper-bound growth; morale/ leadership/form draws stay seeded and deterministic."
   ],
   "budget": {
@@ -1286,8 +1286,8 @@
     "world_key": "gameplay-balance-audit",
     "world_seed": 0
   },
-  "commit": "522e3de99f0871aa00bd68cb6f9bafed52b46c90",
-  "content_hash": "60bc5fadc9e58dbabe3db90ca218b377741773cfd5fd03ab9ae3c20d6b636312",
+  "commit": "92843f4b6d6d31514841878a72e6387ae0b15edd",
+  "content_hash": "78ca508def338e90ff4dd35ad43167c7972e85c1125de583e24826c85042b8a2",
   "development": {
     "ages": [
       18,
@@ -1303,6 +1303,18 @@
       "start_skills": 12,
       "training_bps": 0,
       "training_days": 20
+    },
+    "coverage": {
+      "friendly_factor": null,
+      "gaps": [
+        "cup_growth",
+        "champions_growth",
+        "friendly_growth",
+        "match_form"
+      ],
+      "implemented": "Only league growth and training form are currently connected.",
+      "status": "implementation_gap_not_balance_rule",
+      "target": "League, cup, champions and friendly appearances affect form/development; friendlies have lower development than official matches."
     },
     "focus": "physical",
     "intensity": "medium",
@@ -1350,6 +1362,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 600,
         "league_matches": 18,
         "match_bps": 3726,
@@ -1379,6 +1393,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 280,
         "league_matches": 18,
         "match_bps": 3726,
@@ -1408,6 +1424,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 3000,
         "league_matches": 18,
         "match_bps": 6210,
@@ -1437,6 +1455,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 1400,
         "league_matches": 18,
         "match_bps": 6210,
@@ -1466,6 +1486,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 5000,
         "league_matches": 18,
         "match_bps": 8694,
@@ -1495,6 +1517,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 2520,
         "league_matches": 18,
         "match_bps": 8694,
@@ -1524,6 +1548,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 600,
         "league_matches": 18,
         "match_bps": 3258,
@@ -1553,6 +1579,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 280,
         "league_matches": 18,
         "match_bps": 3258,
@@ -1582,6 +1610,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 3000,
         "league_matches": 18,
         "match_bps": 5436,
@@ -1611,6 +1641,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 1400,
         "league_matches": 18,
         "match_bps": 5436,
@@ -1640,6 +1672,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 5000,
         "league_matches": 18,
         "match_bps": 7614,
@@ -1669,6 +1703,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 2520,
         "league_matches": 18,
         "match_bps": 7614,
@@ -1698,6 +1734,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 600,
         "league_matches": 18,
         "match_bps": 2268,
@@ -1727,6 +1765,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 280,
         "league_matches": 18,
         "match_bps": 2268,
@@ -1756,6 +1796,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 8,
         "leadership_bps": 3000,
         "league_matches": 18,
         "match_bps": 3798,
@@ -1785,6 +1827,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 1400,
         "league_matches": 18,
         "match_bps": 3798,
@@ -1814,6 +1858,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 5000,
         "league_matches": 18,
         "match_bps": 5310,
@@ -1843,6 +1889,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 2520,
         "league_matches": 18,
         "match_bps": 5310,
@@ -1872,6 +1920,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 600,
         "league_matches": 18,
         "match_bps": 1296,
@@ -1901,6 +1951,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 280,
         "league_matches": 18,
         "match_bps": 1296,
@@ -1930,6 +1982,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 3000,
         "league_matches": 18,
         "match_bps": 2160,
@@ -1959,6 +2013,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 1400,
         "league_matches": 18,
         "match_bps": 2160,
@@ -1988,6 +2044,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 5000,
         "league_matches": 18,
         "match_bps": 3024,
@@ -2017,6 +2075,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 2520,
         "league_matches": 18,
         "match_bps": 3024,
@@ -2046,6 +2106,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 600,
         "league_matches": 18,
         "match_bps": 774,
@@ -2075,6 +2137,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 280,
         "league_matches": 18,
         "match_bps": 774,
@@ -2104,6 +2168,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 3000,
         "league_matches": 18,
         "match_bps": 1296,
@@ -2133,6 +2199,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 1400,
         "league_matches": 18,
         "match_bps": 1296,
@@ -2162,6 +2230,8 @@
           "winger": 0
         },
         "calendar": "free",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 7,
         "leadership_bps": 5000,
         "league_matches": 18,
         "match_bps": 1800,
@@ -2191,6 +2261,8 @@
           "winger": 0
         },
         "calendar": "busy",
+        "coverage": "current_league_only_not_target_rules",
+        "form": 6,
         "leadership_bps": 2520,
         "league_matches": 18,
         "match_bps": 1800,
@@ -2205,6 +2277,7 @@
         "training_days": 28
       }
     ],
+    "seed": 7,
     "staff_skills": [
       2,
       10,
@@ -2242,174 +2315,77 @@
   },
   "scout": {
     "affordability": {
-      "count_note": "The turnover count exceeds the upfront-only count because season income (sponsor/merch/tickets/prize) funds part of the wages; both counts ignore windows and the 25-player cap.",
+      "count_note": "The turnover count exceeds the upfront-only count because season income (sponsor/merch/tickets/prize) funds part of the wages; both counts are optimistic affordability estimates, not guaranteed signings; they ignore liquidity timing, windows and the 25-player cap.",
       "count_vs_600k_upfront_only": 1,
       "count_with_turnover_obligations": 2,
-      "discretionary_turnover_cash": 782500,
-      "median_upfront_full_cost": 323220.0,
-      "median_youth_wage": 1305,
-      "squad_cap_note": "Active+incoming player cap is 25 (application/candidates.py); a 20-player squad fits at most 5 signings without sales. Signings need an open window and a free slot; counts above ignore both and stay lower bounds.",
+      "discretionary_turnover_cash": 729520,
+      "existing_wages_per_cycle": 41185,
+      "median_upfront_full_cost": 327060.0,
+      "median_youth_wage": 1272,
+      "scout_hire": 5280,
+      "scout_wage_per_cycle": 1200,
+      "squad_cap_note": "Active+incoming player cap is 25 (application/candidates.py); a 20-player squad fits at most 5 signings without sales. Signings need an open window and a free slot; counts above ignore both and are not achievable guarantees.",
       "upfront_cost_note": "Mission + median signing at skill 5/4d is a LOWER BOUND: windows, squad cap and youth wages are ignored here."
     },
     "cells": [
       {
         "days": 4,
-        "discoveries": 12,
+        "discoveries": 96,
         "elite_share_q15": 0.0,
-        "mean_best_full_cost": 329838.75,
-        "mean_best_quality": 7.583333333333333,
+        "mean_best_full_cost": 319498.8125,
+        "mean_best_quality": 7.322916666666667,
         "mission_fee": 105000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
           "max": 13.0,
           "median": 7.0,
-          "min": 3.0,
-          "p25": 6.0,
-          "p75": 8.5
+          "min": 2.0,
+          "p25": 5.0,
+          "p75": 9.25
         },
         "scout_skill": 1,
         "signing_fee_quantiles": {
-          "max": 611524.0,
-          "median": 164030.0,
+          "max": 679536.0,
+          "median": 179830.0,
           "min": 100000.0,
-          "p25": 126400.0,
-          "p75": 246452.0
+          "p25": 115000.0,
+          "p75": 281446.25
         },
-        "strong_share_q12": 0.16666666666666666
+        "strong_share_q12": 0.08333333333333333
       },
       {
         "days": 8,
-        "discoveries": 24,
+        "discoveries": 192,
         "elite_share_q15": 0.0,
-        "mean_best_full_cost": 454445.25,
-        "mean_best_quality": 8.583333333333334,
+        "mean_best_full_cost": 435463.9583333333,
+        "mean_best_quality": 8.135416666666666,
         "mission_fee": 210000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 12.0,
-          "median": 7.5,
+          "max": 13.0,
+          "median": 7.0,
           "min": 1.0,
-          "p25": 5.75,
-          "p75": 9.0
+          "p25": 5.0,
+          "p75": 8.25
         },
         "scout_skill": 1,
         "signing_fee_quantiles": {
-          "max": 565248.0,
-          "median": 172250.0,
+          "max": 576081.0,
+          "median": 146392.5,
           "min": 100000.0,
-          "p25": 118663.75,
-          "p75": 229995.0
+          "p25": 115000.0,
+          "p75": 222295.0
         },
         "strong_share_q12": 0.041666666666666664
       },
       {
         "days": 12,
-        "discoveries": 36,
+        "discoveries": 288,
         "elite_share_q15": 0.0,
-        "mean_best_full_cost": 572007.5833333334,
-        "mean_best_quality": 9.0,
+        "mean_best_full_cost": 598967.65625,
+        "mean_best_quality": 9.135416666666666,
         "mission_fee": 315000,
-        "missions": 12,
-        "quality_quantiles": {
-          "max": 14.0,
-          "median": 6.5,
-          "min": 2.0,
-          "p25": 4.0,
-          "p75": 8.25
-        },
-        "scout_skill": 1,
-        "signing_fee_quantiles": {
-          "max": 591675.0,
-          "median": 140911.5,
-          "min": 100000.0,
-          "p25": 115000.0,
-          "p75": 210011.25
-        },
-        "strong_share_q12": 0.05555555555555555
-      },
-      {
-        "days": 16,
-        "discoveries": 48,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 737852.1666666666,
-        "mean_best_quality": 9.916666666666666,
-        "mission_fee": 420000,
-        "missions": 12,
-        "quality_quantiles": {
-          "max": 14.0,
-          "median": 6.5,
-          "min": 1.0,
-          "p25": 4.0,
-          "p75": 9.0
-        },
-        "scout_skill": 1,
-        "signing_fee_quantiles": {
-          "max": 604920.0,
-          "median": 142520.0,
-          "min": 100000.0,
-          "p25": 100000.0,
-          "p75": 242575.0
-        },
-        "strong_share_q12": 0.0625
-      },
-      {
-        "days": 4,
-        "discoveries": 12,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 342592.3333333333,
-        "mean_best_quality": 7.916666666666667,
-        "mission_fee": 125000,
-        "missions": 12,
-        "quality_quantiles": {
-          "max": 13.0,
-          "median": 8.0,
-          "min": 4.0,
-          "p25": 6.0,
-          "p75": 9.25
-        },
-        "scout_skill": 5,
-        "signing_fee_quantiles": {
-          "max": 500940.0,
-          "median": 198220.0,
-          "min": 100000.0,
-          "p25": 131963.5,
-          "p75": 248930.0
-        },
-        "strong_share_q12": 0.08333333333333333
-      },
-      {
-        "days": 8,
-        "discoveries": 24,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 520529.75,
-        "mean_best_quality": 9.25,
-        "mission_fee": 250000,
-        "missions": 12,
-        "quality_quantiles": {
-          "max": 13.0,
-          "median": 8.0,
-          "min": 1.0,
-          "p25": 7.0,
-          "p75": 10.0
-        },
-        "scout_skill": 5,
-        "signing_fee_quantiles": {
-          "max": 479160.0,
-          "median": 216717.5,
-          "min": 100000.0,
-          "p25": 150975.0,
-          "p75": 305534.5
-        },
-        "strong_share_q12": 0.08333333333333333
-      },
-      {
-        "days": 12,
-        "discoveries": 36,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 655455.8333333334,
-        "mean_best_quality": 9.25,
-        "mission_fee": 375000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
           "max": 14.0,
           "median": 7.0,
@@ -2417,340 +2393,440 @@
           "p25": 5.0,
           "p75": 9.0
         },
-        "scout_skill": 5,
+        "scout_skill": 1,
         "signing_fee_quantiles": {
-          "max": 622080.0,
-          "median": 179457.5,
+          "max": 637000.0,
+          "median": 148020.0,
           "min": 100000.0,
-          "p25": 107886.25,
-          "p75": 256678.75
+          "p25": 111705.0,
+          "p75": 243637.5
         },
-        "strong_share_q12": 0.05555555555555555
+        "strong_share_q12": 0.04861111111111111
       },
       {
         "days": 16,
-        "discoveries": 48,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 890311.1666666666,
-        "mean_best_quality": 11.333333333333334,
-        "mission_fee": 500000,
-        "missions": 12,
+        "discoveries": 384,
+        "elite_share_q15": 0.0078125,
+        "mean_best_full_cost": 766217.8125,
+        "mean_best_quality": 10.270833333333334,
+        "mission_fee": 420000,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 14.0,
-          "median": 8.5,
+          "max": 15.0,
+          "median": 7.0,
+          "min": 1.0,
+          "p25": 5.0,
+          "p75": 9.0
+        },
+        "scout_skill": 1,
+        "signing_fee_quantiles": {
+          "max": 818202.0,
+          "median": 153913.5,
+          "min": 100000.0,
+          "p25": 115000.0,
+          "p75": 271550.0
+        },
+        "strong_share_q12": 0.08072916666666667
+      },
+      {
+        "days": 4,
+        "discoveries": 96,
+        "elite_share_q15": 0.010416666666666666,
+        "mean_best_full_cost": 358732.9791666667,
+        "mean_best_quality": 7.833333333333333,
+        "mission_fee": 125000,
+        "missions": 96,
+        "quality_quantiles": {
+          "max": 16.0,
+          "median": 8.0,
           "min": 2.0,
           "p25": 6.0,
           "p75": 10.0
         },
         "scout_skill": 5,
         "signing_fee_quantiles": {
-          "max": 532900.0,
-          "median": 207090.0,
+          "max": 883200.0,
+          "median": 202060.0,
           "min": 100000.0,
-          "p25": 128412.0,
-          "p75": 317706.75
+          "p25": 115780.0,
+          "p75": 300820.0
         },
-        "strong_share_q12": 0.125
+        "strong_share_q12": 0.11458333333333333
+      },
+      {
+        "days": 8,
+        "discoveries": 192,
+        "elite_share_q15": 0.005208333333333333,
+        "mean_best_full_cost": 537555.46875,
+        "mean_best_quality": 9.291666666666666,
+        "mission_fee": 250000,
+        "missions": 96,
+        "quality_quantiles": {
+          "max": 15.0,
+          "median": 8.0,
+          "min": 1.0,
+          "p25": 6.0,
+          "p75": 10.0
+        },
+        "scout_skill": 5,
+        "signing_fee_quantiles": {
+          "max": 753600.0,
+          "median": 184910.0,
+          "min": 100000.0,
+          "p25": 128258.75,
+          "p75": 299115.0
+        },
+        "strong_share_q12": 0.09895833333333333
+      },
+      {
+        "days": 12,
+        "discoveries": 288,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 696777.4583333334,
+        "mean_best_quality": 9.864583333333334,
+        "mission_fee": 375000,
+        "missions": 96,
+        "quality_quantiles": {
+          "max": 14.0,
+          "median": 8.0,
+          "min": 1.0,
+          "p25": 6.0,
+          "p75": 10.0
+        },
+        "scout_skill": 5,
+        "signing_fee_quantiles": {
+          "max": 629740.0,
+          "median": 193730.0,
+          "min": 100000.0,
+          "p25": 119282.5,
+          "p75": 289233.0
+        },
+        "strong_share_q12": 0.09027777777777778
+      },
+      {
+        "days": 16,
+        "discoveries": 384,
+        "elite_share_q15": 0.005208333333333333,
+        "mean_best_full_cost": 874807.9166666666,
+        "mean_best_quality": 10.989583333333334,
+        "mission_fee": 500000,
+        "missions": 96,
+        "quality_quantiles": {
+          "max": 15.0,
+          "median": 8.0,
+          "min": 1.0,
+          "p25": 6.0,
+          "p75": 10.0
+        },
+        "scout_skill": 5,
+        "signing_fee_quantiles": {
+          "max": 851896.0,
+          "median": 202920.0,
+          "min": 100000.0,
+          "p25": 123456.0,
+          "p75": 311250.0
+        },
+        "strong_share_q12": 0.12239583333333333
       },
       {
         "days": 4,
-        "discoveries": 12,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 400159.0833333333,
-        "mean_best_quality": 8.666666666666666,
+        "discoveries": 96,
+        "elite_share_q15": 0.020833333333333332,
+        "mean_best_full_cost": 411042.0520833333,
+        "mean_best_quality": 8.552083333333334,
         "mission_fee": 150000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 13.0,
+          "max": 15.0,
           "median": 9.0,
-          "min": 5.0,
+          "min": 2.0,
           "p25": 7.0,
           "p75": 10.0
         },
         "scout_skill": 10,
         "signing_fee_quantiles": {
-          "max": 479160.0,
-          "median": 256156.5,
+          "max": 681835.0,
+          "median": 247012.5,
           "min": 100000.0,
-          "p25": 177671.25,
-          "p75": 304806.25
+          "p25": 148300.0,
+          "p75": 344226.5
         },
-        "strong_share_q12": 0.08333333333333333
+        "strong_share_q12": 0.09375
       },
       {
         "days": 8,
-        "discoveries": 24,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 681306.5,
-        "mean_best_quality": 10.5,
+        "discoveries": 192,
+        "elite_share_q15": 0.005208333333333333,
+        "mean_best_full_cost": 687823.6875,
+        "mean_best_quality": 10.78125,
         "mission_fee": 300000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 14.0,
-          "median": 9.5,
-          "min": 4.0,
+          "max": 15.0,
+          "median": 9.0,
+          "min": 1.0,
           "p25": 7.0,
           "p75": 11.0
         },
         "scout_skill": 10,
         "signing_fee_quantiles": {
-          "max": 691288.0,
-          "median": 273105.0,
-          "min": 115000.0,
-          "p25": 190616.25,
-          "p75": 353816.25
+          "max": 700284.0,
+          "median": 266952.0,
+          "min": 100000.0,
+          "p25": 174035.25,
+          "p75": 393237.0
         },
-        "strong_share_q12": 0.16666666666666666
+        "strong_share_q12": 0.171875
       },
       {
         "days": 12,
-        "discoveries": 36,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 811015.75,
-        "mean_best_quality": 10.583333333333334,
+        "discoveries": 288,
+        "elite_share_q15": 0.027777777777777776,
+        "mean_best_full_cost": 871076.8645833334,
+        "mean_best_quality": 11.5625,
         "mission_fee": 450000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 13.0,
+          "max": 16.0,
           "median": 9.0,
-          "min": 4.0,
+          "min": 2.0,
           "p25": 7.0,
-          "p75": 10.0
+          "p75": 11.0
         },
         "scout_skill": 10,
         "signing_fee_quantiles": {
-          "max": 602266.0,
-          "median": 247722.5,
+          "max": 809600.0,
+          "median": 262875.0,
           "min": 100000.0,
-          "p25": 188899.5,
-          "p75": 295137.0
+          "p25": 165615.0,
+          "p75": 388201.5
         },
-        "strong_share_q12": 0.08333333333333333
+        "strong_share_q12": 0.21180555555555555
       },
       {
         "days": 16,
-        "discoveries": 48,
-        "elite_share_q15": 0.020833333333333332,
-        "mean_best_full_cost": 1011647.9166666666,
-        "mean_best_quality": 11.416666666666666,
+        "discoveries": 384,
+        "elite_share_q15": 0.026041666666666668,
+        "mean_best_full_cost": 1044567.6770833334,
+        "mean_best_quality": 11.770833333333334,
         "mission_fee": 600000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 15.0,
-          "median": 9.0,
-          "min": 3.0,
+          "max": 16.0,
+          "median": 8.5,
+          "min": 2.0,
           "p25": 7.0,
-          "p75": 10.25
+          "p75": 11.0
         },
         "scout_skill": 10,
         "signing_fee_quantiles": {
-          "max": 717715.0,
-          "median": 262875.0,
+          "max": 839592.0,
+          "median": 240370.0,
           "min": 100000.0,
-          "p25": 175728.75,
-          "p75": 324900.0
+          "p25": 148759.5,
+          "p75": 359568.0
         },
-        "strong_share_q12": 0.14583333333333334
+        "strong_share_q12": 0.1796875
       },
       {
         "days": 4,
-        "discoveries": 12,
-        "elite_share_q15": 0.08333333333333333,
-        "mean_best_full_cost": 589015.9166666666,
-        "mean_best_quality": 10.583333333333334,
+        "discoveries": 96,
+        "elite_share_q15": 0.07291666666666667,
+        "mean_best_full_cost": 532295.2083333334,
+        "mean_best_quality": 10.052083333333334,
         "mission_fee": 175000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 15.0,
-          "median": 11.0,
-          "min": 5.0,
-          "p25": 9.75,
+          "max": 16.0,
+          "median": 10.0,
+          "min": 2.0,
+          "p25": 8.0,
           "p75": 12.0
         },
         "scout_skill": 15,
         "signing_fee_quantiles": {
           "max": 973596.0,
-          "median": 379497.0,
+          "median": 339637.5,
           "min": 100000.0,
-          "p25": 334824.0,
-          "p75": 463031.5
+          "p25": 206427.0,
+          "p75": 472305.0
         },
-        "strong_share_q12": 0.3333333333333333
+        "strong_share_q12": 0.3229166666666667
       },
       {
         "days": 8,
-        "discoveries": 24,
-        "elite_share_q15": 0.08333333333333333,
-        "mean_best_full_cost": 734477.8333333334,
-        "mean_best_quality": 10.916666666666666,
+        "discoveries": 192,
+        "elite_share_q15": 0.07291666666666667,
+        "mean_best_full_cost": 786001.4479166666,
+        "mean_best_quality": 11.53125,
         "mission_fee": 350000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
           "max": 16.0,
-          "median": 9.0,
-          "min": 5.0,
-          "p25": 7.0,
-          "p75": 11.0
+          "median": 10.0,
+          "min": 3.0,
+          "p25": 8.0,
+          "p75": 12.0
         },
         "scout_skill": 15,
         "signing_fee_quantiles": {
           "max": 909558.0,
-          "median": 259740.0,
+          "median": 311540.0,
           "min": 100000.0,
-          "p25": 157999.0,
-          "p75": 375585.0
+          "p25": 202062.0,
+          "p75": 445296.75
         },
-        "strong_share_q12": 0.20833333333333334
+        "strong_share_q12": 0.296875
       },
       {
         "days": 12,
-        "discoveries": 36,
-        "elite_share_q15": 0.05555555555555555,
-        "mean_best_full_cost": 1059544.6666666667,
-        "mean_best_quality": 13.083333333333334,
+        "discoveries": 288,
+        "elite_share_q15": 0.04861111111111111,
+        "mean_best_full_cost": 988947.78125,
+        "mean_best_quality": 12.09375,
         "mission_fee": 525000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 15.0,
+          "max": 17.0,
           "median": 9.0,
-          "min": 4.0,
-          "p25": 7.75,
-          "p75": 11.25
+          "min": 3.0,
+          "p25": 8.0,
+          "p75": 11.0
         },
         "scout_skill": 15,
         "signing_fee_quantiles": {
-          "max": 767812.0,
-          "median": 272688.0,
+          "max": 955506.0,
+          "median": 286110.0,
           "min": 100000.0,
-          "p25": 182520.0,
-          "p75": 478543.75
+          "p25": 193087.75,
+          "p75": 403620.0
         },
-        "strong_share_q12": 0.25
+        "strong_share_q12": 0.23958333333333334
       },
       {
         "days": 16,
-        "discoveries": 48,
-        "elite_share_q15": 0.0625,
-        "mean_best_full_cost": 1224025.5833333333,
-        "mean_best_quality": 12.833333333333334,
+        "discoveries": 384,
+        "elite_share_q15": 0.0546875,
+        "mean_best_full_cost": 1226214.1354166667,
+        "mean_best_quality": 12.958333333333334,
         "mission_fee": 700000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
           "max": 17.0,
           "median": 10.0,
-          "min": 4.0,
+          "min": 3.0,
           "p25": 8.0,
           "p75": 12.0
         },
         "scout_skill": 15,
         "signing_fee_quantiles": {
           "max": 978121.0,
-          "median": 321052.5,
+          "median": 335340.0,
           "min": 100000.0,
-          "p25": 202745.0,
-          "p75": 474748.75
+          "p25": 230130.0,
+          "p75": 462147.5
         },
-        "strong_share_q12": 0.2708333333333333
+        "strong_share_q12": 0.328125
       },
       {
         "days": 4,
-        "discoveries": 12,
-        "elite_share_q15": 0.0,
-        "mean_best_full_cost": 634822.1666666666,
-        "mean_best_quality": 11.166666666666666,
+        "discoveries": 96,
+        "elite_share_q15": 0.11458333333333333,
+        "mean_best_full_cost": 617657.3958333334,
+        "mean_best_quality": 10.989583333333334,
         "mission_fee": 200000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 14.0,
+          "max": 19.0,
           "median": 11.0,
-          "min": 8.0,
-          "p25": 10.0,
+          "min": 3.0,
+          "p25": 9.0,
           "p75": 13.0
         },
         "scout_skill": 20,
         "signing_fee_quantiles": {
-          "max": 622080.0,
-          "median": 425244.0,
-          "min": 192000.0,
-          "p25": 316666.5,
-          "p75": 537456.25
+          "max": 1083000.0,
+          "median": 385020.5,
+          "min": 100000.0,
+          "p25": 285602.5,
+          "p75": 531760.0
         },
-        "strong_share_q12": 0.4166666666666667
+        "strong_share_q12": 0.4270833333333333
       },
       {
         "days": 8,
-        "discoveries": 24,
-        "elite_share_q15": 0.08333333333333333,
-        "mean_best_full_cost": 943968.1666666666,
-        "mean_best_quality": 13.416666666666666,
+        "discoveries": 192,
+        "elite_share_q15": 0.10416666666666667,
+        "mean_best_full_cost": 910258.4479166666,
+        "mean_best_quality": 12.53125,
         "mission_fee": 400000,
-        "missions": 12,
+        "missions": 96,
         "quality_quantiles": {
-          "max": 15.0,
-          "median": 12.0,
-          "min": 7.0,
-          "p25": 10.75,
-          "p75": 14.0
-        },
-        "scout_skill": 20,
-        "signing_fee_quantiles": {
-          "max": 769626.0,
-          "median": 436852.5,
-          "min": 136080.0,
-          "p25": 352256.5,
-          "p75": 577715.0
-        },
-        "strong_share_q12": 0.6666666666666666
-      },
-      {
-        "days": 12,
-        "discoveries": 36,
-        "elite_share_q15": 0.05555555555555555,
-        "mean_best_full_cost": 1201354.3333333333,
-        "mean_best_quality": 13.5,
-        "mission_fee": 600000,
-        "missions": 12,
-        "quality_quantiles": {
-          "max": 15.0,
-          "median": 11.0,
-          "min": 4.0,
-          "p25": 9.0,
-          "p75": 14.0
-        },
-        "scout_skill": 20,
-        "signing_fee_quantiles": {
-          "max": 818662.0,
-          "median": 414521.5,
-          "min": 100000.0,
-          "p25": 274278.5,
-          "p75": 614496.75
-        },
-        "strong_share_q12": 0.4444444444444444
-      },
-      {
-        "days": 16,
-        "discoveries": 48,
-        "elite_share_q15": 0.08333333333333333,
-        "mean_best_full_cost": 1398735.6666666667,
-        "mean_best_quality": 13.583333333333334,
-        "mission_fee": 800000,
-        "missions": 12,
-        "quality_quantiles": {
-          "max": 17.0,
+          "max": 16.0,
           "median": 11.0,
           "min": 5.0,
-          "p25": 8.75,
+          "p25": 9.0,
           "p75": 13.0
         },
         "scout_skill": 20,
         "signing_fee_quantiles": {
-          "max": 913962.0,
-          "median": 375576.0,
+          "max": 901056.0,
+          "median": 396450.0,
           "min": 100000.0,
-          "p25": 252223.5,
-          "p75": 497053.5
+          "p25": 244527.0,
+          "p75": 539000.0
         },
-        "strong_share_q12": 0.3958333333333333
+        "strong_share_q12": 0.4739583333333333
+      },
+      {
+        "days": 12,
+        "discoveries": 288,
+        "elite_share_q15": 0.052083333333333336,
+        "mean_best_full_cost": 1126609.1458333333,
+        "mean_best_quality": 12.833333333333334,
+        "mission_fee": 600000,
+        "missions": 96,
+        "quality_quantiles": {
+          "max": 18.0,
+          "median": 11.0,
+          "min": 3.0,
+          "p25": 9.0,
+          "p75": 13.0
+        },
+        "scout_skill": 20,
+        "signing_fee_quantiles": {
+          "max": 891000.0,
+          "median": 369457.0,
+          "min": 100000.0,
+          "p25": 254006.25,
+          "p75": 499905.0
+        },
+        "strong_share_q12": 0.3819444444444444
+      },
+      {
+        "days": 16,
+        "discoveries": 384,
+        "elite_share_q15": 0.10416666666666667,
+        "mean_best_full_cost": 1404117.7083333333,
+        "mean_best_quality": 13.822916666666666,
+        "mission_fee": 800000,
+        "missions": 96,
+        "quality_quantiles": {
+          "max": 19.0,
+          "median": 11.0,
+          "min": 3.0,
+          "p25": 9.0,
+          "p75": 13.0
+        },
+        "scout_skill": 20,
+        "signing_fee_quantiles": {
+          "max": 1044522.0,
+          "median": 386860.0,
+          "min": 100000.0,
+          "p25": 277868.0,
+          "p75": 525400.5
+        },
+        "strong_share_q12": 0.4322916666666667
       }
     ],
     "durations": [
@@ -3021,9 +3097,9 @@
           "fast": 4,
           "long": 16
         },
-        "fast_4d_mean_full": 329838.75,
-        "long_16d_mean_best_full": 737852.1666666666,
-        "long_16d_mean_best_quality": 9.916666666666666,
+        "fast_4d_mean_full": 319498.8125,
+        "long_16d_mean_best_full": 766217.8125,
+        "long_16d_mean_best_quality": 10.270833333333334,
         "short_mean_quality": 7.0
       },
       "10": {
@@ -3031,9 +3107,9 @@
           "fast": 4,
           "long": 16
         },
-        "fast_4d_mean_full": 400159.0833333333,
-        "long_16d_mean_best_full": 1011647.9166666666,
-        "long_16d_mean_best_quality": 11.416666666666666,
+        "fast_4d_mean_full": 411042.0520833333,
+        "long_16d_mean_best_full": 1044567.6770833334,
+        "long_16d_mean_best_quality": 11.770833333333334,
         "short_mean_quality": 9.0
       },
       "15": {
@@ -3041,19 +3117,19 @@
           "fast": 4,
           "long": 16
         },
-        "fast_4d_mean_full": 589015.9166666666,
-        "long_16d_mean_best_full": 1224025.5833333333,
-        "long_16d_mean_best_quality": 12.833333333333334,
-        "short_mean_quality": 11.0
+        "fast_4d_mean_full": 532295.2083333334,
+        "long_16d_mean_best_full": 1226214.1354166667,
+        "long_16d_mean_best_quality": 12.958333333333334,
+        "short_mean_quality": 10.0
       },
       "20": {
         "elapsed_days": {
           "fast": 4,
           "long": 16
         },
-        "fast_4d_mean_full": 634822.1666666666,
-        "long_16d_mean_best_full": 1398735.6666666667,
-        "long_16d_mean_best_quality": 13.583333333333334,
+        "fast_4d_mean_full": 617657.3958333334,
+        "long_16d_mean_best_full": 1404117.7083333333,
+        "long_16d_mean_best_quality": 13.822916666666666,
         "short_mean_quality": 11.0
       },
       "5": {
@@ -3061,9 +3137,9 @@
           "fast": 4,
           "long": 16
         },
-        "fast_4d_mean_full": 342592.3333333333,
-        "long_16d_mean_best_full": 890311.1666666666,
-        "long_16d_mean_best_quality": 11.333333333333334,
+        "fast_4d_mean_full": 358732.9791666667,
+        "long_16d_mean_best_full": 874807.9166666666,
+        "long_16d_mean_best_quality": 10.989583333333334,
         "short_mean_quality": 8.0
       }
     },
@@ -3076,7 +3152,35 @@
       7,
       8,
       9,
-      10
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38
     ],
     "skills": [
       1,
@@ -3091,9 +3195,37 @@
     7,
     8,
     9,
-    10
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38
   ],
-  "tool": "and71-balance-audit-v1",
+  "tool": "and71-balance-audit-v2",
   "turnover": {
     "cycles": 20,
     "offseason_days": 8,
