@@ -18,6 +18,7 @@ from goaletto.application.game_actions import (
     user_effect,
 )
 from goaletto.application.match_runtime import NotReady
+from goaletto.application.recovery import recover_player
 from goaletto.domain.game_cycle import midnight
 from goaletto.domain.training import (
     POLICY_VERSION,
@@ -78,15 +79,17 @@ async def training_blocked(session: AsyncSession, club_id: UUID, day: datetime) 
         .where(
             (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id),
             Fixture.status != "cancelled",
-            Fixture.scheduled_start_at >= day,
             Fixture.scheduled_start_at < day + timedelta(days=1),
+            (Fixture.scheduled_start_at >= day) | Fixture.status.in_(("live", "paused")),
         )
         .limit(1)
     )
     plan = await session.scalar(
         select(FixturePlan.id)
         .where(
-            (FixturePlan.home_club_id == club_id) | (FixturePlan.away_club_id == club_id),
+            (FixturePlan.home_club_id == club_id)
+            | (FixturePlan.away_club_id == club_id)
+            | FixturePlan.possible_club_ids.contains([str(club_id)]),
             FixturePlan.assigned_day == day.date(),
         )
         .limit(1)
@@ -364,6 +367,7 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
         person = people[player.person_id]
         if person.career != "player":
             raise ValueError("Invalid player career")
+        condition = await recover_player(session, person.id, at)
         values = {key: getattr(player, key) for key in SKILLS}
         dev = development.get(person.id)
         if dev is None:
@@ -408,6 +412,16 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             setattr(player, key, value)
         dev.progress = trained.progress
         player.form, player.experience = trained.form, trained.experience
+        condition.energy_bps = max(
+            0,
+            condition.energy_bps
+            - {
+                Intensity.LOW: 80,
+                Intensity.MEDIUM: 140,
+                Intensity.HIGH: 220,
+            }[intensity],
+        )
+        condition.stamina = player.stamina
         if trained.injured:
             player.injured_until = at + timedelta(days=7)
         results.append(

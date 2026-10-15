@@ -23,6 +23,7 @@ from goaletto.infrastructure.models import (
     FixturePlan,
     Job,
     LedgerEntry,
+    PlayerRecovery,
     SalaryContract,
     Season,
 )
@@ -170,8 +171,17 @@ async def test_daily_training_uses_free_date_and_does_not_apply_weekly_growth(se
         await apply_training(session, job, job.due_at)
         assert plan.status == "applied" and max(r["gain_bps"] for r in plan.results) < 1000
         before = plan.results
+        energy_before = {
+            row.person_id: row.energy_bps
+            for row in (await session.scalars(select(PlayerRecovery))).all()
+        }
+        assert any(value == 9860 for value in energy_before.values())
         await apply_training(session, job, job.due_at)
         assert plan.results == before
+        assert energy_before == {
+            row.person_id: row.energy_bps
+            for row in (await session.scalars(select(PlayerRecovery))).all()
+        }
         actor = replace(actor, at=FIRST, operation_id=uuid4())
         screen = await load_training(session, actor)
         assert screen.blocked

@@ -125,7 +125,10 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
             [InlineKeyboardButton(text=tr("🏟 Мой клуб"), callback_data=CLUB_CALLBACK)],
             [InlineKeyboardButton(text=tr("👥 Состав"), callback_data=squad_callback(1))],
             [InlineKeyboardButton(text=tr("📋 Расстановка"), callback_data="ln:open")],
-            [InlineKeyboardButton(text=tr("⚽ Матч"), callback_data="lv:open")],
+            [
+                InlineKeyboardButton(text=tr("⚽ Матч"), callback_data="lv:open"),
+                InlineKeyboardButton(text=tr("🗓 Расписание"), callback_data="ca:open"),
+            ],
             [
                 InlineKeyboardButton(text=tr("🏋️ Тренировки"), callback_data="tr:open"),
                 InlineKeyboardButton(text=tr("📈 Финансы"), callback_data="fi:open"),
@@ -159,7 +162,10 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
         inline_keyboard=[
             [InlineKeyboardButton(text=tr("👥 Состав"), callback_data=squad_callback(1))],
             [InlineKeyboardButton(text=tr("📋 Расстановка"), callback_data="ln:open")],
-            [InlineKeyboardButton(text=tr("⚽ Матч"), callback_data="lv:open")],
+            [
+                InlineKeyboardButton(text=tr("⚽ Матч"), callback_data="lv:open"),
+                InlineKeyboardButton(text=tr("🗓 Расписание"), callback_data="ca:open"),
+            ],
             [
                 InlineKeyboardButton(text=tr("🏋️ Тренировки"), callback_data="tr:open"),
                 InlineKeyboardButton(text=tr("📈 Финансы"), callback_data="fi:open"),
@@ -297,6 +303,15 @@ def player_view(
             p2=card.morale,
         )
     )
+    if card.status != "retired":
+        lines.append(tr("⚡ Энергия: {energy}%", energy=f"{card.energy_bps / 100:.1f}"))
+        if card.energy_bps < 10000 and card.energy_full_at is not None:
+            lines.append(
+                tr(
+                    "До 100% при текущем штабе: {time}",
+                    time=card.energy_full_at.strftime("%d.%m %H:%M UTC"),
+                )
+            )
     if card.club_name is not None:
         lines.append(tr("Клуб: {p0}", p0=escape(latin_name(card.club_name))))
     if not portrait_ready:

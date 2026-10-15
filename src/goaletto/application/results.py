@@ -131,7 +131,9 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
     )
     await session.flush()
     from goaletto.application.finances import match_income
+    from goaletto.application.recovery import finish_energy
 
+    await finish_energy(session, state, fixture.actual_finish_at)
     await match_income(session, fixture, state, at)
     return True
 

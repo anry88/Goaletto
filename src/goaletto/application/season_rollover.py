@@ -15,6 +15,7 @@ from goaletto.application.game_actions import allocation_lock
 from goaletto.application.market import cancel_auction, prohibit_player_trades
 from goaletto.application.match_runtime import NotReady
 from goaletto.application.persons import AppearanceExhausted, NewPerson, create_person
+from goaletto.application.recovery import recover_player
 from goaletto.application.results import league_table
 from goaletto.application.world_portraits import age_band
 from goaletto.domain.calendar import (
@@ -445,8 +446,11 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
                 draw=draw,
             )
         )
+        recovery = await recover_player(session, person.id, at)
         club_id = player.club_id
         person.age = plan.next_age
+        # A retired player's condition is historical; active ages remain 17..38.
+        recovery.age = min(38, person.age)
         person.age_applied_for_season_id = plan.next_age_applied_for_season_id
         player.status = plan.next_status
         player.last_season_id = plan.next_last_season_id

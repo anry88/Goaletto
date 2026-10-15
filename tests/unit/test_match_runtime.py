@@ -477,3 +477,15 @@ def test_closed_job_and_command_payloads_reject_unknown_versions_or_fields():
     )
     with pytest.raises(ValueError):
         domain_command(command, state, halftime=False)
+
+
+@pytest.fixture(autouse=True)
+def recovery_boundary(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr(
+        "goaletto.application.recovery.recover_player",
+        AsyncMock(return_value=SimpleNamespace(energy_bps=10000)),
+    )
+    monkeypatch.setattr("goaletto.application.recovery.lock_energy", AsyncMock())

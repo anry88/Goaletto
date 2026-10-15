@@ -181,6 +181,7 @@ def start_match(
     policy: EnginePolicy | None = None,
     crowd: HomeCrowd | None = None,
     engine_version: str = ENGINE_VERSION,
+    initial_energy: dict[UUID, int] | None = None,
 ) -> MatchState:
     def team(snapshot: TeamSnapshot) -> TeamState:
         return TeamState(
@@ -188,7 +189,14 @@ def start_match(
             snapshot.lineup,
             snapshot.bench,
             (),
-            tuple(PlayerCondition(p.id, injured=not p.available) for p in snapshot.players),
+            tuple(
+                PlayerCondition(
+                    p.id,
+                    energy_bps=(initial_energy or {}).get(p.id, 10000),
+                    injured=not p.available,
+                )
+                for p in snapshot.players
+            ),
             TeamStats(),
             snapshot.tactic,
             snapshot.mentality,

@@ -101,6 +101,8 @@ class PlayerCard:
     kit_primary: str
     kit_secondary: str
     kit_version: int
+    energy_bps: int = 10000
+    energy_full_at: datetime | None = None
 
 
 async def actor_for_callback(
@@ -282,6 +284,13 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
         ownership=ownership,
         club_id=club.id,
     )
+    from goaletto.application.recovery import EnergyStatus, energy_status
+
+    energy = (
+        await energy_status(session, person.id, actor.at)
+        if player.status != "retired"
+        else EnergyStatus(10000, None)
+    )
     return PlayerCard(
         person_id=person.id,
         name=person.name,
@@ -308,6 +317,8 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
         appearance_identity_id=person.appearance_identity_id,
         appearance_variant_id=person.appearance_variant_id,
         catalog_version=identity.catalog_version,
+        energy_bps=energy.bps,
+        energy_full_at=energy.full_at,
         kit_primary=kit_primary,
         kit_secondary=kit_secondary,
         kit_version=kit_version,

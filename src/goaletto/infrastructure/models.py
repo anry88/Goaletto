@@ -740,6 +740,10 @@ class FixturePlan(Base):
     home_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"))
     away_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"))
     conditional_ref: Mapped[str | None] = mapped_column(String(200))
+    possible_club_ids: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    stage: Mapped[str | None] = mapped_column(String(80))
+    leg: Mapped[int | None] = mapped_column(SmallInteger)
+    neutral: Mapped[bool] = mapped_column(Boolean, server_default="false")
     assigned_day: Mapped[date] = mapped_column(Date)
     revision: Mapped[int] = mapped_column(Integer, server_default="1")
     announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -1385,6 +1389,7 @@ class MoneyReservation(Base):
 class SalaryContract(Base):
     __tablename__ = "salary_contracts"
     __table_args__ = (
+        CheckConstraint("recovery_skill BETWEEN 0 AND 20", name="ck_salary_recovery_skill"),
         CheckConstraint("weekly_rate >= 0", name="ck_salary_rate"),
         CheckConstraint("ended_at IS NULL OR ended_at >= started_at", name="ck_salary_dates"),
         CheckConstraint("role IN ('player'," + STAFF_ROLES_SQL + ")", name="ck_salary_role"),
@@ -1399,6 +1404,7 @@ class SalaryContract(Base):
     role: Mapped[str] = mapped_column(String(32))
     weekly_rate: Mapped[int] = mapped_column(BigInteger)
     policy_version: Mapped[str] = mapped_column(String(32), server_default="economy-cycle-v1")
+    recovery_skill: Mapped[int] = mapped_column(SmallInteger, server_default="0")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -1648,3 +1654,23 @@ class FeedbackComment(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     text: Mapped[str] = mapped_column(String(500))
+
+
+class PlayerRecovery(Base):
+    __tablename__ = "player_recovery"
+    __table_args__ = (
+        CheckConstraint("energy_bps BETWEEN 0 AND 10000", name="ck_recovery_energy"),
+        CheckConstraint("remainder BETWEEN 0 AND 86399", name="ck_recovery_remainder"),
+        CheckConstraint(
+            "stamina BETWEEN 1 AND 20 AND age BETWEEN 17 AND 38", name="ck_recovery_traits"
+        ),
+        CheckConstraint("policy_version = 'recovery-v1'", name="ck_recovery_policy"),
+    )
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("players.person_id"), primary_key=True)
+    energy_bps: Mapped[int] = mapped_column(Integer, default=10000)
+    remainder: Mapped[int] = mapped_column(Integer, default=0)
+    recovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    stamina: Mapped[int] = mapped_column(SmallInteger)
+    age: Mapped[int] = mapped_column(SmallInteger)
+    active_match_id: Mapped[UUID | None] = mapped_column(ForeignKey("matches.id"))
+    policy_version: Mapped[str] = mapped_column(String(32), default="recovery-v1")

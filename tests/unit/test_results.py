@@ -211,3 +211,10 @@ def test_telegram_pages_and_report_buttons_fit_callbacks_and_escape_html():
             expand_id(bad)
     with pytest.raises(ValueError):
         table_view(rows, season, league_id, 1, True)
+
+
+@pytest.fixture(autouse=True)
+def recovery_boundary(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr("goaletto.application.recovery.finish_energy", AsyncMock())

@@ -10,6 +10,8 @@ from pathlib import Path
 from string import Formatter
 from uuid import uuid4
 
+import pytest
+
 from goaletto.application.history import get_match_report
 from goaletto.application.lineup import load_lineup
 from goaletto.application.live_commands import LiveScreen
@@ -201,3 +203,16 @@ def test_notification_uses_delivery_locale_and_localized_timeline():
         result = render_text(payload)
         assert "Full-time: Meridian 1:2 Sputnik" in result and "keeper saves" in result
         assert not cyrillic(result)
+
+
+@pytest.fixture(autouse=True)
+def full_energy_projection(monkeypatch):
+    # These recording sessions test navigation/ownership; recovery has PG coverage.
+    from unittest.mock import AsyncMock
+
+    from goaletto.application.recovery import EnergyStatus
+
+    monkeypatch.setattr(
+        "goaletto.application.recovery.energy_status",
+        AsyncMock(return_value=EnergyStatus(10000, None)),
+    )

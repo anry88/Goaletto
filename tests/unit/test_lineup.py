@@ -668,3 +668,16 @@ async def test_missing_real_update_id_fails_before_mutation():
             lineup_input(recorder),
         )
     assert recorder.commands == {} and recorder.statements == []
+
+
+@pytest.fixture(autouse=True)
+def full_energy_projection(monkeypatch):
+    # These recording sessions test navigation/ownership; recovery has PG coverage.
+    from unittest.mock import AsyncMock
+
+    from goaletto.application.recovery import EnergyStatus
+
+    monkeypatch.setattr(
+        "goaletto.application.recovery.energy_status",
+        AsyncMock(return_value=EnergyStatus(10000, None)),
+    )

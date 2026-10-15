@@ -113,3 +113,12 @@
   substantial money, and signing discoveries also costs substantial money. Balance
   combined costs to prevent cheap rapid squad rejuvenation. No automatic costly
   assignments merely because a scout is employed. Track in AND-105/116/61.
+
+- AND-127 implements durable player_recovery and recovery-v1. Physio skill is
+  frozen in SalaryContract.recovery_skill; use employment intervals for recovery,
+  never current staff for past time. Freeze participants at lineup lock through
+  actual final; finalization, training load and lazy updates are transactional.
+  See docs/player-recovery.md. New cup runtimes must settle energy too.
+- AND-122 provides /calendar; preserve UTC phase dates and local kickoff display.
+  Conditional FixturePlan.possible_club_ids must be cleared for eliminated clubs
+  by future tournament logic; unknown opponents never acquire invented times.

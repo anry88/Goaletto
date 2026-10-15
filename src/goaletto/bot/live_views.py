@@ -250,6 +250,7 @@ def render(
                     + "."
                 )
         rows.append([_button(tr("📋 Подготовить состав"), "ln:open")])
+    rows.append([_button(tr("🗓 Расписание"), "ca:open")])
     rows.append([_button(tr("🔄 Обновить"), "lv:open"), _button(tr("🏟 Клуб"), "vc:c")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)
 

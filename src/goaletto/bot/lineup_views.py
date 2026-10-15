@@ -86,6 +86,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
         lines.append(
             f"{index}. {escape(latin_name(member.name))} ({escape(member.slot_position)})"
             f"{_badges(member.person_id, member.slot_position, data)}"
+            f" · ⚡ {member.energy_bps / 100:.0f}%"
         )
     lines.append("")
     lines.append(tr("<b>Запас:</b>"))
@@ -93,6 +94,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
         lines.append(
             f"{index}. {escape(latin_name(member.name))} ({escape(member.position)})"
             f"{_badges(member.person_id, member.position, data)}"
+            f" · ⚡ {member.energy_bps / 100:.0f}%"
         )
     lines.append("")
     if data.reserves:
@@ -101,6 +103,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
             lines.append(
                 f"{escape(latin_name(member.name))} ({escape(member.position)})"
                 f"{_badges(member.person_id, member.position, data)}"
+                f" · ⚡ {member.energy_bps / 100:.0f}%"
             )
     lines.append(
         tr(

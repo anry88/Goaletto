@@ -42,6 +42,7 @@ from goaletto.infrastructure.models import (
     Season,
     SeasonClub,
     Staff,
+    StaffQualification,
 )
 
 
@@ -112,12 +113,19 @@ async def salary_contract(
         ):
             raise ValueError("Invalid agreed player wage")
         rate = quoted_player_wage
+    recovery_skill = 0
+    if role == "physiotherapist":
+        qualification = await session.get(StaffQualification, (person_id, role))
+        if qualification is None:
+            raise ValueError("Physiotherapist needs an explicit qualification")
+        recovery_skill = qualification.skill
     row = SalaryContract(
         id=uuid5(person_id, f"salary:v1:{club_id}:{at.isoformat()}"),
         person_id=person_id,
         club_id=club_id,
         role=role,
         weekly_rate=rate,
+        recovery_skill=recovery_skill,
         policy_version=POLICY_VERSION,
         started_at=at,
     )

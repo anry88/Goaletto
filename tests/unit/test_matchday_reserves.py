@@ -71,3 +71,16 @@ async def test_reserve_picker_worst_revision_fits_and_english_main_shows_outside
             for b in row
         )
         views.bench_choices_keyboard(data, 20)
+
+
+@pytest.fixture(autouse=True)
+def full_energy_projection(monkeypatch):
+    # These recording sessions test navigation/ownership; recovery has PG coverage.
+    from unittest.mock import AsyncMock
+
+    from goaletto.application.recovery import EnergyStatus
+
+    monkeypatch.setattr(
+        "goaletto.application.recovery.energy_status",
+        AsyncMock(return_value=EnergyStatus(10000, None)),
+    )

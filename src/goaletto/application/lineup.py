@@ -65,6 +65,7 @@ class SquadMember:
     slot_position: str
     last_season: bool
     injured: bool
+    energy_bps: int = 10000
 
 
 @dataclass(frozen=True)
@@ -253,6 +254,11 @@ async def _assemble(
     ).all()
     players, persons = await _club_squad(session, club.id, actor.at)
     by_player = {p.person_id: p for p in players}
+    from goaletto.application.recovery import energy_status
+
+    energies = {
+        p.person_id: (await energy_status(session, p.person_id, actor.at)).bps for p in players
+    }
     starters: list[SquadMember] = []
     bench: list[SquadMember] = []
     for slot in slots:
@@ -268,6 +274,7 @@ async def _assemble(
             slot.position,
             player.status == "last_season",
             player.injured_until is not None and player.injured_until > actor.at,
+            energies[player.person_id],
         )
         if slot.slot <= 11:
             starters.append(member)
@@ -283,6 +290,7 @@ async def _assemble(
             p.position,
             p.status == "last_season",
             p.injured_until is not None and p.injured_until > actor.at,
+            energies[p.person_id],
         )
         for p in players
         if p.person_id not in selected

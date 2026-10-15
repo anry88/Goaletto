@@ -62,3 +62,7 @@ PostgreSQL на единственной БД: seeded caps, конкурентн
 callback после нового выбора, один job/club/date, rollback после flush, повтор
 worker, expiry/release cancellation и отсутствие system ownership activity.
 Миграция имеет upgrade/downgrade guards и расширяет SQL allowlist analytics events.
+
+AND-127: [межматчевая энергия](player-recovery.md) теперь сохраняется. Дневная
+тренировка тратит 80/140/220 bps энергии по интенсивности один раз при применении.
+Незавершённый матч, перешедший через UTC-полночь, исключает тренировку этой даты.

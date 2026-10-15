@@ -321,3 +321,16 @@ async def test_callback_actor_needs_start_and_valid_identity() -> None:
         await actor_for_callback(session(recorder), telegram_id=0, callback_id="cb-1", at=NOW)
     with pytest.raises(PermissionDenied):
         await actor_for_callback(session(recorder), telegram_id=123, callback_id="", at=NOW)
+
+
+@pytest.fixture(autouse=True)
+def full_energy_projection(monkeypatch):
+    # These recording sessions test navigation/ownership; recovery has PG coverage.
+    from unittest.mock import AsyncMock
+
+    from goaletto.application.recovery import EnergyStatus
+
+    monkeypatch.setattr(
+        "goaletto.application.recovery.energy_status",
+        AsyncMock(return_value=EnergyStatus(10000, None)),
+    )

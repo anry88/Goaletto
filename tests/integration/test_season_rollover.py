@@ -119,6 +119,10 @@ async def complete_season(sessions, season_id):
                 )
             )
             await session.flush()
+            from goaletto.application.recovery import lock_energy
+
+            match = await session.scalar(select(Match).where(Match.fixture_id == f.id))
+            await lock_energy(session, match, initial, f.lineup_lock_at)
             assert await finalize_result(session, f.id, f.actual_finish_at)
         at = max(season.ends_at, max(f.actual_finish_at for f in fixtures) + timedelta(seconds=1))
         await session.execute(update(Job).values(status="done"))

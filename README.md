@@ -25,6 +25,8 @@ checkpoint/replay и события. Durable [live-worker](docs/match-runtime.md
 [дневные тренировки](docs/training.md) доступны через `/train`; [экономика и денежный журнал](docs/club-finances.md) — через `/finance`; [стадион и посещаемость](docs/stadium.md) — через `/stadium`; [аукционный рынок](docs/transfer-auctions.md) — через `/market`; [общий rollover](docs/season-rollover.md) подключён к worker.
 [Квалификация персонала](docs/staff-quality.md) (пять уровней, новые сотрудники 50–56 лет) и
 [настройки часового пояса/времени](docs/kickoff-preferences.md) доступны в Telegram.
+[Расписание на 10 суток](docs/schedule-screen.md) — `/calendar`;
+[межматчевая энергия](docs/player-recovery.md) сохраняется и восстанавливается по реальному времени.
 [Свободные агенты и персонал](docs/candidate-pools.md) — общие ограниченные пулы, `/freeagents` и `/staff`. [Outbox sender](docs/outbox-delivery.md) подключён отдельным
 циклом worker; по умолчанию выключен (`GOALETTO_OUTBOX_ENABLED=false`).
 В табло и `/match` добавлена компактная [лента событий](docs/live-commentary.md)
