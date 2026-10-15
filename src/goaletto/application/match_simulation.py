@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid5
 
 from goaletto.domain.clock import MatchPhase
+from goaletto.domain.knockout_match import BREAK_PHASES, advance_penalty, start_extra_half
 from goaletto.domain.match_engine import advance_tick, start_match, start_second_half
 from goaletto.domain.match_types import (
     FieldSlot,
@@ -62,6 +63,10 @@ def simulate_match(state: MatchState) -> tuple[MatchState, tuple[MatchEvent, ...
         result = (
             start_second_half(state)
             if state.phase == MatchPhase.HALF_TIME
+            else start_extra_half(state)
+            if state.phase in BREAK_PHASES
+            else advance_penalty(state, len(state.knockout.shootout.kicks) + 1)
+            if state.phase == MatchPhase.PENALTIES and state.knockout and state.knockout.shootout
             else advance_tick(state, state.tick + 1)
         )
         state = result.state

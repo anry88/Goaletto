@@ -45,7 +45,7 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
     match = await session.scalar(
         select(Match).where(Match.fixture_id == fixture_id).with_for_update()
     )
-    if match is None or match.phase != "full_time" or match.completed_tick != 30:
+    if match is None or match.phase != "full_time" or match.completed_tick not in (30, 40):
         raise ValueError("Fixture has no completed regulation checkpoint")
     state = restore_state(match.state)
     if (
@@ -61,6 +61,11 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
     ):
         raise ValueError("Final checkpoint projections do not reconcile")
     hash_value = state_hash(state)
+    competition = fixture.competition or "league"
+    if competition not in {"league", "cup"} or (competition == "cup") != (
+        state.knockout is not None
+    ):
+        raise ValueError("Result has no supported competition runtime")
     receipt = await session.get(MatchResult, match.id)
     if receipt is not None:
         if (
@@ -68,6 +73,7 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
             or receipt.fixture_id != fixture.id
             or receipt.season_id != fixture.season_id
             or receipt.league_id != fixture.league_id
+            or (receipt.competition or "league") != competition
             or receipt.home_club_id != fixture.home_club_id
             or receipt.away_club_id != fixture.away_club_id
             or receipt.actual_start_at != fixture.actual_start_at
@@ -137,7 +143,7 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
     from goaletto.application.recovery import finish_energy
 
     await finish_energy(session, state, fixture.actual_finish_at)
-    if not (fixture.neutral or False):
+    if not fixture.neutral:
         await match_income(session, fixture, state, at)
     from goaletto.application.match_development import apply_development
 

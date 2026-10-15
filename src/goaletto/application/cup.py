@@ -1,14 +1,7 @@
-"""Durable 50-club cup bracket persistence, progression and neutral settlement.
-
-Implements AND-123 (Cup bracket orchestration), AND-124 (knockout tie runtime
-with extra time and penalties), and AND-125 (neutral final revenue settlement).
-"""
-
-from __future__ import annotations
+"""Persisted cup draw, real-engine results, progression and neutral venue receipts."""
 
 from dataclasses import asdict
 from datetime import datetime, timedelta
-from random import Random
 from typing import Any
 from uuid import UUID, uuid5
 
@@ -20,167 +13,74 @@ from goaletto.application.game_actions import allocation_lock
 from goaletto.application.money import credit_locked, locked_accounts
 from goaletto.application.training import reserve_match_day
 from goaletto.domain.cup_bracket import (
+    CupBracket,
     CupEntry,
     all_matches,
     build_bracket,
     possible_clubs,
+    validate_winners,
 )
-from goaletto.domain.knockout import (
-    KNOCKOUT_POLICY,
-    KnockoutTie,
-    MatchResult,
-    PenaltyKick,
-    PenaltyShootout,
-    apply_penalty_kick,
-    decide_shootout,
-    decide_tie,
-)
+from goaletto.domain.knockout import KNOCKOUT_POLICY, KnockoutTie, MatchResult
+from goaletto.domain.knockout_match import KnockoutContext, decision
+from goaletto.domain.match_codec import restore_state, state_hash
+from goaletto.domain.match_types import KNOCKOUT_ENGINE_VERSION
 from goaletto.domain.neutral_final import (
+    NEUTRAL_DEMAND_BPS,
     NEUTRAL_FINAL_POLICY,
     NeutralFinalSnapshot,
     settle_neutral_final,
 )
-from goaletto.domain.world import stable_seed
-from goaletto.infrastructure.models import CupBracket as CupBracketModel
+from goaletto.domain.stadium import Attendance
 from goaletto.infrastructure.models import (
-    CupTie as CupTieModel,
-)
-from goaletto.infrastructure.models import (
+    Club,
     Fixture,
     FixturePlan,
     League,
     Match,
+    NeutralFinalBooking,
     Season,
     SeasonClub,
 )
-
-CUP_DRAW_POLICY = "cup-draw-v1"
-"""Seeded tiebreak draws for extra time and penalties.
-
-Regulation stays 30 ticks through the shared match engine. When a cup tie
-needs extra time or penalties, this runtime resolves them with a persisted
-seeded draw (``stable_seed`` over the match seed) instead of playing extra
-ticks: the 10-tick extra-time runtime with live commands is future work
-(see ``docs/knockout-domain.md`` open integration points). Draws are
-deterministic per match seed, stored in ``cup_ties`` and never redrawn on
-retry (finalization is guarded by the ``MatchResult`` receipt).
-"""
+from goaletto.infrastructure.models import CupBracket as CupBracketModel
+from goaletto.infrastructure.models import CupTie as CupTieModel
+from goaletto.infrastructure.models import MatchResult as ResultReceipt
 
 CUP_FINAL_TICKET_PRICE = 5
-"""Neutral-final ticket price, reusing league ticket economics.
-
-``domain.finances.ticket_income`` charges 5 per spectator; the final reuses
-that price until the user approves dedicated final pricing. Venue capacity is
-frozen from the finalists' stadiums (see ``settle_final_revenue``).
-"""
-
-
-def _seed_random(seed: int, label: str) -> Random:
-    return Random(stable_seed(seed, label))
 
 
 def _dump(value: Any) -> Any:
-    """Convert dataclass payloads to JSONB-safe structures (UUIDs to strings)."""
     if isinstance(value, UUID):
         return str(value)
     if isinstance(value, dict):
-        return {str(key): _dump(item) for key, item in value.items()}
+        return {str(k): _dump(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
-        return [_dump(item) for item in value]
+        return [_dump(v) for v in value]
     return value
 
 
-def _extra_time_goals(rng: Random, home_side: bool) -> int:
-    """Single-draw extra-time goals for one side over 10 ticks."""
-    draw = rng.random()
-    if home_side:
-        if draw < 0.684:
-            return 0
-        if draw < 0.964:
-            return 1
-        return 2
-    if draw < 0.73:
-        return 0
-    if draw < 0.97:
-        return 1
-    return 2
-
-
-def simulate_extra_time(
-    home_id: UUID,
-    away_id: UUID,
-    segment: str,
-    seed: int,
-) -> MatchResult:
-    """Deterministic extra-time goal resolution for 10 ticks."""
-    rng = _seed_random(seed, f"extra-time:{segment}:{home_id}:{away_id}")
-    # Single draw per side: mostly quiet, sometimes one goal, rarely two.
-    return MatchResult(
-        segment=segment,  # type: ignore[arg-type]
-        home_id=home_id,
-        away_id=away_id,
-        home_goals=_extra_time_goals(rng, True),
-        away_goals=_extra_time_goals(rng, False),
-        completed=True,
-    )
-
-
 def _store_segment(result: MatchResult) -> dict[str, Any]:
-    """Persist one pinned knockout segment JSONB-safe with the draw policy."""
     payload = _dump(asdict(result))
     assert isinstance(payload, dict)
-    payload["draw_policy"] = CUP_DRAW_POLICY
     return payload
 
 
 def _load_segment(payload: dict[str, Any]) -> MatchResult:
-    """Rebuild a pinned knockout segment stored by :func:`_store_segment`."""
     data = dict(payload)
-    data.pop("draw_policy", None)
-    return MatchResult(
-        segment=data["segment"],
-        home_id=UUID(str(data["home_id"])),
-        away_id=UUID(str(data["away_id"])),
-        home_goals=int(data["home_goals"]),
-        away_goals=int(data["away_goals"]),
-        completed=bool(data["completed"]),
+    data["home_id"], data["away_id"] = UUID(data["home_id"]), UUID(data["away_id"])
+    return MatchResult(**data)
+
+
+async def frozen_bracket(session: AsyncSession, row: CupBracketModel) -> CupBracket:
+    entries = tuple(
+        CupEntry(UUID(e["league_id"]), e["tier"], tuple(UUID(c) for c in e["order"]))
+        for e in row.entry_snapshot
     )
-
-
-def _store_shootout(shootout: PenaltyShootout) -> dict[str, Any]:
-    """Persist the immutable penalty transcript JSONB-safe."""
-    payload = _dump(asdict(shootout))
-    assert isinstance(payload, dict)
-    payload["draw_policy"] = CUP_DRAW_POLICY
-    return payload
-
-
-def simulate_shootout(
-    club_a: UUID,
-    club_b: UUID,
-    seed: int,
-) -> tuple[PenaltyShootout, dict[str, Any]]:
-    """Deterministic penalty shootout resolution (5 initial kicks then sudden death)."""
-    rng = _seed_random(seed, f"shootout:{club_a}:{club_b}")
-    first_kicker = club_a if rng.random() < 0.5 else club_b
-    shootout = PenaltyShootout(
-        club_a_id=club_a, club_b_id=club_b, first_kicker_id=first_kicker, kicks=()
+    graph = build_bracket(
+        season_id=row.season_id, league_set_id=row.league_set_id, entries=entries, seed=row.seed
     )
-
-    kick_number = 1
-    current_kicker = first_kicker
-    other_kicker = club_b if first_kicker == club_a else club_a
-
-    while True:
-        # Standard ~75% penalty conversion rate
-        scored = rng.random() < 0.75
-        kick = PenaltyKick(kick_number=kick_number, club_id=current_kicker, scored=scored)
-        shootout = apply_penalty_kick(shootout, kick)
-        result = decide_shootout(shootout)
-        if result.status == "decided":
-            return shootout, _store_shootout(shootout)
-        kick_number += 1
-        current_kicker, other_kicker = other_kicker, current_kicker
+    if graph.policy_version != row.policy_version:
+        raise ValueError("Unknown persisted cup draw policy")
+    return graph
 
 
 async def initialize_season_cup(
@@ -194,6 +94,7 @@ async def initialize_season_cup(
 
     existing = await session.get(CupBracketModel, season_id)
     if existing is not None:
+        await frozen_bracket(session, existing)
         return existing
 
     season = await session.get(Season, season_id)
@@ -246,6 +147,7 @@ async def initialize_season_cup(
         seed=season.seed,
         policy_version=domain_bracket.policy_version,
         created_at=at,
+        entry_snapshot=_dump([asdict(e) for e in entries]),
     )
     session.add(bracket_row)
 
@@ -307,186 +209,153 @@ async def initialize_season_cup(
     return bracket_row
 
 
-async def record_cup_match_result(
-    session: AsyncSession,
-    fixture: Fixture,
-    match: Match,
-    at: datetime,
-) -> CupTieModel:
-    """Record leg result, decide tie progression, run extra time/pens and settle neutral final."""
-    require_utc(at)
-    await allocation_lock(session)
-
-    if fixture.competition != "cup":
-        raise ValueError("Expected cup fixture")
-
-    # Fixtures materialized from cup plans keep the plan id, so the tie and
-    # leg resolve exactly through the plan's conditional_ref
-    # ("tie:<tie_uuid>:leg:<leg_number>") instead of fuzzy club matching.
+async def context_for_fixture(session: AsyncSession, fixture: Fixture) -> KnockoutContext:
+    """Authenticate the exact frozen tie/leg; no relabelled operator admission."""
     plan = await session.get(FixturePlan, fixture.id)
-    if plan is None or plan.competition != "cup" or plan.conditional_ref is None:
-        raise ValueError(f"Cup fixture {fixture.id} has no cup plan")
+    if (
+        fixture.competition != "cup"
+        or plan is None
+        or plan.competition != "cup"
+        or plan.conditional_ref is None
+    ):
+        raise ValueError("Cup fixture needs a genuine cup plan")
     parts = plan.conditional_ref.split(":")
     if len(parts) != 4 or parts[0] != "tie" or parts[2] != "leg":
-        raise ValueError(f"Cup plan {plan.id} has a malformed conditional ref")
-    try:
-        tie_id = UUID(parts[1])
-        plan_leg = int(parts[3])
-    except (ValueError, AttributeError) as exc:
-        raise ValueError(f"Cup plan {plan.id} has a malformed conditional ref") from exc
-    if plan_leg != fixture.leg:
-        raise ValueError("Cup fixture leg differs from its plan")
+        raise ValueError("Malformed cup plan")
+    tie_id = UUID(parts[1])
+    leg = int(parts[3])
+    tie = await session.get(CupTieModel, tie_id, with_for_update=True)
+    bracket = await session.get(CupBracketModel, fixture.season_id)
+    if tie is None or bracket is None or tie.season_id != fixture.season_id:
+        raise ValueError("Unknown cup tie")
+    graph = await frozen_bracket(session, bracket)
+    definition = next((t for t in graph.ties if t.id == tie.id), None)
+    if (
+        definition is None
+        or tie.round_key != definition.round_key
+        or tie.neutral != definition.neutral
+        or tie.cup_days != list(definition.cup_days)
+        or (tie.home_kind, tie.home_tie_id) != (definition.home.kind, definition.home.tie_id)
+        or (tie.away_kind, tie.away_tie_id) != (definition.away.kind, definition.away.tie_id)
+    ):
+        raise ValueError("Cup tie differs from frozen draw")
+    all_ties = (
+        await session.scalars(select(CupTieModel).where(CupTieModel.season_id == fixture.season_id))
+    ).all()
+    winners = {
+        t.id: t.winner_club_id
+        for t in all_ties
+        if t.status == "decided" and t.winner_club_id is not None
+    }
+    validate_winners(graph, winners)
+    from goaletto.domain.cup_bracket import resolve_slot
 
-    target_tie = await session.get(CupTieModel, tie_id, with_for_update=True)
-    if target_tie is None or target_tie.season_id != fixture.season_id:
-        raise ValueError(f"No matching cup tie found for fixture {fixture.id}")
-    if target_tie.round_key != fixture.stage:
-        raise ValueError("Cup fixture stage differs from its tie")
-    if target_tie.status == "decided":
-        # Finalization is guarded by the MatchResult receipt, so reaching a
-        # decided tie means a replay: keep the pinned outcome, never redraw.
-        return target_tie
-    if target_tie.home_club_id is None or target_tie.away_club_id is None:
-        raise ValueError("Cup tie participants are not resolved yet")
+    a, b = (
+        resolve_slot(graph, definition.home, winners),
+        resolve_slot(graph, definition.away, winners),
+    )
+    if a is None or b is None or (a, b) != (tie.home_club_id, tie.away_club_id):
+        raise ValueError("Cup participants have unresolved predecessors")
+    if tie.status == "decided":
+        raise ValueError("Cup tie already decided")
+    if leg not in ((1,) if tie.neutral else (1, 2)):
+        raise ValueError("Invalid cup leg")
+    expected = (b, a) if leg == 2 else (a, b)
+    season = await session.get(Season, fixture.season_id)
+    if season is None or season.cycle_epoch is None:
+        raise ValueError("Cup season has no epoch")
+    day = season.cycle_epoch + timedelta(days=4 * (tie.cup_days[leg - 1] - 1))
+    # Explicit calendar recovery may move an unannounced plan to a later cup
+    # day. It keeps its structural round/leg and acquires a new revision.
+    recovered = (
+        plan.revision > 1
+        and plan.assigned_day > day
+        and (plan.assigned_day - season.cycle_epoch).days % 4 == 0
+    )
+    if (
+        plan.id != uuid5(fixture.season_id, f"cup:{tie.id}:{leg}")
+        or plan.season_id != fixture.season_id
+        or plan.announced_at is None
+        or (plan.assigned_day != day and not recovered)
+        or plan.round_number != tie.cup_days[leg - 1]
+        or fixture.round_number != plan.round_number
+        or (plan.home_club_id, plan.away_club_id) != expected
+        or (fixture.home_club_id, fixture.away_club_id) != expected
+        or fixture.leg != leg
+        or fixture.stage != tie.round_key
+        or fixture.neutral != tie.neutral
+        or plan.stage != fixture.stage
+        or plan.leg != fixture.leg
+        or plan.neutral != fixture.neutral
+    ):
+        raise ValueError("Cup fixture does not match its structural plan")
+    if leg == 2 and tie.first_match_result is None:
+        from goaletto.application.match_runtime import NotReady
 
-    club_a_id = target_tie.home_club_id
-    club_b_id = target_tie.away_club_id
-    if target_tie.neutral or fixture.neutral:
-        expected = (club_a_id, club_b_id)
-    elif fixture.leg == 1:
-        expected = (club_a_id, club_b_id)
-    elif fixture.leg == 2:
-        expected = (club_b_id, club_a_id)
-    else:
-        raise ValueError("Cup fixture leg must be 1 or 2")
-    if (fixture.home_club_id, fixture.away_club_id) != expected:
-        raise ValueError("Cup fixture clubs differ from their tie orientation")
-
-    domain_tie = KnockoutTie(
-        policy_version=KNOCKOUT_POLICY,
-        club_a_id=club_a_id,
-        club_b_id=club_b_id,
-        tie_format="single" if target_tie.neutral else "two-leg",
+        raise NotReady("Return leg waits for the first result")
+    return KnockoutContext(
+        tie.id,
+        KnockoutTie(KNOCKOUT_POLICY, a, b, "single" if tie.neutral else "two-leg"),
+        "final" if tie.neutral else "leg2" if leg == 2 else "leg1",
+        _load_segment(tie.first_match_result) if leg == 2 and tie.first_match_result else None,
     )
 
-    if fixture.neutral or target_tie.neutral:
-        # Neutral Single Final
-        final_match = MatchResult(
-            segment="final",
-            home_id=fixture.home_club_id,
-            away_id=fixture.away_club_id,
-            home_goals=match.home_goals,
-            away_goals=match.away_goals,
-            completed=True,
-        )
-        target_tie.first_match_result = _store_segment(final_match)
-        decision = decide_tie(tie=domain_tie, first_match=final_match)
 
-        extra_result = None
-        if decision.status == "await_extra_time":
-            extra_result = simulate_extra_time(
-                fixture.home_club_id, fixture.away_club_id, "final-et", match.seed
+async def record_cup_match_result(
+    session: AsyncSession, fixture: Fixture, match: Match, at: datetime
+) -> CupTieModel:
+    require_utc(at)
+    await allocation_lock(session)
+    state = restore_state(match.state)
+    k = state.knockout
+    result = await session.get(ResultReceipt, match.id)
+    if (
+        k is None
+        or state.engine_version != KNOCKOUT_ENGINE_VERSION
+        or result is None
+        or result.state_hash != state_hash(state)
+    ):
+        raise ValueError("Cup progression needs a genuine finished knockout")
+    target = await session.get(CupTieModel, k.tie_id, with_for_update=True)
+    if target is None or target.season_id != fixture.season_id:
+        raise ValueError("Wrong cup tie result")
+    if target.status == "decided":
+        raise ValueError("Cup tie was already settled")
+    outcome = decision(state)
+    assert k.regulation is not None
+    if k.segment == "leg1":
+        target.first_match_result = _store_segment(k.regulation)
+        target.status = "in_progress"
+    else:
+        if outcome.status != "decided" or outcome.winner is None:
+            raise ValueError("Knockout result is unfinished")
+        if k.segment == "final":
+            target.first_match_result = _store_segment(k.regulation)
+        else:
+            assert k.first_match is not None
+            if target.first_match_result != _store_segment(k.first_match):
+                raise ValueError("First leg changed during the return match")
+            target.second_match_result = _store_segment(k.regulation)
+        if state.tick == 40:
+            target.extra_time_result = _store_segment(
+                MatchResult(
+                    "final-et" if k.segment == "final" else "leg2-et",
+                    fixture.home_club_id,
+                    fixture.away_club_id,
+                    state.home.stats.goals - k.regulation.home_goals,
+                    state.away.stats.goals - k.regulation.away_goals,
+                    True,
+                )
             )
-            target_tie.extra_time_result = _store_segment(extra_result)
-            decision = decide_tie(tie=domain_tie, first_match=final_match, extra_time=extra_result)
-
-        if decision.status == "await_penalties":
-            shootout, shootout_res = simulate_shootout(
-                domain_tie.club_a_id, domain_tie.club_b_id, match.seed
-            )
-            target_tie.shootout_result = shootout_res
-            decision = decide_tie(
-                tie=domain_tie,
-                first_match=final_match,
-                extra_time=extra_result,
-                shootout=shootout,
-            )
-
-        if decision.status == "decided" and decision.winner is not None:
-            target_tie.status = "decided"
-            target_tie.winner_club_id = decision.winner
-            target_tie.decided_at = at
-
-            # Settle neutral final ticket revenue (AND-125)
-            await settle_final_revenue(
-                session,
-                fixture=fixture,
-                club_a_id=domain_tie.club_a_id,
-                club_b_id=domain_tie.club_b_id,
-                seed=match.seed,
-                at=at,
-            )
-
-    elif fixture.leg == 1:
-        leg1_match = MatchResult(
-            segment="leg1",
-            home_id=fixture.home_club_id,
-            away_id=fixture.away_club_id,
-            home_goals=match.home_goals,
-            away_goals=match.away_goals,
-            completed=True,
-        )
-        target_tie.first_match_result = _store_segment(leg1_match)
-        target_tie.status = "in_progress"
-        decision = decide_tie(tie=domain_tie, first_match=leg1_match)
-
-    elif fixture.leg == 2:
-        if target_tie.first_match_result is None:
-            raise ValueError("Leg 2 cannot settle before leg 1")
-        leg1_match = _load_segment(dict(target_tie.first_match_result))
-        leg2_match = MatchResult(
-            segment="leg2",
-            home_id=fixture.home_club_id,
-            away_id=fixture.away_club_id,
-            home_goals=match.home_goals,
-            away_goals=match.away_goals,
-            completed=True,
-        )
-        target_tie.second_match_result = _store_segment(leg2_match)
-        decision = decide_tie(tie=domain_tie, first_match=leg1_match, second_match=leg2_match)
-
-        extra_result = None
-        if decision.status == "await_extra_time":
-            extra_result = simulate_extra_time(
-                fixture.home_club_id, fixture.away_club_id, "leg2-et", match.seed
-            )
-            target_tie.extra_time_result = _store_segment(extra_result)
-            decision = decide_tie(
-                tie=domain_tie,
-                first_match=leg1_match,
-                second_match=leg2_match,
-                extra_time=extra_result,
-            )
-
-        if decision.status == "await_penalties":
-            shootout, shootout_res = simulate_shootout(
-                domain_tie.club_a_id, domain_tie.club_b_id, match.seed
-            )
-            target_tie.shootout_result = shootout_res
-            decision = decide_tie(
-                tie=domain_tie,
-                first_match=leg1_match,
-                second_match=leg2_match,
-                extra_time=extra_result,
-                shootout=shootout,
-            )
-
-        if decision.status == "decided" and decision.winner is not None:
-            target_tie.status = "decided"
-            target_tie.winner_club_id = decision.winner
-            target_tie.decided_at = at
-
-            # Advance tournament progression
-            await advance_bracket_progression(
-                session,
-                season_id=fixture.season_id,
-                tie_id=target_tie.id,
-                winner_id=decision.winner,
-                at=at,
-            )
-
+        if k.shootout:
+            target.shootout_result = _dump(asdict(k.shootout))
+        target.status, target.winner_club_id, target.decided_at = "decided", outcome.winner, at
+        await session.flush()
+        await advance_bracket_progression(session, fixture.season_id, target.id, outcome.winner, at)
+        if fixture.neutral:
+            await settle_final_revenue(session, fixture, at)
     await session.flush()
-    return target_tie
+    return target
 
 
 async def advance_bracket_progression(
@@ -509,6 +378,19 @@ async def advance_bracket_progression(
             select(CupTieModel).where(CupTieModel.season_id == season_id).with_for_update()
         )
     ).all()
+
+    bracket = await session.get(CupBracketModel, season_id)
+    if bracket is None:
+        raise ValueError("Missing frozen cup bracket")
+    graph = await frozen_bracket(session, bracket)
+    winners = {
+        t.id: t.winner_club_id
+        for t in all_ties
+        if t.status == "decided" and t.winner_club_id is not None
+    }
+    validate_winners(graph, winners)
+    if winners.get(tie_id) != winner_id:
+        raise ValueError("Progression requires the persisted winner")
 
     # Update direct consumers of this tie
     for t in all_ties:
@@ -577,63 +459,108 @@ async def advance_bracket_progression(
             ]
 
 
-async def settle_final_revenue(
-    session: AsyncSession,
-    fixture: Fixture,
-    club_a_id: UUID,
-    club_b_id: UUID,
-    seed: int,
-    at: datetime,
-) -> None:
-    """Equal neutral-final ticket split with deterministic odd penny (AND-125).
-
-    The venue is a frozen neutral arena id; capacity reuses the larger
-    finalist stadium and the ticket price reuses league economics until the
-    user approves dedicated final pricing and arena booking. Both inputs are
-    frozen in the persisted snapshot inputs below (supporters, capacity,
-    price, seed), so retries replay the same split.
-    """
-    accounts = await locked_accounts(session, club_a_id, club_b_id)
-    supporters_a = accounts[club_a_id].club.supporters or 2500
-    supporters_b = accounts[club_b_id].club.supporters or 2500
-
-    venue_id = uuid5(fixture.season_id, "venue:neutral-arena")
-    capacity = max(
-        accounts[club_a_id].club.stadium_capacity or 0,
-        accounts[club_b_id].club.stadium_capacity or 0,
+async def pin_final_venue(
+    session: AsyncSession, fixture: Fixture, home: Club, away: Club, seed: int, at: datetime
+) -> Attendance:
+    """Book a real third club's free stadium and freeze every financial input."""
+    if not fixture.neutral or fixture.competition != "cup":
+        raise ValueError("Neutral venue requires a cup final")
+    day = fixture.scheduled_start_at.date()
+    occupied = select(Fixture.home_club_id).where(
+        Fixture.scheduled_start_at >= datetime.combine(day, datetime.min.time(), tzinfo=at.tzinfo),
+        Fixture.scheduled_start_at
+        < datetime.combine(day, datetime.min.time(), tzinfo=at.tzinfo) + timedelta(days=1),
+        Fixture.status != "cancelled",
+        Fixture.neutral.is_(False),
     )
-    if capacity <= 0:
-        raise ValueError("Neutral final needs a positive venue capacity")
+    booked = select(NeutralFinalBooking.venue_club_id).where(
+        NeutralFinalBooking.assigned_day == day
+    )
+    venue = await session.scalar(
+        select(Club)
+        .join(SeasonClub, SeasonClub.club_id == Club.id)
+        .where(
+            SeasonClub.season_id == fixture.season_id,
+            Club.id.not_in((home.id, away.id)),
+            Club.id.not_in(occupied),
+            Club.id.not_in(booked),
+            Club.stadium_capacity > 0,
+        )
+        .order_by(Club.stadium_capacity.desc(), Club.id)
+        .limit(1)
+        .with_for_update(of=Club)
+    )
+    if venue is None:
+        raise ValueError("No free neutral stadium")
     snapshot = NeutralFinalSnapshot(
-        venue_id=venue_id,
-        capacity=capacity,
-        ticket_price=CUP_FINAL_TICKET_PRICE,
-        club_a_id=club_a_id,
-        club_b_id=club_b_id,
-        supporters_a=supporters_a,
-        supporters_b=supporters_b,
-        policy_version=NEUTRAL_FINAL_POLICY,
-        seed=seed,
-        neutral=True,
+        NEUTRAL_FINAL_POLICY,
+        venue.id,
+        venue.stadium_capacity,
+        CUP_FINAL_TICKET_PRICE,
+        home.id,
+        away.id,
+        home.supporters,
+        away.supporters,
+        seed,
+        True,
     )
-    result = settle_neutral_final(snapshot)
+    frozen = settle_neutral_final(snapshot)
+    session.add(
+        NeutralFinalBooking(
+            fixture_id=fixture.id,
+            venue_club_id=venue.id,
+            venue_name=venue.name,
+            assigned_day=day,
+            locked_at=at,
+            basis=_dump(asdict(frozen)),
+        )
+    )
+    return Attendance(
+        home.supporters + away.supporters,
+        frozen.capacity,
+        1,
+        1,
+        (),
+        NEUTRAL_DEMAND_BPS,
+        frozen.crowd,
+    )
 
-    # Atomically credit both clubs in the same transaction
-    await credit_locked(
-        session,
-        accounts[club_a_id],
-        key=f"cup:final:tickets:{fixture.id}:{club_a_id}",
-        kind="tickets",
-        amount=result.payout_a,
-        at=at,
-        details={"crowd": result.crowd, "gross": result.gross, "venue_id": str(venue_id)},
+
+async def settle_final_revenue(session: AsyncSession, fixture: Fixture, at: datetime) -> None:
+    booking = await session.get(NeutralFinalBooking, fixture.id)
+    if booking is None:
+        raise ValueError("Final has no pinned neutral venue")
+    basis = booking.basis
+    frozen = settle_neutral_final(
+        NeutralFinalSnapshot(
+            NEUTRAL_FINAL_POLICY,
+            UUID(basis["venue_id"]),
+            basis["capacity"],
+            basis["ticket_price"],
+            UUID(basis["club_a_id"]),
+            UUID(basis["club_b_id"]),
+            basis["supporters_a"],
+            basis["supporters_b"],
+            basis["seed"],
+            True,
+        )
     )
-    await credit_locked(
-        session,
-        accounts[club_b_id],
-        key=f"cup:final:tickets:{fixture.id}:{club_b_id}",
-        kind="tickets",
-        amount=result.payout_b,
-        at=at,
-        details={"crowd": result.crowd, "gross": result.gross, "venue_id": str(venue_id)},
-    )
+    if _dump(asdict(frozen)) != basis or {frozen.club_a_id, frozen.club_b_id} != {
+        fixture.home_club_id,
+        fixture.away_club_id,
+    }:
+        raise ValueError("Neutral settlement differs from its pinned basis")
+    accounts = await locked_accounts(session, frozen.club_a_id, frozen.club_b_id)
+    for club_id, amount in (
+        (frozen.club_a_id, frozen.payout_a),
+        (frozen.club_b_id, frozen.payout_b),
+    ):
+        await credit_locked(
+            session,
+            accounts[club_id],
+            key=f"cup:final:tickets:{fixture.id}:{club_id}",
+            kind="tickets",
+            amount=amount,
+            at=at,
+            details=basis,
+        )

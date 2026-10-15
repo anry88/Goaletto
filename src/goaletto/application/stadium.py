@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid5
 
 from sqlalchemy import select
@@ -68,10 +69,20 @@ async def crowd_for_fixture(
     return attendance(home.supporters, home.stadium_capacity, tier, place, tuple(points))
 
 
-async def pin_crowd(session: AsyncSession, match: Match, demand: Attendance, at: datetime) -> None:
+async def pin_crowd(
+    session: AsyncSession,
+    match: Match,
+    demand: Attendance,
+    at: datetime,
+    *,
+    neutral_basis: dict[str, Any] | None = None,
+) -> None:
     session.add(
         MatchCrowd(
-            match_id=match.id, policy_version=DEMAND_POLICY, locked_at=at, basis=asdict(demand)
+            match_id=match.id,
+            policy_version="neutral-final-v1" if neutral_basis is not None else DEMAND_POLICY,
+            locked_at=at,
+            basis=neutral_basis if neutral_basis is not None else asdict(demand),
         )
     )
     await session.flush()
@@ -105,6 +116,7 @@ async def load_stadium(
         select(Fixture)
         .where(
             Fixture.home_club_id == club.id,
+            Fixture.neutral.is_(False),
             Fixture.status.in_(("scheduled", "locked", "live", "paused")),
         )
         .order_by(Fixture.scheduled_start_at, Fixture.id)

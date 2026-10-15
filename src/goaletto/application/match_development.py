@@ -53,8 +53,9 @@ async def pin_development(
         and state.tick == 0
         and (state.home.snapshot.club_id, state.away.snapshot.club_id)
         == (fixture.home_club_id, fixture.away_club_id)
-        and plan.competition in ("league", "cup", "champions", "friendly")
+        and plan.competition in ("league", "cup")
         and plan.competition == (fixture.competition or "league")
+        and (plan.competition != "cup" or state.knockout is not None)
         and plan.announced_at is not None
         and plan.announced_at <= at
         and plan.season_id == fixture.season_id
@@ -67,6 +68,11 @@ async def pin_development(
         str(team.snapshot.club_id): await staff_roster(session, team.snapshot.club_id, at)
         for team in (state.home, state.away)
     }
+    if eligible and plan is not None and plan.competition == "cup":
+        from goaletto.application.cup import context_for_fixture
+
+        if await context_for_fixture(session, fixture) != state.knockout:
+            raise ValueError("Practice context differs from the authenticated cup plan")
     session.add(
         MatchDevelopment(
             match_id=state.match_id,

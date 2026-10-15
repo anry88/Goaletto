@@ -23,6 +23,9 @@ SUPPORTED_JOB_KINDS = frozenset(
         "match.tick",
         "match.second_half_start",
         "match.finalize_result",
+        "match.extra_start",
+        "match.extra_second_half_start",
+        "match.penalty",
     }
 )
 

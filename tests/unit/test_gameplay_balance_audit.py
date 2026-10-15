@@ -197,10 +197,8 @@ def test_growth_limits_hold_and_missing_match_coverage_is_reported() -> None:
     coverage = content["development"]["coverage"]
     assert coverage["status"] == "implementation_gap_not_balance_rule"
     assert set(coverage["gaps"]) == {
-        "cup_growth",
         "champions_growth",
         "friendly_growth",
-        "match_form",
     }
     assert coverage["friendly_factor"] is None
     runs = {(r["age"], r["staff"], r["calendar"]): r for r in content["development"]["runs"]}

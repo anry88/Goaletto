@@ -7,6 +7,8 @@ from typing import Any
 from uuid import UUID
 
 from goaletto.domain.clock import MatchPhase
+from goaletto.domain.knockout import KnockoutTie, MatchResult, PenaltyKick, PenaltyShootout
+from goaletto.domain.knockout_match import KnockoutContext
 from goaletto.domain.match_engine import validate_state
 from goaletto.domain.match_types import (
     CoachSnapshot,
@@ -121,7 +123,9 @@ def state_document(state: MatchState) -> dict[str, Any]:
         raise ValueError("Unsupported checkpoint value")
 
     result: dict[str, Any] = json.loads(json.dumps(asdict(state), default=encode))
-    if state.engine_version != "regulation-v3":
+    if state.engine_version != "regulation-v4":
+        del result["knockout"]
+    if state.engine_version not in {"regulation-v3", "regulation-v4"}:
         for side in ("home", "away"):
             del result[side]["snapshot"]["coach"]
             del result[side]["mentality_changes"]
@@ -146,10 +150,40 @@ def state_hash(state: MatchState) -> str:
 
 def restore_state(value: str | dict[str, Any]) -> MatchState:
     try:
-        data = _record(json.loads(value) if isinstance(value, str) else value, MatchState)
+        raw = json.loads(value) if isinstance(value, str) else value
+        if isinstance(raw, dict) and raw.get("engine_version") != "regulation-v4":
+            if "knockout" in raw:
+                raise ValueError("Historic checkpoint contains knockout fields")
+            raw = dict(raw, knockout=None)
+        data = _record(raw, MatchState)
+        if data["engine_version"] == "regulation-v4":
+            k = _record(data["knockout"], KnockoutContext)
+            k["tie_id"] = _uuid(k["tie_id"])
+            tie = _record(k["tie"], KnockoutTie)
+            for field in ("club_a_id", "club_b_id"):
+                tie[field] = _uuid(tie[field])
+            k["tie"] = KnockoutTie(**tie)
+            for field in ("first_match", "regulation"):
+                if k[field] is not None:
+                    segment = _record(k[field], MatchResult)
+                    for club in ("home_id", "away_id"):
+                        segment[club] = _uuid(segment[club])
+                    k[field] = MatchResult(**segment)
+            if k["shootout"] is not None:
+                shootout = _record(k["shootout"], PenaltyShootout)
+                for club in ("club_a_id", "club_b_id", "first_kicker_id"):
+                    shootout[club] = _uuid(shootout[club])
+                kicks = []
+                for row in shootout["kicks"]:
+                    kick = _record(row, PenaltyKick)
+                    kick["club_id"] = _uuid(kick["club_id"])
+                    kicks.append(PenaltyKick(**kick))
+                shootout["kicks"] = tuple(kicks)
+                k["shootout"] = PenaltyShootout(**shootout)
+            data["knockout"] = KnockoutContext(**k)
         data["match_id"] = _uuid(data["match_id"])
         legacy = data["engine_version"] == "regulation-v1"
-        coaching = data["engine_version"] == "regulation-v3"
+        coaching = data["engine_version"] in {"regulation-v3", "regulation-v4"}
         data["home"], data["away"] = (
             _team(data["home"], legacy=legacy, coaching=coaching),
             _team(data["away"], legacy=legacy, coaching=coaching),

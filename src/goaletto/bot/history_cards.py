@@ -64,6 +64,26 @@ def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
     for entry in page.entries:
         marker = OUTCOME_MARKERS.get(entry.outcome, "")
         date = entry.scheduled_start_at.strftime("%d.%m")
+        if entry.competition == "cup":
+            lines.append(tr("Кубок · {date}", date=date))
+            lines.append(
+                f"{marker} <b>{escape(latin_name(entry.home_name))} "
+                f"{entry.home_goals}:{entry.away_goals} "
+                f"{escape(latin_name(entry.away_name))}</b>"
+            )
+            if entry.penalties:
+                lines.append(
+                    tr("Пенальти: {home}:{away}", home=entry.penalties[0], away=entry.penalties[1])
+                )
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=tr("📋 Отчёт о матче"),
+                        callback_data=match_callback(entry.fixture_id, page.page),
+                    )
+                ]
+            )
+            continue
         lines.append(
             tr(
                 "{p0} Тур {p1} · {p2}\n<b>{p3} {p4}:{p5} {p6}</b>",
@@ -157,6 +177,18 @@ def _event_line(
         return tr("🎯 {p0}′ {p1}: Инструкция: {p2}", p0=minute, p1=who, p2=escape(label))
     if kind == "half_time":
         return tr("☕ {p0}′ Перерыв", p0=minute)
+    if kind in {"extra_time_announced", "extra_time_started", "extra_second_half_started"}:
+        return tr("Дополнительное время")
+    if kind == "extra_half_time":
+        return tr("☕ {p0}′ Перерыв", p0=minute)
+    if kind == "penalties_started":
+        return tr("Серия пенальти")
+    if kind in {"penalty_scored", "penalty_missed"}:
+        return (
+            tr("Пенальти: {player} — гол", player=who)
+            if kind == "penalty_scored"
+            else tr("Пенальти: {player} — мимо", player=who)
+        )
     if kind == "full_time":
         return tr("🏁 {p0}′ Финальный свисток", p0=minute)
     return None
@@ -171,7 +203,9 @@ def report_view(
     lines = [
         f"⚽ <b>{escape(latin_name(report.home_name))} {report.home_goals}:{report.away_goals} "
         f"{escape(latin_name(report.away_name))}</b>",
-        tr("Тур {p0} · {p1}", p0=report.round_number, p1=date),
+        tr("Кубок · {date}", date=date)
+        if report.competition == "cup"
+        else tr("Тур {p0} · {p1}", p0=report.round_number, p1=date),
         "",
         tr(
             "Владение: {p0}% / {p1}%",
@@ -184,6 +218,33 @@ def report_view(
         "",
     ]
     entries: list[str] = []
+    if report.neutral_venue is not None:
+        name, capacity, crowd, payout_home, payout_away = report.neutral_venue
+        lines.append(
+            tr(
+                "Нейтральный стадион: {name} · {crowd}/{capacity}",
+                name=escape(latin_name(name)),
+                crowd=crowd,
+                capacity=capacity,
+            )
+        )
+        lines.append(
+            tr(
+                "Билеты — {home}: {amount_home}; {away}: {amount_away}",
+                home=escape(latin_name(report.home_name)),
+                away=escape(latin_name(report.away_name)),
+                amount_home=payout_home,
+                amount_away=payout_away,
+            )
+        )
+    if report.aggregate is not None:
+        lines.append(
+            tr("Общий счёт: {home}:{away}", home=report.aggregate[0], away=report.aggregate[1])
+        )
+    if report.penalties is not None:
+        lines.append(
+            tr("Пенальти: {home}:{away}", home=report.penalties[0], away=report.penalties[1])
+        )
     if section == "events":
         for event in sorted(report.events, key=lambda e: e.minute):
             line = _event_line(

@@ -719,9 +719,10 @@ def development_section(seeds: list[int]) -> dict[str, Any]:
         "coverage": {
             "target": "League, cup, champions and friendly appearances affect form/development; "
             "friendlies have lower development than official matches.",
-            "implemented": "Only league growth and training form are currently connected.",
+            "implemented": "League and cup practice/form are connected. These runs retain "
+            "the legacy league-only baseline; see tournament-runtime.md for real cup receipts.",
             "status": "implementation_gap_not_balance_rule",
-            "gaps": ["cup_growth", "champions_growth", "friendly_growth", "match_form"],
+            "gaps": ["champions_growth", "friendly_growth"],
             "friendly_factor": None,
         },
         "recovery_hours_from_7320bps": recovery_table,
@@ -759,8 +760,8 @@ def run_audit(seeds: list[int], commit: str = "") -> dict[str, Any]:
             "the public market and earn no resale income in this audit.",
             "Development runs use train_player/develop_appearance/grant_growth "
             "directly; only the 18 official league appearances grant match growth, "
-            "cup growth/friendly growth and match form are implementation gaps, NOT target "
-            "rules; these rows cannot validate the target busy-calendar balance.",
+            "these are legacy league-only baseline rows, not the full current game. "
+            "Cup practice/form now work; champions/friendly runtime remain gaps.",
             "Training injuries are discarded to upper-bound growth; morale/ "
             "leadership/form draws stay seeded and deterministic.",
         ],

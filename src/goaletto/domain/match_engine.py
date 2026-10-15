@@ -7,11 +7,13 @@ from random import Random
 from uuid import UUID, uuid5
 
 from goaletto.domain.clock import MatchPhase
+from goaletto.domain.knockout_match import KnockoutContext
 from goaletto.domain.match_commands import apply_commands, substitute
 from goaletto.domain.match_ratings import SectorRatings, effective_skill, sector_ratings
 from goaletto.domain.match_types import (
     COACH_ENGINE_VERSION,
     ENGINE_VERSION,
+    KNOCKOUT_ENGINE_VERSION,
     LIVE_ENGINE_VERSION,
     EnginePolicy,
     FieldSlot,
@@ -32,7 +34,12 @@ from goaletto.domain.match_types import (
 
 
 def validate_state(state: MatchState) -> None:
-    if state.engine_version not in {ENGINE_VERSION, LIVE_ENGINE_VERSION, COACH_ENGINE_VERSION}:
+    if state.engine_version not in {
+        ENGINE_VERSION,
+        LIVE_ENGINE_VERSION,
+        COACH_ENGINE_VERSION,
+        KNOCKOUT_ENGINE_VERSION,
+    }:
         raise ValueError("Unsupported engine version; never replay with another implementation")
     expected_policy = "match-policy-" + state.engine_version.removeprefix("regulation-")
     if state.policy.version != expected_policy:
@@ -43,9 +50,13 @@ def validate_state(state: MatchState) -> None:
         or not 0 <= state.seed < 2**63
     ):
         raise ValueError("Match requires a UUID and explicit nonnegative BIGINT seed")
-    if type(state.tick) is not int or not 0 <= state.tick <= 30:
+    knockout = state.engine_version == KNOCKOUT_ENGINE_VERSION
+    maximum = 40 if knockout else 30
+    if knockout != (state.knockout is not None):
+        raise ValueError("Knockout context and engine disagree")
+    if type(state.tick) is not int or not 0 <= state.tick <= maximum:
         raise ValueError("Invalid regulation tick")
-    if type(state.game_minute) is not int or not 0 <= state.game_minute <= 90:
+    if type(state.game_minute) is not int or not 0 <= state.game_minute <= maximum * 3:
         raise ValueError("Invalid game minute")
     if state.home.snapshot.club_id == state.away.snapshot.club_id:
         raise ValueError("A club cannot play itself")
@@ -62,8 +73,54 @@ def validate_state(state: MatchState) -> None:
         raise ValueError("Half time must follow tick 15")
     if state.phase == MatchPhase.SECOND_HALF and not 15 <= state.tick < 30:
         raise ValueError("Invalid second-half tick")
-    if state.phase == MatchPhase.FULL_TIME and state.tick != 30:
+    if state.phase == MatchPhase.FULL_TIME and state.tick not in ((30, 40) if knockout else (30,)):
         raise ValueError("Full time requires tick 30")
+    from goaletto.domain.knockout_match import BREAK_PHASES, PLAY_PHASES, decision
+
+    if state.phase in BREAK_PHASES | PLAY_PHASES | {MatchPhase.PENALTIES} and not knockout:
+        raise ValueError("Extra time requires knockout engine")
+    if knockout:
+        context = state.knockout
+        assert context is not None
+        a, b = context.tie.club_a_id, context.tie.club_b_id
+        expected = (b, a) if context.segment == "leg2" else (a, b)
+        if (state.home.snapshot.club_id, state.away.snapshot.club_id) != expected:
+            raise ValueError("Knockout orientation changed")
+        if state.tick < 30 and (context.regulation is not None or context.shootout is not None):
+            raise ValueError("Premature knockout result")
+        if context.regulation and (
+            context.regulation.home_goals > state.home.stats.goals
+            or context.regulation.away_goals > state.away.stats.goals
+            or state.tick == 30
+            and (context.regulation.home_goals, context.regulation.away_goals)
+            != (state.home.stats.goals, state.away.stats.goals)
+        ):
+            raise ValueError("Regulation score differs from the live checkpoint")
+        if state.phase in BREAK_PHASES | PLAY_PHASES | {MatchPhase.PENALTIES}:
+            if context.regulation is None or context.segment == "leg1":
+                raise ValueError("Extra time has no drawn regulation")
+            if state.phase == MatchPhase.EXTRA_BREAK and state.tick != 30:
+                raise ValueError("Extra time starts after tick 30")
+            if state.phase == MatchPhase.EXTRA_FIRST_HALF and not 30 <= state.tick < 35:
+                raise ValueError("Invalid extra first half")
+            if state.phase == MatchPhase.EXTRA_HALF_TIME and state.tick != 35:
+                raise ValueError("Extra halftime follows tick 35")
+            if state.phase == MatchPhase.EXTRA_SECOND_HALF and not 35 <= state.tick < 40:
+                raise ValueError("Invalid extra second half")
+            if state.phase == MatchPhase.PENALTIES and (
+                state.tick != 40 or context.shootout is None
+            ):
+                raise ValueError("Penalties follow completed extra time")
+            outcome = decision(state)
+            if outcome.status != (
+                "await_penalties" if state.phase == MatchPhase.PENALTIES else "await_extra_time"
+            ):
+                raise ValueError("Knockout phase has no drawn basis")
+        if state.phase == MatchPhase.FULL_TIME and (
+            context.regulation is None
+            or (context.segment != "leg1" and decision(state).status != "decided")
+        ):
+            raise ValueError("Unresolved knockout cannot finish")
     if (state.phase == MatchPhase.ABANDONED) != (state.termination_reason is not None):
         raise ValueError("Abandonment must have an explicit reason")
     if len(set(state.applied_commands)) != len(state.applied_commands):
@@ -71,13 +128,18 @@ def validate_state(state: MatchState) -> None:
     if (
         type(state.home.support_morale_points) is not int
         or type(state.away.support_morale_points) is not int
-        or state.home.support_morale_points != crowd_morale(state.crowd, state.policy)
+        or state.home.support_morale_points
+        != (
+            0
+            if state.knockout and state.knockout.tie.tie_format == "single"
+            else crowd_morale(state.crowd, state.policy)
+        )
         or state.away.support_morale_points != 0
     ):
         raise ValueError("Support morale must match the pinned crowd and policy")
     for team in (state.home, state.away):
         coach = team.snapshot.coach
-        modern = state.engine_version == COACH_ENGINE_VERSION
+        modern = state.engine_version in {COACH_ENGINE_VERSION, KNOCKOUT_ENGINE_VERSION}
         if modern != (coach is not None):
             raise ValueError("Coaching snapshot and engine disagree")
         abilities = coach.abilities if coach else None
@@ -145,7 +207,7 @@ def validate_state(state: MatchState) -> None:
             or len(team.substitution_windows) > 3
         ):
             raise ValueError("Invalid substitution windows")
-        if any(type(t) is not int or not 1 <= t <= 30 for t in team.substitution_windows):
+        if any(type(t) is not int or not 1 <= t <= maximum for t in team.substitution_windows):
             raise ValueError("Invalid substitution window tick")
         if type(team.tactic_changes) is not int or not 0 <= team.tactic_changes <= (
             abilities.tactic_changes if abilities else 3
@@ -198,6 +260,7 @@ def start_match(
     crowd: HomeCrowd | None = None,
     engine_version: str = ENGINE_VERSION,
     initial_energy: dict[UUID, int] | None = None,
+    knockout: "KnockoutContext | None" = None,
 ) -> MatchState:
     def team(snapshot: TeamSnapshot) -> TeamState:
         return TeamState(
@@ -222,9 +285,21 @@ def start_match(
         version="match-policy-" + engine_version.removeprefix("regulation-")
     )
     crowd = crowd or HomeCrowd()
-    home_team = replace(team(home), support_morale_points=crowd_morale(crowd, policy))
+    home_team = replace(
+        team(home),
+        support_morale_points=0
+        if knockout and knockout.tie.tie_format == "single"
+        else crowd_morale(crowd, policy),
+    )
     state = MatchState(
-        match_id, seed, home_team, team(away), policy, crowd, engine_version=engine_version
+        match_id,
+        seed,
+        home_team,
+        team(away),
+        policy,
+        crowd,
+        engine_version=engine_version,
+        knockout=knockout,
     )
     validate_state(state)
     return state
@@ -368,9 +443,18 @@ def advance_tick(
     commands: tuple[MatchCommand, ...] = (),
 ) -> TickResult:
     validate_state(state)
-    if type(tick_number) is not int or tick_number != state.tick + 1 or tick_number > 30:
+    if (
+        type(tick_number) is not int
+        or tick_number != state.tick + 1
+        or tick_number > (40 if state.knockout else 30)
+    ):
         raise ValueError("Only the next unprocessed regulation tick may execute")
-    if state.phase not in {MatchPhase.FIRST_HALF, MatchPhase.SECOND_HALF}:
+    if state.phase not in {
+        MatchPhase.FIRST_HALF,
+        MatchPhase.SECOND_HALF,
+        MatchPhase.EXTRA_FIRST_HALF,
+        MatchPhase.EXTRA_SECOND_HALF,
+    }:
         raise ValueError("No simulation during half time or after completion")
     state, accepted, rejected = apply_commands(state, commands, tick=tick_number, halftime=False)
     events = _command_events(state, accepted, tick_number, state.game_minute, f"tick:{tick_number}")
@@ -656,14 +740,27 @@ def advance_tick(
         phase = (
             MatchPhase.HALF_TIME
             if tick_number == 15
+            else MatchPhase.EXTRA_HALF_TIME
+            if tick_number == 35
             else MatchPhase.FULL_TIME
-            if tick_number == 30
+            if tick_number in (30, 40)
             else phase
         )
     state = replace(state, tick=tick_number, game_minute=minute, phase=phase)
+    if state.knockout and tick_number in (30, 40) and phase != MatchPhase.ABANDONED:
+        from goaletto.domain.knockout_match import complete_segment
+
+        state = complete_segment(state)
+        phase = state.phase
     if phase == MatchPhase.HALF_TIME:
         emit("half_time")
     elif phase == MatchPhase.FULL_TIME:
         emit("full_time")
+    elif phase == MatchPhase.EXTRA_BREAK:
+        emit("extra_time_announced")
+    elif phase == MatchPhase.EXTRA_HALF_TIME:
+        emit("extra_half_time")
+    elif phase == MatchPhase.PENALTIES:
+        emit("penalties_started")
     validate_state(state)
     return TickResult(state, tuple(events), tuple(c.id for c in accepted), rejected)

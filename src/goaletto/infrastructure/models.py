@@ -720,6 +720,16 @@ class Fixture(Base):
     __tablename__ = "fixtures"
     __table_args__ = (
         ForeignKeyConstraint(
+            ["season_id", "home_club_id", "league_id"],
+            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
+            name="fk_fixture_home_membership",
+        ),
+        ForeignKeyConstraint(
+            ["season_id", "away_club_id", "league_id"],
+            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
+            name="fk_fixture_away_membership",
+        ),
+        ForeignKeyConstraint(
             ["season_id", "home_club_id"],
             ["season_clubs.season_id", "season_clubs.club_id"],
             name="fk_fixture_home_season_club",
@@ -846,10 +856,12 @@ class Match(Base):
         CheckConstraint("state_version > 0", name="ck_match_state_version"),
         CheckConstraint(
             "phase IN ('first_half','half_time','second_half','full_time','abandoned','paused',"
-            "'extra_first_half','extra_half_time','extra_second_half','penalties')",
+            "'extra_break','extra_first_half','extra_half_time','extra_second_half','penalties')",
             name="ck_match_phase",
         ),
-        CheckConstraint("phase <> 'full_time' OR completed_tick IN (30, 40)", name="ck_match_full_time"),
+        CheckConstraint(
+            "phase <> 'full_time' OR completed_tick IN (30, 40)", name="ck_match_full_time"
+        ),
         Index(
             "ix_match_snapshot_gin",
             "starting_snapshot",
@@ -869,7 +881,7 @@ class Match(Base):
     state: Mapped[dict[str, Any]] = mapped_column(JSONB)
     starting_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
     completed_tick: Mapped[int] = mapped_column(SmallInteger, default=0)
-    phase: Mapped[str] = mapped_column(String(16), default="first_half")
+    phase: Mapped[str] = mapped_column(String(32), default="first_half")
     home_goals: Mapped[int] = mapped_column(SmallInteger, default=0)
     away_goals: Mapped[int] = mapped_column(SmallInteger, default=0)
     next_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
@@ -881,7 +893,7 @@ class MatchRecovery(Base):
     __tablename__ = "match_recoveries"
     __table_args__ = (
         UniqueConstraint("match_id", "previous_due_at", name="uq_recovery_window"),
-        CheckConstraint("checkpoint_tick BETWEEN 0 AND 29", name="ck_recovery_tick"),
+        CheckConstraint("checkpoint_tick BETWEEN 0 AND 40", name="ck_recovery_tick"),
         CheckConstraint(
             "next_due_at > previous_due_at AND next_due_at > recovered_at", name="ck_recovery_due"
         ),
@@ -940,7 +952,7 @@ class AcceptedCommand(Base):
             "kind = 'lineup' OR match_id IS NOT NULL", name="ck_command_match_required"
         ),
         CheckConstraint(
-            "target_tick_number IS NULL OR target_tick_number BETWEEN 1 AND 30",
+            "target_tick_number IS NULL OR target_tick_number BETWEEN 1 AND 40",
             name="ck_command_target_tick",
         ),
         CheckConstraint(
@@ -1156,12 +1168,13 @@ class MatchStage(Base):
     __tablename__ = "match_stages"
     __table_args__ = (
         CheckConstraint(
-            "stage IN ('locked','started','second_half','finished','abandoned')",
+            "stage IN ('locked','started','second_half','finished','abandoned','extra_first',"
+            "'extra_second') OR stage ~ '^penalty:[1-9][0-9]*$'",
             name="ck_match_stage",
         ),
     )
     match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
-    stage: Mapped[str] = mapped_column(String(16), primary_key=True)
+    stage: Mapped[str] = mapped_column(String(80), primary_key=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     events: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
@@ -1196,6 +1209,16 @@ class OperationAttempt(Base):
 class MatchResult(Base):
     __tablename__ = "match_results"
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["season_id", "home_club_id", "league_id"],
+            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
+            name="fk_result_home_membership",
+        ),
+        ForeignKeyConstraint(
+            ["season_id", "away_club_id", "league_id"],
+            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
+            name="fk_result_away_membership",
+        ),
         UniqueConstraint("fixture_id", name="uq_result_fixture"),
         ForeignKeyConstraint(
             ["match_id", "fixture_id"],
@@ -1583,7 +1606,9 @@ class StadiumExpansion(Base):
 class MatchCrowd(Base):
     __tablename__ = "match_crowds"
     __table_args__ = (
-        CheckConstraint("policy_version = 'stadium-demand-v1'", name="ck_crowd_policy"),
+        CheckConstraint(
+            "policy_version IN ('stadium-demand-v1','neutral-final-v1')", name="ck_crowd_policy"
+        ),
     )
     match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
     policy_version: Mapped[str] = mapped_column(String(32))
@@ -1981,12 +2006,18 @@ class CupBracket(Base):
     __tablename__ = "cup_brackets"
     __table_args__ = (
         CheckConstraint("seed >= 0", name="ck_cup_bracket_seed"),
+        CheckConstraint(
+            "policy_version = 'cup-bracket-v1' AND jsonb_typeof(entry_snapshot) = 'array' "
+            "AND jsonb_array_length(entry_snapshot) = 5",
+            name="ck_cup_bracket_policy",
+        ),
     )
     season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
     league_set_id: Mapped[UUID] = mapped_column(ForeignKey("league_sets.id"))
     seed: Mapped[int] = mapped_column(BigInteger)
     policy_version: Mapped[str] = mapped_column(String(40), server_default="cup-bracket-v1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    entry_snapshot: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
 
 
 class CupTie(Base):
@@ -2007,7 +2038,10 @@ class CupTie(Base):
             name="ck_cup_tie_status",
         ),
         CheckConstraint(
-            "(status = 'decided') = (winner_club_id IS NOT NULL AND decided_at IS NOT NULL)",
+            "(status = 'decided') = (winner_club_id IS NOT NULL) AND "
+            "(status = 'decided') = (decided_at IS NOT NULL) AND "
+            "(winner_club_id IS NULL OR (home_club_id IS NOT NULL AND away_club_id IS NOT NULL "
+            "AND winner_club_id IN (home_club_id,away_club_id)))",
             name="ck_cup_tie_winner",
         ),
         Index("ix_cup_ties_season", "season_id"),
@@ -2032,3 +2066,16 @@ class CupTie(Base):
     shootout_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+
+class NeutralFinalBooking(Base):
+    __tablename__ = "neutral_final_bookings"
+    __table_args__ = (
+        UniqueConstraint("venue_club_id", "assigned_day", name="uq_neutral_venue_day"),
+        CheckConstraint("jsonb_typeof(basis) = 'object'", name="ck_neutral_booking_basis"),
+    )
+    fixture_id: Mapped[UUID] = mapped_column(ForeignKey("fixtures.id"), primary_key=True)
+    venue_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    venue_name: Mapped[str] = mapped_column(String(80))
+    assigned_day: Mapped[date] = mapped_column(Date)
+    locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    basis: Mapped[dict[str, Any]] = mapped_column(JSONB)

@@ -216,7 +216,18 @@ FINDING_CODES: dict[str, tuple[str, str]] = {
 #: Outbox failure classes that are normal business dedup, not damage.
 OUTBOX_NORMAL_FAILURES = frozenset({"skip_stale", "skip_unavailable", "superseded"})
 
-_NON_TERMINAL_PHASES = frozenset({"first_half", "half_time", "second_half"})
+_NON_TERMINAL_PHASES = frozenset(
+    {
+        "first_half",
+        "half_time",
+        "second_half",
+        "extra_break",
+        "extra_first_half",
+        "extra_half_time",
+        "extra_second_half",
+        "penalties",
+    }
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -656,7 +667,7 @@ def _check_matches(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
             if fixture.actual_start_at is not None and coverage_complete:
                 live_without_match.append(fixture.id)
             continue
-        if match.phase == "half_time":
+        if match.phase in {"half_time", "extra_break", "extra_half_time"}:
             if match.next_due_at is not None and (
                 _age_seconds(snapshot.now, match.next_due_at) > late_threshold
             ):
@@ -818,7 +829,7 @@ def _check_matches(snapshot: Snapshot, late_threshold: float) -> list[Finding]:
 
 def _tick_sequence_broken(completed_tick: int, tick_numbers: tuple[int, ...]) -> bool:
     unique = sorted(set(tick_numbers))
-    if completed_tick < 0 or completed_tick > 30:
+    if completed_tick < 0 or completed_tick > 40:
         return True
     if len(unique) != len(tick_numbers):
         return True
@@ -891,15 +902,16 @@ def _check_recoveries(snapshot: Snapshot, late_threshold: float) -> list[Finding
                 continue
             # The moved window needs a live calendar job carrying it.
             fixture_jobs = jobs_by_fixture.get(match.fixture_id, [])
-            live_kinds = {"match.tick", "match.second_half_start", "match.finalize_result"}
-            if match.phase in ("first_half", "half_time", "second_half") and not any(
-                job.kind in live_kinds
+            expected_kind = {
+                "half_time": "match.second_half_start",
+                "extra_break": "match.extra_start",
+                "extra_half_time": "match.extra_second_half_start",
+                "penalties": "match.penalty",
+            }.get(match.phase, "match.tick")
+            if match.phase in _NON_TERMINAL_PHASES and not any(
+                job.kind == expected_kind
                 and job.due_at == match.next_due_at
-                and (
-                    job.kind == "match.second_half_start"
-                    if match.phase == "half_time"
-                    else job.kind == "match.tick" and job.tick_number == match.completed_tick + 1
-                )
+                and (expected_kind != "match.tick" or job.tick_number == match.completed_tick + 1)
                 for job in fixture_jobs
             ):
                 mismatch_matches.append(recovery.match_id)

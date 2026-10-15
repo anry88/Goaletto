@@ -25,6 +25,13 @@ IMPORTANT = frozenset(
         "half_time",
         "second_half_started",
         "full_time",
+        "extra_time_announced",
+        "extra_time_started",
+        "extra_half_time",
+        "extra_second_half_started",
+        "penalties_started",
+        "penalty_scored",
+        "penalty_missed",
     }
 )
 TACTICS = LabelMap(
@@ -84,6 +91,13 @@ def football_line(state: MatchState, event: dict[str, Any]) -> str | None:
         ),
         "half_time": tr("☕ Перерыв"),
         "second_half_started": tr("⚽ Начался второй тайм"),
+        "extra_time_announced": tr("Дополнительное время"),
+        "extra_time_started": tr("Дополнительное время"),
+        "extra_half_time": tr("☕ Перерыв"),
+        "extra_second_half_started": tr("Дополнительное время"),
+        "penalties_started": tr("Серия пенальти"),
+        "penalty_scored": tr("Пенальти: {player} — гол", player=who),
+        "penalty_missed": tr("Пенальти: {player} — мимо", player=who),
         "full_time": tr("🏁 Финальный свисток"),
     }
     description: str | None

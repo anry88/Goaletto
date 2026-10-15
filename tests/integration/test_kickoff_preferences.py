@@ -93,7 +93,7 @@ async def test_preferences_retry_restart_rollback_and_fixture_immutability(sessi
         assert await fixture_kickoff_decision(session, **args) == decisions[0]
         assert (
             await session.scalar(select(func.count()).select_from(KickoffDecisionReceipt))
-            == before_decisions + 1
+            == before_decisions
         )
         with pytest.raises(ValueError, match="reused"):
             await fixture_kickoff_decision(session, **{**args, "seed": 13})

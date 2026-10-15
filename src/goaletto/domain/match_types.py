@@ -9,10 +9,12 @@ if TYPE_CHECKING:
     from goaletto.domain.staff_quality import StaffAbilities
 
 from goaletto.domain.clock import MatchPhase
+from goaletto.domain.knockout_match import KnockoutContext
 
 ENGINE_VERSION = "regulation-v1"
 LIVE_ENGINE_VERSION = "regulation-v2"
 COACH_ENGINE_VERSION = "regulation-v3"
+KNOCKOUT_ENGINE_VERSION = "regulation-v4"
 POSITIONS = frozenset({"GK", "DL", "DC", "DR", "DM", "ML", "MC", "MR", "AMC", "AML", "AMR", "FC"})
 
 
@@ -222,7 +224,12 @@ class EnginePolicy:
     long_shot_extra_miss_bps: int = 1000
 
     def __post_init__(self) -> None:
-        if self.version not in {"match-policy-v1", "match-policy-v2", "match-policy-v3"}:
+        if self.version not in {
+            "match-policy-v1",
+            "match-policy-v2",
+            "match-policy-v3",
+            "match-policy-v4",
+        }:
             raise ValueError("Unsupported policy")
         if self.version == "match-policy-v1" and (
             self.max_instruction_changes,
@@ -335,6 +342,7 @@ class MatchState:
     applied_commands: tuple[UUID, ...] = ()
     engine_version: str = ENGINE_VERSION
     termination_reason: str | None = None
+    knockout: KnockoutContext | None = None
 
 
 @dataclass(frozen=True)
@@ -373,8 +381,8 @@ class MatchCommand:
     def __post_init__(self) -> None:
         if not isinstance(self.id, UUID) or not isinstance(self.side, Side):
             raise ValueError("Command needs stable ID and side")
-        if type(self.target_tick) is not int or not 1 <= self.target_tick <= 30:
-            raise ValueError("Command target must be tick 1 through 30")
+        if type(self.target_tick) is not int or not 1 <= self.target_tick <= 40:
+            raise ValueError("Command target must be tick 1 through 40")
         if not isinstance(self.kind, CommandKind):
             raise ValueError("Unknown match command")
         if type(self.halftime) is not bool:

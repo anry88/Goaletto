@@ -66,6 +66,8 @@ class ClubResultEntry:
     home_goals: int
     away_goals: int
     outcome: str  # win/draw/loss from the owned club's perspective
+    competition: str = "league"
+    penalties: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -126,7 +128,7 @@ class ReportLineupPlayer:
 class MatchReport:
     fixture_id: UUID
     season_id: UUID
-    league_id: UUID
+    league_id: UUID | None
     round_number: int
     scheduled_start_at: datetime
     actual_start_at: datetime | None
@@ -145,6 +147,10 @@ class MatchReport:
     away_lineup: tuple[ReportLineupPlayer, ...]
     state_hash: str
     recorded_at: datetime
+    competition: str = "league"
+    penalties: tuple[int, int] | None = None
+    aggregate: tuple[int, int] | None = None
+    neutral_venue: tuple[str, int, int, int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -381,6 +387,19 @@ async def get_club_results(
         scored = receipt.home_goals if mine_home else receipt.away_goals
         conceded = receipt.away_goals if mine_home else receipt.home_goals
         outcome = "win" if scored > conceded else "draw" if scored == conceded else "loss"
+        penalties = None
+        if (fixture.competition or "league") == "cup":
+            terminal = restore_state(match.state)
+            if terminal.knockout and terminal.knockout.shootout:
+                from goaletto.domain.knockout import decide_shootout
+
+                shootout = decide_shootout(terminal.knockout.shootout)
+                penalties = (
+                    (shootout.score_a, shootout.score_b)
+                    if terminal.home.snapshot.club_id == terminal.knockout.tie.club_a_id
+                    else (shootout.score_b, shootout.score_a)
+                )
+                outcome = "win" if shootout.winner == club.id else "loss"
         entries.append(
             ClubResultEntry(
                 fixture.id,
@@ -394,6 +413,8 @@ async def get_club_results(
                 receipt.home_goals,
                 receipt.away_goals,
                 outcome,
+                fixture.competition or "league",
+                penalties,
             )
         )
     await user_effect(
@@ -561,6 +582,39 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         club_id=club.id,
         fixture_id=fixture.id,
     )
+    penalties = aggregate = None
+    neutral_venue = None
+    if fixture.neutral:
+        from goaletto.infrastructure.models import NeutralFinalBooking
+
+        booking = await session.get(NeutralFinalBooking, fixture.id)
+        if booking is None:
+            raise ValueError("Neutral final has no venue snapshot")
+        b = booking.basis
+        neutral_venue = (
+            booking.venue_name,
+            b["capacity"],
+            b["crowd"],
+            b["payout_a"],
+            b["payout_b"],
+        )
+    if terminal.knockout:
+        from goaletto.domain.knockout_match import decision
+
+        outcome = decision(terminal)
+        direct = terminal.home.snapshot.club_id == terminal.knockout.tie.club_a_id
+        if terminal.knockout.segment != "leg1":
+            aggregate = (
+                (outcome.aggregate_a, outcome.aggregate_b)
+                if direct
+                else (outcome.aggregate_b, outcome.aggregate_a)
+            )
+        if terminal.knockout.shootout:
+            penalties = (
+                (outcome.penalty_a, outcome.penalty_b)
+                if direct
+                else (outcome.penalty_b, outcome.penalty_a)
+            )
     return MatchReport(
         fixture.id,
         fixture.season_id,
@@ -583,6 +637,10 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         _lineup("away"),
         receipt.state_hash,
         receipt.recorded_at,
+        fixture.competition or "league",
+        penalties,
+        aggregate,
+        neutral_venue,
     )
 
 

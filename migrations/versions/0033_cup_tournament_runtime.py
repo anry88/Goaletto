@@ -71,10 +71,14 @@ def upgrade() -> None:
     op.create_index("ix_cup_ties_season", "cup_ties", ["season_id"])
 
     # 3. Update fixtures table
-    op.add_column("fixtures", sa.Column("competition", sa.String(16), nullable=False, server_default="league"))
+    op.add_column(
+        "fixtures", sa.Column("competition", sa.String(16), nullable=False, server_default="league")
+    )
     op.add_column("fixtures", sa.Column("stage", sa.String(80), nullable=True))
     op.add_column("fixtures", sa.Column("leg", sa.SmallInteger(), nullable=True))
-    op.add_column("fixtures", sa.Column("neutral", sa.Boolean(), nullable=False, server_default="false"))
+    op.add_column(
+        "fixtures", sa.Column("neutral", sa.Boolean(), nullable=False, server_default="false")
+    )
     op.alter_column("fixtures", "league_id", nullable=True)
 
     # Replace fixture constraints
@@ -106,7 +110,14 @@ def upgrade() -> None:
     op.create_index(
         "uq_fixture_competition_leg",
         "fixtures",
-        ["season_id", "competition", "stage", sa.text("COALESCE(leg, 0)"), "home_club_id", "away_club_id"],
+        [
+            "season_id",
+            "competition",
+            "stage",
+            sa.text("COALESCE(leg, 0)"),
+            "home_club_id",
+            "away_club_id",
+        ],
         unique=True,
         postgresql_where=sa.text("competition <> 'league'"),
     )
@@ -123,7 +134,10 @@ def upgrade() -> None:
     )
 
     # 4. Update match_results table
-    op.add_column("match_results", sa.Column("competition", sa.String(16), nullable=False, server_default="league"))
+    op.add_column(
+        "match_results",
+        sa.Column("competition", sa.String(16), nullable=False, server_default="league"),
+    )
     op.alter_column("match_results", "league_id", nullable=True)
 
     op.drop_constraint("fk_result_home_membership", "match_results", type_="foreignkey")
@@ -192,7 +206,9 @@ def downgrade() -> None:
     op.create_check_constraint("ck_tick_number", "match_ticks", "tick_number BETWEEN 1 AND 30")
 
     op.drop_constraint("ck_match_full_time", "matches", type_="check")
-    op.create_check_constraint("ck_match_full_time", "matches", "phase <> 'full_time' OR completed_tick = 30")
+    op.create_check_constraint(
+        "ck_match_full_time", "matches", "phase <> 'full_time' OR completed_tick = 30"
+    )
 
     op.drop_constraint("ck_match_phase", "matches", type_="check")
     op.create_check_constraint(
@@ -229,7 +245,9 @@ def downgrade() -> None:
     op.drop_constraint("ck_fixture_competition", "fixtures", type_="check")
     op.drop_index("uq_fixture_competition_leg", table_name="fixtures")
     op.drop_index("uq_fixture_league_pair", table_name="fixtures")
-    op.create_unique_constraint("uq_fixture_pair", "fixtures", ["season_id", "home_club_id", "away_club_id"])
+    op.create_unique_constraint(
+        "uq_fixture_pair", "fixtures", ["season_id", "home_club_id", "away_club_id"]
+    )
 
     op.drop_constraint("fk_fixture_away_season_club", "fixtures", type_="foreignkey")
     op.drop_constraint("fk_fixture_home_season_club", "fixtures", type_="foreignkey")

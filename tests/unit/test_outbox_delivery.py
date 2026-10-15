@@ -731,3 +731,25 @@ async def test_result_is_sent_even_with_existing_board_and_reminders_disabled(st
     count = len(transport.calls)
     await process_one_delivery(store, transport, clock=lambda: store.now)
     assert len(transport.calls) == count  # Terminal outbox receipt suppresses retries.
+
+
+def test_knockout_result_keeps_match_goals_separate_from_aggregate_and_penalties(store):
+    row = store.message(
+        "match_result",
+        tick=40,
+        phase="full_time",
+        game_minute=120,
+        home_goals=0,
+        away_goals=0,
+        aggregate=[2, 2],
+        penalties=[5, 4],
+        penalty_kicks=12,
+        tie_winner_name="Home <club>",
+    )
+    text = sender.render_text(row.payload)
+    assert "Home 0:0 Away" in text
+    assert "2:2" in text and "5:4" in text
+    assert "Home &lt;club&gt;" in text
+    pending = {**row.payload, "kind": "match_board", "phase": "penalties", "penalty_kicks": 11}
+    assert sender.board_revision(row.payload) > sender.board_revision(pending)
+    assert sender.valid_payload(pending)

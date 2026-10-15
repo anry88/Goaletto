@@ -129,10 +129,18 @@ def _window(
         MatchPhase.FIRST_HALF,
         MatchPhase.HALF_TIME,
         MatchPhase.SECOND_HALF,
+        MatchPhase.EXTRA_BREAK,
+        MatchPhase.EXTRA_FIRST_HALF,
+        MatchPhase.EXTRA_HALF_TIME,
+        MatchPhase.EXTRA_SECOND_HALF,
     }:
         return None, False, None, False
-    halftime = state.phase == MatchPhase.HALF_TIME
-    target = 16 if halftime else state.tick + 1
+    halftime = state.phase in {
+        MatchPhase.HALF_TIME,
+        MatchPhase.EXTRA_BREAK,
+        MatchPhase.EXTRA_HALF_TIME,
+    }
+    target = state.tick + 1
     deadline = due_for(match, fixture, None if halftime else target)
     return target, halftime, deadline, at < deadline
 
@@ -284,7 +292,7 @@ async def accept_live_command(
 ) -> CommandReceipt:
     if actor.update_id is None:
         raise ValueError("A real Telegram update_id is required")
-    if type(target) is not int or not 1 <= target <= 30 or type(halftime) is not bool:
+    if type(target) is not int or not 1 <= target <= 40 or type(halftime) is not bool:
         raise ValueError("Invalid command window")
     fields = {
         "substitution": {"outgoing_id", "incoming_id"},

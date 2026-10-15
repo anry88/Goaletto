@@ -17,10 +17,12 @@ from goaletto.application.outbox_delivery import live_board_key_for, priority_fo
 from goaletto.application.results import finalize_result
 from goaletto.domain.calendar import CALENDAR_VERSION
 from goaletto.domain.clock import MatchClock, MatchPhase
+from goaletto.domain.knockout_match import BREAK_PHASES, advance_penalty, start_extra_half
 from goaletto.domain.match_codec import restore_state, state_document, state_hash
 from goaletto.domain.match_engine import advance_tick, start_match, start_second_half
 from goaletto.domain.match_types import (
     COACH_ENGINE_VERSION,
+    KNOCKOUT_ENGINE_VERSION,
     CommandKind,
     EnginePolicy,
     FieldSlot,
@@ -69,6 +71,9 @@ RUNTIME_KINDS = frozenset(
         "match.tick",
         "match.second_half_start",
         "match.finalize_result",
+        "match.extra_start",
+        "match.extra_second_half_start",
+        "match.penalty",
     }
 )
 
@@ -91,8 +96,11 @@ def job_refs(job: Job) -> tuple[UUID, UUID | None, int | None]:
     fixture = UUID(p["fixture_id"]) if p["fixture_id"] is not None else None
     tick = p["tick_number"]
     if job.kind == "match.tick":
-        if type(tick) is not int or not 1 <= tick <= 30:
+        if type(tick) is not int or not 1 <= tick <= 40:
             raise ValueError("Invalid tick job")
+    elif job.kind == "match.penalty":
+        if type(tick) is not int or tick < 1:
+            raise ValueError("Invalid penalty job")
     elif tick is not None:
         raise ValueError("Unexpected tick")
     if (job.kind in {"season.open", "season.rollover"}) != (fixture is None):
@@ -103,14 +111,78 @@ def job_refs(job: Job) -> tuple[UUID, UUID | None, int | None]:
 def due_for(match: Match, fixture: Fixture, tick: int | None = None) -> datetime:
     if fixture.actual_start_at is None:
         raise NotReady("Kickoff has not committed")
-    seconds = 1080 if tick is None else MatchClock().tick_elapsed_seconds(tick)
+    phase = restore_state(match.state).phase.value if match.phase == "paused" else match.phase
+    if tick is not None:
+        seconds = (
+            MatchClock().tick_elapsed_seconds(tick)
+            if tick <= 30
+            else 2040 + (tick - 30) * 60
+            if tick <= 35
+            else 2400 + (tick - 35) * 60
+        )
+    elif phase == "extra_break":
+        seconds = 2040
+    elif phase == "extra_half_time":
+        seconds = 2400
+    elif phase == "penalties":
+        state = restore_state(match.state)
+        assert state.knockout and state.knockout.shootout
+        seconds = 2760 + len(state.knockout.shootout.kicks) * 60
+    else:
+        seconds = 1080
     return fixture.actual_start_at + timedelta(seconds=seconds + match.paused_seconds)
 
 
 def next_due(state: MatchState, match: Match, fixture: Fixture) -> datetime | None:
     if state.phase in {MatchPhase.FULL_TIME, MatchPhase.ABANDONED}:
         return None
-    return due_for(match, fixture, None if state.phase == MatchPhase.HALF_TIME else state.tick + 1)
+    return due_for(
+        match,
+        fixture,
+        None
+        if state.phase in BREAK_PHASES | {MatchPhase.HALF_TIME, MatchPhase.PENALTIES}
+        else state.tick + 1,
+    )
+
+
+async def schedule_knockout_work(
+    session: AsyncSession, fixture: Fixture, match: Match, state: MatchState
+) -> None:
+    """Only the next durable continuation; retries preserve the same job key."""
+    if match.next_due_at is None or state.tick < 30:
+        return
+    tick = None
+    if state.phase in BREAK_PHASES:
+        kind = (
+            "match.extra_start"
+            if state.phase == MatchPhase.EXTRA_BREAK
+            else "match.extra_second_half_start"
+        )
+    elif state.phase == MatchPhase.PENALTIES:
+        assert state.knockout and state.knockout.shootout
+        kind, tick = "match.penalty", len(state.knockout.shootout.kicks) + 1
+    else:
+        kind, tick = "match.tick", state.tick + 1
+    key = f"knockout:v1:{fixture.id}:{kind}:{tick}"
+    await session.execute(
+        insert(Job)
+        .values(
+            id=uuid5(fixture.id, key),
+            dedupe_key=key,
+            kind=kind,
+            due_at=match.next_due_at,
+            status="pending",
+            attempts=0,
+            payload={
+                "version": 1,
+                "calendar_version": CALENDAR_VERSION,
+                "season_id": str(fixture.season_id),
+                "fixture_id": str(fixture.id),
+                "tick_number": tick,
+            },
+        )
+        .on_conflict_do_nothing(index_elements=["dedupe_key"])
+    )
 
 
 async def activate_season(session: AsyncSession, season_id: UUID, at: datetime) -> None:
@@ -367,6 +439,35 @@ async def queue_notification(
                 shots=[state.home.stats.shots, state.away.stats.shots],
                 on_target=[state.home.stats.on_target, state.away.stats.on_target],
             )
+            if state.knockout and state.knockout.shootout:
+                from goaletto.domain.knockout import decide_shootout
+
+                score = decide_shootout(state.knockout.shootout)
+                payload["penalty_kicks"] = len(state.knockout.shootout.kicks)
+                payload["penalties"] = (
+                    [score.score_a, score.score_b]
+                    if state.home.snapshot.club_id == state.knockout.tie.club_a_id
+                    else [score.score_b, score.score_a]
+                )
+            if (
+                state.knockout
+                and state.phase == MatchPhase.FULL_TIME
+                and state.knockout.segment != "leg1"
+            ):
+                from goaletto.domain.knockout_match import decision
+
+                settled = decision(state)
+                direct = state.home.snapshot.club_id == state.knockout.tie.club_a_id
+                payload["aggregate"] = (
+                    [settled.aggregate_a, settled.aggregate_b]
+                    if direct
+                    else [settled.aggregate_b, settled.aggregate_a]
+                )
+                payload["tie_winner_name"] = (
+                    state.home.snapshot.name
+                    if settled.winner == state.home.snapshot.club_id
+                    else state.away.snapshot.name
+                )
         if resume_deadline is not None:
             payload["resume_deadline"] = resume_deadline.isoformat()
         await session.execute(
@@ -505,7 +606,11 @@ async def apply_commands(
         except (ValueError, TypeError, KeyError):
             row.status = "cancelled"
     result = (
-        start_second_half(state, tuple(valid))
+        (
+            start_extra_half(state, tuple(valid))
+            if state.phase in BREAK_PHASES
+            else start_second_half(state, tuple(valid))
+        )
         if halftime
         else advance_tick(state, tick, tuple(valid))
     )
@@ -622,6 +727,17 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
 
         demand = await crowd_for_fixture(session, fixture, home, at)
         seed = stable_seed(season.seed, f"match:{fixture.id}")
+        context = None
+        if fixture.competition == "cup":
+            from goaletto.application.cup import context_for_fixture
+
+            context = await context_for_fixture(session, fixture)
+        elif (fixture.competition or "league") != "league":
+            raise ValueError("Unsupported competition runtime")
+        if fixture.neutral:
+            from goaletto.application.cup import pin_final_venue
+
+            demand = await pin_final_venue(session, fixture, home, away, seed, at)
         from goaletto.application.recovery import lock_energy, recover_player
 
         home_snapshot = await team_snapshot(session, home, fixture.scheduled_start_at)
@@ -635,16 +751,17 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             home_snapshot,
             away_snapshot,
             initial_energy=energies,
-            policy=EnginePolicy(version="match-policy-v3"),
-            engine_version=COACH_ENGINE_VERSION,
+            policy=EnginePolicy(version="match-policy-v4" if context else "match-policy-v3"),
+            engine_version=KNOCKOUT_ENGINE_VERSION if context else COACH_ENGINE_VERSION,
             crowd=HomeCrowd(demand.capacity, demand.fans),
+            knockout=context,
         )
         match = Match(
             id=state.match_id,
             fixture_id=fixture.id,
             seed=seed,
             engine_version=state.engine_version,
-            state_version=3,
+            state_version=4 if context else 3,
             state=state_document(state),
             starting_snapshot=state_document(state),
             completed_tick=0,
@@ -661,7 +778,14 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
 
         await pin_development(session, fixture, state, at)
         await lock_energy(session, match, state, at)
-        await pin_crowd(session, match, demand, at)
+        if fixture.neutral:
+            from goaletto.infrastructure.models import NeutralFinalBooking
+
+            booking = await session.get(NeutralFinalBooking, fixture.id)
+            assert booking is not None
+            await pin_crowd(session, match, demand, at, neutral_basis=booking.basis)
+        else:
+            await pin_crowd(session, match, demand, at)
         await stage_receipt(session, match, "locked", at, fixture.lineup_lock_at)
         await lifecycle_event(session, fixture, "match_lineup_locked", "locked", at)
         return None
@@ -685,7 +809,14 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
                     Job.payload["fixture_id"].astext == str(fixture.id),
                     Job.status.in_(("pending", "held")),
                     Job.kind.in_(
-                        ("match.tick", "match.second_half_start", "match.finalize_result")
+                        (
+                            "match.tick",
+                            "match.second_half_start",
+                            "match.finalize_result",
+                            "match.extra_start",
+                            "match.extra_second_half_start",
+                            "match.penalty",
+                        )
                     ),
                 )
                 .values(due_at=Job.due_at + delta)
@@ -712,20 +843,48 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         or state.away.snapshot.club_id != fixture.away_club_id
     ):
         raise ValueError("Checkpoint and persistence projection disagree")
-    halftime = job.kind == "match.second_half_start"
+    halftime = job.kind in {
+        "match.second_half_start",
+        "match.extra_start",
+        "match.extra_second_half_start",
+    }
+    penalty = job.kind == "match.penalty"
     if halftime:
-        if state.phase in {MatchPhase.SECOND_HALF, MatchPhase.FULL_TIME}:
-            return None
-        if state.phase != MatchPhase.HALF_TIME:
-            raise NotReady("First half has not committed")
+        if job.kind != "match.second_half_start":
+            expected_phase = (
+                MatchPhase.EXTRA_BREAK
+                if job.kind == "match.extra_start"
+                else MatchPhase.EXTRA_HALF_TIME
+            )
+            target = 31 if job.kind == "match.extra_start" else 36
+            if state.tick >= target or state.phase in {MatchPhase.PENALTIES, MatchPhase.FULL_TIME}:
+                return None
+            if state.phase != expected_phase:
+                raise NotReady("Prior extra-time segment has not committed")
+        else:
+            target = 16
+            if state.tick > 15 or state.phase in {MatchPhase.SECOND_HALF, MatchPhase.FULL_TIME}:
+                return None
+            if state.phase != MatchPhase.HALF_TIME:
+                raise NotReady("First half has not committed")
         due = due_for(match, fixture)
-        target = 16
+    elif penalty:
+        if state.knockout is None or state.knockout.shootout is None or tick is None:
+            raise NotReady("Shootout has not started")
+        if tick <= len(state.knockout.shootout.kicks):
+            return None
+        if tick != len(state.knockout.shootout.kicks) + 1:
+            raise NotReady("Prior penalty has not committed")
+        due, target = due_for(match, fixture), tick
     else:
         if tick is None:
             raise ValueError("Tick is missing")
         if tick <= state.tick:
             return None
-        if tick != state.tick + 1 or state.phase == MatchPhase.HALF_TIME:
+        if tick != state.tick + 1 or state.phase in BREAK_PHASES | {
+            MatchPhase.HALF_TIME,
+            MatchPhase.PENALTIES,
+        }:
             raise NotReady("Prior transition has not committed")
         due = due_for(match, fixture, tick)
         target = tick
@@ -736,18 +895,28 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
     if (at - due).total_seconds() >= 15:
         await restore_decision_window(session, fixture, match, state, due, at, "worker_lag")
         return "rescheduled"
-    new, events = await apply_commands(
-        session, match, fixture, state, target, at, halftime=halftime
-    )
+    if penalty:
+        penalty_result = advance_penalty(state, target)
+        new, events = penalty_result.state, penalty_result.events
+    else:
+        new, events = await apply_commands(
+            session, match, fixture, state, target, at, halftime=halftime
+        )
     match.state = state_document(new)
     match.completed_tick = new.tick
     match.phase = new.phase.value
     match.home_goals = new.home.stats.goals
     match.away_goals = new.away.stats.goals
     match.next_due_at = next_due(new, match, fixture)
+    if new.knockout:
+        await schedule_knockout_work(session, fixture, match, new)
     if halftime:
-        await stage_receipt(session, match, "second_half", at, due, events)
-        await lifecycle_event(session, fixture, "match_second_half_started", "second_half", at)
+        stage = "second_half" if target == 16 else "extra_first" if target == 31 else "extra_second"
+        await stage_receipt(session, match, stage, at, due, events)
+        if target == 16:
+            await lifecycle_event(session, fixture, "match_second_half_started", "second_half", at)
+    elif penalty:
+        await stage_receipt(session, match, f"penalty:{target}", at, due, events)
     else:
         await lifecycle_event(session, fixture, "match_tick_committed", f"tick:{target}", at)
     if new.phase in {MatchPhase.FULL_TIME, MatchPhase.ABANDONED}:
@@ -771,13 +940,26 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             .where(
                 Job.payload["fixture_id"].astext == str(fixture.id),
                 Job.status == "pending",
-                Job.kind.in_(("match.tick", "match.second_half_start")),
+                Job.kind.in_(
+                    (
+                        "match.tick",
+                        "match.second_half_start",
+                        "match.extra_start",
+                        "match.extra_second_half_start",
+                        "match.penalty",
+                    )
+                ),
             )
             .values(status="done")
         )
     else:
         await queue_notification(
-            session, fixture, "match_board", f"tick:{new.tick}:{new.phase.value}", at, new
+            session,
+            fixture,
+            "match_board",
+            f"penalty:{target}" if penalty else f"tick:{new.tick}:{new.phase.value}",
+            at,
+            new,
         )
     return None
 
@@ -836,7 +1018,16 @@ async def restore_decision_window(
         .where(
             Job.payload["fixture_id"].astext == str(fixture.id),
             Job.status.in_(("pending", "held")),
-            Job.kind.in_(("match.tick", "match.second_half_start", "match.finalize_result")),
+            Job.kind.in_(
+                (
+                    "match.tick",
+                    "match.second_half_start",
+                    "match.finalize_result",
+                    "match.extra_start",
+                    "match.extra_second_half_start",
+                    "match.penalty",
+                )
+            ),
             Job.due_at >= previous_due,
         )
         .values(due_at=Job.due_at + timedelta(seconds=delay))
@@ -920,7 +1111,16 @@ async def resume_match(session: AsyncSession, fixture_id: UUID, at: datetime) ->
             Job.payload["fixture_id"].astext == str(fixture.id),
             Job.status.in_(("pending", "held")),
             Job.due_at >= previous_due,
-            Job.kind.in_(("match.tick", "match.second_half_start", "match.finalize_result")),
+            Job.kind.in_(
+                (
+                    "match.tick",
+                    "match.second_half_start",
+                    "match.finalize_result",
+                    "match.extra_start",
+                    "match.extra_second_half_start",
+                    "match.penalty",
+                )
+            ),
         )
         .values(due_at=Job.due_at + timedelta(seconds=duration))
     )

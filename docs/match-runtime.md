@@ -1,5 +1,9 @@
 # Долговечный regulation runtime · AND-52
 
+Обновление 2026-10-16: [кубковый V4 runtime](tournament-runtime.md) добавляет
+настоящее допвремя, отдельные задания пенальти и нейтральный финал. Базовый
+регламент лиги и replay V1/V2/V3 сохраняются.
+
 `application.match_runtime` выполняет календарные jobs в caller-owned PostgreSQL
 transaction. Worker берет due pending Job через FOR UPDATE SKIP LOCKED; fixture
 NO KEY UPDATE SKIP LOCKED сериализует её матч, оставаясь совместимым с FK diagnostic

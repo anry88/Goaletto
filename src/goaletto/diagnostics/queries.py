@@ -77,13 +77,13 @@ def _parse_uuid(value: object) -> UUID | None:
 
 def _parse_tick(value: object) -> int | None:
     if isinstance(value, int) and not isinstance(value, bool):
-        return value if 1 <= value <= 30 else None
+        return value if 1 <= value <= 40 else None
     if isinstance(value, str):
         try:
             tick = int(value)
         except ValueError:
             return None
-        return tick if 1 <= tick <= 30 else None
+        return tick if 1 <= tick <= 40 else None
     return None
 
 
@@ -389,6 +389,13 @@ async def _collect_recoveries(
                 or_(
                     and_(MatchRecovery.checkpoint_tick == 0, MatchStage.stage == "locked"),
                     and_(MatchRecovery.checkpoint_tick == 15, MatchStage.stage == "second_half"),
+                    and_(MatchRecovery.checkpoint_tick == 30, MatchStage.stage == "extra_first"),
+                    and_(MatchRecovery.checkpoint_tick == 35, MatchStage.stage == "extra_second"),
+                    and_(
+                        MatchRecovery.checkpoint_tick == 40,
+                        MatchStage.stage.like("penalty:%"),
+                        MatchStage.state_hash == MatchRecovery.state_hash,
+                    ),
                 ),
             ),
         )

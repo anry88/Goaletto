@@ -213,6 +213,32 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         raise NotReady("Season calendar has not ended")
     if await session.get(Season, next_id) is not None:
         raise ValueError("Next season exists without a rollover receipt")
+    from goaletto.infrastructure.models import CupBracket, CupTie
+
+    if await session.get(CupBracket, season.id) is not None:
+        cup_ties = (
+            await session.scalars(
+                select(CupTie).where(CupTie.season_id == season.id).with_for_update()
+            )
+        ).all()
+        if len(cup_ties) != 49 or any(t.status != "decided" for t in cup_ties):
+            raise NotReady("Cup has unfinished ties")
+        cup_plans = (
+            await session.scalars(
+                select(FixturePlan.id).where(
+                    FixturePlan.season_id == season.id, FixturePlan.competition == "cup"
+                )
+            )
+        ).all()
+        completed_cup = (
+            await session.scalars(
+                select(MatchResult.fixture_id).where(
+                    MatchResult.season_id == season.id, MatchResult.competition == "cup"
+                )
+            )
+        ).all()
+        if len(cup_plans) != 97 or set(cup_plans) != set(completed_cup):
+            raise NotReady("Cup has missing result receipts")
     unannounced = await session.scalar(
         select(FixturePlan.id)
         .where(

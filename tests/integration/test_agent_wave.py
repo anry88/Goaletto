@@ -147,8 +147,8 @@ async def test_lineup_stale_revision_snapshot_and_deadline(sessions):
         tuple(p.person_id for p in data.bench),
         data.formation,
         data.starters[0].person_id,
-        "pressing",
-        "balanced",
+        data.tactic,
+        "attack",
         data.version,
     )
 
@@ -169,7 +169,12 @@ async def test_lineup_stale_revision_snapshot_and_deadline(sessions):
     fixture_id, at = await start_fixture(sessions, club_id)
     async with sessions.begin() as session:
         match = await session.scalar(select(Match).where(Match.fixture_id == fixture_id))
-        assert "pressing" in str(match.starting_snapshot)
+        side = (
+            "home"
+            if match.starting_snapshot["home"]["snapshot"]["club_id"] == str(club_id)
+            else "away"
+        )
+        assert match.starting_snapshot[side]["mentality"] == "attack"
         data = await load_lineup(session, replace(actor, at=at))
         assert data.locked
         with pytest.raises(LineupLocked):

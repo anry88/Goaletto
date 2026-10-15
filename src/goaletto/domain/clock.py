@@ -8,6 +8,11 @@ class MatchPhase(StrEnum):
     FIRST_HALF = "first_half"
     HALF_TIME = "half_time"
     SECOND_HALF = "second_half"
+    EXTRA_BREAK = "extra_break"
+    EXTRA_FIRST_HALF = "extra_first_half"
+    EXTRA_HALF_TIME = "extra_half_time"
+    EXTRA_SECOND_HALF = "extra_second_half"
+    PENALTIES = "penalties"
     FULL_TIME = "full_time"
     ABANDONED = "abandoned"
 

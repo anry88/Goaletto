@@ -159,16 +159,28 @@ def live_board_key_for(payload: dict[str, Any]) -> str | None:
 
 def board_revision(payload: dict[str, Any]) -> int:
     tick, phase = payload.get("tick"), payload.get("phase")
-    if type(tick) is not int or not 0 <= tick <= 30:
+    if type(tick) is not int or not 0 <= tick <= 40:
         raise ValueError("Invalid board tick")
-    phases = {"first_half": 0, "half_time": 1, "second_half": 2}
+    kicks = payload.get("penalty_kicks", 0)
+    if type(kicks) is not int or kicks < 0:
+        raise ValueError("Invalid penalty revision")
+    phases = {
+        "first_half": 0,
+        "half_time": 1,
+        "second_half": 2,
+        "extra_break": 3,
+        "extra_first_half": 4,
+        "extra_half_time": 5,
+        "extra_second_half": 6,
+        "penalties": 7,
+    }
     if payload.get("kind") == "match_result":
         if phase not in {"full_time", "abandoned"}:
             raise ValueError("Invalid result phase")
-        return 1000
+        return 1000 + kicks * 10
     if not isinstance(phase, str) or phase not in phases:
         raise ValueError("Invalid live phase")
-    return tick * 10 + phases[phase]
+    return tick * 10 + phases[phase] + kicks * 10
 
 
 def valid_payload(payload: dict[str, Any]) -> bool:
@@ -257,12 +269,12 @@ def valid_payload(payload: dict[str, Any]) -> bool:
             return False
         return (
             type(payload.get("tick")) is int
-            and 0 <= payload["tick"] < 30
+            and 0 <= payload["tick"] <= 40
             and type(payload.get("game_minute")) is int
-            and 0 <= payload["game_minute"] < 90
+            and 0 <= payload["game_minute"] <= 120
         )
     if "game_minute" in payload and (
-        type(payload["game_minute"]) is not int or not 0 <= payload["game_minute"] <= 90
+        type(payload["game_minute"]) is not int or not 0 <= payload["game_minute"] <= 120
     ):
         return False
     if "commentary_by_locale" in payload:
@@ -284,7 +296,12 @@ def valid_payload(payload: dict[str, Any]) -> bool:
         or any(not isinstance(line, str) or len(line) > 180 for line in payload["commentary"])
     ):
         return False
-    for key in ("shots", "on_target"):
+    if "tie_winner_name" in payload and (
+        not isinstance(payload["tie_winner_name"], str)
+        or not 1 <= len(payload["tie_winner_name"]) <= 80
+    ):
+        return False
+    for key in ("shots", "on_target", "penalties", "aggregate"):
         if key in payload and (
             not isinstance(payload[key], list)
             or len(payload[key]) != 2
@@ -410,6 +427,22 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
             escape(latin_name(payload["away"])[:80]),
         )
         score = f"{home} {payload['home_goals']}:{payload['away_goals']} {away}"
+        if "aggregate" in payload:
+            score += "\n" + tr(
+                "Общий счёт: {home}:{away}",
+                home=payload["aggregate"][0],
+                away=payload["aggregate"][1],
+            )
+        if "tie_winner_name" in payload:
+            score += "\n" + tr(
+                "Победитель: {club}", club=escape(latin_name(payload["tie_winner_name"]))
+            )
+        if "penalties" in payload:
+            score += " · " + tr(
+                "Пенальти: {home}:{away}",
+                home=payload["penalties"][0],
+                away=payload["penalties"][1],
+            )
         commentary = tr("\n\nПоследние события:\n") + commentary_html(timeline) if timeline else ""
         stats = (
             (
@@ -434,7 +467,13 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
                 p2=commentary,
             )
         minute = payload.get("game_minute", payload["tick"] * 3)
-        suffix = tr(" · Перерыв") if payload["phase"] == "half_time" else ""
+        suffix = (
+            tr(" · Перерыв")
+            if payload["phase"] in {"half_time", "extra_break", "extra_half_time"}
+            else tr(" · Дополнительное время")
+            if payload["phase"].startswith("extra_")
+            else ""
+        )
         return tr(
             "⚽ {p0}′{p1}\n{p2}{p3}{p4}\n\n/match — управление матчем",
             p0=minute,

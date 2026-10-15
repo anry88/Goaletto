@@ -122,8 +122,7 @@ async def plan_horizon(session: AsyncSession, season_id: UUID, at: datetime) -> 
         ):
             plan.blocked_reason = "invalid_competition_day"
             continue
-        # Conditional tournament slots remain conditional; cup/champions runtimes
-        # opt in when AND-123..126 land. Never invent winners or use league scoring.
+        # Conditional tournament slots wait for actual persisted winners.
         if plan.home_club_id is None or plan.away_club_id is None:
             plan.blocked_reason = "awaiting_participants"
             continue

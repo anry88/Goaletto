@@ -3,7 +3,6 @@
 import asyncio
 from dataclasses import replace
 from datetime import timedelta
-from uuid import uuid5
 
 import pytest
 from sqlalchemy import func, select, update
@@ -13,15 +12,12 @@ from goaletto.application.market import load_market, place_bid
 from goaletto.application.match_runtime import (
     activate_season,
     handle_calendar_job,
-    team_snapshot,
 )
 from goaletto.application.match_simulation import simulate_match
 from goaletto.application.outbox_delivery import Decision, check_recipient
 from goaletto.application.results import finalize_result, league_table
 from goaletto.application.season_rollover import rollover_season
 from goaletto.domain.match_codec import state_document
-from goaletto.domain.match_engine import start_match
-from goaletto.domain.world import stable_seed
 from goaletto.infrastructure.jobs import process_one_job
 from goaletto.infrastructure.models import (
     Auction,
@@ -54,11 +50,21 @@ pytestmark = pytest.mark.integration
 
 
 async def complete_season(sessions, season_id):
-    """Run the real pure engine and real result finalizer; no 0:0 fabricated tables."""
+    """Real engine/finalizer for league and cup in chronological UTC order."""
+    from datetime import UTC, datetime
+
+    from goaletto.application.calendar_planning import plan_horizon
+    from goaletto.domain.match_codec import restore_state
+
     async with sessions.begin() as session:
         season = await session.get(Season, season_id)
+        epoch = season.cycle_epoch
         if season.status == "scheduled":
-            await activate_season(session, season_id, season.starts_at - timedelta(minutes=6))
+            await activate_season(
+                session,
+                season_id,
+                datetime.combine(epoch, datetime.min.time(), tzinfo=UTC) - timedelta(days=1),
+            )
             work = await session.scalar(
                 select(Job).where(
                     Job.kind == "season.open", Job.payload["season_id"].astext == str(season_id)
@@ -66,76 +72,68 @@ async def complete_season(sessions, season_id):
             )
             await handle_calendar_job(session, work, work.due_at)
             work.status = "done"
-        clubs = (
-            await session.scalars(
-                select(Club)
-                .join(SeasonClub, SeasonClub.club_id == Club.id)
-                .where(SeasonClub.season_id == season_id)
-            )
-        ).all()
-        snapshots = {c.id: await team_snapshot(session, c, season.starts_at) for c in clubs}
-        from goaletto.application.calendar_planning import plan_horizon
-
-        for offset in range(18):
-            await plan_horizon(
-                session,
-                season_id,
-                season.starts_at - timedelta(days=1) + timedelta(days=4 * offset),
-            )
-        fixtures = (
-            await session.scalars(
-                select(Fixture)
-                .where(Fixture.season_id == season_id)
-                .order_by(Fixture.round_number, Fixture.id)
-            )
-        ).all()
-        # Keep the starting documents to verify rollover cannot rewrite old squads.
-        historical = {}
-        for f in fixtures:
-            seed = stable_seed(season.seed, f"match:{f.id}")
-            initial = start_match(
-                uuid5(f.id, "rollover-test-match"),
-                seed,
-                snapshots[f.home_club_id],
-                snapshots[f.away_club_id],
-                engine_version="regulation-v3",
-            )
-            final, _ = simulate_match(initial)
-            assert final.tick == 30 and final.phase.value == "full_time"
-            f.status, f.actual_start_at = "finished", f.scheduled_start_at
-            f.actual_finish_at = f.actual_start_at + timedelta(minutes=33)
-            doc = state_document(initial)
-            historical[f.id] = doc
-            session.add(
-                Match(
-                    id=final.match_id,
-                    fixture_id=f.id,
-                    seed=seed,
-                    engine_version=final.engine_version,
-                    state_version=int(final.engine_version.removeprefix("regulation-v")),
-                    state=state_document(final),
-                    starting_snapshot=doc,
-                    completed_tick=30,
-                    phase="full_time",
-                    home_goals=final.home.stats.goals,
-                    away_goals=final.away.stats.goals,
+    historical = {}
+    latest = season.ends_at
+    for day in range(72):
+        at = datetime.combine(epoch + timedelta(days=day), datetime.min.time(), tzinfo=UTC)
+        async with sessions.begin() as session:
+            await plan_horizon(session, season_id, at)
+            fixtures = (
+                await session.scalars(
+                    select(Fixture)
+                    .where(
+                        Fixture.season_id == season_id,
+                        Fixture.scheduled_start_at >= at,
+                        Fixture.scheduled_start_at < at + timedelta(days=1),
+                    )
+                    .order_by(Fixture.scheduled_start_at, Fixture.id)
                 )
-            )
-            await session.flush()
-            from goaletto.application.recovery import lock_energy
-
-            match = await session.scalar(select(Match).where(Match.fixture_id == f.id))
-            await lock_energy(session, match, initial, f.lineup_lock_at)
-            assert await finalize_result(session, f.id, f.actual_finish_at)
-        at = max(season.ends_at, max(f.actual_finish_at for f in fixtures) + timedelta(seconds=1))
+            ).all()
+            for f in fixtures:
+                if f.status == "finished":
+                    continue
+                for kind in ("match.lock_lineup", "match.start"):
+                    work = await session.scalar(
+                        select(Job).where(
+                            Job.kind == kind, Job.payload["fixture_id"].astext == str(f.id)
+                        )
+                    )
+                    await handle_calendar_job(session, work, work.due_at)
+                    work.status = "done"
+                match = await session.scalar(select(Match).where(Match.fixture_id == f.id))
+                initial = restore_state(match.state)
+                final, _ = simulate_match(initial)
+                assert final.phase.value == "full_time"
+                historical[f.id] = match.starting_snapshot
+                penalty_minutes = (
+                    len(final.knockout.shootout.kicks)
+                    if final.knockout and final.knockout.shootout
+                    else 0
+                )
+                duration = 33 if final.tick == 30 else 45 + penalty_minutes
+                f.status, f.actual_finish_at = (
+                    "finished",
+                    f.actual_start_at + timedelta(minutes=duration),
+                )
+                match.state, match.phase, match.completed_tick = (
+                    state_document(final),
+                    "full_time",
+                    final.tick,
+                )
+                match.home_goals, match.away_goals = final.home.stats.goals, final.away.stats.goals
+                match.next_due_at = None
+                await session.flush()
+                assert await finalize_result(session, f.id, f.actual_finish_at)
+                latest = max(latest, f.actual_finish_at + timedelta(seconds=1))
+    async with sessions.begin() as session:
         await session.execute(update(Job).values(status="done"))
         rollover_job = await session.scalar(
             select(Job).where(
                 Job.kind == "season.rollover", Job.payload["season_id"].astext == str(season_id)
             )
         )
-        rollover_job.status, rollover_job.due_at = "pending", at
-        return at, historical
+        rollover_job.status, rollover_job.due_at = "pending", latest
+    return latest, historical
 
 
 async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(sessions):
@@ -254,7 +252,7 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
             await session.scalar(
                 select(func.count())
                 .select_from(FixturePlan)
-                .where(FixturePlan.season_id == next_season.id)
+                .where(FixturePlan.season_id == next_season.id, FixturePlan.competition == "league")
             )
             == 450
         )
@@ -263,7 +261,9 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
                 select(func.count())
                 .select_from(Job)
                 .where(
-                    Job.payload["season_id"].astext == str(next_season.id), Job.status == "pending"
+                    Job.payload["season_id"].astext == str(next_season.id),
+                    Job.status == "pending",
+                    ~Job.kind.like("match.%"),
                 )
             )
             == 3

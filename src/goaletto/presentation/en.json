@@ -663,5 +663,16 @@
   "Главного тренера можно только заменить через найм другого.": "The head coach can only be replaced by hiring another coach.",
   "Главного тренера можно только заменить через найм другого. Откройте /staff.": "The head coach can only be replaced by hiring another coach. Open /staff.",
   "{skill}: +{gain}% балла": "{skill}: +{gain}% of a point",
-  "\nФорма после матча: {before} → {after}/8": "\nForm after match: {before} → {after}/8"
+  "\nФорма после матча: {before} → {after}/8": "\nForm after match: {before} → {after}/8",
+  "Дополнительное время": "Extra time",
+  " · Дополнительное время": " · Extra time",
+  "Серия пенальти": "Penalty shootout",
+  "Пенальти: {home}:{away}": "Penalties: {home}:{away}",
+  "Пенальти: {player} — гол": "Penalty: {player} — scored",
+  "Пенальти: {player} — мимо": "Penalty: {player} — missed",
+  "Кубок · {date}": "Cup · {date}",
+  "Общий счёт: {home}:{away}": "Aggregate: {home}:{away}",
+  "Нейтральный стадион: {name} · {crowd}/{capacity}": "Neutral stadium: {name} · {crowd}/{capacity}",
+  "Билеты — {home}: {amount_home}; {away}: {amount_away}": "Tickets — {home}: {amount_home}; {away}: {amount_away}",
+  "Победитель: {club}": "Winner: {club}"
 }

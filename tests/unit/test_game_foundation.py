@@ -47,6 +47,11 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
         "training_plans",
         "player_development",
         "match_development",
+        "cup_brackets",
+        "cup_ties",
+        "match_stages",
+        "match_recoveries",
+        "match_crowds",
     }
     dialect = postgresql.dialect()
     for table in Base.metadata.sorted_tables:
@@ -75,6 +80,12 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 "ck_training_week",
                 "ck_match_development_policy",
                 "ck_match_development_terms",
+                "ck_cup_bracket_policy",
+                "ck_cup_tie_winner",
+                "ck_match_stage",
+                "ck_recovery_tick",
+                "ck_command_target_tick",
+                "ck_crowd_policy",
             }:
                 assert (
                     normalized(

@@ -65,7 +65,12 @@ def parse_callback(value: str) -> tuple[str, tuple[int, ...], UUID, UUID, int, b
     ):
         raise ValueError("Invalid live window")
     target = int(suffix[:-1])
-    if not 1 <= target <= 30 or str(target) != suffix[:-1] or suffix[-1] == "h" and target != 16:
+    if (
+        not 1 <= target <= 40
+        or str(target) != suffix[:-1]
+        or suffix[-1] == "h"
+        and target not in {16, 31, 36}
+    ):
         raise ValueError("Invalid live window")
     args = tuple(int(s) for s in args_text)
     if any(not 0 <= a <= 20 for a in args):
@@ -92,8 +97,39 @@ def render(
             f"{state.home.stats.goals}:{state.away.stats.goals} "
             f"{escape(latin_name(state.away.snapshot.name))} · {state.game_minute}′"
         )
-        if state.phase.value == "half_time":
+        if state.phase.value in {"half_time", "extra_break", "extra_half_time"}:
             lines.append(tr("Перерыв · замены не расходуют окно замен."))
+        if state.phase.value.startswith("extra_"):
+            lines.append(tr("Дополнительное время"))
+        if state.knockout and state.knockout.tie.tie_format == "single":
+            lines.append(tr("Нейтральное поле"))
+        if state.knockout and state.phase.value == "full_time" and state.knockout.segment != "leg1":
+            from goaletto.domain.knockout_match import decision
+
+            settled = decision(state)
+            direct = state.home.snapshot.club_id == state.knockout.tie.club_a_id
+            h, a = (
+                (settled.aggregate_a, settled.aggregate_b)
+                if direct
+                else (settled.aggregate_b, settled.aggregate_a)
+            )
+            lines.append(tr("Общий счёт: {home}:{away}", home=h, away=a))
+            winner = (
+                state.home.snapshot.name
+                if settled.winner == state.home.snapshot.club_id
+                else state.away.snapshot.name
+            )
+            lines.append(tr("Победитель: {club}", club=escape(latin_name(winner))))
+        if state.knockout and state.knockout.shootout:
+            from goaletto.domain.knockout import decide_shootout
+
+            score = decide_shootout(state.knockout.shootout)
+            h, a = (
+                (score.score_a, score.score_b)
+                if state.home.snapshot.club_id == state.knockout.tie.club_a_id
+                else (score.score_b, score.score_a)
+            )
+            lines.append(tr("Пенальти: {home}:{away}", home=h, away=a))
         lines.append(
             tr(
                 "Удары: {p0} / {p1} · В створ: {p2} / {p3}",

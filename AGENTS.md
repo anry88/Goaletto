@@ -217,3 +217,14 @@
   champions_bracket; see docs/agent-wave7-review.md. Do not confuse accepted pure
   modules with completed game wiring. Preserve match-development-v1 receipts;
   zero-minute practice must preserve every fraction, including capped skills.
+
+- AND-123/124/125 now wire the ordinary cup end to end; see docs/tournament-runtime.md.
+  New worlds/seasons persist frozen entries, 49 ties and 97 plans alongside 450 league
+  plans. Legacy seasons without a bracket stay untouched. Rollover with a bracket
+  requires all cup results and decided ties; league standings remain league-only.
+  V4 alone permits real ET ticks 31..40 and one durable job per penalty. Preserve
+  V1/V2/V3 replay hashes, original coach/substitution limits and recovery windows.
+  Neutral finals pin an existing third-club arena and split tickets atomically;
+  no home advantage or arena-owner income. League and cup practice use actual
+  0..120 minutes once; penalties add no minutes/goals. Champions/friendly runtime
+  and completion of AND-130 remain separate work.

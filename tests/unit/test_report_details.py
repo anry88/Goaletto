@@ -157,3 +157,23 @@ async def test_practice_report_shows_skill_fraction_form_and_legacy_absence():
         english, _ = report_view(changed, section="home")
     assert "Form after match: 8 → 7/8" in english
     assert "Playmaking: +2.88%" in english
+
+
+async def test_cup_report_separates_penalties_and_shows_frozen_neutral_revenue():
+    from goaletto.presentation.i18n import using_locale
+
+    recorder = Recorder()
+    report = await get_match_report(session(recorder), recorder.actor, recorder.fixture.id)
+    report = replace(
+        report,
+        competition="cup",
+        aggregate=(1, 1),
+        penalties=(4, 3),
+        neutral_venue=("<Арена>", 5000, 4000, 10000, 10000),
+    )
+    text, _ = report_view(report)
+    assert "Кубок" in text and "Общий счёт: 1:1" in text and "Пенальти: 4:3" in text
+    assert "4000/5000" in text and "&lt;Arena&gt;" in text and "10000" in text
+    with using_locale("en"):
+        text, _ = report_view(report)
+    assert "Neutral stadium:" in text and "Tickets" in text and "Penalties: 4:3" in text

@@ -157,6 +157,9 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
                         "match.remind": "reminder",
                         "match.finalize_result": "result",
                         "match.tick": f"tick:{job.payload['tick_number']}",
+                        "match.extra_start": "extra_first",
+                        "match.extra_second_half_start": "extra_second",
+                        "match.penalty": f"penalty:{job.payload['tick_number']}",
                     }[job.kind]
                     operation_id = uuid5(fixture_id, f"runtime:v1:{stage}")
             job.status = "pending" if rescheduled else "done"

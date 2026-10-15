@@ -60,6 +60,8 @@ def apply_commands(
     tick: int,
     halftime: bool,
 ) -> tuple[MatchState, tuple[MatchCommand, ...], tuple[tuple[UUID, str], ...]]:
+    if tick > (40 if state.knockout else 30):
+        raise ValueError("Command exceeds match duration")
     accepted: list[MatchCommand] = []
     rejected: list[tuple[UUID, str]] = []
     seen: set[UUID] = set()
