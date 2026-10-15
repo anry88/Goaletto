@@ -196,7 +196,7 @@ def valid_payload(payload: dict[str, Any]) -> bool:
             and type(payload.get("amount")) is int
             and 0 <= payload["amount"] < 2**63
             and type(payload.get("weekly_rate")) is int
-            and 180 <= payload["weekly_rate"] <= 1700
+            and 1 <= payload["weekly_rate"] <= 200000
             and (payload.get("bid_id") is None or _payload_uuid(payload, "bid_id") is not None)
             and (
                 payload.get("event") not in {"bid", "outbid", "sold", "bought"}

@@ -4,6 +4,7 @@ from uuid import UUID
 import pytest
 
 from goaletto.domain.candidates import STAFF_ROLES, candidate_profile
+from goaletto.domain.finances import staff_fee, staff_wage
 from goaletto.domain.match_types import Tactic
 from goaletto.domain.staff_quality import generated_staff, quality_tier, staff_abilities
 
@@ -21,7 +22,9 @@ def test_seeded_supply_spans_ages_skills_and_rare_elite():
 @pytest.mark.parametrize("role", STAFF_ROLES)
 def test_capabilities_are_role_specific_and_generation_is_separate_from_money(role):
     name, age, skills, fee, wage = candidate_profile(UUID(int=12), "staff", role)
-    assert name and 50 <= age <= 56 and fee == 4 * wage
+    assert name and 50 <= age <= 56
+    assert fee == staff_fee(role, skills[0], age)
+    assert wage == staff_wage(role, skills[0], age)
     for skill in (1, 4, 5, 8, 9, 12, 13, 16, 17, 20):
         abilities = staff_abilities(role, skill)
         assert abilities.tier == quality_tier(skill)

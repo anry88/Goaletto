@@ -14,6 +14,7 @@ from goaletto.domain.finances import (
     season_prize,
     sponsor_income,
     stadium_upkeep,
+    staff_wage,
     ticket_income,
 )
 from goaletto.domain.match_engine import start_match
@@ -85,9 +86,11 @@ def main() -> None:
                 recent[away].append(3 if a > h else 1 if a == h else 0)
             ranked = rank_league(tuple(standings.values()))
             for place, row in enumerate(ranked, 1):
-                wage = sum(player_wage(p.skills[:8]) for p in clubs[row.club_id].players)
+                wage = sum(
+                    player_wage(p.skills[:8], p.age, p.position) for p in clubs[row.club_id].players
+                )
                 sponsor = sponsor_income(league.tier, place)
-                common = sponsor + merchandise_income(2500) - wage - 50000
+                common = sponsor + merchandise_income(2500) - wage - staff_wage("head_coach")
                 baseline[row.club_id] += common - stadium_upkeep(5000)
                 expanded[row.club_id] += common - stadium_upkeep(
                     10000 if round_number > 1 else 5000
@@ -110,6 +113,21 @@ def main() -> None:
                         "expanded_cash": expanded[row.club_id],
                     }
                 )
+        # Eight-day offseason also pays salaries and upkeep, without match tickets.
+        for place, row in enumerate(rank_league(tuple(standings.values())), 1):
+            wage = sum(
+                player_wage(p.skills[:8], p.age, p.position) for p in clubs[row.club_id].players
+            )
+            common = (
+                sponsor_income(league.tier, place)
+                + merchandise_income(2500)
+                - wage
+                - staff_wage("head_coach")
+            )
+            baseline[row.club_id] += 2 * (common - stadium_upkeep(5000))
+            expanded[row.club_id] += 2 * (common - stadium_upkeep(10000))
+            baseline_min = min(baseline_min, baseline[row.club_id])
+            expanded_min = min(expanded_min, expanded[row.club_id])
         assert all(s.played == 18 for s in standings.values())
         report.append(
             f"| {league.tier} | "
@@ -133,9 +151,9 @@ def main() -> None:
 фанбаза, фиксированные составы. Долгосрочные травмы, трансферы и тренировки здесь не
 моделируются.
 
-На каждый клуб заложена зарплата главного тренера 50K как финансовый сценарий; его влияние
-на качество игры не моделируется. Недельные поступления/расходы после тура, 9 домашних
-билетов и один итоговый приз. Частичная первая неделя считается полной: это консервативный
+economy-cycle-v2: на каждый клуб заложен слабый тренер 8K/4 дня как финансовый сценарий; его влияние
+на качество игры не моделируется. Поступления/расходы за четырёхдневный цикл после тура, 9 домашних
+билетов и один итоговый приз. Частичный первый цикл считается полным: это консервативный
 расходный прогноз.
 
 Сравнение: исходный стадион 5,000; расширение до 10,000 за 300K, вступившее в силу со
@@ -144,7 +162,7 @@ def main() -> None:
 поэтому цена расширения видна как долгосрочное решение. Стартовые 600K не вынуждают
 расширять арену.
 
-| Tier | Зрители | Билеты/клуб | Min cash 5K | Min cash 10K | Итог 5K с призом |
+| Tier | Зрители | Билеты/клуб | Min cash 5K | Min cash 10K | Итог 5K, приз и 8 дней межсезонья |
 |---|---:|---:|---:|---:|---:|
 """
         + "\n".join(report)
@@ -152,10 +170,10 @@ def main() -> None:
 
 Все 50 cash forecasts остались положительными. Отдельный расчёт economy-calculation.md
 проверяет нулевые билеты, постоянное последнее место, покупку игрока, оба вложения,
-дорогой штаб и две недели межсезонья. Приз не используется до конца сезона.
+дорогой штаб и два цикла межсезонья. Приз не используется до конца сезона.
 
 Воспроизведение: `.venv/bin/python scripts/simulate_economy_season.py`. Детальные 900
-club-week rows: `work/economy-season.csv`; никаких DB или изображений.
+club-cycle rows: `work/economy-season.csv`; никаких DB или изображений.
 """,
         encoding="utf-8",
     )

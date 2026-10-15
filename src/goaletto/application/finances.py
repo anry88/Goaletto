@@ -16,6 +16,7 @@ from goaletto.application.match_runtime import NotReady
 from goaletto.application.money import credit_locked, debit_locked, locked_accounts
 from goaletto.domain.finances import (
     POLICY_VERSION,
+    SALARY_POLICIES,
     accrued_wage,
     merchandise_income,
     player_wage,
@@ -54,9 +55,16 @@ async def salary_contract(
     at: datetime,
     *,
     quoted_player_wage: int | None = None,
+    quoted_staff_wage: int | None = None,
+    policy_version: str = POLICY_VERSION,
 ) -> SalaryContract:
     """After a hire/transfer, bind a fixed wage. Caller owns the full transaction."""
     require_utc(at)
+    if policy_version not in SALARY_POLICIES:
+        raise ValueError("Unsupported salary policy")
+    if quoted_staff_wage is not None and quoted_player_wage is not None:
+        raise ValueError("Conflicting salary quotes")
+    quoted_rate = quoted_player_wage if quoted_player_wage is not None else quoted_staff_wage
     await allocation_lock(session)
     person = await session.scalar(select(Person).where(Person.id == person_id).with_for_update())
     row = await session.scalar(
@@ -81,8 +89,8 @@ async def salary_contract(
         if (
             row.club_id != club_id
             or row.role != role
-            or quoted_player_wage is not None
-            and row.weekly_rate != quoted_player_wage
+            or quoted_rate is not None
+            and (row.weekly_rate != quoted_rate or row.policy_version != policy_version)
         ):
             raise ValueError("Close previous salary before changing employer")
         return row
@@ -100,19 +108,31 @@ async def salary_contract(
         .limit(1)
     ):
         raise ValueError("Cannot backdate salary into a settled period")
-    rate = (
-        player_wage(tuple(getattr(worker, name) for name in SKILL_NAMES[:8]))
-        if role == "player"
-        else staff_wage(role)
+    qualification = (
+        await session.get(StaffQualification, (person_id, role))
+        if isinstance(worker, Staff)
+        else None
     )
-    if quoted_player_wage is not None:
+    if isinstance(worker, Staff) and qualification is None:
+        raise ValueError("Staff needs an explicit qualification")
+    rate = (
+        player_wage(
+            tuple(getattr(worker, name) for name in SKILL_NAMES[:8]),
+            person.age,
+            worker.position,
+            1 + len(worker.alternative_positions),
+        )
+        if isinstance(worker, Player)
+        else staff_wage(role, qualification.skill if qualification else 1, person.age)
+    )
+    if quoted_rate is not None:
         if (
-            role != "player"
-            or type(quoted_player_wage) is not int
-            or not 180 <= quoted_player_wage <= 1700
+            type(quoted_rate) is not int
+            or not 1 <= quoted_rate <= 200_000
+            or (role == "player") != (quoted_player_wage is not None)
         ):
-            raise ValueError("Invalid agreed player wage")
-        rate = quoted_player_wage
+            raise ValueError("Invalid agreed wage")
+        rate = quoted_rate
     recovery_skill = 0
     if role == "physiotherapist":
         qualification = await session.get(StaffQualification, (person_id, role))
@@ -126,7 +146,7 @@ async def salary_contract(
         role=role,
         weekly_rate=rate,
         recovery_skill=recovery_skill,
-        policy_version=POLICY_VERSION,
+        policy_version=policy_version,
         started_at=at,
     )
     session.add(row)
@@ -224,7 +244,7 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
     require_utc(week)
     if not timedelta(0) < week - start <= timedelta(seconds=CYCLE_SECONDS) or job.due_at != week:
         raise ValueError("Invalid finance cycle")
-    period_seconds, policy = CYCLE_SECONDS, "economy-cycle-v1"
+    period_seconds, policy = CYCLE_SECONDS, POLICY_VERSION
     if at < week:
         raise NotReady("Finance period not finished")
     if not await allocation_lock(session, try_lock=True):
@@ -260,7 +280,7 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
         wages = {"player_salary": 0, "staff_salary": 0}
         contract_snapshot = []
         for contract in contracts:
-            if contract.policy_version != POLICY_VERSION:
+            if contract.policy_version not in SALARY_POLICIES:
                 raise ValueError("Unsupported salary policy")
             seconds = math.ceil(
                 (
@@ -274,6 +294,7 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
                     "id": str(contract.id),
                     "seconds": seconds,
                     "rate": contract.weekly_rate,
+                    "policy": contract.policy_version,
                     "period_seconds": CYCLE_SECONDS,
                     "due": due,
                 }
@@ -286,7 +307,9 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
         )
         amounts = {
             "sponsor": accrued_wage(
-                sponsor_income(tier, place), int((week - start).total_seconds()), period_seconds
+                sponsor_income(tier, place, account.club.supporters),
+                int((week - start).total_seconds()),
+                period_seconds,
             ),
             "merchandise": accrued_wage(
                 merchandise_income(account.club.supporters),
@@ -342,7 +365,7 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
             )
         )
         await session.flush()
-    elif prior.week_start != week or prior.policy_version != policy:
+    elif prior.week_start != week or prior.policy_version not in SALARY_POLICIES:
         raise ValueError("Conflicting finance cycle")
     await session.execute(
         insert(Job)
@@ -404,6 +427,24 @@ async def pay_league_prizes(
     accounts = await locked_accounts(session, *(r.club_id for r in ranked))
     changed = False
     for place, row in enumerate(ranked, 1):
+        # A completed payout belongs to its original policy, even after deployment.
+        prior = await session.scalar(
+            select(LedgerEntry).where(
+                LedgerEntry.club_id == row.club_id,
+                LedgerEntry.operation_key == f"prize:{season_id}:{league_id}",
+            )
+        )
+        if prior is not None:
+            details = prior.request["details"]
+            if (
+                prior.kind != "prize"
+                or details.get("season_id") != str(season_id)
+                or details.get("league_id") != str(league_id)
+                or details.get("place") != place
+                or details.get("policy") not in SALARY_POLICIES
+            ):
+                raise ValueError("Conflicting historical prize")
+            continue
         changed |= await credit_locked(
             session,
             accounts[row.club_id],
@@ -503,7 +544,7 @@ async def load_finances(
         account.record.arrears,
         sum(c.weekly_rate for c in contracts if c.role == "player"),
         sum(c.weekly_rate for c in contracts if c.role != "player"),
-        sponsor_income(tier, place),
+        sponsor_income(tier, place, account.club.supporters),
         merchandise_income(club.supporters),
         stadium_upkeep(club.stadium_capacity),
         due,

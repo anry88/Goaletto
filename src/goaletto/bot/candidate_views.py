@@ -9,6 +9,7 @@ from goaletto.application.candidates import CandidateItem, CandidateScreen
 from goaletto.bot.finance_views import amount
 from goaletto.bot.market_views import button
 from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.domain.finances import player_quality
 from goaletto.domain.market import decode_price, encode_price
 from goaletto.domain.names import latin_name
 from goaletto.domain.staff_quality import QUALITY_NAMES, quality_tier
@@ -107,13 +108,19 @@ def candidate_list(
                 ),
             )
         )
+        if kind == "player":
+            ability = (
+                tr("Качество: {quality}/20", quality=player_quality(item.skills, offer.profile))
+                + "\n"
+                + ability
+            )
         lines.extend(
             (
                 "",
                 f"<b>{escape(latin_name(person.name))}</b> · {person.age} · {role}",
                 ability,
                 tr(
-                    "Подписание: {fee} · зарплата: {wage}/период клуба",
+                    "Подписание: {fee} · зарплата: {wage}/4 дня",
                     fee=amount(offer.fee),
                     wage=amount(offer.weekly_rate),
                 ),
@@ -156,12 +163,16 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
     offer, person = item.offer, item.person
     role = offer.profile if offer.kind == "player" else ROLES[offer.profile]
     text = tr(
-        "Подписать {name} · {role}?\nРазово: {fee}\nЗарплата: {wage}/период клуба",
+        "Подписать {name} · {role}?\nРазово: {fee}\nЗарплата: {wage}/4 дня",
         name=escape(latin_name(person.name)),
         role=role,
         fee=amount(offer.fee),
         wage=amount(offer.weekly_rate),
     )
+    if offer.kind == "player":
+        text += "\n" + tr(
+            "Качество: {quality}/20", quality=player_quality(item.skills, offer.profile)
+        )
     if offer.kind == "staff":
         text += "\n" + tr(
             "Квалификация: {quality} · {skill}/20",

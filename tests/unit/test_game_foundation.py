@@ -36,6 +36,8 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
         "persons",
         "ledger_entries",
         "candidate_signings",
+        "candidate_offers",
+        "auctions",
         "staff_qualifications",
         "seasons",
         "salary_contracts",

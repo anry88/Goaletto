@@ -11,6 +11,7 @@ from goaletto.domain.candidates import (
     candidate_profile,
     deficit,
 )
+from goaletto.domain.finances import player_fee, player_wage
 from goaletto.domain.names import international_catalog
 from goaletto.domain.retirement import STAFF_PROBABILITIES_BPS, staff_last_season
 from goaletto.domain.season_rollover import rollover_kickoff
@@ -61,9 +62,10 @@ def test_new_baseline_players_cover_positions_reproducibly(position):
     name, age, skills, fee, wage = profile
     seed = stable_seed(0, f"{POOL_POLICY}:{person_id}")
     assert name in {name for _, name in international_catalog(seed)}
-    assert name and age == 18 and len(skills) == 10
+    assert name and 26 <= age <= 30 and len(skills) == 10
     assert all(1 <= skill <= 20 for skill in skills)
-    assert fee == 100000 and wage == 100 + 10 * sum(skills[:8])
+    assert fee == player_fee(skills[:8], age, position)
+    assert wage == player_wage(skills[:8], age, position)
 
 
 @pytest.mark.parametrize("kind", ["player_lifecycle", "staff_lifecycle"])

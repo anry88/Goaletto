@@ -20,6 +20,7 @@ from goaletto.application.game_actions import (
 )
 from goaletto.application.money import InsufficientFunds, locked_accounts, release, reserve, settle
 from goaletto.domain.finances import MAX_MONEY, money, player_wage
+from goaletto.domain.finances import POLICY_VERSION as ECONOMY_POLICY
 from goaletto.domain.market import (
     AUCTION_HOURS,
     MIN_PRICE,
@@ -289,7 +290,13 @@ async def list_player(
         league_set_id=await league_set_for(session, club),
         player_age=person.age,
         initial_price=price,
-        weekly_rate=player_wage(tuple(getattr(player, k) for k in SKILL_NAMES[:8])),
+        economy_policy=ECONOMY_POLICY,
+        weekly_rate=player_wage(
+            tuple(getattr(player, k) for k in SKILL_NAMES[:8]),
+            person.age,
+            player.position,
+            1 + len(player.alternative_positions),
+        ),
         created_at=at,
         ends_at=at + timedelta(hours=AUCTION_HOURS),
         status="open",
@@ -711,7 +718,13 @@ async def close_auction(session: AsyncSession, job: Job, at: datetime) -> bool:
     await session.flush()
     await repair_lineup(session, bid.buyer_club_id, None, player, at)
     await salary_contract(
-        session, person.id, bid.buyer_club_id, "player", at, quoted_player_wage=auction.weekly_rate
+        session,
+        person.id,
+        bid.buyer_club_id,
+        "player",
+        at,
+        quoted_player_wage=auction.weekly_rate,
+        policy_version=auction.economy_policy,
     )
     await settle(session, bid.buyer_club_id, auction.seller_club_id, bid.reservation_id, at)
     session.add(

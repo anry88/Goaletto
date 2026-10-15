@@ -15,6 +15,7 @@ from goaletto.domain.finances import (
     money,
     player_wage,
     sponsor_income,
+    staff_wage,
     ticket_income,
 )
 from goaletto.domain.world import WorldOptions, build_world
@@ -33,10 +34,10 @@ def test_starter_wages_and_guaranteed_income_cover_head_coach_without_tickets():
     )
     for league in world.leagues:
         for club in league.clubs:
-            wages = sum(player_wage(p.skills[:8]) for p in club.players)
-            assert wages == 16270
-            assert sponsor_income(club.tier, 10) + 2500 > wages + 50000 + 3000
-    assert INITIAL_CAPITAL >= (400000 + 2 * (16270 + 1000 + 50000 + 4000)) * 110 // 100
+            wages = sum(player_wage(p.skills[:8], p.age, p.position) for p in club.players)
+            assert 39000 <= wages <= 42000
+            assert sponsor_income(club.tier, 10) + 2500 > wages + staff_wage("head_coach") + 3000
+    assert INITIAL_CAPITAL == 600000
     assert accrued_wage(50000, 345600) == 50000
     assert accrued_wage(50000, 172800) == 25000
     assert accrued_wage(50000, 1) == 1

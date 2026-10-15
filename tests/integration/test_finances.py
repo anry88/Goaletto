@@ -286,12 +286,30 @@ async def test_league_prizes_require_full_results_and_pay_once(sessions):
             row.played = row.drawn = row.points = 18
         await session.flush()
         at = max(f.actual_finish_at for f in fixtures)
+        from goaletto.application.results import league_table
+
+        first = (await league_table(session, result.season_id, club.league_id))[0]
+        account = (await locked_accounts(session, first.club_id))[first.club_id]
+        await credit_locked(
+            session,
+            account,
+            f"prize:{result.season_id}:{club.league_id}",
+            "prize",
+            250000,
+            at,
+            {
+                "season_id": str(result.season_id),
+                "league_id": str(club.league_id),
+                "place": 1,
+                "policy": "economy-cycle-v1",
+            },
+        )
         assert await pay_league_prizes(session, result.season_id, club.league_id, at)
         assert not await pay_league_prizes(session, result.season_id, club.league_id, at)
         prizes = (
             await session.scalars(select(LedgerEntry).where(LedgerEntry.kind == "prize"))
         ).all()
-        assert len(prizes) == 10 and sum(p.cash_delta for p in prizes) == sum(
-            season_prize(5, place) for place in range(1, 11)
+        assert len(prizes) == 10 and sum(p.cash_delta for p in prizes) == 250000 + sum(
+            season_prize(5, place) for place in range(2, 11)
         )
         assert len({p.request["details"]["place"] for p in prizes}) == 10

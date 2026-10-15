@@ -547,5 +547,8 @@
   "1/8 финала": "Round of 16",
   "Четвертьфинал": "Quarterfinal",
   "Полуфинал": "Semifinal",
-  "Финал": "Final"
+  "Финал": "Final",
+  "Качество: {quality}/20": "Quality: {quality}/20",
+  "Подписание: {fee} · зарплата: {wage}/4 дня": "Signing: {fee} · wage: {wage}/4 days",
+  "Подписать {name} · {role}?\nРазово: {fee}\nЗарплата: {wage}/4 дня": "Sign {name} · {role}?\nOne-time fee: {fee}\nWage: {wage}/4 days"
 }

@@ -390,8 +390,8 @@ async def test_free_player_can_enter_staff_pool_with_separate_career_receipts(se
             )
         ).all()
         assert {r.kind: (r.profile, r.fee) for r in history} == {
-            "player": ("DC", 100000),
-            "staff": ("defence_coach", 80000),
+            "player": ("DC", first.fee),
+            "staff": ("defence_coach", second.fee),
         }
         assert (
             await sign_candidate(

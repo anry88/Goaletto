@@ -558,6 +558,10 @@ class CandidatePool(Base):
 class CandidateOffer(Base):
     __tablename__ = "candidate_offers"
     __table_args__ = (
+        CheckConstraint(
+            "economy_policy IN ('economy-cycle-v1','economy-cycle-v2')",
+            name="ck_candidate_offers_economy",
+        ),
         ForeignKeyConstraint(
             ["kind", "pool_profile"],
             ["candidate_pools.kind", "candidate_pools.profile"],
@@ -572,6 +576,7 @@ class CandidateOffer(Base):
     profile: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(16), default="available")
     fee: Mapped[int] = mapped_column(BigInteger)
+    economy_policy: Mapped[str] = mapped_column(String(32), server_default="economy-cycle-v1")
     weekly_rate: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -579,6 +584,10 @@ class CandidateOffer(Base):
 class CandidateSigning(Base):
     __tablename__ = "candidate_signings"
     __table_args__ = (
+        CheckConstraint(
+            "economy_policy IN ('economy-cycle-v1','economy-cycle-v2')",
+            name="ck_candidate_signings_economy",
+        ),
         CheckConstraint("fee > 0 AND weekly_rate > 0", name="ck_signing_price"),
         CheckConstraint("kind IN ('player','staff')", name="ck_signing_kind"),
         UniqueConstraint("person_id", "kind", name="uq_candidate_signing_career"),
@@ -590,6 +599,7 @@ class CandidateSigning(Base):
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
     ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
     fee: Mapped[int] = mapped_column(BigInteger)
+    economy_policy: Mapped[str] = mapped_column(String(32), server_default="economy-cycle-v1")
     weekly_rate: Mapped[int] = mapped_column(Integer)
     signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -1413,7 +1423,9 @@ class FinanceCycle(Base):
     __tablename__ = "finance_cycles"
     __table_args__ = (
         UniqueConstraint("club_id", "week_start", name="uq_finance_week"),
-        CheckConstraint("policy_version = 'economy-cycle-v1'", name="ck_finance_policy"),
+        CheckConstraint(
+            "policy_version IN ('economy-cycle-v1','economy-cycle-v2')", name="ck_finance_policy"
+        ),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
@@ -1476,10 +1488,13 @@ class MatchCrowd(Base):
 class Auction(Base):
     __tablename__ = "auctions"
     __table_args__ = (
+        CheckConstraint(
+            "economy_policy IN ('economy-cycle-v1','economy-cycle-v2')", name="ck_auctions_economy"
+        ),
         UniqueConstraint("operation_id", name="uq_auction_operation"),
         CheckConstraint("policy_version = 'auction-v1'", name="ck_auction_policy"),
         CheckConstraint(
-            "initial_price >= 100000 AND weekly_rate BETWEEN 180 AND 1700", name="ck_auction_money"
+            "initial_price >= 100000 AND weekly_rate BETWEEN 1 AND 200000", name="ck_auction_money"
         ),
         CheckConstraint(
             "player_age BETWEEN 17 AND 38 AND ends_at >= created_at + interval '48 hours'",
@@ -1519,6 +1534,7 @@ class Auction(Base):
     policy_version: Mapped[str] = mapped_column(String(32), server_default="auction-v1")
     player_age: Mapped[int] = mapped_column(SmallInteger)
     initial_price: Mapped[int] = mapped_column(BigInteger)
+    economy_policy: Mapped[str] = mapped_column(String(32), server_default="economy-cycle-v1")
     weekly_rate: Mapped[int] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

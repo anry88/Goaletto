@@ -34,8 +34,10 @@ from goaletto.domain.candidates import (
     candidate_profile,
     deficit,
 )
+from goaletto.domain.finances import POLICY_VERSION as ECONOMY_POLICY
+from goaletto.domain.market_players import market_player
 from goaletto.domain.retirement import player_last_season, staff_last_season
-from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS, SKILLS, initial_caps
+from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS
 from goaletto.domain.world import SKILL_NAMES
 from goaletto.infrastructure.models import (
     Auction,
@@ -260,7 +262,7 @@ async def replenish_pool(
         return 0  # No portrait assignment, randomness or person creation above the threshold.
     bank = "players" if kind == "player" else "staff"
     catalog = load_whole_catalog()
-    stage = "player-youth" if kind == "player" else "staff-middle"
+    stage = "player-adult" if kind == "player" else "staff-middle"
     eligible = tuple(
         key
         for key, entry in catalog["variants"].items()
@@ -268,7 +270,7 @@ async def replenish_pool(
         and (
             entry.get("stage") == stage
             or (
-                17 <= entry.get("depicted_age", 0) <= 21
+                26 <= entry.get("depicted_age", 0) <= 30
                 if kind == "player"
                 else 45 <= entry.get("depicted_age", 0) <= 59
             )
@@ -318,7 +320,7 @@ async def replenish_pool(
                 session.add(
                     PlayerDevelopment(
                         person_id=person.id,
-                        caps=initial_caps(person.id, dict(zip(SKILLS, skills[:8], strict=True))),
+                        caps=market_player(person.id, selected).caps,
                         progress=dict.fromkeys(PROGRESS_KEYS, 0),
                         policy_version=POLICY_VERSION,
                     )
@@ -345,6 +347,14 @@ async def replenish_pool(
                     staff=kind == "staff",
                 )
             )
+        if kind == "staff":
+            from goaletto.domain.finances import staff_fee, staff_wage
+
+            qualification = await session.get(StaffQualification, (person.id, profile))
+            if qualification is None:
+                raise ValueError("Missing candidate qualification")
+            fee = staff_fee(profile, qualification.skill, person.age)
+            wage = staff_wage(profile, qualification.skill, person.age)
         offer = await session.get(CandidateOffer, person.id)
         if offer is None:
             session.add(
@@ -355,6 +365,7 @@ async def replenish_pool(
                     profile=selected,
                     fee=fee,
                     weekly_rate=wage,
+                    economy_policy=ECONOMY_POLICY,
                     created_at=at,
                     status="available",
                 )
@@ -364,6 +375,7 @@ async def replenish_pool(
                 raise ValueError("Candidate career offer cannot be overwritten")
             # The player receipt retains its old role/fee/wage; this is the same human.
             offer.kind, offer.pool_profile, offer.profile = kind, profile, selected
+            offer.economy_policy = ECONOMY_POLICY
             offer.fee, offer.weekly_rate, offer.created_at, offer.status = (
                 fee,
                 wage,
@@ -544,7 +556,13 @@ async def sign_candidate(
         "signing_fee",
         offer.fee,
         at,
-        details={"person_id": str(person.id), "kind": offer.kind, "role": offer.profile},
+        details={
+            "person_id": str(person.id),
+            "kind": offer.kind,
+            "role": offer.profile,
+            "policy": offer.economy_policy,
+            "cycle_rate": offer.weekly_rate,
+        },
     )
     worker.club_id = club.id
     if isinstance(worker, Staff):
@@ -561,6 +579,8 @@ async def sign_candidate(
         "player" if offer.kind == "player" else offer.profile,
         at,
         quoted_player_wage=offer.weekly_rate if offer.kind == "player" else None,
+        quoted_staff_wage=offer.weekly_rate if offer.kind == "staff" else None,
+        policy_version=offer.economy_policy,
     )
     receipt = CandidateSigning(
         operation_id=actor.operation_id,
@@ -571,6 +591,7 @@ async def sign_candidate(
         ownership_id=owner.id,
         fee=offer.fee,
         weekly_rate=offer.weekly_rate,
+        economy_policy=offer.economy_policy,
         signed_at=at,
     )
     session.add(receipt)
@@ -583,7 +604,7 @@ async def sign_candidate(
 
 
 async def _adopt_free_people(session: AsyncSession, kind: str, profile: str, at: datetime) -> None:
-    from goaletto.domain.finances import player_wage, staff_wage
+    from goaletto.domain.finances import player_fee, player_wage, staff_fee, staff_wage
 
     missing_offer = (
         ~select(CandidateOffer.person_id).where(CandidateOffer.person_id == Person.id).exists()
@@ -603,7 +624,9 @@ async def _adopt_free_people(session: AsyncSession, kind: str, profile: str, at:
             )
         ).all()
         for worker, person in rows:
-            rate = player_wage(tuple(getattr(worker, k) for k in SKILL_NAMES[:8]))
+            skills = tuple(getattr(worker, k) for k in SKILL_NAMES[:8])
+            positions = 1 + len(worker.alternative_positions)
+            rate = player_wage(skills, person.age, worker.position, positions)
             session.add(
                 CandidateOffer(
                     person_id=person.id,
@@ -611,8 +634,9 @@ async def _adopt_free_people(session: AsyncSession, kind: str, profile: str, at:
                     pool_profile=profile,
                     profile=worker.position,
                     status="available",
-                    fee=100000,
+                    fee=player_fee(skills, person.age, worker.position, positions),
                     weekly_rate=rate,
+                    economy_policy=ECONOMY_POLICY,
                     created_at=at,
                 )
             )
@@ -633,7 +657,10 @@ async def _adopt_free_people(session: AsyncSession, kind: str, profile: str, at:
             )
         ).all()
         for person in people:
-            rate = staff_wage(profile)
+            qualification = await session.get(StaffQualification, (person.id, profile))
+            if qualification is None:
+                raise ValueError("Missing free staff qualification")
+            rate = staff_wage(profile, qualification.skill, person.age)
             session.add(
                 CandidateOffer(
                     person_id=person.id,
@@ -641,8 +668,9 @@ async def _adopt_free_people(session: AsyncSession, kind: str, profile: str, at:
                     pool_profile=profile,
                     profile=profile,
                     status="available",
-                    fee=4 * rate,
+                    fee=staff_fee(profile, qualification.skill, person.age),
                     weekly_rate=rate,
+                    economy_policy=ECONOMY_POLICY,
                     created_at=at,
                 )
             )

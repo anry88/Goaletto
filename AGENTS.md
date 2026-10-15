@@ -122,3 +122,11 @@
 - AND-122 provides /calendar; preserve UTC phase dates and local kickoff display.
   Conditional FixturePlan.possible_club_ids must be cleared for eliminated clubs
   by future tournament logic; unknown opponents never acquire invented times.
+
+- AND-105/107 implement economy-cycle-v2 and market-players-v2: fresh public
+  footballers age 26-30, varied quality/caps; saved quotes pin fee, four-day wage
+  and policy through settlement. Existing contracts and ledger keep original terms.
+  Starting capital remains 600K after the 20-cycle calculation. Scout findings vary
+  in price: at age 19, q6/q10/q18 plus a Q2 scout mission cost 225K/400K/1,016K.
+  Mission flow remains AND-116; do not treat every discovery as an elite-price player.
+  See docs/economy-calculation.md. AND-117 still owns persisted seasonal sponsorship.

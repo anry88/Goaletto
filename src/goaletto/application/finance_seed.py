@@ -36,7 +36,7 @@ def opening_rows(plan: WorldPlan, at: datetime) -> tuple[list[dict[str, Any]], .
             "person_id": p.id,
             "club_id": p.club_id,
             "role": "player",
-            "weekly_rate": player_wage(p.skills[:8]),
+            "weekly_rate": player_wage(p.skills[:8], p.age, p.position),
             "policy_version": POLICY_VERSION,
             "started_at": at,
             "ended_at": None,
