@@ -341,6 +341,9 @@ async def initialize_world(
     for work in prepared.work:
         await session.execute(insert(Job).values(**job_row(plan.season_id, work, "held")))
     await ensure_planner_job(session, plan.season_id, initialized_at, held=True)
+    from goaletto.application.cup import initialize_season_cup
+
+    await initialize_season_cup(session, plan.season_id, initialized_at)
     account_rows, ledger_rows, salary_rows, finance_jobs = opening_rows(plan, initialized_at)
     await write(FinanceAccount, account_rows)
     await write(LedgerEntry, ledger_rows)

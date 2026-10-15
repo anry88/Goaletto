@@ -720,22 +720,29 @@ class Fixture(Base):
     __tablename__ = "fixtures"
     __table_args__ = (
         ForeignKeyConstraint(
-            ["season_id", "home_club_id", "league_id"],
-            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
-            name="fk_fixture_home_membership",
+            ["season_id", "home_club_id"],
+            ["season_clubs.season_id", "season_clubs.club_id"],
+            name="fk_fixture_home_season_club",
         ),
         ForeignKeyConstraint(
-            ["season_id", "away_club_id", "league_id"],
-            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
-            name="fk_fixture_away_membership",
+            ["season_id", "away_club_id"],
+            ["season_clubs.season_id", "season_clubs.club_id"],
+            name="fk_fixture_away_season_club",
         ),
-        UniqueConstraint("season_id", "home_club_id", "away_club_id", name="uq_fixture_pair"),
         CheckConstraint("home_club_id <> away_club_id", name="ck_fixture_distinct_clubs"),
         CheckConstraint("round_number BETWEEN 1 AND 18", name="ck_fixture_round"),
         CheckConstraint("lineup_lock_at <= scheduled_start_at", name="ck_fixture_lock"),
         CheckConstraint(
             "status IN ('scheduled','live','paused','finished','abandoned','cancelled')",
             name="ck_fixture_status",
+        ),
+        CheckConstraint(
+            "competition IN ('league','cup','champions','friendly')",
+            name="ck_fixture_competition",
+        ),
+        CheckConstraint(
+            "competition <> 'league' OR league_id IS NOT NULL",
+            name="ck_fixture_league",
         ),
         CheckConstraint(
             "(status IN ('finished','abandoned')) = (actual_finish_at IS NOT NULL)",
@@ -750,6 +757,25 @@ class Fixture(Base):
             "actual_finish_at >= actual_start_at)",
             name="ck_fixture_actual_dates",
         ),
+        Index(
+            "uq_fixture_league_pair",
+            "season_id",
+            "home_club_id",
+            "away_club_id",
+            unique=True,
+            postgresql_where=text("competition = 'league'"),
+        ),
+        Index(
+            "uq_fixture_competition_leg",
+            "season_id",
+            "competition",
+            "stage",
+            text("COALESCE(leg, 0)"),
+            "home_club_id",
+            "away_club_id",
+            unique=True,
+            postgresql_where=text("competition <> 'league'"),
+        ),
         Index("ix_fixture_schedule", "status", "scheduled_start_at"),
         Index("ix_fixture_league_round", "season_id", "league_id", "round_number"),
         Index("ix_fixture_home_history", "home_club_id", "status", "scheduled_start_at", "id"),
@@ -757,7 +783,11 @@ class Fixture(Base):
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     season_id: Mapped[UUID] = mapped_column(Uuid)
-    league_id: Mapped[UUID] = mapped_column(Uuid)
+    league_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    competition: Mapped[str] = mapped_column(String(16), server_default="league")
+    stage: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    leg: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    neutral: Mapped[bool] = mapped_column(Boolean, server_default="false")
     home_club_id: Mapped[UUID] = mapped_column(Uuid)
     away_club_id: Mapped[UUID] = mapped_column(Uuid)
     round_number: Mapped[int] = mapped_column(SmallInteger)
@@ -811,14 +841,15 @@ class Match(Base):
     __tablename__ = "matches"
     __table_args__ = (
         UniqueConstraint("id", "fixture_id", name="uq_match_fixture_identity"),
-        CheckConstraint("completed_tick BETWEEN 0 AND 30", name="ck_match_tick"),
+        CheckConstraint("completed_tick BETWEEN 0 AND 40", name="ck_match_tick"),
         CheckConstraint("home_goals >= 0 AND away_goals >= 0", name="ck_match_score"),
         CheckConstraint("state_version > 0", name="ck_match_state_version"),
         CheckConstraint(
-            "phase IN ('first_half','half_time','second_half','full_time','abandoned','paused')",
+            "phase IN ('first_half','half_time','second_half','full_time','abandoned','paused',"
+            "'extra_first_half','extra_half_time','extra_second_half','penalties')",
             name="ck_match_phase",
         ),
-        CheckConstraint("phase <> 'full_time' OR completed_tick = 30", name="ck_match_full_time"),
+        CheckConstraint("phase <> 'full_time' OR completed_tick IN (30, 40)", name="ck_match_full_time"),
         Index(
             "ix_match_snapshot_gin",
             "starting_snapshot",
@@ -869,7 +900,7 @@ class MatchRecovery(Base):
 class MatchTick(Base):
     __tablename__ = "match_ticks"
     __table_args__ = (
-        CheckConstraint("tick_number BETWEEN 1 AND 30", name="ck_tick_number"),
+        CheckConstraint("tick_number BETWEEN 1 AND 40", name="ck_tick_number"),
         CheckConstraint(
             "game_minute BETWEEN tick_number * 3 - 2 AND tick_number * 3",
             name="ck_tick_game_minute",
@@ -1172,18 +1203,26 @@ class MatchResult(Base):
             name="fk_result_match_fixture",
         ),
         ForeignKeyConstraint(
-            ["season_id", "home_club_id", "league_id"],
-            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
-            name="fk_result_home_membership",
+            ["season_id", "home_club_id"],
+            ["season_clubs.season_id", "season_clubs.club_id"],
+            name="fk_result_home_season_club",
         ),
         ForeignKeyConstraint(
-            ["season_id", "away_club_id", "league_id"],
-            ["season_clubs.season_id", "season_clubs.club_id", "season_clubs.league_id"],
-            name="fk_result_away_membership",
+            ["season_id", "away_club_id"],
+            ["season_clubs.season_id", "season_clubs.club_id"],
+            name="fk_result_away_season_club",
         ),
         CheckConstraint(
             "version = 1 AND home_goals >= 0 AND away_goals >= 0 AND home_club_id <> away_club_id",
             name="ck_result_score",
+        ),
+        CheckConstraint(
+            "competition IN ('league','cup','champions','friendly')",
+            name="ck_result_competition",
+        ),
+        CheckConstraint(
+            "competition <> 'league' OR league_id IS NOT NULL",
+            name="ck_result_league",
         ),
         CheckConstraint(
             "actual_finish_at >= actual_start_at AND recorded_at >= actual_finish_at",
@@ -1194,7 +1233,8 @@ class MatchResult(Base):
     match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
     fixture_id: Mapped[UUID] = mapped_column(ForeignKey("fixtures.id"))
     season_id: Mapped[UUID] = mapped_column(Uuid)
-    league_id: Mapped[UUID] = mapped_column(Uuid)
+    league_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    competition: Mapped[str] = mapped_column(String(16), server_default="league")
     home_club_id: Mapped[UUID] = mapped_column(Uuid)
     away_club_id: Mapped[UUID] = mapped_column(Uuid)
     version: Mapped[int] = mapped_column(SmallInteger)
@@ -1935,3 +1975,60 @@ class SponsorContract(Base):
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     review_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class CupBracket(Base):
+    __tablename__ = "cup_brackets"
+    __table_args__ = (
+        CheckConstraint("seed >= 0", name="ck_cup_bracket_seed"),
+    )
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
+    league_set_id: Mapped[UUID] = mapped_column(ForeignKey("league_sets.id"))
+    seed: Mapped[int] = mapped_column(BigInteger)
+    policy_version: Mapped[str] = mapped_column(String(40), server_default="cup-bracket-v1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class CupTie(Base):
+    __tablename__ = "cup_ties"
+    __table_args__ = (
+        CheckConstraint(
+            "(home_kind = 'club' AND home_club_id IS NOT NULL AND home_tie_id IS NULL) "
+            "OR (home_kind = 'winner' AND home_tie_id IS NOT NULL)",
+            name="ck_cup_tie_home_slot",
+        ),
+        CheckConstraint(
+            "(away_kind = 'club' AND away_club_id IS NOT NULL AND away_tie_id IS NULL) "
+            "OR (away_kind = 'winner' AND away_tie_id IS NOT NULL)",
+            name="ck_cup_tie_away_slot",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'in_progress', 'decided')",
+            name="ck_cup_tie_status",
+        ),
+        CheckConstraint(
+            "(status = 'decided') = (winner_club_id IS NOT NULL AND decided_at IS NOT NULL)",
+            name="ck_cup_tie_winner",
+        ),
+        Index("ix_cup_ties_season", "season_id"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    round_key: Mapped[str] = mapped_column(String(40))
+    round_label: Mapped[str] = mapped_column(String(80))
+    home_kind: Mapped[str] = mapped_column(String(16))
+    home_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), nullable=True)
+    home_tie_id: Mapped[UUID | None] = mapped_column(ForeignKey("cup_ties.id"), nullable=True)
+    away_kind: Mapped[str] = mapped_column(String(16))
+    away_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), nullable=True)
+    away_tie_id: Mapped[UUID | None] = mapped_column(ForeignKey("cup_ties.id"), nullable=True)
+    cup_days: Mapped[list[int]] = mapped_column(JSONB)
+    neutral: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    status: Mapped[str] = mapped_column(String(20), server_default="pending")
+    winner_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), nullable=True)
+    first_match_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    second_match_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    extra_time_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    shootout_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+

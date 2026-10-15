@@ -27,6 +27,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     old = {"league_sets", "leagues", "clubs", "jobs", "outbox_messages"}
     altered = {
         "fixtures",
+        "match_results",
         "matches",
         "match_ticks",
         "accepted_commands",

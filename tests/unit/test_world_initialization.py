@@ -101,6 +101,8 @@ async def test_seed_batch_reserves_unique_people_and_keeps_all_jobs_held(monkeyp
     )
     sponsors = AsyncMock()
     monkeypatch.setattr("goaletto.application.sponsorship.sign_sponsor", sponsors)
+    cup = AsyncMock()
+    monkeypatch.setattr("goaletto.application.cup.initialize_season_cup", cup)
     session = SQLRecorder()
 
     async def registered(*args, **kwargs):
@@ -110,6 +112,7 @@ async def test_seed_batch_reserves_unique_people_and_keeps_all_jobs_held(monkeyp
     result = await initialize_world(cast(AsyncSession, session), OPTIONS, initialized_at=NOW)
     assert result.created
     assert sponsors.await_count == 50
+    assert cup.await_count == 1
     assert session.writes[-1].table.name == "world_seed_receipts"
     people = []
     job_statuses = []

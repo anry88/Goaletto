@@ -400,7 +400,8 @@ async def match_income(
                 "policy": POLICY_VERSION,
             },
         )
-    await pay_league_prizes(session, fixture.season_id, fixture.league_id, at)
+    if fixture.league_id is not None:
+        await pay_league_prizes(session, fixture.season_id, fixture.league_id, at)
 
 
 async def pay_league_prizes(

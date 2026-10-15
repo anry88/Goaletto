@@ -53,11 +53,12 @@ async def pin_development(
         and state.tick == 0
         and (state.home.snapshot.club_id, state.away.snapshot.club_id)
         == (fixture.home_club_id, fixture.away_club_id)
-        and plan.competition == "league"
+        and plan.competition in ("league", "cup", "champions", "friendly")
+        and plan.competition == (fixture.competition or "league")
         and plan.announced_at is not None
         and plan.announced_at <= at
         and plan.season_id == fixture.season_id
-        and plan.league_id == fixture.league_id
+        and (plan.competition != "league" or plan.league_id == fixture.league_id)
         and plan.round_number == fixture.round_number
         and plan.assigned_day == fixture.scheduled_start_at.date()
         and (plan.home_club_id, plan.away_club_id) == (fixture.home_club_id, fixture.away_club_id)
@@ -126,7 +127,7 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                 or receipt.terms_snapshot["match_seed"] != f"{state.match_id}:{state.seed}"
                 or receipt.terms_snapshot["fixture_id"] != str(final.fixture_id)
                 or receipt.terms_snapshot["season_id"] != str(final.season_id)
-                or receipt.terms_snapshot["competition"] != "league"
+                or receipt.terms_snapshot["competition"] != final.competition
             ):
                 raise ValueError("Practice needs its finalized gameplay result")
         for team in (state.home, state.away):

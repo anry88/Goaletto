@@ -215,24 +215,39 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         raise ValueError("Next season exists without a rollover receipt")
     unannounced = await session.scalar(
         select(FixturePlan.id)
-        .where(FixturePlan.season_id == season.id, FixturePlan.announced_at.is_(None))
+        .where(
+            FixturePlan.season_id == season.id,
+            FixturePlan.competition == "league",
+            FixturePlan.announced_at.is_(None),
+        )
         .limit(1)
     )
     if unannounced is not None:
         raise NotReady("Season has unresolved mandatory tournament plans")
-    # Lock every fixture so the completion proof and transition share one snapshot.
+    # Lock every league fixture so the completion proof and transition share one snapshot.
+    # Cup fixtures are excluded: the cup bracket check is separate.
     fixtures = list(
         (
             await session.scalars(
                 select(Fixture)
-                .where(Fixture.season_id == season.id)
+                .where(
+                    Fixture.season_id == season.id,
+                    Fixture.competition == "league",
+                )
                 .order_by(Fixture.id)
                 .with_for_update()
             )
         ).all()
     )
     results = list(
-        (await session.scalars(select(MatchResult).where(MatchResult.season_id == season.id))).all()
+        (
+            await session.scalars(
+                select(MatchResult).where(
+                    MatchResult.season_id == season.id,
+                    MatchResult.competition == "league",
+                )
+            )
+        ).all()
     )
     result_by_fixture = {r.fixture_id: r for r in results}
     if (
@@ -637,6 +652,9 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     for season_job in season_work(next_id, kickoff):
         await session.execute(insert(Job).values(**job_row(next_id, season_job)))
     await ensure_planner_job(session, next_id, at)
+    from goaletto.application.cup import initialize_season_cup
+
+    await initialize_season_cup(session, next_id, at)
     await plan_horizon(session, next_id, at)
     # Replenish only pools that were opened already; rollover does not create an
     # unused staff market. The first set owns free-candidate aging, not availability.

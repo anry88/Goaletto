@@ -127,7 +127,9 @@ async def plan_horizon(session: AsyncSession, season_id: UUID, at: datetime) -> 
         if plan.home_club_id is None or plan.away_club_id is None:
             plan.blocked_reason = "awaiting_participants"
             continue
-        if plan.competition != "league" or plan.league_id is None:
+        if plan.competition not in ("league", "cup") or (
+            plan.competition == "league" and plan.league_id is None
+        ):
             plan.blocked_reason = "awaiting_competition_runtime"
             continue
         seed = stable_seed(season.seed, f"kickoff:{plan.id}:{plan.revision}")
@@ -192,12 +194,20 @@ async def plan_horizon(session: AsyncSession, season_id: UUID, at: datetime) -> 
             plan.home_club_id,
             plan.away_club_id,
             decision.kickoff,
+            competition=plan.competition,
+            stage=plan.stage,
+            leg=plan.leg,
+            neutral=plan.neutral,
         )
         session.add(
             Fixture(
                 id=fixture.id,
                 season_id=fixture.season_id,
                 league_id=fixture.league_id,
+                competition=fixture.competition,
+                stage=fixture.stage,
+                leg=fixture.leg,
+                neutral=fixture.neutral,
                 round_number=fixture.round_number,
                 home_club_id=fixture.home_club_id,
                 away_club_id=fixture.away_club_id,

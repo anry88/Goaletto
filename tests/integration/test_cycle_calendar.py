@@ -45,7 +45,23 @@ async def setup(sessions):
             ),
             initialized_at=AT,
         )
-        assert await session.scalar(select(func.count()).select_from(FixturePlan)) == 450
+        assert await session.scalar(select(func.count()).select_from(FixturePlan)) == 547
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(FixturePlan)
+                .where(FixturePlan.competition == "league")
+            )
+            == 450
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(FixturePlan)
+                .where(FixturePlan.competition == "cup")
+            )
+            == 97
+        )
         assert await session.scalar(select(func.count()).select_from(Fixture)) == 0
         assert (
             await session.scalar(
@@ -63,8 +79,19 @@ async def setup(sessions):
 async def test_horizon_parallel_pinning_preferences_dst_and_conditional_slots(sessions):
     result, actor, club = await setup(sessions)
     async with sessions.begin() as session:
-        first = dict((await session.execute(select(Fixture.id, Fixture.scheduled_start_at))).all())
-        assert len(first) == 50  # Two rounds in [12th 12:00, 22nd 12:00).
+        first = dict(
+            (
+                await session.execute(
+                    select(Fixture.id, Fixture.scheduled_start_at).where(
+                        Fixture.competition == "league"
+                    )
+                )
+            ).all()
+        )
+        assert len(first) == 50  # Two league rounds in [12th 12:00, 22nd 12:00).
+        cup_before = await session.scalar(
+            select(func.count()).select_from(Fixture).where(Fixture.competition == "cup")
+        )
         await set_kickoff_preference(
             session, replace(actor, operation_id=uuid4()), zone="Europe/Belgrade", minute=1200
         )
@@ -88,21 +115,22 @@ async def test_horizon_parallel_pinning_preferences_dst_and_conditional_slots(se
         async with sessions.begin() as session:
             return await plan_horizon(session, result.season_id, later)
 
-    assert sum(await asyncio.gather(run(), run())) == 25
+    made = sum(await asyncio.gather(run(), run()))
     async with sessions.begin() as session:
         fixtures = list((await session.scalars(select(Fixture))).all())
-        assert len(fixtures) == 75
-        assert all(f.scheduled_start_at == first[f.id] for f in fixtures if f.id in first)
-        own = [
-            f for f in fixtures if club in (f.home_club_id, f.away_club_id) and f.id not in first
-        ]
+        league = [f for f in fixtures if f.competition == "league"]
+        assert len(league) == 75
+        cup_made = len([f for f in fixtures if f.competition == "cup"]) - cup_before
+        assert made == 25 + cup_made
+        assert all(f.scheduled_start_at == first[f.id] for f in league if f.id in first)
+        own = [f for f in league if club in (f.home_club_id, f.away_club_id) and f.id not in first]
         assert len(own) == 1 and own[0].scheduled_start_at == datetime(2026, 10, 25, 19, tzinfo=UTC)
         plans = list((await session.scalars(select(FixturePlan))).all())
         for plan in plans:
             if plan.announced_at is not None:
                 fixture = await session.get(Fixture, plan.id)
                 assert fixture.scheduled_start_at < plan.planning_until
-        conditional = next(p for p in plans if p.competition == "cup")
+        conditional = next(p for p in plans if p.conditional_ref == "winner:future-tie")
         assert (
             conditional.announced_at is None
             and conditional.blocked_reason == "awaiting_participants"
@@ -111,7 +139,7 @@ async def test_horizon_parallel_pinning_preferences_dst_and_conditional_slots(se
             await session.scalar(
                 select(func.count()).select_from(Job).where(Job.kind == "match.tick")
             )
-            == 75 * 30
+            == len(fixtures) * 30
         )
 
 
@@ -202,13 +230,31 @@ async def test_exact_horizon_boundary_missed_window_and_announced_recovery_guard
     result, _, _ = await setup(sessions)
     boundary = FIRST - timedelta(days=2)
     async with sessions.begin() as session:
-        # Round three sits exactly at planning_at + 10 days and stays unfixed.
-        assert await plan_horizon(session, result.season_id, boundary) == 0
-        assert await plan_horizon(session, result.season_id, boundary + timedelta(seconds=1)) == 25
+        # League round three sits exactly at planning_at + 10 days and stays
+        # unfixed; cup plans inside the window still materialize normally.
+        cup0 = await session.scalar(
+            select(func.count()).select_from(Fixture).where(Fixture.competition == "cup")
+        )
+        made1 = await plan_horizon(session, result.season_id, boundary)
+        cup1 = await session.scalar(
+            select(func.count()).select_from(Fixture).where(Fixture.competition == "cup")
+        )
+        assert made1 == cup1 - cup0
+        made2 = await plan_horizon(session, result.season_id, boundary + timedelta(seconds=1))
+        cup2 = await session.scalar(
+            select(func.count()).select_from(Fixture).where(Fixture.competition == "cup")
+        )
+        assert made2 - (cup2 - cup1) == 25
         missed_at = FIRST + timedelta(days=12)
         await plan_horizon(session, result.season_id, missed_at)
         missed = list(
-            (await session.scalars(select(FixturePlan).where(FixturePlan.round_number == 4))).all()
+            (
+                await session.scalars(
+                    select(FixturePlan).where(
+                        FixturePlan.competition == "league", FixturePlan.round_number == 4
+                    )
+                )
+            ).all()
         )
         assert len(missed) == 25
         assert all(p.blocked_reason == "missed_preparation_window" for p in missed)

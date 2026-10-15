@@ -83,7 +83,10 @@ async def start_fixture(sessions, club_id):
     async with sessions.begin() as session:
         fixture = await session.scalar(
             select(Fixture)
-            .where((Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id))
+            .where(
+                Fixture.competition == "league",
+                (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id),
+            )
             .order_by(Fixture.scheduled_start_at)
             .limit(1)
         )

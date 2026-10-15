@@ -22,11 +22,15 @@ def validate_kickoff(value: datetime) -> None:
 class ScheduledFixture:
     id: UUID
     season_id: UUID
-    league_id: UUID
+    league_id: UUID | None
     round_number: int
     home_club_id: UUID
     away_club_id: UUID
     kickoff: datetime
+    competition: str = "league"
+    stage: str | None = None
+    leg: int | None = None
+    neutral: bool = False
 
     @property
     def lineup_lock_at(self) -> datetime:
