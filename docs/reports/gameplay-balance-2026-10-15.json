@@ -1,0 +1,3102 @@
+{
+  "assumptions": [
+    "Tier-5 starting club, 2500 supporters, 20 players from the pinned world (key gameplay-balance-audit, seed 0); wages vary per club, the report keeps the min/max band and the full series of the first club.",
+    "Fixed seasonal sponsor: opening tenth-place base for cycles 1-18, renewal by final place/destination tier for cycles 19-20; the season prize lands with cycle 18 only, never earlier.",
+    "Expenses are charged before income each cycle; a negative pre-income minimum is a liquidity shortfall forecast, the runtime keeps cash >= 0 with debt instead.",
+    "Scout discoveries are private: declined/unsigned people never enter the public market and earn no resale income in this audit.",
+    "Development runs use train_player/develop_appearance/grant_growth directly; only the 18 official league appearances grant match growth, cup load days and friendlies grant none.",
+    "Training injuries are discarded to upper-bound growth; morale/ leadership/form draws stay seeded and deterministic."
+  ],
+  "budget": {
+    "cycles": 20,
+    "scenarios": [
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 602708,
+            "cycle": 1,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 617916,
+            "cycle": 2,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 633124,
+            "cycle": 3,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 648332,
+            "cycle": 4,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 663540,
+            "cycle": 5,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 678748,
+            "cycle": 6,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 693956,
+            "cycle": 7,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 709164,
+            "cycle": 8,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 724372,
+            "cycle": 9,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 739580,
+            "cycle": 10,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 742288,
+            "cycle": 11,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 744996,
+            "cycle": 12,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 747704,
+            "cycle": 13,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 750412,
+            "cycle": 14,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 753120,
+            "cycle": 15,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 755828,
+            "cycle": 16,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 758536,
+            "cycle": 17,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 781244,
+            "cycle": 18,
+            "expenses": 50792,
+            "income": 73500
+          },
+          {
+            "cash": 783952,
+            "cycle": 19,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 786660,
+            "cycle": 20,
+            "expenses": 50792,
+            "income": 53500
+          }
+        ],
+        "ending_max": 786660,
+        "ending_min": 758800,
+        "extra_player_wage": 0,
+        "first_shortfall_cycle": null,
+        "hypothetical": false,
+        "key": "calm",
+        "label": "Спокойный старт",
+        "min_pre_income": 547815,
+        "season_prize": 20000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 51000,
+        "staff_per_cycle": 8000,
+        "upfront": 0,
+        "upkeep_per_cycle": 3000,
+        "upkeep_total": 60000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      },
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 559508,
+            "cycle": 1,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 566716,
+            "cycle": 2,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 573924,
+            "cycle": 3,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 581132,
+            "cycle": 4,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 588340,
+            "cycle": 5,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 595548,
+            "cycle": 6,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 602756,
+            "cycle": 7,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 609964,
+            "cycle": 8,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 617172,
+            "cycle": 9,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 624380,
+            "cycle": 10,
+            "expenses": 58792,
+            "income": 66000
+          },
+          {
+            "cash": 619088,
+            "cycle": 11,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 613796,
+            "cycle": 12,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 608504,
+            "cycle": 13,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 603212,
+            "cycle": 14,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 597920,
+            "cycle": 15,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 592628,
+            "cycle": 16,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 587336,
+            "cycle": 17,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 602044,
+            "cycle": 18,
+            "expenses": 58792,
+            "income": 73500
+          },
+          {
+            "cash": 596752,
+            "cycle": 19,
+            "expenses": 58792,
+            "income": 53500
+          },
+          {
+            "cash": 591460,
+            "cycle": 20,
+            "expenses": 58792,
+            "income": 53500
+          }
+        ],
+        "ending_max": 591460,
+        "ending_min": 563600,
+        "extra_player_wage": 0,
+        "first_shortfall_cycle": null,
+        "hypothetical": false,
+        "key": "specialist",
+        "label": "Профильный специалист Q2",
+        "min_pre_income": 454240,
+        "season_prize": 20000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 51000,
+        "staff_per_cycle": 16000,
+        "upfront": 35200,
+        "upkeep_per_cycle": 3000,
+        "upkeep_total": 60000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      },
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 596228,
+            "cycle": 1,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 610236,
+            "cycle": 2,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 624244,
+            "cycle": 3,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 638252,
+            "cycle": 4,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 652260,
+            "cycle": 5,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 666268,
+            "cycle": 6,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 680276,
+            "cycle": 7,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 694284,
+            "cycle": 8,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 708292,
+            "cycle": 9,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 722300,
+            "cycle": 10,
+            "expenses": 51992,
+            "income": 66000
+          },
+          {
+            "cash": 723808,
+            "cycle": 11,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 725316,
+            "cycle": 12,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 726824,
+            "cycle": 13,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 728332,
+            "cycle": 14,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 729840,
+            "cycle": 15,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 731348,
+            "cycle": 16,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 732856,
+            "cycle": 17,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 754364,
+            "cycle": 18,
+            "expenses": 51992,
+            "income": 73500
+          },
+          {
+            "cash": 755872,
+            "cycle": 19,
+            "expenses": 51992,
+            "income": 53500
+          },
+          {
+            "cash": 757380,
+            "cycle": 20,
+            "expenses": 51992,
+            "income": 53500
+          }
+        ],
+        "ending_max": 757380,
+        "ending_min": 729520,
+        "extra_player_wage": 0,
+        "first_shortfall_cycle": null,
+        "hypothetical": false,
+        "key": "scout_idle",
+        "label": "Бездействующий скаут Q2",
+        "min_pre_income": 541335,
+        "season_prize": 20000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 51000,
+        "staff_per_cycle": 9200,
+        "upfront": 5280,
+        "upkeep_per_cycle": 3000,
+        "upkeep_total": 60000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      },
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 301044,
+            "cycle": 1,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 314588,
+            "cycle": 2,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 328132,
+            "cycle": 3,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 341676,
+            "cycle": 4,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 355220,
+            "cycle": 5,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 368764,
+            "cycle": 6,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 382308,
+            "cycle": 7,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 395852,
+            "cycle": 8,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 409396,
+            "cycle": 9,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 422940,
+            "cycle": 10,
+            "expenses": 52456,
+            "income": 66000
+          },
+          {
+            "cash": 423984,
+            "cycle": 11,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 425028,
+            "cycle": 12,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 426072,
+            "cycle": 13,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 427116,
+            "cycle": 14,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 428160,
+            "cycle": 15,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 429204,
+            "cycle": 16,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 430248,
+            "cycle": 17,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 451292,
+            "cycle": 18,
+            "expenses": 52456,
+            "income": 73500
+          },
+          {
+            "cash": 452336,
+            "cycle": 19,
+            "expenses": 52456,
+            "income": 53500
+          },
+          {
+            "cash": 453380,
+            "cycle": 20,
+            "expenses": 52456,
+            "income": 53500
+          }
+        ],
+        "ending_max": 453380,
+        "ending_min": 425520,
+        "extra_player_wage": 1664,
+        "first_shortfall_cycle": null,
+        "hypothetical": false,
+        "key": "adult_signing",
+        "label": "Покупка взрослого Q10/26",
+        "min_pre_income": 243708,
+        "season_prize": 20000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 51000,
+        "staff_per_cycle": 8000,
+        "upfront": 300000,
+        "upkeep_per_cycle": 3000,
+        "upkeep_total": 60000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      },
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 427108,
+            "cycle": 1,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 416316,
+            "cycle": 2,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 405524,
+            "cycle": 3,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 394732,
+            "cycle": 4,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 383940,
+            "cycle": 5,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 373148,
+            "cycle": 6,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 362356,
+            "cycle": 7,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 351564,
+            "cycle": 8,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 340772,
+            "cycle": 9,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 329980,
+            "cycle": 10,
+            "expenses": 76792,
+            "income": 66000
+          },
+          {
+            "cash": 306688,
+            "cycle": 11,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 283396,
+            "cycle": 12,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 260104,
+            "cycle": 13,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 236812,
+            "cycle": 14,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 213520,
+            "cycle": 15,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 190228,
+            "cycle": 16,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 166936,
+            "cycle": 17,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 163644,
+            "cycle": 18,
+            "expenses": 76792,
+            "income": 73500
+          },
+          {
+            "cash": 140352,
+            "cycle": 19,
+            "expenses": 76792,
+            "income": 53500
+          },
+          {
+            "cash": 117060,
+            "cycle": 20,
+            "expenses": 76792,
+            "income": 53500
+          }
+        ],
+        "ending_max": 117060,
+        "ending_min": 89200,
+        "extra_player_wage": 0,
+        "first_shortfall_cycle": null,
+        "hypothetical": false,
+        "key": "expensive_staff",
+        "label": "Дорогой штаб (главный Q3 + защита Q2)",
+        "min_pre_income": 35700,
+        "season_prize": 20000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 51000,
+        "staff_per_cycle": 34000,
+        "upfront": 149600,
+        "upkeep_per_cycle": 3000,
+        "upkeep_total": 60000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      },
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 234108,
+            "cycle": 1,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 242316,
+            "cycle": 2,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 250524,
+            "cycle": 3,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 258732,
+            "cycle": 4,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 266940,
+            "cycle": 5,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 275148,
+            "cycle": 6,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 283356,
+            "cycle": 7,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 291564,
+            "cycle": 8,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 299772,
+            "cycle": 9,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 307980,
+            "cycle": 10,
+            "expenses": 57792,
+            "income": 66000
+          },
+          {
+            "cash": 303688,
+            "cycle": 11,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 299396,
+            "cycle": 12,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 295104,
+            "cycle": 13,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 290812,
+            "cycle": 14,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 286520,
+            "cycle": 15,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 282228,
+            "cycle": 16,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 277936,
+            "cycle": 17,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 293644,
+            "cycle": 18,
+            "expenses": 57792,
+            "income": 73500
+          },
+          {
+            "cash": 289352,
+            "cycle": 19,
+            "expenses": 57792,
+            "income": 53500
+          },
+          {
+            "cash": 285060,
+            "cycle": 20,
+            "expenses": 57792,
+            "income": 53500
+          }
+        ],
+        "ending_max": 285060,
+        "ending_min": 257200,
+        "extra_player_wage": 0,
+        "first_shortfall_cycle": null,
+        "hypothetical": false,
+        "key": "stadium",
+        "label": "Расширение стадиона до 10K + тренер Q2",
+        "min_pre_income": 137840,
+        "season_prize": 20000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 51000,
+        "staff_per_cycle": 14000,
+        "upfront": 361600,
+        "upkeep_per_cycle": 4000,
+        "upkeep_total": 80000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      },
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 602708,
+            "cycle": 1,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 605416,
+            "cycle": 2,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 608124,
+            "cycle": 3,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 610832,
+            "cycle": 4,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 613540,
+            "cycle": 5,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 616248,
+            "cycle": 6,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 618956,
+            "cycle": 7,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 621664,
+            "cycle": 8,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 624372,
+            "cycle": 9,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 627080,
+            "cycle": 10,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 629788,
+            "cycle": 11,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 632496,
+            "cycle": 12,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 635204,
+            "cycle": 13,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 637912,
+            "cycle": 14,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 640620,
+            "cycle": 15,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 643328,
+            "cycle": 16,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 646036,
+            "cycle": 17,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 668744,
+            "cycle": 18,
+            "expenses": 50792,
+            "income": 73500
+          },
+          {
+            "cash": 671452,
+            "cycle": 19,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 674160,
+            "cycle": 20,
+            "expenses": 50792,
+            "income": 53500
+          }
+        ],
+        "ending_max": 674160,
+        "ending_min": 646300,
+        "extra_player_wage": 0,
+        "first_shortfall_cycle": null,
+        "hypothetical": false,
+        "key": "bad_stands",
+        "label": "Неблагоприятное место/посещаемость",
+        "min_pre_income": 547815,
+        "season_prize": 20000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 51000,
+        "staff_per_cycle": 8000,
+        "upfront": 0,
+        "upkeep_per_cycle": 3000,
+        "upkeep_total": 60000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      },
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 602708,
+            "cycle": 1,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 617916,
+            "cycle": 2,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 633124,
+            "cycle": 3,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 648332,
+            "cycle": 4,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 663540,
+            "cycle": 5,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 678748,
+            "cycle": 6,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 693956,
+            "cycle": 7,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 709164,
+            "cycle": 8,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 724372,
+            "cycle": 9,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 739580,
+            "cycle": 10,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 742288,
+            "cycle": 11,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 744996,
+            "cycle": 12,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 747704,
+            "cycle": 13,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 750412,
+            "cycle": 14,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 753120,
+            "cycle": 15,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 755828,
+            "cycle": 16,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 758536,
+            "cycle": 17,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 841244,
+            "cycle": 18,
+            "expenses": 50792,
+            "income": 133500
+          },
+          {
+            "cash": 851952,
+            "cycle": 19,
+            "expenses": 50792,
+            "income": 61500
+          },
+          {
+            "cash": 862660,
+            "cycle": 20,
+            "expenses": 50792,
+            "income": 61500
+          }
+        ],
+        "ending_max": 862660,
+        "ending_min": 834800,
+        "extra_player_wage": 0,
+        "first_shortfall_cycle": null,
+        "hypothetical": false,
+        "key": "promotion",
+        "label": "Повышение в tier 4 (место 2)",
+        "min_pre_income": 547815,
+        "season_prize": 80000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 59000,
+        "staff_per_cycle": 8000,
+        "upfront": 0,
+        "upkeep_per_cycle": 3000,
+        "upkeep_total": 60000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      },
+      {
+        "cash_flow_first_club": [
+          {
+            "cash": 602708,
+            "cycle": 1,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 617916,
+            "cycle": 2,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 633124,
+            "cycle": 3,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 648332,
+            "cycle": 4,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 663540,
+            "cycle": 5,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 678748,
+            "cycle": 6,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 693956,
+            "cycle": 7,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 709164,
+            "cycle": 8,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 724372,
+            "cycle": 9,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 739580,
+            "cycle": 10,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 742288,
+            "cycle": 11,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 744996,
+            "cycle": 12,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 747704,
+            "cycle": 13,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 750412,
+            "cycle": 14,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 753120,
+            "cycle": 15,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 755828,
+            "cycle": 16,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 771036,
+            "cycle": 17,
+            "expenses": 50792,
+            "income": 66000
+          },
+          {
+            "cash": 793744,
+            "cycle": 18,
+            "expenses": 50792,
+            "income": 73500
+          },
+          {
+            "cash": 796452,
+            "cycle": 19,
+            "expenses": 50792,
+            "income": 53500
+          },
+          {
+            "cash": 799160,
+            "cycle": 20,
+            "expenses": 50792,
+            "income": 53500
+          }
+        ],
+        "ending_max": 799160,
+        "ending_min": 771300,
+        "extra_player_wage": 0,
+        "first_shortfall_cycle": null,
+        "hypothetical": true,
+        "key": "cup_hypothetical",
+        "label": "Гипотетический финал кубка +12.5K",
+        "min_pre_income": 547815,
+        "season_prize": 20000,
+        "sponsor_opening_rate": 51000,
+        "sponsor_renewal_rate": 51000,
+        "staff_per_cycle": 8000,
+        "upfront": 0,
+        "upkeep_per_cycle": 3000,
+        "upkeep_total": 60000,
+        "wages_max": 41185,
+        "wages_min": 39792
+      }
+    ],
+    "season_cycles": 18,
+    "supporters": 2500,
+    "tier": 5,
+    "world_key": "gameplay-balance-audit",
+    "world_seed": 0
+  },
+  "commit": "522e3de99f0871aa00bd68cb6f9bafed52b46c90",
+  "content_hash": "60bc5fadc9e58dbabe3db90ca218b377741773cfd5fd03ab9ae3c20d6b636312",
+  "development": {
+    "ages": [
+      18,
+      21,
+      26,
+      30,
+      34
+    ],
+    "ceiling_demo": {
+      "caps": 12,
+      "note": "Caps bind first: 20 strong sessions grant nothing when skills already sit at their potential.",
+      "stamina_gain": 0,
+      "start_skills": 12,
+      "training_bps": 0,
+      "training_days": 20
+    },
+    "focus": "physical",
+    "intensity": "medium",
+    "recovery_hours_from_7320bps": [
+      {
+        "hours_to_full": 35.73,
+        "physio": 0
+      },
+      {
+        "hours_to_full": 33.85,
+        "physio": 1
+      },
+      {
+        "hours_to_full": 27.97,
+        "physio": 5
+      },
+      {
+        "hours_to_full": 22.97,
+        "physio": 10
+      },
+      {
+        "hours_to_full": 19.49,
+        "physio": 15
+      },
+      {
+        "hours_to_full": 16.93,
+        "physio": 20
+      }
+    ],
+    "recovery_note": "Recovery is real elapsed hours (recovery-v1); adjacent UTC dates do not guarantee 24 hours of rest.",
+    "runs": [
+      {
+        "age": 18,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 600,
+          "match": 3726,
+          "pace": 4620,
+          "playmaking": 3726,
+          "set_pieces": 0,
+          "stamina": 4680,
+          "training": 9300,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 600,
+        "league_matches": 18,
+        "match_bps": 3726,
+        "morale": 51,
+        "pace_fraction": 4620,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 4680,
+        "stamina_gain": 0,
+        "total_bps": 13026,
+        "training_bps": 9300,
+        "training_days": 60
+      },
+      {
+        "age": 18,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 280,
+          "match": 3726,
+          "pace": 2156,
+          "playmaking": 3726,
+          "set_pieces": 0,
+          "stamina": 2184,
+          "training": 4340,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 280,
+        "league_matches": 18,
+        "match_bps": 3726,
+        "morale": 50,
+        "pace_fraction": 2156,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 2184,
+        "stamina_gain": 0,
+        "total_bps": 8066,
+        "training_bps": 4340,
+        "training_days": 28
+      },
+      {
+        "age": 18,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 3000,
+          "match": 6210,
+          "pace": 7740,
+          "playmaking": 6210,
+          "set_pieces": 0,
+          "stamina": 7800,
+          "training": 15540,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 3000,
+        "league_matches": 18,
+        "match_bps": 6210,
+        "morale": 60,
+        "pace_fraction": 7740,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 7800,
+        "stamina_gain": 0,
+        "total_bps": 21750,
+        "training_bps": 15540,
+        "training_days": 60
+      },
+      {
+        "age": 18,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 1400,
+          "match": 6210,
+          "pace": 3612,
+          "playmaking": 6210,
+          "set_pieces": 0,
+          "stamina": 3640,
+          "training": 7252,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 1400,
+        "league_matches": 18,
+        "match_bps": 6210,
+        "morale": 55,
+        "pace_fraction": 3612,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 3640,
+        "stamina_gain": 0,
+        "total_bps": 13462,
+        "training_bps": 7252,
+        "training_days": 28
+      },
+      {
+        "age": 18,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 5000,
+          "match": 8694,
+          "pace": 9955,
+          "playmaking": 8694,
+          "set_pieces": 0,
+          "stamina": 10045,
+          "training": 20000,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 5000,
+        "league_matches": 18,
+        "match_bps": 8694,
+        "morale": 68,
+        "pace_fraction": 9955,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 45,
+        "stamina_gain": 1,
+        "total_bps": 28694,
+        "training_bps": 20000,
+        "training_days": 60
+      },
+      {
+        "age": 18,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 2520,
+          "match": 8694,
+          "pace": 5068,
+          "playmaking": 8694,
+          "set_pieces": 0,
+          "stamina": 5068,
+          "training": 10136,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 2520,
+        "league_matches": 18,
+        "match_bps": 8694,
+        "morale": 60,
+        "pace_fraction": 5068,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 5068,
+        "stamina_gain": 0,
+        "total_bps": 18830,
+        "training_bps": 10136,
+        "training_days": 28
+      },
+      {
+        "age": 21,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 600,
+          "match": 3258,
+          "pace": 4080,
+          "playmaking": 3258,
+          "set_pieces": 0,
+          "stamina": 4080,
+          "training": 8160,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 600,
+        "league_matches": 18,
+        "match_bps": 3258,
+        "morale": 52,
+        "pace_fraction": 4080,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 4080,
+        "stamina_gain": 0,
+        "total_bps": 11418,
+        "training_bps": 8160,
+        "training_days": 60
+      },
+      {
+        "age": 21,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 280,
+          "match": 3258,
+          "pace": 1904,
+          "playmaking": 3258,
+          "set_pieces": 0,
+          "stamina": 1904,
+          "training": 3808,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 280,
+        "league_matches": 18,
+        "match_bps": 3258,
+        "morale": 52,
+        "pace_fraction": 1904,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 1904,
+        "stamina_gain": 0,
+        "total_bps": 7066,
+        "training_bps": 3808,
+        "training_days": 28
+      },
+      {
+        "age": 21,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 3000,
+          "match": 5436,
+          "pace": 6780,
+          "playmaking": 5436,
+          "set_pieces": 0,
+          "stamina": 6780,
+          "training": 13560,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 3000,
+        "league_matches": 18,
+        "match_bps": 5436,
+        "morale": 60,
+        "pace_fraction": 6780,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 6780,
+        "stamina_gain": 0,
+        "total_bps": 18996,
+        "training_bps": 13560,
+        "training_days": 60
+      },
+      {
+        "age": 21,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 1400,
+          "match": 5436,
+          "pace": 3164,
+          "playmaking": 5436,
+          "set_pieces": 0,
+          "stamina": 3164,
+          "training": 6328,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 1400,
+        "league_matches": 18,
+        "match_bps": 5436,
+        "morale": 55,
+        "pace_fraction": 3164,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 3164,
+        "stamina_gain": 0,
+        "total_bps": 11764,
+        "training_bps": 6328,
+        "training_days": 28
+      },
+      {
+        "age": 21,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 5000,
+          "match": 7614,
+          "pace": 9480,
+          "playmaking": 7614,
+          "set_pieces": 0,
+          "stamina": 9540,
+          "training": 19020,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 5000,
+        "league_matches": 18,
+        "match_bps": 7614,
+        "morale": 68,
+        "pace_fraction": 9480,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 9540,
+        "stamina_gain": 0,
+        "total_bps": 26634,
+        "training_bps": 19020,
+        "training_days": 60
+      },
+      {
+        "age": 21,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 2520,
+          "match": 7614,
+          "pace": 4424,
+          "playmaking": 7614,
+          "set_pieces": 0,
+          "stamina": 4452,
+          "training": 8876,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 2520,
+        "league_matches": 18,
+        "match_bps": 7614,
+        "morale": 59,
+        "pace_fraction": 4424,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 4452,
+        "stamina_gain": 0,
+        "total_bps": 16490,
+        "training_bps": 8876,
+        "training_days": 28
+      },
+      {
+        "age": 26,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 600,
+          "match": 2268,
+          "pace": 2820,
+          "playmaking": 2268,
+          "set_pieces": 0,
+          "stamina": 2880,
+          "training": 5700,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 600,
+        "league_matches": 18,
+        "match_bps": 2268,
+        "morale": 52,
+        "pace_fraction": 2820,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 2880,
+        "stamina_gain": 0,
+        "total_bps": 7968,
+        "training_bps": 5700,
+        "training_days": 60
+      },
+      {
+        "age": 26,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 280,
+          "match": 2268,
+          "pace": 1316,
+          "playmaking": 2268,
+          "set_pieces": 0,
+          "stamina": 1344,
+          "training": 2660,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 280,
+        "league_matches": 18,
+        "match_bps": 2268,
+        "morale": 52,
+        "pace_fraction": 1316,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 1344,
+        "stamina_gain": 0,
+        "total_bps": 4928,
+        "training_bps": 2660,
+        "training_days": 28
+      },
+      {
+        "age": 26,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 3000,
+          "match": 3798,
+          "pace": 4740,
+          "playmaking": 3798,
+          "set_pieces": 0,
+          "stamina": 4740,
+          "training": 9480,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 3000,
+        "league_matches": 18,
+        "match_bps": 3798,
+        "morale": 56,
+        "pace_fraction": 4740,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 4740,
+        "stamina_gain": 0,
+        "total_bps": 13278,
+        "training_bps": 9480,
+        "training_days": 60
+      },
+      {
+        "age": 26,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 1400,
+          "match": 3798,
+          "pace": 2212,
+          "playmaking": 3798,
+          "set_pieces": 0,
+          "stamina": 2212,
+          "training": 4424,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 1400,
+        "league_matches": 18,
+        "match_bps": 3798,
+        "morale": 56,
+        "pace_fraction": 2212,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 2212,
+        "stamina_gain": 0,
+        "total_bps": 8222,
+        "training_bps": 4424,
+        "training_days": 28
+      },
+      {
+        "age": 26,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 5000,
+          "match": 5310,
+          "pace": 6600,
+          "playmaking": 5310,
+          "set_pieces": 0,
+          "stamina": 6660,
+          "training": 13260,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 5000,
+        "league_matches": 18,
+        "match_bps": 5310,
+        "morale": 68,
+        "pace_fraction": 6600,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 6660,
+        "stamina_gain": 0,
+        "total_bps": 18570,
+        "training_bps": 13260,
+        "training_days": 60
+      },
+      {
+        "age": 26,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 2520,
+          "match": 5310,
+          "pace": 3080,
+          "playmaking": 5310,
+          "set_pieces": 0,
+          "stamina": 3108,
+          "training": 6188,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 2520,
+        "league_matches": 18,
+        "match_bps": 5310,
+        "morale": 57,
+        "pace_fraction": 3080,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 3108,
+        "stamina_gain": 0,
+        "total_bps": 11498,
+        "training_bps": 6188,
+        "training_days": 28
+      },
+      {
+        "age": 30,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 600,
+          "match": 1296,
+          "pace": 1620,
+          "playmaking": 1296,
+          "set_pieces": 0,
+          "stamina": 1620,
+          "training": 3240,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 600,
+        "league_matches": 18,
+        "match_bps": 1296,
+        "morale": 52,
+        "pace_fraction": 1620,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 1620,
+        "stamina_gain": 0,
+        "total_bps": 4536,
+        "training_bps": 3240,
+        "training_days": 60
+      },
+      {
+        "age": 30,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 280,
+          "match": 1296,
+          "pace": 756,
+          "playmaking": 1296,
+          "set_pieces": 0,
+          "stamina": 756,
+          "training": 1512,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 280,
+        "league_matches": 18,
+        "match_bps": 1296,
+        "morale": 51,
+        "pace_fraction": 756,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 756,
+        "stamina_gain": 0,
+        "total_bps": 2808,
+        "training_bps": 1512,
+        "training_days": 28
+      },
+      {
+        "age": 30,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 3000,
+          "match": 2160,
+          "pace": 2700,
+          "playmaking": 2160,
+          "set_pieces": 0,
+          "stamina": 2700,
+          "training": 5400,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 3000,
+        "league_matches": 18,
+        "match_bps": 2160,
+        "morale": 59,
+        "pace_fraction": 2700,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 2700,
+        "stamina_gain": 0,
+        "total_bps": 7560,
+        "training_bps": 5400,
+        "training_days": 60
+      },
+      {
+        "age": 30,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 1400,
+          "match": 2160,
+          "pace": 1260,
+          "playmaking": 2160,
+          "set_pieces": 0,
+          "stamina": 1260,
+          "training": 2520,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 1400,
+        "league_matches": 18,
+        "match_bps": 2160,
+        "morale": 59,
+        "pace_fraction": 1260,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 1260,
+        "stamina_gain": 0,
+        "total_bps": 4680,
+        "training_bps": 2520,
+        "training_days": 28
+      },
+      {
+        "age": 30,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 5000,
+          "match": 3024,
+          "pace": 3780,
+          "playmaking": 3024,
+          "set_pieces": 0,
+          "stamina": 3780,
+          "training": 7560,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 5000,
+        "league_matches": 18,
+        "match_bps": 3024,
+        "morale": 67,
+        "pace_fraction": 3780,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 3780,
+        "stamina_gain": 0,
+        "total_bps": 10584,
+        "training_bps": 7560,
+        "training_days": 60
+      },
+      {
+        "age": 30,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 2520,
+          "match": 3024,
+          "pace": 1764,
+          "playmaking": 3024,
+          "set_pieces": 0,
+          "stamina": 1764,
+          "training": 3528,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 2520,
+        "league_matches": 18,
+        "match_bps": 3024,
+        "morale": 55,
+        "pace_fraction": 1764,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 1764,
+        "stamina_gain": 0,
+        "total_bps": 6552,
+        "training_bps": 3528,
+        "training_days": 28
+      },
+      {
+        "age": 34,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 600,
+          "match": 774,
+          "pace": 960,
+          "playmaking": 774,
+          "set_pieces": 0,
+          "stamina": 960,
+          "training": 1920,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 600,
+        "league_matches": 18,
+        "match_bps": 774,
+        "morale": 52,
+        "pace_fraction": 960,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 960,
+        "stamina_gain": 0,
+        "total_bps": 2694,
+        "training_bps": 1920,
+        "training_days": 60
+      },
+      {
+        "age": 34,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 280,
+          "match": 774,
+          "pace": 448,
+          "playmaking": 774,
+          "set_pieces": 0,
+          "stamina": 448,
+          "training": 896,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 280,
+        "league_matches": 18,
+        "match_bps": 774,
+        "morale": 52,
+        "pace_fraction": 448,
+        "pace_gain": 0,
+        "staff": 2,
+        "stamina_fraction": 448,
+        "stamina_gain": 0,
+        "total_bps": 1670,
+        "training_bps": 896,
+        "training_days": 28
+      },
+      {
+        "age": 34,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 3000,
+          "match": 1296,
+          "pace": 1620,
+          "playmaking": 1296,
+          "set_pieces": 0,
+          "stamina": 1620,
+          "training": 3240,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 3000,
+        "league_matches": 18,
+        "match_bps": 1296,
+        "morale": 60,
+        "pace_fraction": 1620,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 1620,
+        "stamina_gain": 0,
+        "total_bps": 4536,
+        "training_bps": 3240,
+        "training_days": 60
+      },
+      {
+        "age": 34,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 1400,
+          "match": 1296,
+          "pace": 756,
+          "playmaking": 1296,
+          "set_pieces": 0,
+          "stamina": 756,
+          "training": 1512,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 1400,
+        "league_matches": 18,
+        "match_bps": 1296,
+        "morale": 57,
+        "pace_fraction": 756,
+        "pace_gain": 0,
+        "staff": 10,
+        "stamina_fraction": 756,
+        "stamina_gain": 0,
+        "total_bps": 2808,
+        "training_bps": 1512,
+        "training_days": 28
+      },
+      {
+        "age": 34,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 5000,
+          "match": 1800,
+          "pace": 2220,
+          "playmaking": 1800,
+          "set_pieces": 0,
+          "stamina": 2280,
+          "training": 4500,
+          "winger": 0
+        },
+        "calendar": "free",
+        "leadership_bps": 5000,
+        "league_matches": 18,
+        "match_bps": 1800,
+        "morale": 65,
+        "pace_fraction": 2220,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 2280,
+        "stamina_gain": 0,
+        "total_bps": 6300,
+        "training_bps": 4500,
+        "training_days": 60
+      },
+      {
+        "age": 34,
+        "budget_used": {
+          "attacking": 0,
+          "defending": 0,
+          "goalkeeping": 0,
+          "leadership": 2520,
+          "match": 1800,
+          "pace": 1036,
+          "playmaking": 1800,
+          "set_pieces": 0,
+          "stamina": 1064,
+          "training": 2100,
+          "winger": 0
+        },
+        "calendar": "busy",
+        "leadership_bps": 2520,
+        "league_matches": 18,
+        "match_bps": 1800,
+        "morale": 60,
+        "pace_fraction": 1036,
+        "pace_gain": 0,
+        "staff": 18,
+        "stamina_fraction": 1064,
+        "stamina_gain": 0,
+        "total_bps": 3900,
+        "training_bps": 2100,
+        "training_days": 28
+      }
+    ],
+    "staff_skills": [
+      2,
+      10,
+      18
+    ],
+    "transfer_demo": {
+      "granted_after_transfer": 14226,
+      "note": "A transfer reuses the same age-season budget object: prior use is preserved, and the grant is capped by the remaining allowance, not reset.",
+      "remaining_training_allowance": 18080,
+      "requested_training_bps": 30000,
+      "used_before_transfer": {
+        "attacking": 0,
+        "defending": 0,
+        "goalkeeping": 0,
+        "leadership": 600,
+        "match": 774,
+        "pace": 960,
+        "playmaking": 774,
+        "set_pieces": 0,
+        "stamina": 960,
+        "training": 1920,
+        "winger": 0
+      }
+    }
+  },
+  "policies": {
+    "development_budget": "development-budget-v1",
+    "economy": "economy-cycle-v2",
+    "match_development": "match-development-v1",
+    "recovery": "recovery-v1",
+    "scouting": "scouting-v1",
+    "season_sponsor": "season-sponsor-v1",
+    "training_schema": "training-v1",
+    "training_session": "training-specialists-v2"
+  },
+  "scout": {
+    "affordability": {
+      "count_note": "The turnover count exceeds the upfront-only count because season income (sponsor/merch/tickets/prize) funds part of the wages; both counts ignore windows and the 25-player cap.",
+      "count_vs_600k_upfront_only": 1,
+      "count_with_turnover_obligations": 2,
+      "discretionary_turnover_cash": 782500,
+      "median_upfront_full_cost": 323220.0,
+      "median_youth_wage": 1305,
+      "squad_cap_note": "Active+incoming player cap is 25 (application/candidates.py); a 20-player squad fits at most 5 signings without sales. Signings need an open window and a free slot; counts above ignore both and stay lower bounds.",
+      "upfront_cost_note": "Mission + median signing at skill 5/4d is a LOWER BOUND: windows, squad cap and youth wages are ignored here."
+    },
+    "cells": [
+      {
+        "days": 4,
+        "discoveries": 12,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 329838.75,
+        "mean_best_quality": 7.583333333333333,
+        "mission_fee": 105000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 13.0,
+          "median": 7.0,
+          "min": 3.0,
+          "p25": 6.0,
+          "p75": 8.5
+        },
+        "scout_skill": 1,
+        "signing_fee_quantiles": {
+          "max": 611524.0,
+          "median": 164030.0,
+          "min": 100000.0,
+          "p25": 126400.0,
+          "p75": 246452.0
+        },
+        "strong_share_q12": 0.16666666666666666
+      },
+      {
+        "days": 8,
+        "discoveries": 24,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 454445.25,
+        "mean_best_quality": 8.583333333333334,
+        "mission_fee": 210000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 12.0,
+          "median": 7.5,
+          "min": 1.0,
+          "p25": 5.75,
+          "p75": 9.0
+        },
+        "scout_skill": 1,
+        "signing_fee_quantiles": {
+          "max": 565248.0,
+          "median": 172250.0,
+          "min": 100000.0,
+          "p25": 118663.75,
+          "p75": 229995.0
+        },
+        "strong_share_q12": 0.041666666666666664
+      },
+      {
+        "days": 12,
+        "discoveries": 36,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 572007.5833333334,
+        "mean_best_quality": 9.0,
+        "mission_fee": 315000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 14.0,
+          "median": 6.5,
+          "min": 2.0,
+          "p25": 4.0,
+          "p75": 8.25
+        },
+        "scout_skill": 1,
+        "signing_fee_quantiles": {
+          "max": 591675.0,
+          "median": 140911.5,
+          "min": 100000.0,
+          "p25": 115000.0,
+          "p75": 210011.25
+        },
+        "strong_share_q12": 0.05555555555555555
+      },
+      {
+        "days": 16,
+        "discoveries": 48,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 737852.1666666666,
+        "mean_best_quality": 9.916666666666666,
+        "mission_fee": 420000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 14.0,
+          "median": 6.5,
+          "min": 1.0,
+          "p25": 4.0,
+          "p75": 9.0
+        },
+        "scout_skill": 1,
+        "signing_fee_quantiles": {
+          "max": 604920.0,
+          "median": 142520.0,
+          "min": 100000.0,
+          "p25": 100000.0,
+          "p75": 242575.0
+        },
+        "strong_share_q12": 0.0625
+      },
+      {
+        "days": 4,
+        "discoveries": 12,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 342592.3333333333,
+        "mean_best_quality": 7.916666666666667,
+        "mission_fee": 125000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 13.0,
+          "median": 8.0,
+          "min": 4.0,
+          "p25": 6.0,
+          "p75": 9.25
+        },
+        "scout_skill": 5,
+        "signing_fee_quantiles": {
+          "max": 500940.0,
+          "median": 198220.0,
+          "min": 100000.0,
+          "p25": 131963.5,
+          "p75": 248930.0
+        },
+        "strong_share_q12": 0.08333333333333333
+      },
+      {
+        "days": 8,
+        "discoveries": 24,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 520529.75,
+        "mean_best_quality": 9.25,
+        "mission_fee": 250000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 13.0,
+          "median": 8.0,
+          "min": 1.0,
+          "p25": 7.0,
+          "p75": 10.0
+        },
+        "scout_skill": 5,
+        "signing_fee_quantiles": {
+          "max": 479160.0,
+          "median": 216717.5,
+          "min": 100000.0,
+          "p25": 150975.0,
+          "p75": 305534.5
+        },
+        "strong_share_q12": 0.08333333333333333
+      },
+      {
+        "days": 12,
+        "discoveries": 36,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 655455.8333333334,
+        "mean_best_quality": 9.25,
+        "mission_fee": 375000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 14.0,
+          "median": 7.0,
+          "min": 1.0,
+          "p25": 5.0,
+          "p75": 9.0
+        },
+        "scout_skill": 5,
+        "signing_fee_quantiles": {
+          "max": 622080.0,
+          "median": 179457.5,
+          "min": 100000.0,
+          "p25": 107886.25,
+          "p75": 256678.75
+        },
+        "strong_share_q12": 0.05555555555555555
+      },
+      {
+        "days": 16,
+        "discoveries": 48,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 890311.1666666666,
+        "mean_best_quality": 11.333333333333334,
+        "mission_fee": 500000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 14.0,
+          "median": 8.5,
+          "min": 2.0,
+          "p25": 6.0,
+          "p75": 10.0
+        },
+        "scout_skill": 5,
+        "signing_fee_quantiles": {
+          "max": 532900.0,
+          "median": 207090.0,
+          "min": 100000.0,
+          "p25": 128412.0,
+          "p75": 317706.75
+        },
+        "strong_share_q12": 0.125
+      },
+      {
+        "days": 4,
+        "discoveries": 12,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 400159.0833333333,
+        "mean_best_quality": 8.666666666666666,
+        "mission_fee": 150000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 13.0,
+          "median": 9.0,
+          "min": 5.0,
+          "p25": 7.0,
+          "p75": 10.0
+        },
+        "scout_skill": 10,
+        "signing_fee_quantiles": {
+          "max": 479160.0,
+          "median": 256156.5,
+          "min": 100000.0,
+          "p25": 177671.25,
+          "p75": 304806.25
+        },
+        "strong_share_q12": 0.08333333333333333
+      },
+      {
+        "days": 8,
+        "discoveries": 24,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 681306.5,
+        "mean_best_quality": 10.5,
+        "mission_fee": 300000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 14.0,
+          "median": 9.5,
+          "min": 4.0,
+          "p25": 7.0,
+          "p75": 11.0
+        },
+        "scout_skill": 10,
+        "signing_fee_quantiles": {
+          "max": 691288.0,
+          "median": 273105.0,
+          "min": 115000.0,
+          "p25": 190616.25,
+          "p75": 353816.25
+        },
+        "strong_share_q12": 0.16666666666666666
+      },
+      {
+        "days": 12,
+        "discoveries": 36,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 811015.75,
+        "mean_best_quality": 10.583333333333334,
+        "mission_fee": 450000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 13.0,
+          "median": 9.0,
+          "min": 4.0,
+          "p25": 7.0,
+          "p75": 10.0
+        },
+        "scout_skill": 10,
+        "signing_fee_quantiles": {
+          "max": 602266.0,
+          "median": 247722.5,
+          "min": 100000.0,
+          "p25": 188899.5,
+          "p75": 295137.0
+        },
+        "strong_share_q12": 0.08333333333333333
+      },
+      {
+        "days": 16,
+        "discoveries": 48,
+        "elite_share_q15": 0.020833333333333332,
+        "mean_best_full_cost": 1011647.9166666666,
+        "mean_best_quality": 11.416666666666666,
+        "mission_fee": 600000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 15.0,
+          "median": 9.0,
+          "min": 3.0,
+          "p25": 7.0,
+          "p75": 10.25
+        },
+        "scout_skill": 10,
+        "signing_fee_quantiles": {
+          "max": 717715.0,
+          "median": 262875.0,
+          "min": 100000.0,
+          "p25": 175728.75,
+          "p75": 324900.0
+        },
+        "strong_share_q12": 0.14583333333333334
+      },
+      {
+        "days": 4,
+        "discoveries": 12,
+        "elite_share_q15": 0.08333333333333333,
+        "mean_best_full_cost": 589015.9166666666,
+        "mean_best_quality": 10.583333333333334,
+        "mission_fee": 175000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 15.0,
+          "median": 11.0,
+          "min": 5.0,
+          "p25": 9.75,
+          "p75": 12.0
+        },
+        "scout_skill": 15,
+        "signing_fee_quantiles": {
+          "max": 973596.0,
+          "median": 379497.0,
+          "min": 100000.0,
+          "p25": 334824.0,
+          "p75": 463031.5
+        },
+        "strong_share_q12": 0.3333333333333333
+      },
+      {
+        "days": 8,
+        "discoveries": 24,
+        "elite_share_q15": 0.08333333333333333,
+        "mean_best_full_cost": 734477.8333333334,
+        "mean_best_quality": 10.916666666666666,
+        "mission_fee": 350000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 16.0,
+          "median": 9.0,
+          "min": 5.0,
+          "p25": 7.0,
+          "p75": 11.0
+        },
+        "scout_skill": 15,
+        "signing_fee_quantiles": {
+          "max": 909558.0,
+          "median": 259740.0,
+          "min": 100000.0,
+          "p25": 157999.0,
+          "p75": 375585.0
+        },
+        "strong_share_q12": 0.20833333333333334
+      },
+      {
+        "days": 12,
+        "discoveries": 36,
+        "elite_share_q15": 0.05555555555555555,
+        "mean_best_full_cost": 1059544.6666666667,
+        "mean_best_quality": 13.083333333333334,
+        "mission_fee": 525000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 15.0,
+          "median": 9.0,
+          "min": 4.0,
+          "p25": 7.75,
+          "p75": 11.25
+        },
+        "scout_skill": 15,
+        "signing_fee_quantiles": {
+          "max": 767812.0,
+          "median": 272688.0,
+          "min": 100000.0,
+          "p25": 182520.0,
+          "p75": 478543.75
+        },
+        "strong_share_q12": 0.25
+      },
+      {
+        "days": 16,
+        "discoveries": 48,
+        "elite_share_q15": 0.0625,
+        "mean_best_full_cost": 1224025.5833333333,
+        "mean_best_quality": 12.833333333333334,
+        "mission_fee": 700000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 17.0,
+          "median": 10.0,
+          "min": 4.0,
+          "p25": 8.0,
+          "p75": 12.0
+        },
+        "scout_skill": 15,
+        "signing_fee_quantiles": {
+          "max": 978121.0,
+          "median": 321052.5,
+          "min": 100000.0,
+          "p25": 202745.0,
+          "p75": 474748.75
+        },
+        "strong_share_q12": 0.2708333333333333
+      },
+      {
+        "days": 4,
+        "discoveries": 12,
+        "elite_share_q15": 0.0,
+        "mean_best_full_cost": 634822.1666666666,
+        "mean_best_quality": 11.166666666666666,
+        "mission_fee": 200000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 14.0,
+          "median": 11.0,
+          "min": 8.0,
+          "p25": 10.0,
+          "p75": 13.0
+        },
+        "scout_skill": 20,
+        "signing_fee_quantiles": {
+          "max": 622080.0,
+          "median": 425244.0,
+          "min": 192000.0,
+          "p25": 316666.5,
+          "p75": 537456.25
+        },
+        "strong_share_q12": 0.4166666666666667
+      },
+      {
+        "days": 8,
+        "discoveries": 24,
+        "elite_share_q15": 0.08333333333333333,
+        "mean_best_full_cost": 943968.1666666666,
+        "mean_best_quality": 13.416666666666666,
+        "mission_fee": 400000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 15.0,
+          "median": 12.0,
+          "min": 7.0,
+          "p25": 10.75,
+          "p75": 14.0
+        },
+        "scout_skill": 20,
+        "signing_fee_quantiles": {
+          "max": 769626.0,
+          "median": 436852.5,
+          "min": 136080.0,
+          "p25": 352256.5,
+          "p75": 577715.0
+        },
+        "strong_share_q12": 0.6666666666666666
+      },
+      {
+        "days": 12,
+        "discoveries": 36,
+        "elite_share_q15": 0.05555555555555555,
+        "mean_best_full_cost": 1201354.3333333333,
+        "mean_best_quality": 13.5,
+        "mission_fee": 600000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 15.0,
+          "median": 11.0,
+          "min": 4.0,
+          "p25": 9.0,
+          "p75": 14.0
+        },
+        "scout_skill": 20,
+        "signing_fee_quantiles": {
+          "max": 818662.0,
+          "median": 414521.5,
+          "min": 100000.0,
+          "p25": 274278.5,
+          "p75": 614496.75
+        },
+        "strong_share_q12": 0.4444444444444444
+      },
+      {
+        "days": 16,
+        "discoveries": 48,
+        "elite_share_q15": 0.08333333333333333,
+        "mean_best_full_cost": 1398735.6666666667,
+        "mean_best_quality": 13.583333333333334,
+        "mission_fee": 800000,
+        "missions": 12,
+        "quality_quantiles": {
+          "max": 17.0,
+          "median": 11.0,
+          "min": 5.0,
+          "p25": 8.75,
+          "p75": 13.0
+        },
+        "scout_skill": 20,
+        "signing_fee_quantiles": {
+          "max": 913962.0,
+          "median": 375576.0,
+          "min": 100000.0,
+          "p25": 252223.5,
+          "p75": 497053.5
+        },
+        "strong_share_q12": 0.3958333333333333
+      }
+    ],
+    "durations": [
+      4,
+      8,
+      12,
+      16
+    ],
+    "elite_band": 15,
+    "examples_skill5_mc": [
+      {
+        "candidates": [
+          {
+            "age": 21,
+            "alternatives": [],
+            "mission_fee": 125000,
+            "person_id": "d329165e-8861-5bfc-b19e-a862cc3d5ee4",
+            "position": "MC",
+            "positions": 1,
+            "quality_floor": 6,
+            "quality_units": 32,
+            "signing_fee": 102400,
+            "skills8": [
+              3,
+              2,
+              7,
+              2,
+              8,
+              4,
+              4,
+              7
+            ],
+            "wage_per_cycle": 729
+          }
+        ],
+        "days": 4,
+        "mission_fee": 125000,
+        "skill": 5
+      },
+      {
+        "candidates": [
+          {
+            "age": 17,
+            "alternatives": [],
+            "mission_fee": 250000,
+            "person_id": "34b97151-8596-54a2-97fa-dbeee5f81abb",
+            "position": "MC",
+            "positions": 1,
+            "quality_floor": 4,
+            "quality_units": 23,
+            "signing_fee": 100000,
+            "skills8": [
+              3,
+              2,
+              5,
+              5,
+              5,
+              1,
+              4,
+              4
+            ],
+            "wage_per_cycle": 414
+          },
+          {
+            "age": 18,
+            "alternatives": [],
+            "mission_fee": 250000,
+            "person_id": "edd6c387-5937-5ca7-96c3-1c9f802e910a",
+            "position": "MC",
+            "positions": 1,
+            "quality_floor": 12,
+            "quality_units": 61,
+            "signing_fee": 427915,
+            "skills8": [
+              3,
+              8,
+              12,
+              7,
+              9,
+              10,
+              12,
+              13
+            ],
+            "wage_per_cycle": 2712
+          }
+        ],
+        "days": 8,
+        "mission_fee": 250000,
+        "skill": 5
+      },
+      {
+        "candidates": [
+          {
+            "age": 17,
+            "alternatives": [
+              "MR",
+              "ML"
+            ],
+            "mission_fee": 375000,
+            "person_id": "ab15ae3f-f6f2-5bbd-8b3d-7b20a23be563",
+            "position": "MC",
+            "positions": 3,
+            "quality_floor": 10,
+            "quality_units": 50,
+            "signing_fee": 390000,
+            "skills8": [
+              1,
+              11,
+              11,
+              13,
+              8,
+              8,
+              9,
+              8
+            ],
+            "wage_per_cycle": 2264
+          },
+          {
+            "age": 21,
+            "alternatives": [],
+            "mission_fee": 375000,
+            "person_id": "e1b5d976-f06b-511c-a3cc-614bbea7af07",
+            "position": "MC",
+            "positions": 1,
+            "quality_floor": 11,
+            "quality_units": 56,
+            "signing_fee": 313600,
+            "skills8": [
+              2,
+              7,
+              12,
+              11,
+              8,
+              12,
+              10,
+              10
+            ],
+            "wage_per_cycle": 2183
+          },
+          {
+            "age": 18,
+            "alternatives": [],
+            "mission_fee": 375000,
+            "person_id": "d796495c-9494-508f-87b1-b1d2321b7620",
+            "position": "MC",
+            "positions": 1,
+            "quality_floor": 3,
+            "quality_units": 18,
+            "signing_fee": 100000,
+            "skills8": [
+              3,
+              1,
+              4,
+              3,
+              1,
+              3,
+              5,
+              1
+            ],
+            "wage_per_cycle": 282
+          }
+        ],
+        "days": 12,
+        "mission_fee": 375000,
+        "skill": 5
+      },
+      {
+        "candidates": [
+          {
+            "age": 21,
+            "alternatives": [],
+            "mission_fee": 500000,
+            "person_id": "99b1acf7-7049-5ea1-95ee-e4530beb70f0",
+            "position": "MC",
+            "positions": 1,
+            "quality_floor": 14,
+            "quality_units": 73,
+            "signing_fee": 532900,
+            "skills8": [
+              1,
+              12,
+              15,
+              14,
+              14,
+              14,
+              12,
+              16
+            ],
+            "wage_per_cycle": 3465
+          },
+          {
+            "age": 19,
+            "alternatives": [],
+            "mission_fee": 500000,
+            "person_id": "5ab804a4-1516-53f2-9957-738cd66ae1f6",
+            "position": "MC",
+            "positions": 1,
+            "quality_floor": 11,
+            "quality_units": 55,
+            "signing_fee": 332750,
+            "skills8": [
+              2,
+              10,
+              12,
+              13,
+              14,
+              9,
+              9,
+              10
+            ],
+            "wage_per_cycle": 2259
+          },
+          {
+            "age": 20,
+            "alternatives": [
+              "DM"
+            ],
+            "mission_fee": 500000,
+            "person_id": "b8971c9e-b33d-5ef4-9d8a-46933ce7c3d4",
+            "position": "MC",
+            "positions": 2,
+            "quality_floor": 6,
+            "quality_units": 34,
+            "signing_fee": 139587,
+            "skills8": [
+              2,
+              6,
+              7,
+              7,
+              4,
+              5,
+              6,
+              7
+            ],
+            "wage_per_cycle": 801
+          },
+          {
+            "age": 19,
+            "alternatives": [],
+            "mission_fee": 500000,
+            "person_id": "404010a4-dba4-5029-86fe-3e64dea69de4",
+            "position": "MC",
+            "positions": 1,
+            "quality_floor": 9,
+            "quality_units": 48,
+            "signing_fee": 253440,
+            "skills8": [
+              3,
+              7,
+              10,
+              8,
+              6,
+              10,
+              11,
+              7
+            ],
+            "wage_per_cycle": 1551
+          }
+        ],
+        "days": 16,
+        "mission_fee": 500000,
+        "skill": 5
+      }
+    ],
+    "fast_vs_long_skill": {
+      "1": {
+        "elapsed_days": {
+          "fast": 4,
+          "long": 16
+        },
+        "fast_4d_mean_full": 329838.75,
+        "long_16d_mean_best_full": 737852.1666666666,
+        "long_16d_mean_best_quality": 9.916666666666666,
+        "short_mean_quality": 7.0
+      },
+      "10": {
+        "elapsed_days": {
+          "fast": 4,
+          "long": 16
+        },
+        "fast_4d_mean_full": 400159.0833333333,
+        "long_16d_mean_best_full": 1011647.9166666666,
+        "long_16d_mean_best_quality": 11.416666666666666,
+        "short_mean_quality": 9.0
+      },
+      "15": {
+        "elapsed_days": {
+          "fast": 4,
+          "long": 16
+        },
+        "fast_4d_mean_full": 589015.9166666666,
+        "long_16d_mean_best_full": 1224025.5833333333,
+        "long_16d_mean_best_quality": 12.833333333333334,
+        "short_mean_quality": 11.0
+      },
+      "20": {
+        "elapsed_days": {
+          "fast": 4,
+          "long": 16
+        },
+        "fast_4d_mean_full": 634822.1666666666,
+        "long_16d_mean_best_full": 1398735.6666666667,
+        "long_16d_mean_best_quality": 13.583333333333334,
+        "short_mean_quality": 11.0
+      },
+      "5": {
+        "elapsed_days": {
+          "fast": 4,
+          "long": 16
+        },
+        "fast_4d_mean_full": 342592.3333333333,
+        "long_16d_mean_best_full": 890311.1666666666,
+        "long_16d_mean_best_quality": 11.333333333333334,
+        "short_mean_quality": 8.0
+      }
+    },
+    "positions": [
+      "MC",
+      "FC",
+      "DC"
+    ],
+    "seeds": [
+      7,
+      8,
+      9,
+      10
+    ],
+    "skills": [
+      1,
+      5,
+      10,
+      15,
+      20
+    ],
+    "strong_band": 12
+  },
+  "seeds": [
+    7,
+    8,
+    9,
+    10
+  ],
+  "tool": "and71-balance-audit-v1",
+  "turnover": {
+    "cycles": 20,
+    "offseason_days": 8,
+    "season_days": 72
+  }
+}
