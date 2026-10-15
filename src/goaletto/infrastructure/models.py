@@ -1844,17 +1844,32 @@ class MatchDevelopment(Base):
     __tablename__ = "match_development"
     __table_args__ = (
         CheckConstraint(
-            "policy_version = 'match-development-v1'", name="ck_match_development_policy"
+            "policy_version IN ('match-development-v1','match-practice-v2')",
+            name="ck_match_development_policy",
         ),
         CheckConstraint(
             "jsonb_typeof(staff_snapshot) = 'object' AND jsonb_typeof(results) = 'array'",
             name="ck_match_development_documents",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(terms_snapshot) = 'object' AND "
+            "(policy_version = 'match-development-v1' OR ("
+            "terms_snapshot ?& ARRAY['competition','fixture_id','season_id','plan_revision',"
+            "'match_seed','friendly_skill_factor','friendly_experience_factor','players'] AND "
+            "terms_snapshot->>'competition' IN ('league','cup','champions','friendly') AND "
+            "jsonb_typeof(terms_snapshot->'players') = 'object' AND "
+            "jsonb_typeof(terms_snapshot->'match_seed') = 'string' AND "
+            "length(terms_snapshot->>'match_seed') > 0 AND "
+            "(terms_snapshot->>'friendly_skill_factor')::int BETWEEN 1 AND 9999 AND "
+            "(terms_snapshot->>'friendly_experience_factor')::int BETWEEN 1 AND 9999) IS TRUE)",
+            name="ck_match_development_terms",
         ),
     )
     match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
     policy_version: Mapped[str] = mapped_column(String(32))
     eligible: Mapped[bool] = mapped_column(Boolean)
     staff_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    terms_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     results: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)

@@ -117,6 +117,9 @@ class ReportLineupPlayer:
     appeared: bool = False  # includes a player entering immediately before final whistle
     growth_bps: int | None = None
     experience_gain: int | None = None
+    form_before: int | None = None
+    form_after: int | None = None
+    skill_gains: tuple[tuple[str, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -521,6 +524,15 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     ),
                     growth_rows.get(str(snapshot_player.id), {}).get("gain_bps"),
                     growth_rows.get(str(snapshot_player.id), {}).get("experience_gain"),
+                    growth_rows.get(str(snapshot_player.id), {}).get("form_before"),
+                    growth_rows.get(str(snapshot_player.id), {}).get("form_after"),
+                    tuple(
+                        (key, value)
+                        for key, value in growth_rows.get(str(snapshot_player.id), {})
+                        .get("granted", {})
+                        .items()
+                        if value
+                    ),
                 )
             )
         rows_out.sort(key=lambda r: (not r.started, not r.appeared, r.name, str(r.person_id)))

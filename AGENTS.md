@@ -100,6 +100,11 @@
 - This repository is proprietary; do not change licensing without user instruction.
 - Keep Linear tasks aligned with meaningful completed work. Do not close unimplemented
   gameplay tasks merely because scaffolding exists.
+- Match practice integration 2026-10-15: new league locks pin match-practice-v2,
+  persisted terms/staff/seed/participants and atomic form/skills/experience receipts.
+  V2 permits bounded -1/0/+1 form; V1 calculations and legacy appearance receipts
+  retain their behavior. See docs/match-practice-runtime.md. Cup/champions/friendly
+  admission still requires their real runtime; relabeling a league plan grants none.
 - Run ruff, mypy, relevant pytest checks and migration rendering/execution.
   User clarified on 2026-10-12: do not create new local/CI test databases.
   During development, while Goaletto has no real players, use the single

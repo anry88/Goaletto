@@ -129,3 +129,31 @@ def test_upcoming_fixture_has_timezone_lock_and_lineup_navigation() -> None:
     assert any(b.callback_data == "ln:open" for row in kb.inline_keyboard for b in row)
     text, _ = render(replace(screen, next_locked=True))
     assert "уже зафиксирован" in text and "Сохраните состав" not in text
+
+
+async def test_practice_report_shows_skill_fraction_form_and_legacy_absence():
+    from goaletto.presentation.i18n import using_locale
+
+    recorder = Recorder()
+    report = await get_match_report(session(recorder), recorder.actor, recorder.fixture.id)
+    member = replace(
+        report.home_lineup[0],
+        growth_bps=288,
+        experience_gain=1200,
+        skill_gains=(("playmaking", 288),),
+        form_before=8,
+        form_after=7,
+    )
+    changed = replace(report, home_lineup=(member, report.home_lineup[-1]))
+    text, _ = report_view(changed, section="home")
+    assert "Плеймейкинг: +2.88% балла" in text
+    assert "опыт +12.00% балла" in text
+    assert "Форма после матча: 8 → 7/8" in text
+    assert text.count("Форма после матча") == 1
+    # Legacy/unused players have no inferred zeroes or retrospective form changes.
+    original, _ = report_view(report, section="home")
+    assert "Форма после матча" not in original
+    with using_locale("en"):
+        english, _ = report_view(changed, section="home")
+    assert "Form after match: 8 → 7/8" in english
+    assert "Playmaking: +2.88%" in english

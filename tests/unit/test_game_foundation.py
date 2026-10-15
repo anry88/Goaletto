@@ -45,6 +45,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
         "finance_cycles",
         "training_plans",
         "player_development",
+        "match_development",
     }
     dialect = postgresql.dialect()
     for table in Base.metadata.sorted_tables:
@@ -71,6 +72,8 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 "ck_journey_name",
                 "ck_signing_kind",
                 "ck_training_week",
+                "ck_match_development_policy",
+                "ck_match_development_terms",
             }:
                 assert (
                     normalized(
@@ -81,6 +84,9 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 )
     assert "ALTER TABLE clubs ADD COLUMN stadium_capacity INTEGER DEFAULT '5000' NOT NULL" in sql
     assert "ALTER TABLE matches ADD COLUMN paused_at TIMESTAMP WITH TIME ZONE" in sql
+    assert (
+        "ALTER TABLE match_development ADD COLUMN terms_snapshot JSONB DEFAULT '{}' NOT NULL" in sql
+    )
     assert "CREATE TRIGGER tr_match_stage_immutable" in sql
     assert (
         "ALTER TABLE managers ADD COLUMN reminders_enabled BOOLEAN DEFAULT 'true' NOT NULL" in sql

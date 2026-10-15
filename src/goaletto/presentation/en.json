@@ -661,5 +661,7 @@
   "Отклонить": "Decline",
   "🏟 <b>{p0}</b> · Лига {p1}\n💰 Бюджет: {p2}\n🏟 Стадион: {p3:,} · 👥 Болельщики: {p4:,}": "🏟 <b>{p0}</b> · Tier {p1}\n💰 Balance: {p2}\n🏟 Stadium: {p3:,} · 👥 Supporters: {p4:,}",
   "Главного тренера можно только заменить через найм другого.": "The head coach can only be replaced by hiring another coach.",
-  "Главного тренера можно только заменить через найм другого. Откройте /staff.": "The head coach can only be replaced by hiring another coach. Open /staff."
+  "Главного тренера можно только заменить через найм другого. Откройте /staff.": "The head coach can only be replaced by hiring another coach. Open /staff.",
+  "{skill}: +{gain}% балла": "{skill}: +{gain}% of a point",
+  "\nФорма после матча: {before} → {after}/8": "\nForm after match: {before} → {after}/8"
 }

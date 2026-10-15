@@ -17,7 +17,7 @@ from goaletto.application.history import (
     SeasonSummary,
 )
 from goaletto.application.match_commentary import INSTRUCTIONS, MENTALITIES, TACTICS
-from goaletto.bot.club_cards import CLUB_CALLBACK, MENU_CALLBACK
+from goaletto.bot.club_cards import CLUB_CALLBACK, MENU_CALLBACK, SKILL_LABELS
 from goaletto.bot.history_callbacks import (
     REPORT_SECTIONS,
     archive_callback,
@@ -242,6 +242,29 @@ def report_view(
                         experience=f"{(member.experience_gain or 0) / 100:.2f}",
                     )
                     if member.growth_bps is not None
+                    else ""
+                )
+                + (
+                    "\n"
+                    + " · ".join(
+                        tr(
+                            "{skill}: +{gain}% балла",
+                            skill=tr(dict(SKILL_LABELS)[key]),
+                            gain=f"{gain / 100:.2f}",
+                        )
+                        for key, gain in member.skill_gains
+                        if key in dict(SKILL_LABELS)
+                    )
+                    if member.skill_gains
+                    else ""
+                )
+                + (
+                    tr(
+                        "\nФорма после матча: {before} → {after}/8",
+                        before=member.form_before,
+                        after=member.form_after,
+                    )
+                    if member.form_before is not None and member.form_after is not None
                     else ""
                 )
             )

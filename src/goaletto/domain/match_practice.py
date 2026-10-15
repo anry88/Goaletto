@@ -33,6 +33,7 @@ from goaletto.domain.staff_effects import seeded_draw
 from goaletto.domain.training import PRIMARY_SKILLS, TrainingPlayer, age_multiplier
 
 POLICY = "match-practice-v1"
+CURRENT_POLICY = "match-practice-v2"
 
 # Proposal values, not user decisions. Calibration compares 2500/5000/7500.
 DEFAULT_FRIENDLY_SKILL_FACTOR = 5000
@@ -91,7 +92,7 @@ def _check_seed(match_seed: str) -> str:
 
 
 def _check_policy(policy: str) -> str:
-    if policy != POLICY:
+    if policy not in (POLICY, CURRENT_POLICY):
         raise ValueError("Unknown practice policy")
     return policy
 
@@ -132,6 +133,21 @@ class FormOutcome:
     form: int
     draw: int
     chance: int
+    down_chance: int = 0
+
+
+def form_chances(minutes: int, form: int) -> tuple[int, int]:
+    """V2: modest practice around form 5–6; exceptional form can subside.
+
+    One disjoint draw gives -1/0/+1. More minutes give more exposure,
+    not larger jumps. Neither edge is absorbing; no appearance means no change.
+    """
+    _check_minutes(minutes)
+    if type(form) is not int or not 1 <= form <= 8:
+        raise ValueError("Invalid form")
+    up = (1800, 1700, 1500, 1200, 800, 500, 200, 0)[form - 1]
+    down = (0, 100, 200, 300, 500, 800, 1200, 1800)[form - 1]
+    return up * minutes // 90, down * minutes // 90
 
 
 def practice_form(
@@ -145,8 +161,8 @@ def practice_form(
     """Seeded form step keyed by policy, match seed and person.
 
     Same inputs and seed always give the same result; there is no free
-    redraw on retry. Never mixes morale, skill or energy. Only 0/+1,
-    capped at 8.
+    redraw on retry. Never mixes morale, skill or energy. V1 only rises;
+    explicit V2 also permits a one-point fall, with stronger return from extremes.
     """
     _check_policy(policy)
     _check_minutes(minutes)
@@ -155,11 +171,17 @@ def practice_form(
     if not isinstance(person_id, UUID):
         raise ValueError("Invalid person id")
     _check_seed(match_seed)
-    chance = form_up_chance(minutes, form)
-    draw = seeded_draw(match_seed, person_id, "form", policy=POLICY)
+    chance, down = (
+        form_chances(minutes, form)
+        if policy == CURRENT_POLICY
+        else (form_up_chance(minutes, form), 0)
+    )
+    draw = seeded_draw(match_seed, person_id, "form", policy=policy)
+    if down and chance <= draw < chance + down:
+        return FormOutcome(form - 1, draw, chance, down)
     if minutes > 0 and form < 8 and draw < chance:
-        return FormOutcome(form + 1, draw, chance)
-    return FormOutcome(form, draw, chance)
+        return FormOutcome(form + 1, draw, chance, down)
+    return FormOutcome(form, draw, chance, down)
 
 
 @dataclass(frozen=True)
@@ -188,6 +210,7 @@ class MatchPracticeResult:
     terms: PracticeTerms
     form_draw: int
     form_chance: int
+    form_down_chance: int = 0
 
 
 def develop_match_practice(
@@ -262,7 +285,9 @@ def develop_match_practice(
     whole, fractions["experience"] = divmod(fractions["experience"] + experience_gain, 10000)
     growth = SkillGrowth(growth.skills, fractions, growth.budget, growth.granted)
 
-    form_outcome = practice_form(player.form, minutes, person_id=player.id, match_seed=match_seed)
+    form_outcome = practice_form(
+        player.form, minutes, person_id=player.id, match_seed=match_seed, policy=policy
+    )
     return MatchPracticeResult(
         skills=dict(growth.skills),
         progress=dict(fractions),
@@ -272,7 +297,7 @@ def develop_match_practice(
         growth=growth,
         granted=dict(growth.granted),
         terms=PracticeTerms(
-            policy=POLICY,
+            policy=policy,
             competition=competition_value,
             minutes=minutes,
             skill_factor=skill_factor,
@@ -283,4 +308,5 @@ def develop_match_practice(
         ),
         form_draw=form_outcome.draw,
         form_chance=form_outcome.chance,
+        form_down_chance=form_outcome.down_chance,
     )

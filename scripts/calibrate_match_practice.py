@@ -9,12 +9,14 @@ Reproduce: ``.venv/bin/python scripts/calibrate_match_practice.py --seed 7``
 """
 
 import argparse
+from collections import Counter
 from dataclasses import replace
 from uuid import UUID
 
 from goaletto.domain.development import GrowthBudget
 from goaletto.domain.match_development import develop_appearance
 from goaletto.domain.match_practice import (
+    CURRENT_POLICY,
     Competition,
     develop_match_practice,
     form_up_chance,
@@ -138,6 +140,61 @@ def form_table(seed: int) -> list[str]:
     return lines
 
 
+def form_long_run(seed: int) -> list[str]:
+    """Exercise the exact V2 form function, including existing training boosts."""
+    lines = [f"== {CURRENT_POLICY}: 128 players, 400 matches, starting form 8 =="]
+    for training_days in (0, 1, 3):
+        counts: Counter[int] = Counter()
+        ups = downs = 0
+        for index in range(128):
+            person_id = UUID(int=index + 1)
+            form = 8
+            current = replace(player(22, form=8), id=person_id)
+            budget = GrowthBudget(22)
+            for match in range(400):
+                outcome = practice_form(
+                    form,
+                    90,
+                    person_id=person_id,
+                    match_seed=f"long:{seed}:{match}",
+                    policy=CURRENT_POLICY,
+                )
+                ups += outcome.form > form
+                downs += outcome.form < form
+                form = outcome.form
+                for day in range(training_days):
+                    trained = train_player(
+                        replace(current, form=form),
+                        Focus.PLAYMAKING,
+                        Intensity.MEDIUM,
+                        seed=f"long:{seed}:{match}:{day}",
+                        trainer_skill=10,
+                        head_skill=10,
+                        budget=budget,
+                    )
+                    current = replace(
+                        current,
+                        skills=trained.skills,
+                        progress=trained.progress,
+                        form=trained.form,
+                        experience=trained.experience,
+                        morale=trained.morale,
+                        leadership=trained.leadership,
+                        leadership_progress=trained.leadership_progress,
+                    )
+                    budget, form = trained.budget, trained.form
+                if match >= 200:
+                    counts[form] += 1
+        total = sum(counts.values())
+        average = sum(form * n for form, n in counts.items()) / total
+        lines.append(
+            f"training days/match {training_days}: mean {average:.3f}, "
+            f"form8 {counts[8] / total:.1%}, ups/downs {ups}/{downs}, "
+            f"distribution {dict(sorted(counts.items()))}"
+        )
+    return lines
+
+
 def simulate_season(seed: int, dense: bool, friendly_factor: int) -> dict[str, int | str]:
     current = player(22)
     budget = GrowthBudget(22)
@@ -176,6 +233,7 @@ def simulate_season(seed: int, dense: bool, friendly_factor: int) -> dict[str, i
                 match_seed=f"season:{seed}:{day}:{competition}",
                 friendly_skill_factor=friendly_factor,
                 friendly_experience_factor=friendly_factor,
+                policy=CURRENT_POLICY,
             )
             match_bps += sum(result.granted.values())
             budget = result.growth.budget
@@ -256,6 +314,7 @@ def main() -> None:
         factor_table(),
         extra_time_table(),
         form_table(args.seed),
+        form_long_run(args.seed),
         season_table(args.seed),
     ]
     print("\n\n".join("\n".join(section) for section in sections))
