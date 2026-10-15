@@ -566,3 +566,25 @@ def test_knockout_winner_feeds_cup_bracket_validate_winners() -> None:
     assert undecided.winner is None
     with pytest.raises(ValueError):
         validate_winners(bracket, {prelim.id: uuid4()})
+
+
+def test_return_match_cannot_exist_before_first_match_finishes():
+    with pytest.raises(ValueError):
+        decide_tie(
+            tie=make_tie(),
+            first_match=make_match("leg1", CLUB_A, CLUB_B, 0, 0, False),
+            second_match=make_match("leg2", CLUB_B, CLUB_A, 1, 0, True),
+        )
+
+
+def test_restored_shootout_result_rejects_mutable_transcript():
+    result = decide_shootout(PenaltyShootout(CLUB_A, CLUB_B, CLUB_A, ()))
+    with pytest.raises(ValueError):
+        dataclasses.replace(result, kicks=[])
+
+
+def test_duplicate_kick_cannot_bypass_invalid_transcript_after_winner():
+    kicks = tuple(PenaltyKick(i, CLUB_A if i % 2 else CLUB_B, bool(i % 2)) for i in range(1, 8))
+    invalid = PenaltyShootout(CLUB_A, CLUB_B, CLUB_A, kicks)
+    with pytest.raises(ValueError, match="after"):
+        apply_penalty_kick(invalid, kicks[0])

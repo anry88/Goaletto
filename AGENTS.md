@@ -176,6 +176,12 @@
   age-season budget. Staff is frozen outside the immutable match state. Only
   announced official league plans qualify currently; friendlies, offline/operator
   fixtures, abandoned and old matches without pinned terms do not grant growth.
+- User clarification 2026-10-15: all real gameplay matches (league, cup,
+  champions, friendlies) must affect form and development by actual participation.
+  Friendlies give reduced development versus official games; the multiplier
+  is not yet agreed. Shared growth caps/potential still apply. Current league-only
+  growth and missing match-form updates are implementation gaps, not design rules.
+  Audits must flag these gaps, never approve no-growth cup/friendly balance.
 - AND-114 assigns retired-staff-v1 once at football retirement, independently of
   candidate deficits. Preserve StaffCareer origin/role/skill and the same face/history.
   First refusal lasts 8 days; decline/timeout/unowned releases to global supply,
@@ -197,3 +203,6 @@
   Cup winner mappings must include decided ancestors; all readers validate them.
   These calculators do not activate cross-set rollover, cup jobs or ledger payouts.
   Keep parents open until persisted runtime/DB/UI acceptance is complete.
+- Accepted external AND-124/126/71 subpackages: domain.knockout,
+  domain.champions_groups and scripts/audit_gameplay_balance.py.
+  See docs/agent-wave6-review.md; shared runtime/DB wiring remains unfinished.

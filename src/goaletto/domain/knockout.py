@@ -340,6 +340,7 @@ class ShootoutResult:
             raise ValueError("Shootout needs two distinct clubs")
         if self.status not in ("awaiting", "decided"):
             raise ValueError("Invalid shootout status")
+        PenaltyShootout(self.club_a_id, self.club_b_id, self.first_kicker_id, self.kicks)
         expected = _eval_shootout(self.club_a_id, self.club_b_id, self.first_kicker_id, self.kicks)
         (score_a, score_b, taken_a, taken_b, status, winner, next_kicker, next_number) = expected
         if (
@@ -420,6 +421,7 @@ def apply_penalty_kick(shootout: PenaltyShootout, kick: PenaltyKick) -> PenaltyS
         raise ValueError("Kick must be a PenaltyKick")
     if kick.club_id not in (shootout.club_a_id, shootout.club_b_id):
         raise ValueError("Penalty club is foreign to this shootout")
+    current = decide_shootout(shootout)
     existing = {row.kick_number: row for row in shootout.kicks}
     if kick.kick_number in existing:
         if existing[kick.kick_number] == kick:
@@ -427,7 +429,6 @@ def apply_penalty_kick(shootout: PenaltyShootout, kick: PenaltyKick) -> PenaltyS
         raise ValueError("Conflicting payload under a recorded kick number")
     if kick.kick_number != len(shootout.kicks) + 1:
         raise ValueError("Kick numbers must run 1..N without gaps")
-    current = decide_shootout(shootout)
     if current.status == "decided":
         raise ValueError("Shootout is already decided")
     if kick.club_id != current.next_kicker_id or kick.kick_number != current.next_kick_number:
@@ -477,6 +478,8 @@ def _derive_tie(
             raise ValueError("Two-leg extra time must use segment 'leg2-et'")
         if second_match is not None and first_match is None:
             raise ValueError("Second leg without the first leg")
+        if second_match is not None and first_match is not None and not first_match.completed:
+            raise ValueError("Second leg before completed first leg")
         if extra_time is not None and (first_match is None or second_match is None):
             raise ValueError("Extra time without completed regulation legs")
         if first_match is not None:

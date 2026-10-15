@@ -424,3 +424,37 @@ def test_invalid_helpers_rejected() -> None:
         group_id_for("", 1, 0)
     with pytest.raises(ValueError):
         participant_id_for("cohort", 6, _set_id(0))
+
+
+def test_restored_draw_must_match_exact_group_partition():
+    from dataclasses import replace
+
+    result = build_champions_groups(make_cohort(3), seed=7)
+    draw = result.draws[0]
+    changed = (draw.ordered_set_ids[-1], *draw.ordered_set_ids[1:-1], draw.ordered_set_ids[0])
+    with pytest.raises(ValueError, match="slice"):
+        replace(result, draws=(replace(draw, ordered_set_ids=changed), *result.draws[1:]))
+
+
+def test_restored_qualifiers_cannot_duplicate_place_or_season():
+    from dataclasses import replace
+
+    group = build_champions_groups(make_cohort(1), seed=7).groups[0]
+    first = group.participants[0]
+    other = next(p for p in group.participants if p.qualifying_place != first.qualifying_place)
+    with pytest.raises(ValueError, match="places"):
+        replace(
+            group,
+            participants=(
+                replace(first, qualifying_place=other.qualifying_place),
+                *group.participants[1:],
+            ),
+        )
+    with pytest.raises(ValueError, match="season"):
+        replace(
+            group,
+            participants=(
+                replace(first, qualifying_season_id=UUID(int=9876)),
+                *group.participants[1:],
+            ),
+        )

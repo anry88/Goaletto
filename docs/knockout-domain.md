@@ -98,22 +98,35 @@ ET без ничейного основания, пенальти без зав�
 ```python
 from goaletto.domain.cup_bracket import validate_winners
 from goaletto.domain.knockout import (
-    KNOCKOUT_POLICY, KnockoutTie, MatchResult, decide_tie,
+    KNOCKOUT_POLICY,
+    KnockoutTie,
+    MatchResult,
+    decide_tie,
 )
 
 tie = KnockoutTie(
     policy_version=KNOCKOUT_POLICY,
-    club_a_id=club_a, club_b_id=club_b, tie_format="two-leg",
+    club_a_id=club_a,
+    club_b_id=club_b,
+    tie_format="two-leg",
 )
 decision = decide_tie(
     tie=tie,
     first_match=MatchResult(
-        segment="leg1", home_id=club_a, away_id=club_b,
-        home_goals=2, away_goals=1, completed=True,
+        segment="leg1",
+        home_id=club_a,
+        away_id=club_b,
+        home_goals=2,
+        away_goals=1,
+        completed=True,
     ),
     second_match=MatchResult(
-        segment="leg2", home_id=club_b, away_id=club_a,
-        home_goals=1, away_goals=0, completed=True,
+        segment="leg2",
+        home_id=club_b,
+        away_id=club_a,
+        home_goals=1,
+        away_goals=0,
+        completed=True,
     ),
 )
 assert decision.status == "await_extra_time"  # агрегат 2:2

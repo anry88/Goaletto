@@ -154,7 +154,7 @@ def test_inputs_are_not_mutated() -> None:
     assert F.scout_mission_fee(5, 4) == 125_000
 
 
-def test_growth_limits_hold_and_cups_add_no_match_progress() -> None:
+def test_growth_limits_hold_and_missing_match_coverage_is_reported() -> None:
     from goaletto.domain.development import (
         GROWTH_POLICY,
         GrowthBudget,
@@ -194,12 +194,21 @@ def test_growth_limits_hold_and_cups_add_no_match_progress() -> None:
     assert sum(used[k] for k in skills) <= 30_000
 
     content = AUDIT.run_audit([7])
+    coverage = content["development"]["coverage"]
+    assert coverage["status"] == "implementation_gap_not_balance_rule"
+    assert set(coverage["gaps"]) == {
+        "cup_growth",
+        "champions_growth",
+        "friendly_growth",
+        "match_form",
+    }
+    assert coverage["friendly_factor"] is None
     runs = {(r["age"], r["staff"], r["calendar"]): r for r in content["development"]["runs"]}
     for age in (18, 21, 26, 30, 34):
         for staff in (2, 10, 18):
             free = runs[(age, staff, "free")]
             busy = runs[(age, staff, "busy")]
-            # Same 18 league appearances: cup load days grant no match growth.
+            # Characterization of current implementation only, not accepted gameplay.
             assert free["league_matches"] == busy["league_matches"] == 18
             assert free["match_bps"] == busy["match_bps"]
             assert free["training_days"] > busy["training_days"]
@@ -219,3 +228,12 @@ def test_cli_bounds_reject_bad_volume() -> None:
             AUDIT.parse_args(["--seed", "7", "--count", "2", "--max-findings", "1"])
         )
     assert AUDIT.resolve_seeds(AUDIT.parse_args(["--seeds", "7,8"])) == [7, 8]
+
+
+def test_affordability_includes_the_scouts_hire_and_wages():
+    from goaletto.domain import finances as F
+
+    result = AUDIT.run_audit([7])["scout"]["affordability"]
+    assert result["scout_hire"] == F.staff_fee("scout", 5, 50)
+    assert result["scout_wage_per_cycle"] == F.staff_wage("scout", 5, 50)
+    assert result["existing_wages_per_cycle"] >= 40000

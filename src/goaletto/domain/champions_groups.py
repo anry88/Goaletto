@@ -220,11 +220,16 @@ class ChampionsGroup:
         if actual_sets != expected_sets:
             raise ValueError("Champions group sets differ from participant sources")
         for set_id in self.league_set_ids:
-            count = sum(
-                1 for participant in self.participants if participant.source_league_set_id == set_id
-            )
-            if count != QUALIFIERS_PER_LEAGUE:
+            qualifiers = [p for p in self.participants if p.source_league_set_id == set_id]
+            if len(qualifiers) != QUALIFIERS_PER_LEAGUE:
                 raise ValueError("Each league contributes exactly eight qualifiers")
+            if {p.qualifying_place for p in qualifiers} != set(range(1, 9)):
+                raise ValueError("Qualifying places must cover exactly 1..8")
+            if (
+                len({p.source_league_id for p in qualifiers}) != 1
+                or len({p.qualifying_season_id for p in qualifiers}) != 1
+            ):
+                raise ValueError("Qualifiers of one set/tier must share league and season")
         expected_count = QUALIFIERS_PER_LEAGUE * len(self.league_set_ids)
         if type(self.participant_count) is not int or self.participant_count != expected_count:
             raise ValueError("Participant count must equal 8G")
@@ -236,9 +241,17 @@ class ChampionsGroup:
         expected_days = 2 * expected_rounds - 1
         if type(self.match_days) is not int or self.match_days != expected_days:
             raise ValueError("Match days must equal 2*log2(8G)-1")
-        if self.champions_cycles != tuple(range(1, expected_days + 1)):
+        if (
+            type(self.champions_cycles) is not tuple
+            or any(type(day) is not int for day in self.champions_cycles)
+            or self.champions_cycles != tuple(range(1, expected_days + 1))
+        ):
             raise ValueError("Champions cycles must run 1..D")
-        if self.free_cycles != tuple(range(expected_days + 1, TOTAL_CHAMPIONS_CYCLES + 1)):
+        if (
+            type(self.free_cycles) is not tuple
+            or any(type(day) is not int for day in self.free_cycles)
+            or self.free_cycles != tuple(range(expected_days + 1, TOTAL_CHAMPIONS_CYCLES + 1))
+        ):
             raise ValueError("Free cycles must run D+1..18")
         if not self.free_cycles or self.free_cycles[-1] != TOTAL_CHAMPIONS_CYCLES:
             raise ValueError("Cycle 18 is always free")
@@ -321,8 +334,43 @@ class ChampionsGroupsResult:
         by_tier_groups: dict[int, list[ChampionsGroup]] = {tier: [] for tier in range(1, 6)}
         for group in self.groups:
             by_tier_groups[group.tier].append(group)
+        clubs = [p.club_id for g in self.groups for p in g.participants]
+        if len(set(clubs)) != len(clubs):
+            raise ValueError("A club qualifies only once across all tiers")
+        set_seasons: dict[UUID, UUID] = {}
+        season_sets: dict[UUID, UUID] = {}
+        for group in self.groups:
+            for p in group.participants:
+                if (
+                    set_seasons.setdefault(p.source_league_set_id, p.qualifying_season_id)
+                    != p.qualifying_season_id
+                ):
+                    raise ValueError("One qualifying set must use one season across all tiers")
+                if (
+                    season_sets.setdefault(p.qualifying_season_id, p.source_league_set_id)
+                    != p.source_league_set_id
+                ):
+                    raise ValueError("A qualifying season belongs to one set")
+        expected_sets = set(self.draws[0].ordered_set_ids)
         for draw in self.draws:
+            if set(draw.ordered_set_ids) != expected_sets:
+                raise ValueError("All tiers must cover the same qualifying sets")
+            if draw.group_sizes != split_group_sizes(len(expected_sets)):
+                raise ValueError("Group sizes differ from canonical grouping")
             tier_groups = sorted(by_tier_groups[draw.tier], key=lambda g: g.group_index)
+            offset = 0
+            for group, size in zip(tier_groups, draw.group_sizes, strict=True):
+                drawn = set(draw.ordered_set_ids[offset : offset + size])
+                if set(group.league_set_ids) != drawn:
+                    raise ValueError("Group membership differs from saved draw slice")
+                if group.id != group_id_for(self.cohort_key, group.tier, group.group_index):
+                    raise ValueError("Group ID differs from cohort namespace")
+                for p in group.participants:
+                    if p.participant_id != participant_id_for(
+                        self.cohort_key, group.tier, p.club_id
+                    ):
+                        raise ValueError("Participant ID differs from cohort namespace")
+                offset += size
             if [g.id for g in tier_groups] != list(draw.group_ids):
                 raise ValueError("Tier group IDs differ from the draw")
             if tuple(len(g.league_set_ids) for g in tier_groups) != draw.group_sizes:

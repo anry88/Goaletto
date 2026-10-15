@@ -55,7 +55,7 @@ from goaletto.domain.training import (
 )
 from goaletto.domain.world import WorldOptions, build_world
 
-TOOL_VERSION = "and71-balance-audit-v1"
+TOOL_VERSION = "and71-balance-audit-v2"
 WORLD_KEY = "gameplay-balance-audit"
 WORLD_SEED = 0
 FIRST_KICKOFF = datetime(2026, 10, 19, 18, tzinfo=UTC)
@@ -413,6 +413,7 @@ def scout_section(seeds: list[int]) -> dict[str, Any]:
                             "missions": 0,
                             "qualities": [],
                             "fees": [],
+                            "wages": [],
                             "best_qualities": [],
                             "best_full": [],
                             "single_full": [],
@@ -422,6 +423,7 @@ def scout_section(seeds: list[int]) -> dict[str, Any]:
                     for record in discoveries:
                         cell["qualities"].append(record["quality_floor"])
                         cell["fees"].append(record["signing_fee"])
+                        cell["wages"].append(record["wage_per_cycle"])
                     best = max(discoveries, key=lambda r: (r["quality_floor"], -r["signing_fee"]))
                     cell["best_qualities"].append(best["quality_floor"])
                     cell["best_full"].append(
@@ -482,16 +484,13 @@ def scout_section(seeds: list[int]) -> dict[str, Any]:
     median_single_full = by_key[(5, 4)]["signing_fee_quantiles"]["median"] + F.scout_mission_fee(
         5, 4
     )
-    void_wages: list[int] = []
-    for position in SCOUT_POSITIONS:
-        record = _discovery_record(seeds[0], 0, 5, position, 4, 0)
-        void_wages.append(
-            F.player_wage(tuple(record["skills8"]), record["age"], position, record["positions"])
-        )
-    median_youth_wage = sorted(void_wages)[len(void_wages) // 2]
-    wages_mid = 40_000  # Documented tier-5 band midpoint; ledger below uses real wages.
-    obligations = TOTAL_CYCLES * (
-        wages_mid + F.staff_wage("head_coach") + F.stadium_upkeep(BASE_CAPACITY)
+    wages = sorted(cells[(5, 4)]["wages"])
+    median_youth_wage = wages[len(wages) // 2]
+    wages_high = budget_section()["scenarios"][0]["wages_max"]
+    scout_hire = F.staff_fee("scout", 5, 50)
+    scout_wage = F.staff_wage("scout", 5, 50)
+    obligations = scout_hire + TOTAL_CYCLES * (
+        wages_high + F.staff_wage("head_coach") + scout_wage + F.stadium_upkeep(BASE_CAPACITY)
     )
     conservative_income = (
         TOTAL_CYCLES
@@ -505,6 +504,9 @@ def scout_section(seeds: list[int]) -> dict[str, Any]:
         "upfront_cost_note": "Mission + median signing at skill 5/4d is a LOWER BOUND: "
         "windows, squad cap and youth wages are ignored here.",
         "median_youth_wage": median_youth_wage,
+        "scout_hire": scout_hire,
+        "scout_wage_per_cycle": scout_wage,
+        "existing_wages_per_cycle": wages_high,
         "count_vs_600k_upfront_only": F.INITIAL_CAPITAL // int(median_single_full),
         "discretionary_turnover_cash": discretionary,
         "count_with_turnover_obligations": max(
@@ -512,10 +514,11 @@ def scout_section(seeds: list[int]) -> dict[str, Any]:
         ),
         "count_note": "The turnover count exceeds the upfront-only count because "
         "season income (sponsor/merch/tickets/prize) funds part of the wages; "
-        "both counts ignore windows and the 25-player cap.",
+        "both counts are optimistic affordability estimates, not guaranteed signings; "
+        "they ignore liquidity timing, windows and the 25-player cap.",
         "squad_cap_note": "Active+incoming player cap is 25 (application/candidates.py); "
         "a 20-player squad fits at most 5 signings without sales. Signings need an "
-        "open window and a free slot; counts above ignore both and stay lower bounds.",
+        "open window and a free slot; counts above ignore both and are not achievable guarantees.",
     }
     return {
         "seeds": seeds,
@@ -574,7 +577,7 @@ def _development_run(age: int, staff: int, busy: bool, seed: int) -> dict[str, A
             budget = growth.budget
         elif not cup_load:
             # Free UTC date with an explicit plan; cup/friendly load days and
-            # matches never grant growth in the eligible runtime.
+            # load is an integration gap, not the intended no-growth gameplay rule.
             days += 1
             result = train_player(
                 player,
@@ -612,6 +615,8 @@ def _development_run(age: int, staff: int, busy: bool, seed: int) -> dict[str, A
         "total_bps": budget.used["training"] + budget.used["match"],
         "leadership_bps": budget.used["leadership"],
         "stamina_gain": player.skills["stamina"] - 10,
+        "form": player.form,
+        "coverage": "current_league_only_not_target_rules",
         "pace_gain": player.skills["pace"] - 10,
         "stamina_fraction": player.progress["stamina"],
         "pace_fraction": player.progress["pace"],
@@ -680,7 +685,7 @@ def development_section(seeds: list[int]) -> dict[str, Any]:
     finished = next(
         r for r in runs if r["age"] == 34 and r["staff"] == 2 and r["calendar"] == "free"
     )
-    transferred = GrowthBudget(18, dict(finished["budget_used"]))
+    transferred = GrowthBudget(finished["age"], dict(finished["budget_used"]))
     skills = dict.fromkeys(SKILLS, 10)
     caps = dict.fromkeys(SKILLS, 20)
     progress = dict.fromkeys([*SKILLS, "experience"], 0)
@@ -704,12 +709,21 @@ def development_section(seeds: list[int]) -> dict[str, Any]:
     ]
     return {
         "focus": DEV_FOCUS.value,
+        "seed": seed,
         "intensity": DEV_INTENSITY.value,
         "ages": list(DEV_AGES),
         "staff_skills": list(DEV_STAFF),
         "runs": runs,
         "ceiling_demo": ceiling_demo,
         "transfer_demo": transfer_demo,
+        "coverage": {
+            "target": "League, cup, champions and friendly appearances affect form/development; "
+            "friendlies have lower development than official matches.",
+            "implemented": "Only league growth and training form are currently connected.",
+            "status": "implementation_gap_not_balance_rule",
+            "gaps": ["cup_growth", "champions_growth", "friendly_growth", "match_form"],
+            "friendly_factor": None,
+        },
         "recovery_hours_from_7320bps": recovery_table,
         "recovery_note": "Recovery is real elapsed hours (recovery-v1); adjacent UTC "
         "dates do not guarantee 24 hours of rest.",
@@ -745,7 +759,8 @@ def run_audit(seeds: list[int], commit: str = "") -> dict[str, Any]:
             "the public market and earn no resale income in this audit.",
             "Development runs use train_player/develop_appearance/grant_growth "
             "directly; only the 18 official league appearances grant match growth, "
-            "cup load days and friendlies grant none.",
+            "cup growth/friendly growth and match form are implementation gaps, NOT target "
+            "rules; these rows cannot validate the target busy-calendar balance.",
             "Training injuries are discarded to upper-bound growth; morale/ "
             "leadership/form draws stay seeded and deterministic.",
         ],
@@ -782,7 +797,9 @@ def render_markdown(content: dict[str, Any], digest: str) -> str:
     ]
     for row in content["budget"]["scenarios"]:
         flag = " (hypothetical)" if row["hypothetical"] else ""
-        shortfall = row["first_shortfall_cycle"] or "—"
+        shortfall = (
+            row["first_shortfall_cycle"] if row["first_shortfall_cycle"] is not None else "—"
+        )
         lines.append(
             f"| {row['label']}{flag} | {row['staff_per_cycle']:,} | {row['upfront']:,} | "
             f"{row['min_pre_income']:,} | {row['ending_min']:,}–{row['ending_max']:,} | "
@@ -814,14 +831,19 @@ def render_markdown(content: dict[str, Any], digest: str) -> str:
         f"Median upfront full cost (mission + signing, lower bound): "
         f"{int(afford['median_upfront_full_cost']):,}. "
         f"Youths vs 600K upfront-only: {afford['count_vs_600k_upfront_only']}. "
-        f"With 20 cycles of wages/coach/upkeep and season income: "
+        f"Optimistic turnover estimate including wages/coach/scout hire/scout upkeep and income: "
         f"{afford['count_with_turnover_obligations']} (squad cap 25 fits at most 5 "
-        "without sales; windows also apply).",
+        "without sales; windows and cash-flow timing still apply). These are estimates,",
+        "not proof that rapid rejuvenation is impossible. Four audit seeds are a",
+        "small sample; a wider run is required before changing coefficients.",
         "",
         "## 3. Development speed (physical/medium; runs in JSON)",
         "",
         "Free calendar (~60 sessions) vs busy cup calendar (~28 sessions); only 18",
-        "league appearances grant match growth. Values are fractional points.",
+        "league appearances grant match growth in CURRENT code. This is an implementation",
+        "gap: target rules give form/development to all matches, with reduced friendly",
+        "development. Busy totals below are not an acceptable target balance verdict.",
+        "Values are fractional points; friendly coefficient remains uncalibrated.",
         "",
         "| Age | Staff | Free total | Busy total | Match (both) |",
         "|---|---:|---:|---:|---:|",
