@@ -211,6 +211,33 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
             assert tiers[new_leagues[table[-1].club_id]] == min(5, tier + 1)
             assert tiers[new_leagues[table[-2].club_id]] == min(5, tier + 1)
             assert all(tiers[new_leagues[r.club_id]] == tier for r in table[2:8])
+            from goaletto.domain.sponsorship import sponsor_terms
+            from goaletto.infrastructure.models import SponsorContract
+
+            for place, row in enumerate(table, 1):
+                sponsor = await session.scalar(
+                    select(SponsorContract).where(
+                        SponsorContract.club_id == row.club_id,
+                        SponsorContract.season_id == next_season.id,
+                    )
+                )
+                club = await session.get(Club, row.club_id)
+                destination = tiers[new_leagues[row.club_id]]
+                assert sponsor.source_season_id == season_id
+                assert sponsor.basis == "season_result" and sponsor.place == place
+                assert sponsor.tier == destination and sponsor.supporters == club.supporters
+                assert (
+                    sponsor.cycle_rate
+                    == sponsor_terms(destination, place, club.supporters).cycle_rate
+                )
+                assert sponsor.starts_at == at and sponsor.ends_at is None
+                old = await session.scalar(
+                    select(SponsorContract).where(
+                        SponsorContract.club_id == club.id,
+                        SponsorContract.season_id == season_id,
+                    )
+                )
+                assert old.ends_at == at
         assert (
             dict(
                 (

@@ -337,7 +337,7 @@ async def initialize_world(
     from goaletto.application.calendar_planning import add_plan, ensure_planner_job, job_row
 
     for fixture in prepared.fixtures:
-        await add_plan(session, fixture)
+        await add_plan(session, fixture, initialized_at)
     for work in prepared.work:
         await session.execute(insert(Job).values(**job_row(plan.season_id, work, "held")))
     await ensure_planner_job(session, plan.season_id, initialized_at, held=True)
@@ -370,4 +370,19 @@ async def initialize_world(
 
     await session.flush()
     await ensure_starting_coaches(session, initialized_at, league_set_id=plan.league_set_id)
+    from goaletto.application.sponsorship import sign_sponsor
+
+    for league in plan.leagues:
+        for seeded_club in league.clubs:
+            club_row = await session.get(Club, seeded_club.id)
+            if club_row is None:
+                raise ValueError("Missing sponsor club")
+            await sign_sponsor(
+                session,
+                club_row,
+                plan.season_id,
+                initialized_at,
+                season_end(plan.options.first_kickoff),
+                tier=league.tier,
+            )
     return SeedResult(plan.league_set_id, plan.season_id, True)

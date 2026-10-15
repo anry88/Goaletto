@@ -12,7 +12,7 @@ from goaletto.application.game_actions import PermissionDenied, actor_for, owned
 from goaletto.application.training import load_training, select_training
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import expand_id
-from goaletto.bot.training_views import parse_choice, training_report, training_view
+from goaletto.bot.training_views import parse_choice, parse_date, training_report, training_view
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import TrainingPlan
 from goaletto.presentation.i18n import tr
@@ -72,11 +72,17 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
                 if plan is None:
                     raise PermissionDenied("Training report belongs to another owner")
                 text, keyboard = training_report(plan, club.name, int(parts[3]))
+            elif data.startswith("tr:d:"):
+                owner_id, day = parse_date(data)
+                owner, _ = await owned_club(session, actor)
+                if owner.id != owner_id:
+                    raise PermissionDenied("Date button belongs to an earlier owner")
+                text, keyboard = training_view(await load_training(session, actor, day=day))
             elif data == "tr:open":
                 text, keyboard = training_view(await load_training(session, actor))
             else:
                 action, ownership_id, week, focus, intensity, executor_id = parse_choice(data)
-                screen = await load_training(session, actor, record=False)
+                screen = await load_training(session, actor, record=False, day=week)
                 if ownership_id != screen.ownership_id or week != screen.week_start:
                     text, keyboard = training_view(
                         screen, notice=tr("Кнопка устарела. Выберите тренировку заново.")
@@ -92,7 +98,7 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
                         executor_id=executor_id,
                     )
                     text, keyboard = training_view(
-                        await load_training(session, actor, record=False),
+                        await load_training(session, actor, record=False, day=week),
                         notice=tr("Тренировка сохранена."),
                     )
                 else:

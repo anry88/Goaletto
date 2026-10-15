@@ -2,10 +2,10 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +21,7 @@ from goaletto.application.game_actions import (
 from goaletto.application.match_runtime import NotReady
 from goaletto.application.recovery import recover_player
 from goaletto.application.training_staff import qualifications, staff_roster, training_staff
-from goaletto.domain.game_cycle import midnight
+from goaletto.domain.game_cycle import HORIZON_DAYS, midnight
 from goaletto.domain.training import (
     POLICY_VERSION,
     PROGRESS_KEYS,
@@ -46,6 +46,8 @@ from goaletto.infrastructure.models import (
     Person,
     Player,
     PlayerDevelopment,
+    Season,
+    SeasonClub,
     TrainingDecision,
     TrainingPlan,
 )
@@ -56,6 +58,15 @@ class TrainingMember:
     id: UUID
     name: str
     position: str
+
+
+@dataclass(frozen=True)
+class TrainingDate:
+    day: datetime
+    reason: str | None = None
+    opponent: str | None = None
+    competition: str | None = None
+    selected: bool = False
 
 
 @dataclass(frozen=True)
@@ -70,6 +81,8 @@ class TrainingScreen:
     blocked: bool = False
     available: tuple[Focus, ...] = (Focus.TEAM,)
     staff_changed: bool = False
+    dates: tuple[TrainingDate, ...] = ()
+    block_reason: TrainingDate | None = None
 
 
 def week_start(at: datetime) -> datetime:
@@ -77,35 +90,112 @@ def week_start(at: datetime) -> datetime:
     return midnight(at.date())
 
 
-async def training_blocked(session: AsyncSession, club_id: UUID, day: datetime) -> bool:
-    fixture = await session.scalar(
-        select(Fixture.id)
-        .where(
-            (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id),
-            Fixture.status != "cancelled",
-            Fixture.scheduled_start_at < day + timedelta(days=1),
-            (Fixture.scheduled_start_at >= day) | Fixture.status.in_(("live", "paused")),
+async def training_dates(
+    session: AsyncSession, club_id: UUID, at: datetime, days: tuple[datetime, ...]
+) -> tuple[TrainingDate, ...]:
+    first, until = min(days), max(days) + timedelta(days=1)
+    fixtures = (
+        await session.scalars(
+            select(Fixture).where(
+                (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id),
+                Fixture.status != "cancelled",
+                Fixture.scheduled_start_at < until,
+                (Fixture.scheduled_start_at >= first) | Fixture.status.in_(("live", "paused")),
+            )
         )
-        .limit(1)
-    )
-    plan = await session.scalar(
-        select(FixturePlan.id)
-        .where(
-            (FixturePlan.home_club_id == club_id)
-            | (FixturePlan.away_club_id == club_id)
-            | FixturePlan.possible_club_ids.contains([str(club_id)]),
-            FixturePlan.assigned_day == day.date(),
+    ).all()
+    plans = (
+        await session.scalars(
+            select(FixturePlan).where(
+                (FixturePlan.home_club_id == club_id)
+                | (FixturePlan.away_club_id == club_id)
+                | FixturePlan.possible_club_ids.contains([str(club_id)]),
+                (
+                    (FixturePlan.assigned_day >= first.date())
+                    & (FixturePlan.assigned_day < until.date())
+                )
+                | FixturePlan.id.in_([f.id for f in fixtures]),
+            )
         )
-        .limit(1)
+    ).all()
+    combined: tuple[Fixture | FixturePlan, ...] = (*fixtures, *plans)
+    club_ids = {c for f in combined for c in (f.home_club_id, f.away_club_id) if c and c != club_id}
+    names = {
+        cid: name
+        for cid, name in (
+            await session.execute(select(Club.id, Club.name).where(Club.id.in_(club_ids)))
+        ).all()
+    }
+    known_end = await session.scalar(
+        select(func.max(Season.ends_at))
+        .join(SeasonClub, SeasonClub.season_id == Season.id)
+        .where(SeasonClub.club_id == club_id)
     )
-    return fixture is not None or plan is not None
+    chosen = set(
+        (
+            await session.scalars(
+                select(TrainingPlan.week_start).where(
+                    TrainingPlan.club_id == club_id,
+                    TrainingPlan.week_start >= first,
+                    TrainingPlan.week_start < until,
+                    TrainingPlan.status.in_(("scheduled", "applied")),
+                )
+            )
+        ).all()
+    )
+    result = []
+    for day in days:
+        fixture = next(
+            (
+                f
+                for f in fixtures
+                if f.scheduled_start_at.date() == day.date()
+                or (
+                    f.status in {"live", "paused"}
+                    and f.scheduled_start_at < day
+                    and day.date() <= at.date()
+                )
+            ),
+            None,
+        )
+        plan = next((p for p in plans if p.assigned_day == day.date()), None)
+        opponent_id = None
+        reason = competition = None
+        if fixture:
+            actual_plan = next((p for p in plans if p.id == fixture.id), None)
+            reason, competition = "match", actual_plan.competition if actual_plan else "league"
+            opponent_id = (
+                fixture.away_club_id if fixture.home_club_id == club_id else fixture.home_club_id
+            )
+        elif plan:
+            conditional = club_id not in (plan.home_club_id, plan.away_club_id)
+            reason, competition = ("conditional" if conditional else "match"), plan.competition
+            opponent_id = plan.away_club_id if plan.home_club_id == club_id else plan.home_club_id
+        elif known_end is not None and day >= known_end:
+            reason = "calendar_pending"
+        result.append(TrainingDate(day, reason, names.get(opponent_id), competition, day in chosen))
+    return tuple(result)
+
+
+async def training_blocked(
+    session: AsyncSession, club_id: UUID, day: datetime, *, at: datetime | None = None
+) -> bool:
+    return (await training_dates(session, club_id, at or day, (day,)))[0].reason is not None
 
 
 async def load_training(
-    session: AsyncSession, actor: Actor, *, record: bool = True
+    session: AsyncSession, actor: Actor, *, record: bool = True, day: datetime | None = None
 ) -> TrainingScreen:
     ownership, club = await owned_club(session, actor)
-    week = week_start(actor.at)
+    current = week_start(actor.at)
+    week = day if day is not None else current
+    require_utc(week)
+    if week != week_start(week) or not current <= week < current + timedelta(days=HORIZON_DAYS):
+        raise ValueError("Training date is outside the planning horizon")
+    dates = await training_dates(
+        session, club.id, actor.at, tuple(current + timedelta(days=i) for i in range(HORIZON_DAYS))
+    )
+    selected_date = next(d for d in dates if d.day == week)
     plan = await session.scalar(
         select(TrainingPlan).where(
             TrainingPlan.club_id == club.id,
@@ -150,9 +240,11 @@ async def load_training(
         plan,
         last,
         tuple(TrainingMember(*r) for r in players),
-        await training_blocked(session, club.id, week),
+        selected_date.reason is not None,
         allowed,
         changed,
+        dates,
+        selected_date,
     )
 
 
@@ -175,10 +267,10 @@ async def select_training(
     if ownership.id != ownership_id or ownership.expires_at <= at:
         raise PermissionDenied("Training requires the current owner")
     current = week_start(at)
-    if await training_blocked(session, club.id, current):
+    if week != week_start(week) or not current <= week < current + timedelta(days=HORIZON_DAYS):
+        raise ValueError("Training date is outside the planning horizon")
+    if await training_blocked(session, club.id, week, at=at):
         raise ValueError("Training is unavailable on a match day")
-    if week != current:
-        raise ValueError("Training button belongs to a different UTC date")
     payload = {
         "focus": focus.value,
         "intensity": intensity.value,
@@ -207,7 +299,11 @@ async def select_training(
             )
             .with_for_update()
         )
-        if player is None or player.injured_until is not None and player.injured_until > at:
+        if (
+            player is None
+            or player.injured_until is not None
+            and player.injured_until > max(at, week)
+        ):
             raise ValueError("Select an available set-piece taker")
     elif executor_id is not None:
         raise ValueError("Executor only applies to set pieces")
@@ -473,3 +569,67 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             }
         )
     plan.results, plan.applied_at, plan.status = results, at, "applied"
+
+
+async def reserve_match_day(
+    session: AsyncSession, club_ids: tuple[UUID, ...], day: date, at: datetime, *, competition: str
+) -> None:
+    """Shared tournament/friendly gate: serialize against selections and receipts."""
+    require_utc(at)
+    if competition not in {"league", "cup", "champions", "friendly"}:
+        raise ValueError("Unknown competition")
+    await allocation_lock(session)
+    plans = (
+        await session.scalars(
+            select(TrainingPlan)
+            .where(TrainingPlan.club_id.in_(club_ids), TrainingPlan.week_start == midnight(day))
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).all()
+    if competition == "friendly":
+        if any(p.status in {"scheduled", "applied"} for p in plans):
+            raise ValueError("Training already occupies this date")
+        return
+    from goaletto.infrastructure.models import OutboxMessage
+
+    for plan in plans:
+        if plan.status != "scheduled":
+            continue
+        plan.status, plan.results = "cancelled", [{"reason": "match_day"}]
+        owner = await session.get(OwnershipPeriod, plan.ownership_id)
+        club = await session.get(Club, plan.club_id)
+        manager = await session.get(Manager, owner.manager_id) if owner else None
+        if (
+            not owner
+            or not club
+            or not manager
+            or owner.ended_at is not None
+            or owner.club_id != club.id
+            or owner.expires_at <= at
+            or club.owner_telegram_id != manager.telegram_id
+        ):
+            continue
+        key = f"training:cancelled:{plan.id}"
+        await session.execute(
+            insert(OutboxMessage)
+            .values(
+                id=uuid5(plan.id, key),
+                dedupe_key=key,
+                chat_id=manager.telegram_id,
+                payload={
+                    "version": 1,
+                    "kind": "training_cancelled",
+                    "plan_id": str(plan.id),
+                    "ownership_id": str(owner.id),
+                    "club_id": str(club.id),
+                    "day": day.isoformat(),
+                },
+                due_at=at,
+                priority=70,
+                status="pending",
+                attempts=0,
+            )
+            .on_conflict_do_nothing()
+        )
+    await session.flush()

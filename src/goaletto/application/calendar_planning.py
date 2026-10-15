@@ -21,7 +21,7 @@ from goaletto.domain.game_cycle import (
     season_epoch,
 )
 from goaletto.domain.world import stable_seed
-from goaletto.infrastructure.models import Fixture, FixturePlan, Job, Season, TrainingPlan
+from goaletto.infrastructure.models import Fixture, FixturePlan, Job, Season
 
 # Covers regulation and future extra time/penalties. Actual unfinished games are
 # also checked at runtime; the reserve is not a promise of 24 hours of recovery.
@@ -58,7 +58,16 @@ def job_row(
     )
 
 
-async def add_plan(session: AsyncSession, fixture: ScheduledFixture) -> None:
+async def add_plan(session: AsyncSession, fixture: ScheduledFixture, at: datetime) -> None:
+    from goaletto.application.training import reserve_match_day
+
+    await reserve_match_day(
+        session,
+        (fixture.home_club_id, fixture.away_club_id),
+        fixture.kickoff.date(),
+        at,
+        competition="league",
+    )
     await session.execute(
         insert(FixturePlan)
         .values(
@@ -157,22 +166,15 @@ async def plan_horizon(session: AsyncSession, season_id: UUID, at: datetime) -> 
         if conflicts is not None:
             plan.blocked_reason = "fixture_overlap"
             continue
-        training = list(
-            (
-                await session.scalars(
-                    select(TrainingPlan)
-                    .where(
-                        TrainingPlan.club_id.in_((plan.home_club_id, plan.away_club_id)),
-                        TrainingPlan.week_start == midnight(plan.assigned_day),
-                        TrainingPlan.policy_version == "training-daily-v1",
-                    )
-                    .with_for_update()
-                )
-            ).all()
+        from goaletto.application.training import reserve_match_day
+
+        await reserve_match_day(
+            session,
+            (plan.home_club_id, plan.away_club_id),
+            plan.assigned_day,
+            at,
+            competition=plan.competition,
         )
-        if any(t.status == "applied" for t in training):
-            plan.blocked_reason = "training_already_applied"
-            continue
         decision = await fixture_kickoff_decision(
             session,
             fixture_key=plan.id,
@@ -211,10 +213,6 @@ async def plan_horizon(session: AsyncSession, season_id: UUID, at: datetime) -> 
                 .values(**job_row(season.id, work, revision=plan.revision))
                 .on_conflict_do_nothing(index_elements=["dedupe_key"])
             )
-        for training_plan in training:
-            if training_plan.status == "scheduled":
-                training_plan.status = "cancelled"
-                training_plan.results = [{"reason": "match_day"}]
         plan.announced_at, plan.planning_until, plan.blocked_reason = at, until, None
         made += 1
     await session.flush()
@@ -264,6 +262,13 @@ async def recover_unannounced_plan(
         or cycle_on(season.cycle_epoch, day.date()).phase != required
     ):
         raise ValueError("Recovery must retain the competition phase")
+    from goaletto.application.training import reserve_match_day
+
+    participants = {c for c in (plan.home_club_id, plan.away_club_id) if c is not None}
+    participants.update(UUID(c) for c in plan.possible_club_ids)
+    await reserve_match_day(
+        session, tuple(sorted(participants)), day.date(), at, competition=plan.competition
+    )
     plan.assigned_day, plan.revision, plan.blocked_reason = day.date(), plan.revision + 1, None
     await session.flush()
     return await plan_horizon(session, plan.season_id, at)

@@ -627,5 +627,22 @@
   "Отказаться: {name}": "Decline: {name}",
   "Предложение отклонено. Сотрудник вышел на общий рынок.": "Offer declined. The staff candidate is now on the public market.",
   "🤝 {person} готов продолжить карьеру в штабе вашего клуба. Лояльность клубу даёт скидку 20% на зарплату. Условия и ответ в течение 8 дней — /staff.": "🤝 {person} is ready to join your staff. Club loyalty gives a 20% wage discount. Terms and your decision within 8 days — /staff.",
-  "\nРазвитие за матч: +{gain}% балла · опыт +{experience}% балла": "\nMatch development: +{gain}% of a point · experience +{experience}% of a point"
+  "\nРазвитие за матч: +{gain}% балла · опыт +{experience}% балла": "\nMatch development: +{gain}% of a point · experience +{experience}% of a point",
+  "Календарь следующего сезона ещё не определён.": "The next season calendar is not yet confirmed.",
+  "Тренировка выбрана": "Training selected",
+  "Свободно": "Available",
+  "Ближайшие даты (UTC):": "Upcoming dates (UTC):",
+  "Матч": "Match",
+  "Возможный матч: {competition}. Дата зарезервирована.": "Possible match: {competition}. This date is reserved.",
+  "На выбранную дату у клуба матч. Выберите свободный UTC-день.": "Your club has a match on this date. Choose a free UTC day.",
+  "Кубки чемпионов": "Champions cups",
+  "Первый сезон: базовые условия": "First season: baseline terms",
+  "Условия на момент перехода к сезонному контракту": "Terms when seasonal sponsorship began",
+  "Итоговое место прошлого сезона: {place}": "Previous season final place: {place}",
+  "<b>Сезонный спонсор</b>": "<b>Seasonal sponsor</b>",
+  "Лига: {tier} · болельщики при подписании: {fans}": "Tier: {tier} · supporters at signing: {fans}",
+  "Ставка: {rate}/4 дня до конца сезона": "Rate: {rate}/4 days until the season ends",
+  "Следующий пересмотр: после завершения сезона, не ранее {date} UTC.": "Next renewal: after the season finishes, no earlier than {date} UTC.",
+  "🏋️ Тренировка {day} UTC отменена: назначен официальный матч. Выберите свободную дату в /train.": "🏋️ Training on {day} UTC was cancelled because an official match was scheduled. Choose a free date in /train.",
+  "На эту дату тренировка ещё не выбрана.": "No training selected for this date yet."
 }

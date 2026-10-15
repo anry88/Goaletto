@@ -24,6 +24,7 @@ from goaletto.domain.finances import (
     ticket_income,
 )
 from goaletto.domain.recovery import daily_recovery, recover
+from goaletto.domain.sponsorship import sponsor_terms
 from goaletto.domain.training import (
     PROGRESS_KEYS,
     SKILLS,
@@ -150,8 +151,10 @@ def calculate() -> str:
                     if cash < 0 and first_debt is None:
                         first_debt = cycle
                     tier = max(1, min(5, league.tier + (change if cycle > 18 else 0)))
-                    # Conservative last-place contract, fixed fans. AND-117 persists renewal.
-                    income = sponsor_income(tier, 10, 2500) + merchandise_income(2500)
+                    # Opening basis, then a conservative last-place renewal after cycle 18.
+                    income = sponsor_terms(
+                        tier, None if cycle <= 18 else 10, 2500
+                    ).cycle_rate + merchandise_income(2500)
                     if cycle <= 18 and any(
                         f.round_number == cycle and f.home_club_id == club.id for f in fixtures
                     ):
@@ -260,9 +263,10 @@ max(0.3, 1.1 − (clamp(возраст, 50, 70) − 50) × 0.05).
 Спонсор за цикл: 48K + (5 − tier) × 4K + (11 − место) × 500 + min(фанаты, 10K).
 Мерч: 1 за фаната; билеты: 5 за зрителя; стадион: 2000 + вместимость / 5.
 Призы мест 1..10: 100/80/65/55/45/38/32/27/23/20K × (6 − tier).
-Приз приходит после 18-го цикла. Подписанный сезонный спонсор AND-117 ещё не подключён:
-runtime пока использует текущую позицию; здесь консервативно последнее место весь сезон.
-Продление на новую лигу в сценариях повышения/понижения — расчёт контракта AND-117.
+Приз приходит после 18-го цикла. [Сезонный спонсор AND-117](season-sponsorship.md)
+подключён: новая команда получает базу десятого места, затем ставка фиксируется
+по прошлому итоговому месту, фанатам и новой лиге. Здесь консервативно десятое место;
+сценарии переходов проверяют изменение уровня в момент продления.
 Слабый стартовый тренер заложен в расходы; его выдача и лимиты матча подключены в AND-109.
 
 Проверены все 10 клубов каждого уровня, настоящий календарь 9 домашних/9 выездных,

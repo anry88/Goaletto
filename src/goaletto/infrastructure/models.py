@@ -1358,7 +1358,8 @@ class TrainingPlan(Base):
             "(status = 'applied') = (applied_at IS NOT NULL)", name="ck_training_applied"
         ),
         CheckConstraint(
-            "due_at = week_start + interval '1 day' AND selected_at >= week_start "
+            "due_at = week_start + interval '1 day' "
+            "AND selected_at >= week_start - interval '9 days' "
             "AND selected_at < due_at",
             name="ck_training_week",
         ),
@@ -1883,3 +1884,39 @@ class StaffCareer(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SponsorContract(Base):
+    __tablename__ = "sponsor_contracts"
+    __table_args__ = (
+        UniqueConstraint("club_id", "season_id", name="uq_sponsor_club_season"),
+        CheckConstraint("policy_version = 'season-sponsor-v1'", name="ck_sponsor_policy"),
+        CheckConstraint(
+            "basis IN ('opening','transition','season_result')", name="ck_sponsor_basis"
+        ),
+        CheckConstraint(
+            "tier BETWEEN 1 AND 5 AND (place IS NULL OR place BETWEEN 1 AND 10) "
+            "AND supporters >= 0 AND cycle_rate > 0",
+            name="ck_sponsor_terms",
+        ),
+        CheckConstraint("ends_at IS NULL OR ends_at >= starts_at", name="ck_sponsor_dates"),
+        Index(
+            "uq_sponsor_active_club",
+            "club_id",
+            unique=True,
+            postgresql_where=text("ends_at IS NULL"),
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    source_season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
+    basis: Mapped[str] = mapped_column(String(24))
+    policy_version: Mapped[str] = mapped_column(String(32))
+    tier: Mapped[int] = mapped_column(SmallInteger)
+    place: Mapped[int | None] = mapped_column(SmallInteger)
+    supporters: Mapped[int] = mapped_column(Integer)
+    cycle_rate: Mapped[int] = mapped_column(Integer)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -90,6 +90,32 @@ def finance_view(screen: FinanceScreen) -> tuple[str, Keyboard]:
         ),
         tr("Билеты и призовые начисляются отдельно."),
     ]
+    if screen.sponsorship:
+        contract = screen.sponsorship
+        basis = (
+            tr("Первый сезон: базовые условия")
+            if contract.basis == "opening"
+            else tr("Условия на момент перехода к сезонному контракту")
+            if contract.basis == "transition"
+            else tr("Итоговое место прошлого сезона: {place}", place=contract.place)
+        )
+        lines.extend(
+            (
+                "",
+                tr("<b>Сезонный спонсор</b>"),
+                basis,
+                tr(
+                    "Лига: {tier} · болельщики при подписании: {fans}",
+                    tier=contract.tier,
+                    fans=contract.supporters,
+                ),
+                tr("Ставка: {rate}/4 дня до конца сезона", rate=amount(contract.cycle_rate)),
+                tr(
+                    "Следующий пересмотр: после завершения сезона, не ранее {date} UTC.",
+                    date=contract.review_at.strftime("%d.%m.%Y %H:%M"),
+                ),
+            )
+        )
     if screen.due_at:
         lines.append(tr("Расчёт: {date} UTC", date=screen.due_at.strftime("%d.%m %H:%M")))
     if screen.arrears:

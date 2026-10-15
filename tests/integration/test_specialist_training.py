@@ -404,16 +404,27 @@ async def test_telegram_gates_specialists_then_saves_and_displays_actual_result(
         assert await session.scalar(select(func.count()).select_from(TrainingPlan)) == 0
         await hired(session, actor, "fitness_coach")
     unlocked = await send(command="/train")
+    # Date selection survives focus/back/save callbacks without relying on FSM state.
+    from goaletto.bot.training_views import parse_date
+
+    tomorrow = week_start(now) + timedelta(days=1)
+    date_choice = next(s for s in buttons(unlocked, "tr:d:") if parse_date(s)[1] == tomorrow)
+    unlocked = await send(data=date_choice)
+    assert tomorrow.strftime("%d.%m.%Y") in unlocked.text
     physical = next(
         s
         for s in buttons(unlocked, "tr:f:")
         if s.split(":")[2] == str(list(Focus).index(Focus.PHYSICAL))
     )
     detail = await send(data=physical)
+    back = await send(data=buttons(detail, "tr:d:")[0])
+    assert tomorrow.strftime("%d.%m.%Y") in back.text
+    detail = await send(data=physical)
     saved = await send(data=buttons(detail, "tr:s:")[0])
     assert "Тренировка сохранена" in saved.text
     async with sessions.begin() as session:
         plan = await session.scalar(select(TrainingPlan))
+        assert plan.week_start == tomorrow
         await apply_training(session, await training_job(session, plan), plan.due_at)
         current = plan.due_at + timedelta(hours=1)
     screen = await send(command="/train")

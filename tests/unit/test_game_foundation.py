@@ -70,6 +70,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 "ck_action_kind",
                 "ck_journey_name",
                 "ck_signing_kind",
+                "ck_training_week",
             }:
                 assert (
                     normalized(

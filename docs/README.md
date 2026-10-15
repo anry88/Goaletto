@@ -1,5 +1,8 @@
 # Документация Goaletto
 
+[Сезонный спонсор](season-sponsorship.md) — AND-117;
+[выбор свободной даты тренировки](training.md) — AND-129, реализовано.
+
 [Профильные тренировки и эффекты штаба](training.md) — AND-111/112;
 [сезонная калибровка](staff-training-calibration.md).
 

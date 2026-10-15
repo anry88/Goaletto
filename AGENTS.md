@@ -129,7 +129,8 @@
   Starting capital remains 600K after the 20-cycle calculation. Scout findings vary
   in price: at age 19, q6/q10/q18 plus a Q2 scout mission cost 225K/400K/1,016K.
   Mission flow is implemented in AND-116; do not treat every discovery as an elite-price player.
-  See docs/economy-calculation.md. AND-117 still owns persisted seasonal sponsorship.
+  See docs/economy-calculation.md. AND-117 implements season-sponsor-v1;
+  preserve fixed contract terms/history and interval-based accrual. See docs/season-sponsorship.md.
 
 - Latest scout clarification 2026-10-15 supersedes automatic weekly findings:
   manager selects target position and 4/8/12/16 elapsed days, pays the search fee,
@@ -152,6 +153,10 @@
   missions stop on lost scout/ownership without refund or extra dismissal fee.
 
 - AND-111/112 implement training-specialists-v2 and staff-session-v1. See docs/training.md.
+  AND-129 adds ten-day UTC date selection including conditional tournament plans.
+  All future fixture creators/movers must call reserve_match_day under the shared
+  allocation lock in the same transaction as their fixture plan: official matches
+  cancel pending training with an outbox notice; friendlies reject scheduled/applied training.
   Profile focuses require their specialist at selection and application. Staff snapshots
   pin person/skill/salary contract; rehire never revives an old selected profile.
   Physical gain is split across stamina/pace; head coach does not multiply every

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import StrEnum
 from html import escape
 from typing import Any, Protocol, cast
@@ -48,6 +48,7 @@ SUPPORTED_KINDS = frozenset(
         "market_notice",
         "scout_report",
         "staff_career",
+        "training_cancelled",
         "player_lifecycle",
         "staff_lifecycle",
     }
@@ -61,6 +62,7 @@ PRIORITY_BY_KIND = {
     "market_notice": 70,
     "scout_report": 70,
     "staff_career": 80,
+    "training_cancelled": 70,
     "player_lifecycle": 80,
     "staff_lifecycle": 80,
     "match_recovery": 90,
@@ -188,6 +190,14 @@ def valid_payload(payload: dict[str, Any]) -> bool:
             and isinstance(payload.get("player_name"), str)
             and 0 < len(payload["player_name"]) <= 120
         )
+    if kind == "training_cancelled":
+        try:
+            day = date.fromisoformat(str(payload.get("day", "")))
+        except ValueError:
+            return False
+        return day.isoformat() == payload.get("day") and all(
+            _payload_uuid(payload, k) is not None for k in ("plan_id", "club_id")
+        )
     if kind == "staff_career":
         return (
             _payload_uuid(payload, "person_id") is not None
@@ -294,6 +304,12 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "training_cancelled":
+        return tr(
+            "🏋️ Тренировка {day} UTC отменена: назначен официальный матч. "
+            "Выберите свободную дату в /train.",
+            day=escape(payload["day"]),
+        )
     if kind == "staff_career":
         return tr(
             "🤝 {person} готов продолжить карьеру в штабе вашего клуба. "
@@ -498,6 +514,24 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     if not manager.bot_available:
         return Decision.SKIP_UNAVAILABLE
     kind = payload["kind"]
+    if kind == "training_cancelled":
+        from goaletto.infrastructure.models import TrainingPlan
+
+        plan = await session.get(
+            TrainingPlan, _payload_uuid(payload, "plan_id"), populate_existing=True
+        )
+        return (
+            Decision.DELIVER
+            if plan
+            and plan.ownership_id == ownership.id
+            and plan.club_id == club.id
+            and plan.week_start.date().isoformat() == payload["day"]
+            and _payload_uuid(payload, "club_id") == club.id
+            and plan.status == "cancelled"
+            and plan.results
+            and plan.results[0].get("reason") == "match_day"
+            else Decision.SKIP_STALE
+        )
     if kind == "staff_career":
         from goaletto.infrastructure.models import StaffCareer
 

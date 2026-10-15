@@ -607,6 +607,23 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         )
     await session.flush()
     session.add_all([Standing(season_id=next_id, club_id=c.id) for c in clubs])
+    from goaletto.application.sponsorship import sign_sponsor
+
+    final_places = {
+        row.club_id: place for table in tables.values() for place, row in enumerate(table, 1)
+    }
+    tiers_by_league = {league.id: league.tier for league in leagues}
+    for club in clubs:
+        await sign_sponsor(
+            session,
+            club,
+            next_id,
+            at,
+            season_end(kickoff),
+            tier=tiers_by_league[club.league_id],
+            place=final_places[club.id],
+            source_season_id=season.id,
+        )
     from goaletto.application.calendar_planning import (
         add_plan,
         ensure_planner_job,
@@ -616,7 +633,7 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     )
 
     for planned in calendars:
-        await add_plan(session, planned)
+        await add_plan(session, planned, at)
     for season_job in season_work(next_id, kickoff):
         await session.execute(insert(Job).values(**job_row(next_id, season_job)))
     await ensure_planner_job(session, next_id, at)

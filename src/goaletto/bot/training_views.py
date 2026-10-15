@@ -7,7 +7,7 @@ from uuid import UUID
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup as Keyboard
 
-from goaletto.application.training import TrainingScreen
+from goaletto.application.training import TrainingDate, TrainingScreen
 from goaletto.bot.candidate_views import ROLES
 from goaletto.bot.club_cards import SKILL_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
@@ -114,8 +114,31 @@ def training_view(
         tr("Результат: ") + screen.due_at.strftime("%d.%m.%Y %H:%M UTC"),
         "",
     ]
+    calendar_rows = []
+    if screen.dates and (focus is None or screen.blocked):
+        lines.append(tr("Ближайшие даты (UTC):"))
+        for item in screen.dates:
+            mark = "⚽" if item.reason else "✅" if item.selected else "○"
+            lines.append(f"{mark} {item.day:%d.%m} — " + date_description(item))
+        for index in range(0, len(screen.dates), 2):
+            calendar_rows.append(
+                [
+                    _button(
+                        ("⚽ " if item.reason else "✅ " if item.selected else "○ ")
+                        + item.day.strftime("%d.%m"),
+                        date_callback(screen.ownership_id, item.day),
+                    )
+                    for item in screen.dates[index : index + 2]
+                ]
+            )
+        lines.append("")
     if screen.blocked:
-        rows = []
+        lines.append(
+            date_description(screen.block_reason)
+            if screen.block_reason
+            else tr("На выбранную дату у клуба матч. Выберите свободный UTC-день.")
+        )
+        rows = calendar_rows
         if screen.last_result:
             rows.append(
                 [
@@ -125,9 +148,7 @@ def training_view(
                 ]
             )
         rows.append([_button(tr("🏟 Клуб"), "vc:c")])
-        return tr("Сегодня у клуба матч. Выберите тренировку в свободный UTC-день."), Keyboard(
-            inline_keyboard=rows
-        )
+        return "\n".join(lines), Keyboard(inline_keyboard=rows)
     if screen.staff_changed:
         lines.append(tr("Штаб изменился. Выберите тренировку заново, чтобы она состоялась."))
     if screen.plan:
@@ -141,7 +162,7 @@ def training_view(
             + INTENSITY_LABELS[Intensity(plan.intensity)].lower()
         )
     else:
-        lines.append(tr("На сегодня тренировка ещё не выбрана."))
+        lines.append(tr("На эту дату тренировка ещё не выбрана."))
     if notice:
         lines.append(escape(notice))
     if focus is not None and focus not in screen.available:
@@ -169,6 +190,7 @@ def training_view(
                         role=ROLES[SPECIALISTS[value]],
                     )
                 )
+        rows = calendar_rows + rows
         rows.append([_button(tr("👥 Персонал"), "cg:s:0")])
     else:
         intensity = intensity or Intensity.MEDIUM
@@ -212,7 +234,14 @@ def training_view(
                     )
                 ]
             )
-        rows.append([_button(tr("← Выбрать другой фокус"), "tr:open")])
+        rows.append(
+            [
+                _button(
+                    tr("← Выбрать другой фокус"),
+                    date_callback(screen.ownership_id, screen.week_start),
+                )
+            ]
+        )
     if screen.last_result:
         rows.append(
             [_button(tr("📋 Последний результат"), f"tr:r:{compact_id(screen.last_result.id)}:1")]
@@ -310,3 +339,44 @@ def cancellation_reason(plan: TrainingPlan) -> str:
             "Прежний план отменён. Выберите новое занятие в следующий свободный день."
         ),
     }.get(reason, tr("Тренировка отменена. Выберите новое занятие в свободный день."))
+
+
+def date_callback(owner_id: UUID, day: datetime) -> str:
+    return f"tr:d:{compact_id(owner_id)}:{day:%Y%m%d}"
+
+
+def parse_date(value: str) -> tuple[UUID, datetime]:
+    parts = value.split(":")
+    if (
+        len(parts) != 4
+        or parts[:2] != ["tr", "d"]
+        or len(value.encode()) > 64
+        or len(parts[3]) != 8
+        or not parts[3].isascii()
+        or not parts[3].isdigit()
+    ):
+        raise ValueError("Invalid training date button")
+    day = datetime.strptime(parts[3], "%Y%m%d").replace(tzinfo=UTC)
+    if day.strftime("%Y%m%d") != parts[3]:
+        raise ValueError("Invalid training date")
+    return expand_id(parts[2]), day
+
+
+def date_description(item: TrainingDate | None) -> str:
+    if item is None:
+        return ""
+    if item.reason == "calendar_pending":
+        return tr("Календарь следующего сезона ещё не определён.")
+    if item.reason:
+        competition = {
+            "league": tr("Лига"),
+            "cup": tr("Кубок"),
+            "champions": tr("Кубки чемпионов"),
+            "friendly": tr("Товарищеский матч"),
+        }.get(item.competition or "", tr("Матч"))
+        if item.reason == "conditional":
+            return tr(
+                "Возможный матч: {competition}. Дата зарезервирована.", competition=competition
+            )
+        return competition + (" · " + escape(latin_name(item.opponent)) if item.opponent else "")
+    return tr("Тренировка выбрана") if item.selected else tr("Свободно")

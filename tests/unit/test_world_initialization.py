@@ -11,7 +11,7 @@ from sqlalchemy.sql.dml import Insert
 
 from goaletto.application.world import initialize_world
 from goaletto.domain.world import WORLD_POLICY, WorldOptions, build_world
-from goaletto.infrastructure.models import WorldSeedReceipt
+from goaletto.infrastructure.models import Club, WorldSeedReceipt
 
 OPTIONS = WorldOptions(
     key="initial",
@@ -39,6 +39,8 @@ class SQLRecorder:
             self.writes.append(statement)
 
     async def get(self, model, key):
+        if model is Club:
+            return Club(id=key, supporters=2500)
         return self.receipt if model is WorldSeedReceipt else None
 
     async def flush(self):
@@ -97,6 +99,8 @@ async def test_seed_batch_reserves_unique_people_and_keeps_all_jobs_held(monkeyp
     monkeypatch.setattr(
         "goaletto.application.coaches.ensure_starting_coaches", AsyncMock(return_value=50)
     )
+    sponsors = AsyncMock()
+    monkeypatch.setattr("goaletto.application.sponsorship.sign_sponsor", sponsors)
     session = SQLRecorder()
 
     async def registered(*args, **kwargs):
@@ -105,6 +109,7 @@ async def test_seed_batch_reserves_unique_people_and_keeps_all_jobs_held(monkeyp
     monkeypatch.setattr("goaletto.application.world.register_catalog", registered)
     result = await initialize_world(cast(AsyncSession, session), OPTIONS, initialized_at=NOW)
     assert result.created
+    assert sponsors.await_count == 50
     assert session.writes[-1].table.name == "world_seed_receipts"
     people = []
     job_statuses = []
