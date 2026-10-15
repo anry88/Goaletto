@@ -74,6 +74,7 @@ def apply_commands(
             continue
         team = state.home if command.side == Side.HOME else state.away
         reason = None
+        abilities = team.snapshot.coach.abilities if team.snapshot.coach else None
         if command.kind == CommandKind.SUBSTITUTION:
             assert command.outgoing_id is not None and command.incoming_id is not None
             team, reason = substitute(
@@ -87,8 +88,12 @@ def apply_commands(
             )
         elif command.kind == CommandKind.TACTIC:
             assert command.tactic is not None
-            if team.tactic != command.tactic:
-                if team.tactic_changes >= state.policy.max_tactic_changes:
+            if abilities and command.tactic not in abilities.tactics:
+                reason = "tactic_unavailable"
+            elif team.tactic != command.tactic:
+                if team.tactic_changes >= (
+                    abilities.tactic_changes if abilities else state.policy.max_tactic_changes
+                ):
                     reason = "tactic_limit"
                 else:
                     team = replace(
@@ -100,12 +105,16 @@ def apply_commands(
             current = next(
                 (p.instruction for p in team.instructions if p.player_id == command.player_id), None
             )
-            if state.engine_version != "regulation-v2":
+            if state.engine_version == "regulation-v1":
                 reason = "unsupported_instruction"
             elif slot is None or slot.position == "GK":
                 reason = "player_unavailable"
             elif current != command.instruction:
-                if team.instruction_changes >= state.policy.max_instruction_changes:
+                if team.instruction_changes >= (
+                    abilities.instruction_changes
+                    if abilities
+                    else state.policy.max_instruction_changes
+                ):
                     reason = "instruction_limit"
                 else:
                     team = replace(
@@ -118,7 +127,15 @@ def apply_commands(
                     )
         else:
             assert command.mentality is not None
-            team = replace(team, mentality=command.mentality)
+            if team.mentality != command.mentality:
+                if abilities and team.mentality_changes >= abilities.mentality_changes:
+                    reason = "mentality_limit"
+                else:
+                    team = replace(
+                        team,
+                        mentality=command.mentality,
+                        mentality_changes=team.mentality_changes + (1 if abilities else 0),
+                    )
         if reason is not None:
             rejected.append((command.id, reason))
         else:

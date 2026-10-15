@@ -83,6 +83,7 @@ class LineupData:
     lock_at: datetime | None
     ownership_id: UUID
     reserves: tuple[SquadMember, ...] = ()
+    allowed_tactics: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -295,6 +296,9 @@ async def _assemble(
         for p in players
         if p.person_id not in selected
     )
+    from goaletto.application.coaches import coach_snapshot
+
+    coach = await coach_snapshot(session, club.id)
     tactics = lineup.tactics if isinstance(lineup.tactics, dict) else {}
     captain = await _latest_captain(session, club.id)
     if captain is not None and captain not in {m.person_id for m in starters}:
@@ -311,13 +315,18 @@ async def _assemble(
         starters=tuple(starters),
         bench=tuple(bench),
         captain_id=captain,
-        tactic=str(tactics.get("tactic", "normal")),
+        tactic=(
+            str(tactics.get("tactic", "normal"))
+            if tactics.get("tactic", "normal") in coach.abilities.tactics
+            else coach.abilities.tactics[0].value
+        ),
         mentality=str(tactics.get("mentality", "balanced")),
         version=lineup.version,
         locked=locked,
         lock_at=lock_at,
         ownership_id=ownership.id,
         reserves=reserves,
+        allowed_tactics=tuple(t.value for t in coach.abilities.tactics),
     )
 
 
@@ -398,6 +407,11 @@ async def save_lineup(
         tactic=lineup_input.tactic,
         mentality=lineup_input.mentality,
     )
+    from goaletto.application.coaches import coach_snapshot
+
+    coach = await coach_snapshot(session, club.id)
+    if validated.tactic not in coach.abilities.tactics:
+        raise LineupInvalid("tactic", "Coach does not know this tactic")
     payload = command_payload(validated)
 
     lineup.formation = validated.formation

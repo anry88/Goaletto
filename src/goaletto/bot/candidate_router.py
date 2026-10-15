@@ -9,7 +9,13 @@ from aiogram.types import CallbackQuery, Message, Update
 from goaletto.application.candidates import load_candidates, sign_candidate
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied, actor_for
-from goaletto.bot.candidate_views import candidate_list, candidate_quote, parse_candidate
+from goaletto.application.staff_changes import execute_change, quote_change
+from goaletto.bot.candidate_views import (
+    candidate_list,
+    candidate_quote,
+    parse_candidate,
+    staff_change_view,
+)
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import CandidateOffer
@@ -57,21 +63,43 @@ async def candidates_callback(
                 text, keyboard = candidate_list(
                     await load_candidates(session, actor, kind), kind, value
                 )
+            elif action == "x":
+                if person_id is None:
+                    raise ValueError("Missing confirmation")
+                await execute_change(session, actor, person_id, at=datetime.now(UTC))
+                text, keyboard = candidate_list(
+                    await load_candidates(
+                        session, actor, "staff", record=False, refresh_supply=False
+                    ),
+                    "staff",
+                    notice=tr("Штаб обновлён. Условия зарплаты сохранены."),
+                )
+            elif action == "f":
+                if owner_id is None or person_id is None:
+                    raise ValueError("Missing employee")
+                quote = await quote_change(session, actor, owner_id, outgoing_id=person_id)
+                text, keyboard = staff_change_view(quote)
             else:
                 offer = await session.get(CandidateOffer, person_id)
                 if offer is None or person_id is None or owner_id is None:
                     raise ValueError("Unknown candidate")
                 kind = offer.kind
-                if action == "b":
+                if kind == "staff":
+                    if action != "q":
+                        raise ValueError("Staff requires a fresh confirmation")
+                    quote = await quote_change(
+                        session, actor, owner_id, incoming_id=person_id, quoted_fee=value
+                    )
+                    text, keyboard = staff_change_view(quote)
+                elif action == "b":
                     receipt = await sign_candidate(
                         session, actor, owner_id, person_id, value, at=datetime.now(UTC)
                     )
-                    kind = receipt.kind
                     text, keyboard = candidate_list(
                         await load_candidates(
-                            session, actor, kind, record=False, refresh_supply=False
+                            session, actor, receipt.kind, record=False, refresh_supply=False
                         ),
-                        kind,
+                        receipt.kind,
                         notice=tr("Контракт подписан. Проверьте состав и расходы клуба."),
                     )
                 else:

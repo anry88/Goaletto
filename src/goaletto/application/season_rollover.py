@@ -746,6 +746,7 @@ async def _rollover_staff(
         if person.career != "staff" or person.age_applied_for_season_id != season.id:
             raise ValueError("Staff calendar does not match the completed season")
         club_id = worker.club_id
+        former_role = worker.role
         if worker.status == "last_season":
             if worker.last_season_id != season.id:
                 raise ValueError("Staff warning is outside the completed season")
@@ -755,6 +756,14 @@ async def _rollover_staff(
             session.add(_person_event(person, season.id, "staff_retired", at))
             await session.flush()
             await close_salary(session, person.id, at)
+            if club_id is not None and former_role == "head_coach":
+                from goaletto.application.staff_changes import normalize_tactic
+
+                await normalize_tactic(session, club_id)
+            if club_id is not None and former_role == "scout":
+                from goaletto.application.scouting import cancel_invalid
+
+                await cancel_invalid(session, club_id, at)
             await _notice(session, person, club_id, season.id, "retired", at, staff=True)
             counts["staff_retired"] += 1
         else:

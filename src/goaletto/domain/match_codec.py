@@ -9,6 +9,7 @@ from uuid import UUID
 from goaletto.domain.clock import MatchPhase
 from goaletto.domain.match_engine import validate_state
 from goaletto.domain.match_types import (
+    CoachSnapshot,
     EnginePolicy,
     FieldSlot,
     HomeCrowd,
@@ -59,8 +60,16 @@ def _slot(value: Any) -> FieldSlot:
     return FieldSlot(_uuid(data["player_id"]), data["position"])
 
 
-def _snapshot(value: Any) -> TeamSnapshot:
+def _snapshot(value: Any, *, coaching: bool) -> TeamSnapshot:
+    if not coaching and isinstance(value, dict):
+        if "coach" in value:
+            raise ValueError("Historic snapshot contains coaching fields")
+        value = dict(value, coach=None)
     data = _record(value, TeamSnapshot)
+    if coaching:
+        coach = _record(data["coach"], CoachSnapshot)
+        coach["person_id"] = _uuid(coach["person_id"]) if coach["person_id"] is not None else None
+        data["coach"] = CoachSnapshot(**coach)
     data["club_id"] = _uuid(data["club_id"])
     data["players"] = tuple(_player(p) for p in data["players"])
     data["lineup"] = tuple(_slot(p) for p in data["lineup"])
@@ -70,13 +79,17 @@ def _snapshot(value: Any) -> TeamSnapshot:
     return TeamSnapshot(**data)
 
 
-def _team(value: Any, *, legacy: bool) -> TeamState:
+def _team(value: Any, *, legacy: bool, coaching: bool) -> TeamState:
+    if not coaching and isinstance(value, dict):
+        if "mentality_changes" in value:
+            raise ValueError("Historic checkpoint contains mentality counter")
+        value = dict(value, mentality_changes=0)
     if legacy and isinstance(value, dict):
         if set(value) & {"instructions", "instruction_changes"}:
             raise ValueError("Legacy checkpoint has new fields")
         value = dict(value, instructions=[], instruction_changes=0)
     data = _record(value, TeamState)
-    data["snapshot"] = _snapshot(data["snapshot"])
+    data["snapshot"] = _snapshot(data["snapshot"], coaching=coaching)
     data["lineup"] = tuple(_slot(p) for p in data["lineup"])
     data["bench"] = tuple(_uuid(p) for p in data["bench"])
     data["removed"] = tuple(_uuid(p) for p in data["removed"])
@@ -108,6 +121,10 @@ def state_document(state: MatchState) -> dict[str, Any]:
         raise ValueError("Unsupported checkpoint value")
 
     result: dict[str, Any] = json.loads(json.dumps(asdict(state), default=encode))
+    if state.engine_version != "regulation-v3":
+        for side in ("home", "away"):
+            del result[side]["snapshot"]["coach"]
+            del result[side]["mentality_changes"]
     if state.engine_version == "regulation-v1":
         for side in ("home", "away"):
             del result[side]["instructions"]
@@ -132,9 +149,10 @@ def restore_state(value: str | dict[str, Any]) -> MatchState:
         data = _record(json.loads(value) if isinstance(value, str) else value, MatchState)
         data["match_id"] = _uuid(data["match_id"])
         legacy = data["engine_version"] == "regulation-v1"
+        coaching = data["engine_version"] == "regulation-v3"
         data["home"], data["away"] = (
-            _team(data["home"], legacy=legacy),
-            _team(data["away"], legacy=legacy),
+            _team(data["home"], legacy=legacy, coaching=coaching),
+            _team(data["away"], legacy=legacy, coaching=coaching),
         )
         if legacy:
             raw_policy = data["policy"]

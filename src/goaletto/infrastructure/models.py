@@ -20,6 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -500,6 +501,13 @@ class Staff(Base):
     __tablename__ = "staff"
     __table_args__ = (
         CheckConstraint(f"role IS NULL OR role IN ({STAFF_ROLES_SQL})", name="ck_staff_role"),
+        Index(
+            "uq_staff_club_role",
+            "club_id",
+            "role",
+            unique=True,
+            postgresql_where=text("club_id IS NOT NULL"),
+        ),
         CheckConstraint("(club_id IS NULL) = (role IS NULL)", name="ck_staff_employment"),
         CheckConstraint("status IN ('active', 'last_season', 'retired')", name="ck_staff_status"),
         CheckConstraint(
@@ -590,7 +598,12 @@ class CandidateSigning(Base):
         ),
         CheckConstraint("fee > 0 AND weekly_rate > 0", name="ck_signing_price"),
         CheckConstraint("kind IN ('player','staff')", name="ck_signing_kind"),
-        UniqueConstraint("person_id", "kind", name="uq_candidate_signing_career"),
+        Index(
+            "uq_candidate_player_signing",
+            "person_id",
+            unique=True,
+            postgresql_where=text("kind = 'player'"),
+        ),
     )
     operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     person_id: Mapped[UUID] = mapped_column(ForeignKey("candidate_offers.person_id"))
@@ -602,6 +615,37 @@ class CandidateSigning(Base):
     economy_policy: Mapped[str] = mapped_column(String(32), server_default="economy-cycle-v1")
     weekly_rate: Mapped[int] = mapped_column(Integer)
     signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class StaffChange(Base):
+    """Durable confirmation pins both employees and all quoted terms."""
+
+    __tablename__ = "staff_changes"
+    __table_args__ = (
+        CheckConstraint(
+            "incoming_id IS NOT NULL OR outgoing_id IS NOT NULL", name="ck_staff_change_people"
+        ),
+        CheckConstraint(
+            "incoming_id IS NULL OR outgoing_id IS NULL OR incoming_id != outgoing_id",
+            name="ck_staff_change_distinct",
+        ),
+        CheckConstraint(f"role IN ({STAFF_ROLES_SQL})", name="ck_staff_change_role"),
+        CheckConstraint(
+            "(executed_at IS NULL) = (execution_operation_id IS NULL)",
+            name="ck_staff_change_execution",
+        ),
+        UniqueConstraint("execution_operation_id", name="uq_staff_change_execution"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    role: Mapped[str] = mapped_column(String(32))
+    outgoing_id: Mapped[UUID | None] = mapped_column(ForeignKey("staff.person_id"))
+    incoming_id: Mapped[UUID | None] = mapped_column(ForeignKey("staff.person_id"))
+    terms: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    execution_operation_id: Mapped[UUID | None] = mapped_column(Uuid)
 
 
 class PersonSeasonEvent(Base):

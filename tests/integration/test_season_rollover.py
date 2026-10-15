@@ -96,6 +96,7 @@ async def complete_season(sessions, season_id):
                 seed,
                 snapshots[f.home_club_id],
                 snapshots[f.away_club_id],
+                engine_version="regulation-v3",
             )
             final, _ = simulate_match(initial)
             assert final.tick == 30 and final.phase.value == "full_time"
@@ -109,7 +110,7 @@ async def complete_season(sessions, season_id):
                     fixture_id=f.id,
                     seed=seed,
                     engine_version=final.engine_version,
-                    state_version=2 if final.engine_version != "regulation-v1" else 1,
+                    state_version=int(final.engine_version.removeprefix("regulation-v")),
                     state=state_document(final),
                     starting_snapshot=doc,
                     completed_tick=30,
@@ -285,7 +286,7 @@ async def test_unfinished_season_defers_without_mutations(sessions):
         assert work.status == "pending" and work.last_error == "not_ready"
         assert (await session.get(Season, result.season_id)).status == "scheduled"
         assert not (await session.scalars(select(SeasonRolloverReceipt))).all()
-        assert await session.scalar(select(func.count()).select_from(Person)) == 1000
+        assert await session.scalar(select(func.count()).select_from(Person)) == 1050
 
 
 async def test_rollover_fault_rolls_everything_back_and_retry_succeeds(sessions, monkeypatch):
@@ -304,7 +305,7 @@ async def test_rollover_fault_rolls_everything_back_and_retry_succeeds(sessions,
             await rollover_season(session, result.season_id, at)
     async with sessions.begin() as session:
         assert await session.scalar(select(func.count()).select_from(Season)) == 1
-        assert await session.scalar(select(func.count()).select_from(Person)) == 1000
+        assert await session.scalar(select(func.count()).select_from(Person)) == 1050
         assert await session.scalar(select(func.count()).select_from(LineupSlot)) == 1000
         assert (await session.get(Season, result.season_id)).status == "active"
     monkeypatch.setattr(module, "_install_lineups", original)
@@ -324,16 +325,16 @@ async def test_global_candidates_and_staff_warn_full_season_then_retire(sessions
         person = await session.get(Person, item.person.id)
         person.age = 69
         face = person.appearance_identity_id
-        free_ids = [i.person.id for i in players.items]
+        free_ages = {i.person.id: i.person.age for i in players.items}
     at, _ = await complete_season(sessions, result.season_id)
     async with sessions.begin() as session:
         first = await rollover_season(session, result.season_id, at)
-        assert first.staff_aged == 15 and first.staff_warned == 1 and first.staff_retired == 0
+        assert first.staff_aged == 65 and first.staff_warned == 1 and first.staff_retired == 0
         worker = await session.get(Staff, item.person.id)
         assert worker.status == "last_season" and worker.last_season_id == first.next_season_id
         assert (await session.get(Person, worker.person_id)).age == 70
-        for person_id in free_ids:
-            assert (await session.get(Person, person_id)).age == 19
+        for person_id, initial_age in free_ages.items():
+            assert (await session.get(Person, person_id)).age == initial_age + 1
         next_season = await session.get(Season, first.next_season_id)
         active_actor = replace(action(actor), at=next_season.starts_at - timedelta(days=1))
         # An explicit owner action, rather than rollover, renews the ownership lease.

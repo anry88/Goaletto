@@ -43,6 +43,7 @@ from goaletto.infrastructure.models import (
     OwnershipPeriod,
     Person,
     Player,
+    Staff,
 )
 
 NOW = datetime(2026, 10, 17, 12, tzinfo=UTC)
@@ -57,6 +58,9 @@ class Rows:
 
     def all(self):
         return self.rows
+
+    def one_or_none(self):
+        return self.rows[0] if self.rows else None
 
 
 def _extract_in_ids(statement):
@@ -157,6 +161,7 @@ class Recorder:
         self.fixture = None
         self.commands: dict[str, AcceptedCommand] = {}
         self.receipts = {}
+        self.coach_id = uuid4()
         self.statements = []
         self.added = []
         self.events = []
@@ -174,6 +179,8 @@ class Recorder:
         if getattr(statement, "is_insert", False) or getattr(statement, "is_update", False):
             return Rows()
         entities = [d.get("entity") for d in statement.column_descriptions]
+        if entities and entities[0] is Staff:
+            return Rows([(self.coach_id, 20)])
         if entities == [Player, Person]:
             return Rows([(p, self.persons[p.person_id]) for p in self.club_players])
         if len(entities) == 1 and entities[0] is Player:

@@ -57,6 +57,7 @@ async def salary_contract(
     quoted_player_wage: int | None = None,
     quoted_staff_wage: int | None = None,
     policy_version: str = POLICY_VERSION,
+    employment_id: UUID | None = None,
 ) -> SalaryContract:
     """After a hire/transfer, bind a fixed wage. Caller owns the full transaction."""
     require_utc(at)
@@ -140,7 +141,12 @@ async def salary_contract(
             raise ValueError("Physiotherapist needs an explicit qualification")
         recovery_skill = qualification.skill
     row = SalaryContract(
-        id=uuid5(person_id, f"salary:v1:{club_id}:{at.isoformat()}"),
+        id=uuid5(
+            person_id,
+            f"salary:employment:v1:{employment_id}"
+            if employment_id is not None
+            else f"salary:v1:{club_id}:{at.isoformat()}",
+        ),
         person_id=person_id,
         club_id=club_id,
         role=role,

@@ -88,10 +88,10 @@ async def test_parallel_open_and_purchase_refill_once_preserve_faces(sessions):
         assert (await session.get(Player, person.id)).club_id == club_id
         # The starting set already consumes all 1000 catalog identities. Reuse works
         # with different person IDs, while the original 1000 people remain distinct.
-        assert await session.scalar(select(func.count()).select_from(Person)) == 1013
+        assert await session.scalar(select(func.count()).select_from(Person)) == 1063
         assert (
             await session.scalar(select(func.count(func.distinct(Person.appearance_identity_id))))
-            == 1000
+            == 1050
         )
 
 
@@ -113,7 +113,7 @@ async def test_staff_role_hire_refills_only_one_and_does_not_duplicate_role(sess
             )
         )
         second_id, fee = second.person_id, second.fee
-    with pytest.raises(ValueError, match="already employed"):
+    with pytest.raises(ValueError, match="employment changed"):
         async with sessions.begin() as session:
             await sign_candidate(
                 session, action(actor), screen.ownership_id, second_id, fee, at=NOW
@@ -123,7 +123,7 @@ async def test_staff_role_hire_refills_only_one_and_does_not_duplicate_role(sess
             await session.scalar(
                 select(func.count()).select_from(Staff).where(Staff.club_id == club_id)
             )
-            == 1
+            == 2
         )
         assert (await session.get(CandidatePool, ("staff", first.offer.profile))).generation == 3
 
@@ -160,7 +160,7 @@ async def test_supply_counts_auctions_and_never_generates_above_twelve(sessions)
         assert await supply_count(session, "player", "player", NOW) == 12
         assert await replenish_pool(session, "player", "player", NOW) == 0
         assert (await session.get(CandidatePool, ("player", "player"))).generation == 0
-        assert await session.scalar(select(func.count()).select_from(Person)) == 1000
+        assert await session.scalar(select(func.count()).select_from(Person)) == 1050
 
 
 async def test_staff_uses_retired_player_without_new_person_or_face(sessions):
@@ -185,7 +185,7 @@ async def test_staff_uses_retired_player_without_new_person_or_face(sessions):
         assert person.career == "staff"
         assert (await session.get(Staff, person.id)).club_id is None
         assert (await session.get(Player, person.id)).status == "retired"
-        assert await session.scalar(select(func.count()).select_from(Person)) == 1001
+        assert await session.scalar(select(func.count()).select_from(Person)) == 1051
         assert await replenish_pool(session, "staff", "defence_coach", NOW) == 0
 
 
@@ -230,7 +230,7 @@ async def test_one_global_pool_visible_in_another_set_without_more_people(sessio
         second_staff = await load_candidates(session, action(second_actor), "staff")
         assert {i.person.id for i in second_players.items} == {i.person.id for i in first.items}
         assert {i.person.id for i in second_staff.items} == {i.person.id for i in staff.items}
-        assert await session.scalar(select(func.count()).select_from(Person)) == 2026
+        assert await session.scalar(select(func.count()).select_from(Person)) == 2126
         assert (
             await session.get(CandidatePool, ("player", "player"))
         ).home_league_set_id == result.league_set_id
@@ -318,6 +318,8 @@ async def test_actual_telegram_router_signs_player_and_staff_after_commit(sessio
 
     for command in ("/freeagents", "/staff"):
         screen = await send(text=command)
+        if command == "/staff":
+            screen = await send(data="cg:s:2")  # Head coaches, including the occupied role.
         button = next(
             b.callback_data
             for row in screen.reply_markup.inline_keyboard
@@ -325,11 +327,16 @@ async def test_actual_telegram_router_signs_player_and_staff_after_commit(sessio
             if (b.callback_data or "").startswith("cg:q:")
         )
         quote = await send(data=button)
-        assert "Разово:" in quote.text and "Зарплата:" in quote.text
+        assert "Разово:" in quote.text and (
+            "Зарплата:" in quote.text if command == "/freeagents" else "Приходит:" in quote.text
+        )
         confirm = quote.reply_markup.inline_keyboard[0][0].callback_data
-        assert confirm.startswith("cg:b:") and len(confirm.encode()) <= 64
+        assert (
+            confirm.startswith("cg:b:" if command == "/freeagents" else "cg:x:")
+            and len(confirm.encode()) <= 64
+        )
         signed = await send(data=confirm)
-        assert "Контракт подписан" in signed.text
+        assert ("Контракт подписан" if command == "/freeagents" else "Штаб обновлён") in signed.text
     async with sessions.begin() as session:
         assert await session.scalar(select(func.count()).select_from(CandidateSigning)) == 2
         assert (
@@ -345,6 +352,21 @@ async def test_actual_telegram_router_signs_player_and_staff_after_commit(sessio
             == 1
         )
         assert (await session.get(CandidatePool, ("player", "player"))).generation == 13
+    screen = await send(text="/staff")
+    dismiss = next(
+        b.callback_data
+        for row in screen.reply_markup.inline_keyboard
+        for b in row
+        if (b.callback_data or "").startswith("cg:f:")
+    )
+    confirmation = await send(data=dismiss)
+    assert (
+        "Штрафа за увольнение нет" in confirmation.text
+        and "Без главного тренера" in confirmation.text
+    )
+    await send(data=confirmation.reply_markup.inline_keyboard[0][0].callback_data)
+    async with sessions.begin() as session:
+        assert not await session.scalar(select(Staff.person_id).where(Staff.club_id == club_id))
     await bot.session.close()
 
 

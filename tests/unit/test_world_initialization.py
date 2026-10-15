@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 from typing import cast
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy.dialects import postgresql
@@ -40,6 +41,9 @@ class SQLRecorder:
     async def get(self, model, key):
         return self.receipt if model is WorldSeedReceipt else None
 
+    async def flush(self):
+        pass
+
     async def scalars(self, statement):
         return EmptyValues()
 
@@ -58,6 +62,9 @@ def receipt() -> WorldSeedReceipt:
 
 
 async def test_retry_after_matches_and_catalog_changes_does_not_reset_world(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "goaletto.application.coaches.ensure_starting_coaches", AsyncMock(return_value=0)
+    )
     session = SQLRecorder(receipt())
 
     def forbidden(*args, **kwargs):
@@ -87,6 +94,9 @@ async def test_reusing_key_with_changed_configuration_is_rejected() -> None:
 
 
 async def test_seed_batch_reserves_unique_people_and_keeps_all_jobs_held(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "goaletto.application.coaches.ensure_starting_coaches", AsyncMock(return_value=50)
+    )
     session = SQLRecorder()
 
     async def registered(*args, **kwargs):

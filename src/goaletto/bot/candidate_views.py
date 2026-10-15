@@ -13,6 +13,7 @@ from goaletto.domain.finances import player_quality
 from goaletto.domain.market import decode_price, encode_price
 from goaletto.domain.names import latin_name
 from goaletto.domain.staff_quality import QUALITY_NAMES, quality_tier
+from goaletto.infrastructure.models import StaffChange
 from goaletto.presentation.i18n import LabelMap, tr
 
 ROLES = LabelMap(
@@ -43,7 +44,9 @@ def parse_candidate(data: str) -> tuple[str, UUID | None, UUID | None, int]:
         and len(p[2]) <= 3
     ):
         return p[1], None, None, int(p[2])
-    if len(p) == 5 and p[:2] in (["cg", "q"], ["cg", "b"]):
+    if len(p) == 3 and p[:2] == ["cg", "x"]:
+        return "x", expand_id(p[2]), None, 0
+    if len(p) == 5 and p[:2] in (["cg", "q"], ["cg", "b"], ["cg", "f"]):
         return p[1], expand_id(p[2]), expand_id(p[3]), decode_price(p[4])
     raise ValueError("Invalid candidate action")
 
@@ -55,9 +58,7 @@ def candidate_list(
         raise ValueError("Invalid candidate page")
     prefix = "p" if kind == "player" else "s"
     busy_roles = {row[0] for row in screen.employed}
-    available = tuple(
-        i for i in screen.items if kind == "player" or i.offer.profile not in busy_roles
-    )
+    available = screen.items
     pages = max(1, (len(available) + PAGE_SIZE - 1) // PAGE_SIZE)
     page = min(page, pages - 1)
     title = tr("Свободные футболисты") if kind == "player" else tr("Персонал")
@@ -76,6 +77,20 @@ def candidate_list(
     if notice:
         lines.extend(("", notice))
     rows = []
+    if kind == "staff":
+        for employee_id, employee in zip(screen.employee_ids, screen.employed, strict=True):
+            rows.append(
+                [
+                    button(
+                        tr("Уволить: {name}", name=latin_name(employee[1])),
+                        f"cg:f:{compact_id(employee_id)}:{compact_id(screen.ownership_id)}:0",
+                    )
+                ]
+            )
+        if "head_coach" not in busy_roles:
+            lines.append(
+                tr("Без главного тренера: обычная тактика, 1 инструкция и 1 смена настроя за матч.")
+            )
     for item in available[page * PAGE_SIZE : (page + 1) * PAGE_SIZE]:
         offer, person = item.offer, item.person
         role = (
@@ -199,5 +214,84 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
                 )
             ],
             [button(tr("Назад"), f"cg:{prefix}:0")],
+        ]
+    )
+
+
+def staff_change_view(change: StaffChange) -> tuple[str, Keyboard]:
+    from goaletto.domain.staff_quality import staff_abilities
+
+    lines = [f"<b>{ROLES[change.role]}</b>"]
+    for key, label in (("outgoing", tr("Уходит")), ("incoming", tr("Приходит"))):
+        person = change.terms.get(key)
+        if person is None:
+            continue
+        lines.append(
+            tr(
+                "{label}: {name} · {age} · {skill}/20 · {wage}/4 дня",
+                label=label,
+                name=escape(latin_name(person["name"])),
+                age=person["age"],
+                skill=person["skill"],
+                wage=amount(person["wage"]),
+            )
+        )
+        if person["status"] == "last_season":
+            lines.append(tr("⏳ Последний рабочий сезон"))
+        if change.role == "head_coach":
+            abilities = staff_abilities(change.role, person["skill"])
+            from goaletto.bot.lineup_views import TACTIC_LABELS
+
+            lines.append(
+                tr(
+                    "Тактики: {tactics}. Смены за матч: тактика {t}, инструкции {i}, настрой {m}.",
+                    tactics=", ".join(TACTIC_LABELS[t] for t in abilities.tactics),
+                    t=abilities.tactic_changes,
+                    i=abilities.instruction_changes,
+                    m=abilities.mentality_changes,
+                )
+            )
+        elif change.role == "physiotherapist":
+            lines.append(tr("Восстановление энергии: {skill}/20", skill=person["skill"]))
+        elif change.role == "scout":
+            lines.append(tr("Поиск и оценка потенциала: {skill}/20", skill=person["skill"]))
+        else:
+            lines.append(tr("Тренировочная квалификация: {skill}/20", skill=person["skill"]))
+    incoming = change.terms.get("incoming")
+    lines.append(
+        tr(
+            "Разово: {fee}. Штрафа за увольнение нет.",
+            fee=amount(incoming["fee"] if incoming else 0),
+        )
+    )
+    if change.outgoing_id:
+        lines.append(
+            tr(
+                "Старая зарплата начисляется до момента увольнения. "
+                "Новый контракт действует с подписания."
+            )
+        )
+    if change.role == "scout" and change.outgoing_id:
+        lines.append(
+            tr(
+                "Текущий поиск скаута прекратится без возврата оплаты. "
+                "Готовые отчёты сохранятся до их срока."
+            )
+        )
+    if change.role == "head_coach":
+        lines.append(
+            tr(
+                "Возможности текущего матча уже зафиксированы. "
+                "Новый штаб влияет на следующие матчи."
+            )
+        )
+        if incoming is None:
+            lines.append(
+                tr("Без главного тренера: обычная тактика, 1 инструкция и 1 смена настроя за матч.")
+            )
+    return "\n".join(lines), Keyboard(
+        inline_keyboard=[
+            [button(tr("Подтвердить"), f"cg:x:{compact_id(change.id)}")],
+            [button(tr("Назад"), "cg:s:0")],
         ]
     )

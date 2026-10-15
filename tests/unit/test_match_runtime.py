@@ -24,7 +24,7 @@ from goaletto.application.match_runtime import (
 )
 from goaletto.application.match_simulation import demo_match, simulate_match
 from goaletto.domain.match_codec import restore_state, state_document, state_hash
-from goaletto.domain.match_types import EnginePolicy, Mentality
+from goaletto.domain.match_types import CoachSnapshot, EnginePolicy, Mentality
 from goaletto.infrastructure.models import (
     AcceptedCommand,
     Club,
@@ -272,7 +272,8 @@ async def test_lock_pins_crowd_and_start_never_reads_changed_stadium(monkeypatch
         return recorder.season
 
     async def snapshot(session, club, at):
-        return state.home.snapshot if club.id == home.id else state.away.snapshot
+        snapshot = state.home.snapshot if club.id == home.id else state.away.snapshot
+        return replace(snapshot, coach=CoachSnapshot(None))
 
     recorder.scalars = scalars
     recorder.get = get

@@ -578,5 +578,22 @@
   "🔶 — последний сезон. ↔85% — дополнительная позиция. ⚠️60% — чужая. 🤕 — травма.": "🔶 — final season. ↔85% — alternative position. ⚠️60% — unfamiliar position. 🤕 — injury.",
   "🔎 Скаутские задания": "🔎 Scouting searches",
   "Скаутский поиск": "Scouting search",
-  "Подписание": "Signing"
+  "Подписание": "Signing",
+  "Уволить: {name}": "Dismiss: {name}",
+  "Без главного тренера: обычная тактика, 1 инструкция и 1 смена настроя за матч.": "Without a head coach: normal tactic, 1 instruction and 1 mentality change per match.",
+  "Штаб обновлён. Условия зарплаты сохранены.": "Staff updated. Wage terms saved.",
+  "Уходит": "Leaving",
+  "Приходит": "Joining",
+  "{label}: {name} · {age} · {skill}/20 · {wage}/4 дня": "{label}: {name} · {age} · {skill}/20 · {wage}/4 days",
+  "Тактики: {tactics}. Смены за матч: тактика {t}, инструкции {i}, настрой {m}.": "Tactics: {tactics}. Changes per match: tactics {t}, instructions {i}, mentality {m}.",
+  "Разово: {fee}. Штрафа за увольнение нет.": "One-time fee: {fee}. No dismissal penalty.",
+  "Старая зарплата начисляется до момента увольнения. Новый контракт действует с подписания.": "The old wage accrues until dismissal. The new contract starts on signing.",
+  "Текущий поиск скаута прекратится без возврата оплаты. Готовые отчёты сохранятся до их срока.": "The active scout search will stop without a refund. Completed reports keep their expiry dates.",
+  "Возможности текущего матча уже зафиксированы. Новый штаб влияет на следующие матчи.": "Current match capabilities are already pinned. New staff affect subsequent matches.",
+  "Лимиты тренера: тактика {t}/{tm} · инструкции {i}/{im} · настрой {m}/{mm}": "Coach limits: tactics {t}/{tm} · instructions {i}/{im} · mentality {m}/{mm}",
+  "Замены: {s}/5 · окна: {w}/3": "Substitutions: {s}/5 · windows: {w}/3",
+  "Подтвердить": "Confirm",
+  "Восстановление энергии: {skill}/20": "Energy recovery: {skill}/20",
+  "Поиск и оценка потенциала: {skill}/20": "Scouting and potential assessment: {skill}/20",
+  "Тренировочная квалификация: {skill}/20": "Training qualification: {skill}/20"
 }

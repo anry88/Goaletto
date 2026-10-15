@@ -75,6 +75,7 @@ class CandidateScreen:
     available_money: int
     items: tuple[CandidateItem, ...]
     employed: tuple[tuple[str, str, int, int, str], ...]
+    employee_ids: tuple[UUID, ...] = ()
 
 
 async def pool_calendar(session: AsyncSession) -> Season:
@@ -152,7 +153,7 @@ async def supply_count(session: AsyncSession, kind: str, profile: str, at: datet
             .join(StaffQualification, StaffQualification.person_id == Staff.person_id)
             .where(
                 Staff.club_id.is_(None),
-                Staff.status == "active",
+                Staff.status.in_(("active", "last_season")),
                 Person.career == "staff",
                 StaffQualification.role == profile,
             )
@@ -433,7 +434,11 @@ async def load_candidates(
             Player | Staff | None,
             await session.get(Player if kind == "player" else Staff, person.id),
         )
-        if worker is None or worker.club_id is not None or worker.status != "active":
+        if (
+            worker is None
+            or worker.club_id is not None
+            or worker.status not in (("active", "last_season") if kind == "staff" else ("active",))
+        ):
             continue
         skill_values = (
             tuple(getattr(worker, k) for k in SKILL_NAMES[:8])
@@ -458,7 +463,14 @@ async def load_candidates(
         )
     employed = (
         await session.execute(
-            select(Staff.role, Person.name, Person.age, StaffQualification.skill, Staff.status)
+            select(
+                Staff.role,
+                Person.name,
+                Person.age,
+                StaffQualification.skill,
+                Staff.status,
+                Staff.person_id,
+            )
             .join(Person)
             .join(
                 StaffQualification,
@@ -480,8 +492,9 @@ async def load_candidates(
         tuple(items),
         tuple(
             (cast(str, role), name, age, skill, status)
-            for role, name, age, skill, status in employed
+            for role, name, age, skill, status, _ in employed
         ),
+        tuple(row[5] for row in employed),
     )
 
 
@@ -493,6 +506,7 @@ async def sign_candidate(
     quoted_fee: int,
     *,
     at: datetime,
+    expected_outgoing: UUID | None = None,
 ) -> CandidateSigning:
     require_utc(at)
     if at < actor.at:
@@ -529,7 +543,8 @@ async def sign_candidate(
     if (
         worker is None
         or worker.club_id is not None
-        or worker.status != "active"
+        or worker.status
+        not in (("active", "last_season") if offer.kind == "staff" else ("active",))
         or person.career != offer.kind
     ):
         raise ValueError("Candidate unavailable")
@@ -541,6 +556,12 @@ async def sign_candidate(
     elif worker.position != offer.profile:
         raise ValueError("Player offer differs from the profile")
     season, window = await calendar_for(session, club.id, at)
+    if (
+        isinstance(worker, Staff)
+        and worker.status == "last_season"
+        and worker.last_season_id != season.id
+    ):
+        raise ValueError("Last-season staff require the same season calendar")
     if offer.kind == "player":
         if (
             not window.contains(at)
@@ -559,16 +580,20 @@ async def sign_candidate(
         )
         if busy is not None:
             raise ValueError("Wait until the locked fixture finishes")
-    elif await session.scalar(
-        select(Staff.person_id)
-        .where(
-            Staff.club_id == club.id,
-            Staff.role == offer.profile,
-            Staff.status.in_(("active", "last_season")),
+    else:
+        employed = await session.scalar(
+            select(Staff.person_id).where(
+                Staff.club_id == club.id,
+                Staff.role == offer.profile,
+                Staff.status.in_(("active", "last_season")),
+            )
         )
-        .limit(1)
-    ):
-        raise ValueError("Staff role already employed")
+        if employed != expected_outgoing:
+            raise ValueError("Staff employment changed; obtain a new confirmation")
+        if employed is not None:
+            from goaletto.application.staff_changes import release_staff
+
+            await release_staff(session, employed, club.id, at, normalize=False)
     account = (await locked_accounts(session, club.id))[club.id]
     await debit_locked(
         session,
@@ -588,6 +613,10 @@ async def sign_candidate(
     worker.club_id = club.id
     if isinstance(worker, Staff):
         worker.role = offer.profile
+        from goaletto.application.staff_changes import normalize_tactic
+
+        await session.flush()
+        await normalize_tactic(session, club.id)
     person.home_league_set_id = await league_set_for(session, club)
     # Changing calendars never adds a year at signing; the new club owns subsequent aging.
     person.age_applied_for_season_id = season.id
@@ -602,6 +631,7 @@ async def sign_candidate(
         quoted_player_wage=offer.weekly_rate if offer.kind == "player" else None,
         quoted_staff_wage=offer.weekly_rate if offer.kind == "staff" else None,
         policy_version=offer.economy_policy,
+        employment_id=actor.operation_id if offer.kind == "staff" else None,
     )
     receipt = CandidateSigning(
         operation_id=actor.operation_id,
@@ -675,7 +705,7 @@ async def _adopt_free_people(session: AsyncSession, kind: str, profile: str, at:
                 .join(StaffQualification)
                 .where(
                     Staff.club_id.is_(None),
-                    Staff.status == "active",
+                    Staff.status.in_(("active", "last_season")),
                     Person.career == "staff",
                     StaffQualification.role == profile,
                     missing_offer,

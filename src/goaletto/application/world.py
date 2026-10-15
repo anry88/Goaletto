@@ -133,6 +133,9 @@ async def initialize_world(
         )
         if receipt.config_hash != expected.fingerprint:
             raise ValueError("World key already has a different seed configuration")
+        from goaletto.application.coaches import ensure_starting_coaches
+
+        await ensure_starting_coaches(session, initialized_at, league_set_id=receipt.league_set_id)
         return SeedResult(receipt.league_set_id, receipt.season_id, False)
     if initialized_at.tzinfo is None or initialized_at.utcoffset() != timedelta(0):
         raise ValueError("Initialization timestamp must be timezone-aware UTC")
@@ -363,4 +366,8 @@ async def initialize_world(
             }
         ],
     )
+    from goaletto.application.coaches import ensure_starting_coaches
+
+    await session.flush()
+    await ensure_starting_coaches(session, initialized_at, league_set_id=plan.league_set_id)
     return SeedResult(plan.league_set_id, plan.season_id, True)

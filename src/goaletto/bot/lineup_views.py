@@ -179,6 +179,7 @@ def tactic_keyboard(data: LineupData) -> InlineKeyboardMarkup:
         [_button(label, f"ln:t:{tactic.value}:{version}")]
         for tactic, label in TACTIC_LABELS.items()
         if tactic.value != data.tactic
+        and (not data.allowed_tactics or tactic.value in data.allowed_tactics)
     ]
     rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

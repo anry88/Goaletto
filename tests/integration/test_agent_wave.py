@@ -112,7 +112,7 @@ async def test_seed_retry_claim_race_and_unique_faces(sessions):
         distinct = await session.scalar(
             select(func.count(func.distinct(Person.appearance_identity_id)))
         )
-        assert total == distinct == 1000
+        assert total == distinct == 1050
         a = await begin_game(session, telegram_id=1002, update_id=2, payload=None, at=NOW)
         b = await begin_game(session, telegram_id=1003, update_id=3, payload=None, at=NOW)
         target = a.offers[0].id

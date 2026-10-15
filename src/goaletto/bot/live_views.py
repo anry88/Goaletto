@@ -129,16 +129,37 @@ def render(
                     p1=MENTALITY_LABELS[current.mentality],
                 )
             )
-            lines.append(
-                tr(
-                    "С учётом принятых команд: замены {p0}/5 · окна {p1}/3 · "
-                    "тактика {p2}/3 · инструкции {p3}/3",
-                    p0=team.substitutions,
-                    p1=len(team.substitution_windows),
-                    p2=team.tactic_changes,
-                    p3=team.instruction_changes,
+            if team.snapshot.coach is None:
+                lines.append(
+                    tr(
+                        "С учётом принятых команд: замены {p0}/5 · окна {p1}/3 · "
+                        "тактика {p2}/3 · инструкции {p3}/3",
+                        p0=team.substitutions,
+                        p1=len(team.substitution_windows),
+                        p2=team.tactic_changes,
+                        p3=team.instruction_changes,
+                    )
                 )
-            )
+            abilities = team.snapshot.coach.abilities if team.snapshot.coach else None
+            if abilities:
+                lines.append(
+                    tr(
+                        "Замены: {s}/5 · окна: {w}/3",
+                        s=team.substitutions,
+                        w=len(team.substitution_windows),
+                    )
+                )
+                lines.append(
+                    tr(
+                        "Лимиты тренера: тактика {t}/{tm} · инструкции {i}/{im} · настрой {m}/{mm}",
+                        t=team.tactic_changes,
+                        tm=abilities.tactic_changes,
+                        i=team.instruction_changes,
+                        im=abilities.instruction_changes,
+                        m=team.mentality_changes,
+                        mm=abilities.mentality_changes,
+                    )
+                )
             players = list(team.snapshot.players)
             index_by_id = {p.id: index for index, p in enumerate(players, 1)}
             names = {p.id: latin_name(p.name) for p in players}
@@ -159,18 +180,25 @@ def render(
                     [_button(label, callback(screen, "t", list(Tactic).index(value)))]
                     for value, label in TACTIC_LABELS.items()
                     if value != team.tactic
+                    and (
+                        not abilities
+                        or value in abilities.tactics
+                        and team.tactic_changes < abilities.tactic_changes
+                    )
                 ]
             elif panel == 3:
                 rows = [
                     [_button(label, callback(screen, "m", list(Mentality).index(value)))]
                     for value, label in MENTALITY_LABELS.items()
                     if value != team.mentality
+                    and (not abilities or team.mentality_changes < abilities.mentality_changes)
                 ]
-            elif panel == 4 and state.engine_version == "regulation-v2":
+            elif panel == 4 and state.engine_version != "regulation-v1":
                 rows = [
                     [_button(names[s.player_id], callback(screen, "u", index_by_id[s.player_id]))]
                     for s in team.lineup
                     if s.position != "GK"
+                    and (not abilities or team.instruction_changes < abilities.instruction_changes)
                 ]
             elif panel == 5:
                 outgoing = players[selected - 1].id if 1 <= selected <= len(players) else None
@@ -196,7 +224,10 @@ def render(
             elif panel == 6:
                 player = players[selected - 1] if 1 <= selected <= len(players) else None
                 if player is None or player.id not in {
-                    s.player_id for s in team.lineup if s.position != "GK"
+                    s.player_id
+                    for s in team.lineup
+                    if s.position != "GK"
+                    and (not abilities or team.instruction_changes < abilities.instruction_changes)
                 }:
                     raise ValueError("Stale instruction player")
                 rows = [
@@ -215,7 +246,7 @@ def render(
                     ],
                     [_button(tr("💬 Настрой"), callback(screen, "p", 3))],
                 ]
-                if state.engine_version == "regulation-v2":
+                if state.engine_version != "regulation-v1":
                     rows.append([_button(tr("🎯 Инструкция"), callback(screen, "p", 4))])
             rows.append([_button(tr("← Матч"), callback(screen, "r"))])
         kinds = {

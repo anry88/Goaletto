@@ -15,7 +15,14 @@ from goaletto.application.live_commands import (
     load_live_screen,
 )
 from goaletto.domain.match_codec import restore_state
-from goaletto.infrastructure.models import AcceptedCommand, Club, Match, OwnershipPeriod
+from goaletto.infrastructure.models import (
+    AcceptedCommand,
+    Club,
+    Match,
+    OwnershipPeriod,
+    Staff,
+    StaffQualification,
+)
 from tests.integration.test_agent_wave import job, setup_world, start_fixture
 
 pytestmark = pytest.mark.integration
@@ -23,6 +30,11 @@ pytestmark = pytest.mark.integration
 
 async def live(sessions):
     _, actor, club_id = await setup_world(sessions)
+    async with sessions.begin() as session:
+        coach = await session.scalar(
+            select(Staff.person_id).where(Staff.club_id == club_id, Staff.role == "head_coach")
+        )
+        (await session.get(StaffQualification, (coach, "head_coach"))).skill = 13
     fixture_id, at = await start_fixture(sessions, club_id)
     actor = replace(actor, at=at)
     async with sessions.begin() as session:
@@ -135,13 +147,15 @@ async def test_deadline_stale_ownership_pause_and_conflicting_receipt_are_reject
 
 async def test_pending_tactics_and_instructions_reserve_limits_before_tick(sessions):
     actor, fixture_id, at, screen = await live(sessions)
-    for update, tactic in enumerate(("pressing", "counter", "wings"), 100):
+    for update, tactic in enumerate(("defence", "counter", "wings"), 100):
         await accept(sessions, actor, screen, "tactics", {"tactic": tactic}, update)
     with pytest.raises(CommandUnavailable, match="tactic_limit"):
-        await accept(sessions, actor, screen, "tactics", {"tactic": "defence"}, 103)
+        await accept(sessions, actor, screen, "tactics", {"tactic": "long_balls"}, 103)
     team = screen.state.home if screen.side.value == "home" else screen.state.away
     person = next(s.player_id for s in team.lineup if s.position != "GK")
-    for update, value in enumerate(("move_left", "move_right", "drop_back"), 104):
+    for update, value in enumerate(
+        ("move_left", "move_right", "drop_back", "long_shots", "runs_behind"), 104
+    ):
         await accept(
             sessions,
             actor,
@@ -156,16 +170,16 @@ async def test_pending_tactics_and_instructions_reserve_limits_before_tick(sessi
             actor,
             screen,
             "instruction",
-            {"player_id": str(person), "instruction": "runs_behind"},
-            107,
+            {"player_id": str(person), "instruction": "long_shots"},
+            109,
         )
     await job(sessions, "match.tick", fixture_id, 1)
     async with sessions.begin() as session:
         match = await session.get(Match, screen.match_id)
         state = restore_state(match.state)
         team = state.home if screen.side.value == "home" else state.away
-        assert (team.tactic_changes, team.instruction_changes) == (3, 3)
-        assert team.instructions[0].instruction.value == "drop_back"
+        assert (team.tactic_changes, team.instruction_changes) == (3, 5)
+        assert team.instructions[0].instruction.value == "runs_behind"
 
 
 async def test_concurrent_duplicate_substitution_and_expired_owner_at_application(sessions):

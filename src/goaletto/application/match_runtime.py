@@ -20,8 +20,7 @@ from goaletto.domain.clock import MatchClock, MatchPhase
 from goaletto.domain.match_codec import restore_state, state_document, state_hash
 from goaletto.domain.match_engine import advance_tick, start_match, start_second_half
 from goaletto.domain.match_types import (
-    ENGINE_VERSION,
-    LIVE_ENGINE_VERSION,
+    COACH_ENGINE_VERSION,
     CommandKind,
     EnginePolicy,
     FieldSlot,
@@ -244,6 +243,9 @@ async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> Team
         raise ValueError("Invalid legacy tactics flag")
     if tactics.get("pressing") and tactics.get("counterattack"):
         raise ValueError("Conflicting saved tactics")
+    from goaletto.application.coaches import coach_snapshot
+
+    coach = await coach_snapshot(session, club.id)
     tactic = Tactic(
         tactics.get(
             "tactic",
@@ -260,7 +262,8 @@ async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> Team
         tuple(p for p in players if p.id in {s.person_id for s in slots}),
         tuple(starters),
         tuple(bench),
-        tactic=tactic,
+        tactic=tactic if tactic in coach.abilities.tactics else coach.abilities.tactics[0],
+        coach=coach,
         mentality=Mentality(tactics.get("mentality", "balanced")),
     )
 
@@ -632,8 +635,8 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             home_snapshot,
             away_snapshot,
             initial_energy=energies,
-            policy=EnginePolicy(version="match-policy-v2"),
-            engine_version=LIVE_ENGINE_VERSION,
+            policy=EnginePolicy(version="match-policy-v3"),
+            engine_version=COACH_ENGINE_VERSION,
             crowd=HomeCrowd(demand.capacity, demand.fans),
         )
         match = Match(
@@ -641,7 +644,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             fixture_id=fixture.id,
             seed=seed,
             engine_version=state.engine_version,
-            state_version=2,
+            state_version=3,
             state=state_document(state),
             starting_snapshot=state_document(state),
             completed_tick=0,
@@ -699,7 +702,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         or state.engine_version != match.engine_version
         or state.tick != match.completed_tick
         or state.phase.value != match.phase
-        or match.state_version != (1 if state.engine_version == ENGINE_VERSION else 2)
+        or match.state_version != int(state.engine_version.removeprefix("regulation-v"))
         or state.home.stats.goals != match.home_goals
         or state.away.stats.goals != match.away_goals
         or state.home.snapshot.club_id != fixture.home_club_id

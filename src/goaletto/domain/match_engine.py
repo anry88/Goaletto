@@ -10,6 +10,7 @@ from goaletto.domain.clock import MatchPhase
 from goaletto.domain.match_commands import apply_commands, substitute
 from goaletto.domain.match_ratings import SectorRatings, effective_skill, sector_ratings
 from goaletto.domain.match_types import (
+    COACH_ENGINE_VERSION,
     ENGINE_VERSION,
     LIVE_ENGINE_VERSION,
     EnginePolicy,
@@ -31,11 +32,9 @@ from goaletto.domain.match_types import (
 
 
 def validate_state(state: MatchState) -> None:
-    if state.engine_version not in {ENGINE_VERSION, LIVE_ENGINE_VERSION}:
+    if state.engine_version not in {ENGINE_VERSION, LIVE_ENGINE_VERSION, COACH_ENGINE_VERSION}:
         raise ValueError("Unsupported engine version; never replay with another implementation")
-    expected_policy = (
-        "match-policy-v1" if state.engine_version == ENGINE_VERSION else "match-policy-v2"
-    )
+    expected_policy = "match-policy-" + state.engine_version.removeprefix("regulation-")
     if state.policy.version != expected_policy:
         raise ValueError("Engine and policy versions disagree")
     if (
@@ -77,6 +76,19 @@ def validate_state(state: MatchState) -> None:
     ):
         raise ValueError("Support morale must match the pinned crowd and policy")
     for team in (state.home, state.away):
+        coach = team.snapshot.coach
+        modern = state.engine_version == COACH_ENGINE_VERSION
+        if modern != (coach is not None):
+            raise ValueError("Coaching snapshot and engine disagree")
+        abilities = coach.abilities if coach else None
+        if abilities and (
+            team.tactic not in abilities.tactics or team.snapshot.tactic not in abilities.tactics
+        ):
+            raise ValueError("Tactic outside the pinned repertoire")
+        if type(team.mentality_changes) is not int or not 0 <= team.mentality_changes <= (
+            abilities.mentality_changes if abilities else 0
+        ):
+            raise ValueError("Invalid mentality count")
         snapshot_ids = {p.id for p in team.snapshot.players}
         instruction_ids = [i.player_id for i in team.instructions]
         if (
@@ -84,7 +96,9 @@ def validate_state(state: MatchState) -> None:
             or not set(instruction_ids) <= snapshot_ids
         ):
             raise ValueError("Instruction references must be unique snapshot players")
-        if type(team.instruction_changes) is not int or not 0 <= team.instruction_changes <= 3:
+        if type(team.instruction_changes) is not int or not 0 <= team.instruction_changes <= (
+            abilities.instruction_changes if abilities else 3
+        ):
             raise ValueError("Invalid instruction count")
         if len(team.instructions) > team.instruction_changes:
             raise ValueError("Instruction assignments exceed the change counter")
@@ -133,7 +147,9 @@ def validate_state(state: MatchState) -> None:
             raise ValueError("Invalid substitution windows")
         if any(type(t) is not int or not 1 <= t <= 30 for t in team.substitution_windows):
             raise ValueError("Invalid substitution window tick")
-        if type(team.tactic_changes) is not int or not 0 <= team.tactic_changes <= 3:
+        if type(team.tactic_changes) is not int or not 0 <= team.tactic_changes <= (
+            abilities.tactic_changes if abilities else 3
+        ):
             raise ValueError("Invalid tactic count")
         if not isinstance(team.tactic, Tactic) or not isinstance(team.mentality, Mentality):
             raise ValueError("Invalid team tactics")
@@ -203,7 +219,7 @@ def start_match(
         )
 
     policy = policy or EnginePolicy(
-        version="match-policy-v2" if engine_version == LIVE_ENGINE_VERSION else "match-policy-v1"
+        version="match-policy-" + engine_version.removeprefix("regulation-")
     )
     crowd = crowd or HomeCrowd()
     home_team = replace(team(home), support_morale_points=crowd_morale(crowd, policy))

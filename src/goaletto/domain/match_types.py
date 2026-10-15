@@ -2,12 +2,17 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from goaletto.domain.staff_quality import StaffAbilities
 
 from goaletto.domain.clock import MatchPhase
 
 ENGINE_VERSION = "regulation-v1"
 LIVE_ENGINE_VERSION = "regulation-v2"
+COACH_ENGINE_VERSION = "regulation-v3"
 POSITIONS = frozenset({"GK", "DL", "DC", "DR", "DM", "ML", "MC", "MR", "AMC", "AML", "AMR", "FC"})
 
 
@@ -128,6 +133,29 @@ class FieldSlot:
 
 
 @dataclass(frozen=True)
+class CoachSnapshot:
+    person_id: UUID | None
+    skill: int = 1
+    policy_version: str = "staff-quality-v1"
+
+    def __post_init__(self) -> None:
+        if self.person_id is not None and not isinstance(self.person_id, UUID):
+            raise ValueError("Invalid coach identity")
+        if type(self.skill) is not int or not 1 <= self.skill <= 20:
+            raise ValueError("Invalid coach skill")
+        if self.person_id is None and self.skill != 1:
+            raise ValueError("Vacancy must use basic coaching")
+        if self.policy_version != "staff-quality-v1":
+            raise ValueError("Unknown coaching policy")
+
+    @property
+    def abilities(self) -> "StaffAbilities":
+        from goaletto.domain.staff_quality import staff_abilities
+
+        return staff_abilities("head_coach", self.skill, self.policy_version)
+
+
+@dataclass(frozen=True)
 class TeamSnapshot:
     club_id: UUID
     name: str
@@ -137,6 +165,7 @@ class TeamSnapshot:
     tactic: Tactic = Tactic.NORMAL
     mentality: Mentality = Mentality.BALANCED
     automatic_injury_substitutions: bool = True
+    coach: CoachSnapshot | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.club_id, UUID) or not self.name.strip():
@@ -193,7 +222,7 @@ class EnginePolicy:
     long_shot_extra_miss_bps: int = 1000
 
     def __post_init__(self) -> None:
-        if self.version not in {"match-policy-v1", "match-policy-v2"}:
+        if self.version not in {"match-policy-v1", "match-policy-v2", "match-policy-v3"}:
             raise ValueError("Unsupported policy")
         if self.version == "match-policy-v1" and (
             self.max_instruction_changes,
@@ -289,6 +318,7 @@ class TeamState:
     support_morale_points: int = 0
     instructions: tuple[PlayerInstruction, ...] = ()
     instruction_changes: int = 0
+    mentality_changes: int = 0
 
 
 @dataclass(frozen=True)
