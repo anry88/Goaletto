@@ -185,6 +185,11 @@ class NeutralFinalResult:
         money(self.payout_b)
         if self.crowd > self.capacity:
             raise ValueError("Crowd exceeds venue capacity")
+        expected_crowd = min(
+            self.capacity, (self.supporters_a + self.supporters_b) * NEUTRAL_DEMAND_BPS // 10_000
+        )
+        if self.crowd != expected_crowd:
+            raise ValueError("Crowd differs from frozen demand policy")
         if self.gross != self.crowd * self.ticket_price:
             raise ValueError("Gross must equal crowd times ticket price")
         if self.gross > MAX_MONEY:
@@ -197,8 +202,17 @@ class NeutralFinalResult:
             if self.odd_recipient is not None:
                 raise ValueError("Even gross has no odd recipient")
         else:
-            if self.odd_recipient not in (self.club_a_id, self.club_b_id):
-                raise ValueError("Odd recipient must be one of the finalists")
+            recipient = _odd_recipient(
+                seed=self.seed,
+                venue_id=self.venue_id,
+                club_a_id=self.club_a_id,
+                club_b_id=self.club_b_id,
+            )
+            if self.odd_recipient != recipient:
+                raise ValueError("Odd recipient differs from frozen draw")
+            larger = self.club_a_id if self.payout_a > self.payout_b else self.club_b_id
+            if larger != self.odd_recipient:
+                raise ValueError("Odd recipient must receive the extra money unit")
 
 
 def _odd_recipient(*, seed: int, venue_id: UUID, club_a_id: UUID, club_b_id: UUID) -> UUID:
@@ -234,35 +248,18 @@ def settle_neutral_final(snapshot: NeutralFinalSnapshot) -> NeutralFinalResult:
     money(crowd)
     gross = money(crowd * snapshot.ticket_price)
     half, remainder = divmod(gross, 2)
-    if remainder == 0:
-        return NeutralFinalResult(
-            policy_version=snapshot.policy_version,
+    recipient = (
+        _odd_recipient(
+            seed=snapshot.seed,
             venue_id=snapshot.venue_id,
-            capacity=snapshot.capacity,
-            ticket_price=snapshot.ticket_price,
             club_a_id=snapshot.club_a_id,
             club_b_id=snapshot.club_b_id,
-            supporters_a=snapshot.supporters_a,
-            supporters_b=snapshot.supporters_b,
-            seed=snapshot.seed,
-            neutral=True,
-            home_advantage=0,
-            crowd=crowd,
-            gross=gross,
-            payout_a=half,
-            payout_b=half,
-            odd_recipient=None,
         )
-    recipient = _odd_recipient(
-        seed=snapshot.seed,
-        venue_id=snapshot.venue_id,
-        club_a_id=snapshot.club_a_id,
-        club_b_id=snapshot.club_b_id,
+        if remainder
+        else None
     )
-    if recipient == snapshot.club_a_id:
-        payout_a, payout_b = half + 1, half
-    else:
-        payout_a, payout_b = half, half + 1
+    payout_a = half + int(recipient == snapshot.club_a_id)
+    payout_b = half + int(recipient == snapshot.club_b_id)
     return NeutralFinalResult(
         policy_version=snapshot.policy_version,
         venue_id=snapshot.venue_id,

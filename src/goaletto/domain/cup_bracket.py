@@ -46,7 +46,11 @@ the shared knockout runtime AND-124 supplies the decided winner later):
   removed while the other branch is preserved.
 * :func:`validate_winners` rejects unknown ties, foreign clubs, winners
   outside the tie's subtree, incompatible downstream winners, duplicate
-  winners on unrelated branches and dependency cycles.
+  winners on unrelated branches and unresolved feeder results. All public
+  progression readers validate the whole winners mapping before using it.
+  A recorded tie requires both feeder winners (and their ancestors); independent
+  unfinished branches may be absent. Full graph validation rejects cycles,
+  reused feeder slots, wrong entry rounds and inconsistent round days.
 * :func:`champion` returns the final winner when decided.
 
 The bracket never binds future promotion/relegation to an old ladder: it only
@@ -55,6 +59,7 @@ consumes the explicitly passed membership for this cup group.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from random import Random
@@ -219,7 +224,7 @@ class CupTie:
             raise ValueError("Cup tie id must be UUID")
         if self.round_key not in _ROUND_ORDER:
             raise ValueError("Unknown cup round")
-        if not self.round_label.strip():
+        if not isinstance(self.round_label, str) or not self.round_label.strip():
             raise ValueError("Cup tie needs a round label")
         if (
             type(self.cup_days) is not tuple
@@ -228,10 +233,12 @@ class CupTie:
             or any(not 1 <= day <= 17 for day in self.cup_days)
         ):
             raise ValueError("Cup days must be one/two days within 1..17")
-        if RESERVE_CUP_DAY in self.cup_days:
-            raise ValueError("Reserve day never hosts a cup match")
+        if self.cup_days != _ROUND_DAYS[self.round_key]:
+            raise ValueError("Cup days differ from the round schedule")
         if not isinstance(self.home, CupSlot) or not isinstance(self.away, CupSlot):
             raise ValueError("Cup tie slots must be CupSlot rows")
+        if self.home == self.away:
+            raise ValueError("A tie requires two different participants")
         if type(self.neutral) is not bool:
             raise ValueError("Cup tie neutral flag must be bool")
         if self.round_key == "final":
@@ -270,6 +277,13 @@ class CupLeg:
             raise ValueError("Cup leg slots must be CupSlot rows")
         if type(self.neutral) is not bool:
             raise ValueError("Cup leg neutral flag must be bool")
+        days = _ROUND_DAYS[self.round_key]
+        if self.leg_number > len(days) or self.cup_day != days[self.leg_number - 1]:
+            raise ValueError("Cup leg differs from the round schedule")
+        if self.neutral != (self.round_key == "final"):
+            raise ValueError("Only the final is neutral")
+        if self.home == self.away:
+            raise ValueError("A match requires two different participants")
 
 
 @dataclass(frozen=True)
@@ -319,6 +333,58 @@ class CupBracket:
         if len(set(direct)) != len(direct):
             raise ValueError("Each club enters the cup exactly once")
         _require_acyclic(self.ties)
+        _validate_layout(self)
+
+
+def _validate_entries(entries: Sequence[CupEntry]) -> dict[int, CupEntry]:
+    if len(entries) != 5 or any(not isinstance(entry, CupEntry) for entry in entries):
+        raise ValueError("Cup needs exactly five leagues (tiers 1..5)")
+    if sorted(entry.tier for entry in entries) != [1, 2, 3, 4, 5]:
+        raise ValueError("Cup needs exactly tiers 1..5")
+    if len({entry.league_id for entry in entries}) != 5:
+        raise ValueError("Duplicated cup league")
+    clubs = [club for entry in entries for club in entry.order]
+    if len(set(clubs)) != TOTAL_CLUBS:
+        raise ValueError("Cup needs 50 unique clubs")
+    return {entry.tier: entry for entry in entries}
+
+
+def _entry_rounds(entries: Mapping[int, CupEntry]) -> dict[UUID, str]:
+    return {
+        club: ("round-32" if tier <= 3 else "entry-16" if tier == 4 or place <= 2 else "prelim")
+        for tier, entry in entries.items()
+        for place, club in enumerate(entry.order, 1)
+    }
+
+
+def _validate_layout(bracket: CupBracket) -> None:
+    """Validate a restored graph as strictly as a freshly drawn full cup."""
+    entries = _validate_entries(bracket.entries)
+    if Counter(tie.round_key for tie in bracket.ties) != _ROUND_TIE_COUNTS:
+        raise ValueError("Cup must contain every round and exactly 49 ties")
+    entrant_round = _entry_rounds(entries)
+    direct = {
+        slot.club_id for tie in bracket.ties for slot in (tie.home, tie.away) if slot.kind == "club"
+    }
+    if direct != set(entrant_round):
+        raise ValueError("Cup graph must contain exactly its frozen entrants")
+    index = {tie.id: tie for tie in bracket.ties}
+    previous = dict(zip(_ROUND_ORDER[1:], _ROUND_ORDER[:-1], strict=True))
+    consumers: Counter[UUID] = Counter()
+    for tie in bracket.ties:
+        for slot in (tie.home, tie.away):
+            if slot.kind == "club":
+                assert slot.club_id is not None
+                if entrant_round[slot.club_id] != tie.round_key:
+                    raise ValueError("Club enters in the wrong cup round")
+            else:
+                assert slot.tie_id is not None
+                if index[slot.tie_id].round_key != previous.get(tie.round_key):
+                    raise ValueError("Winner must feed the next cup round")
+                consumers[slot.tie_id] += 1
+    for tie in bracket.ties:
+        if consumers[tie.id] != (0 if tie.round_key == "final" else 1):
+            raise ValueError("Every non-final tie must feed exactly one next tie")
 
 
 def _require_acyclic(ties: tuple[CupTie, ...]) -> None:
@@ -386,27 +452,8 @@ def build_bracket(
     if isinstance(entries, (str, bytes, bytearray, dict)) or not isinstance(entries, Sequence):
         raise ValueError("Cup entries must be a sequence of CupEntry rows")
     snapshot = list(entries)
-    if len(snapshot) != 5:
-        raise ValueError("Cup needs exactly five leagues (tiers 1..5)")
-    for entry in snapshot:
-        if not isinstance(entry, CupEntry):
-            raise ValueError("Cup entries must be CupEntry rows")
-    tiers = sorted(entry.tier for entry in snapshot)
-    if tiers != [1, 2, 3, 4, 5]:
-        raise ValueError("Cup needs exactly tiers 1..5")
-    league_ids = [entry.league_id for entry in snapshot]
-    if len(set(league_ids)) != 5:
-        raise ValueError("Duplicated cup league")
-    all_clubs = [club for entry in snapshot for club in entry.order]
-    if len(all_clubs) != TOTAL_CLUBS or len(set(all_clubs)) != TOTAL_CLUBS:
-        raise ValueError("Cup needs 50 unique clubs")
-
-    by_tier: dict[int, CupEntry] = {entry.tier: entry for entry in snapshot}
-    tier5_order = by_tier[5].order
-    upper5 = (tier5_order[0], tier5_order[1])
-    lower8 = tuple(tier5_order[2:])
-    tier4_order = by_tier[4].order
-    top30 = tuple([*by_tier[1].order, *by_tier[2].order, *by_tier[3].order])
+    by_tier = _validate_entries(snapshot)
+    entry_round = _entry_rounds(by_tier)
 
     def draw_key(round_key: str, suffix: str) -> str:
         return f"{CUP_POLICY}:{season_id.hex}:{league_set_id.hex}:{round_key}:{suffix}"
@@ -426,86 +473,30 @@ def build_bracket(
             neutral=neutral,
         )
 
-    # Days 1-2: lower 8 of tier 5 -> 4.
-    prelim_base = [club_slot(club) for club in sorted(lower8, key=lambda c: c.hex)]
-    prelim_draw = _shuffled(prelim_base, seed=seed, key=draw_key("prelim", "pool"))
-    prelim_ids: list[UUID] = []
-    for index in range(_ROUND_TIE_COUNTS["prelim"]):
-        tie = make_tie("prelim", index, prelim_draw[2 * index], prelim_draw[2 * index + 1])
-        ties.append(tie)
-        prelim_ids.append(tie.id)
-
-    # Days 3-4: prelim winners + upper tier 5 + tier 4 = 16 -> 8.
-    entry16_base = [winner_slot(tie_id) for tie_id in sorted(prelim_ids, key=lambda c: c.hex)]
-    entry16_base.extend(
-        club_slot(club) for club in sorted((*upper5, *tier4_order), key=lambda c: c.hex)
-    )
-    entry16_draw = _shuffled(entry16_base, seed=seed, key=draw_key("entry-16", "pool"))
-    entry16_ids: list[UUID] = []
-    for index in range(_ROUND_TIE_COUNTS["entry-16"]):
-        tie = make_tie("entry-16", index, entry16_draw[2 * index], entry16_draw[2 * index + 1])
-        ties.append(tie)
-        entry16_ids.append(tie.id)
-
-    # Days 5-6: 8 -> 4.
-    entry8_base = [winner_slot(tie_id) for tie_id in sorted(entry16_ids, key=lambda c: c.hex)]
-    entry8_draw = _shuffled(entry8_base, seed=seed, key=draw_key("entry-8", "pool"))
-    entry8_ids: list[UUID] = []
-    for index in range(_ROUND_TIE_COUNTS["entry-8"]):
-        tie = make_tie("entry-8", index, entry8_draw[2 * index], entry8_draw[2 * index + 1])
-        ties.append(tie)
-        entry8_ids.append(tie.id)
-
-    # Days 7-8: 4 -> 2.
-    entry4_base = [winner_slot(tie_id) for tie_id in sorted(entry8_ids, key=lambda c: c.hex)]
-    entry4_draw = _shuffled(entry4_base, seed=seed, key=draw_key("entry-4", "pool"))
-    entry4_ids: list[UUID] = []
-    for index in range(_ROUND_TIE_COUNTS["entry-4"]):
-        tie = make_tie("entry-4", index, entry4_draw[2 * index], entry4_draw[2 * index + 1])
-        ties.append(tie)
-        entry4_ids.append(tie.id)
-
-    # Days 9-10: survivors + tiers 1..3 = 32 -> 16.
-    round32_base = [winner_slot(tie_id) for tie_id in sorted(entry4_ids, key=lambda c: c.hex)]
-    round32_base.extend(club_slot(club) for club in sorted(top30, key=lambda c: c.hex))
-    round32_draw = _shuffled(round32_base, seed=seed, key=draw_key("round-32", "pool"))
-    round32_ids: list[UUID] = []
-    for index in range(_ROUND_TIE_COUNTS["round-32"]):
-        tie = make_tie("round-32", index, round32_draw[2 * index], round32_draw[2 * index + 1])
-        ties.append(tie)
-        round32_ids.append(tie.id)
-
-    # Days 11-12: 16 -> 8.
-    round16_base = [winner_slot(tie_id) for tie_id in sorted(round32_ids, key=lambda c: c.hex)]
-    round16_draw = _shuffled(round16_base, seed=seed, key=draw_key("round-16", "pool"))
-    round16_ids: list[UUID] = []
-    for index in range(_ROUND_TIE_COUNTS["round-16"]):
-        tie = make_tie("round-16", index, round16_draw[2 * index], round16_draw[2 * index + 1])
-        ties.append(tie)
-        round16_ids.append(tie.id)
-
-    # Days 13-14: 8 -> 4.
-    quarter_base = [winner_slot(tie_id) for tie_id in sorted(round16_ids, key=lambda c: c.hex)]
-    quarter_draw = _shuffled(quarter_base, seed=seed, key=draw_key("quarter", "pool"))
-    quarter_ids: list[UUID] = []
-    for index in range(_ROUND_TIE_COUNTS["quarter"]):
-        tie = make_tie("quarter", index, quarter_draw[2 * index], quarter_draw[2 * index + 1])
-        ties.append(tie)
-        quarter_ids.append(tie.id)
-
-    # Days 15-16: 4 -> 2.
-    semi_base = [winner_slot(tie_id) for tie_id in sorted(quarter_ids, key=lambda c: c.hex)]
-    semi_draw = _shuffled(semi_base, seed=seed, key=draw_key("semi", "pool"))
-    semi_ids: list[UUID] = []
-    for index in range(_ROUND_TIE_COUNTS["semi"]):
-        tie = make_tie("semi", index, semi_draw[2 * index], semi_draw[2 * index + 1])
-        ties.append(tie)
-        semi_ids.append(tie.id)
-
-    # Day 17: single neutral final.
-    final_base = [winner_slot(tie_id) for tie_id in sorted(semi_ids, key=lambda c: c.hex)]
-    final_draw = _shuffled(final_base, seed=seed, key=draw_key("final", "pool"))
-    ties.append(make_tie("final", 0, final_draw[0], final_draw[1], neutral=True))
+    # Each stage adds only its direct entrants to the preceding winners.
+    # Stable sorted bases preserve the v1 draw when input order changes.
+    previous_ids: list[UUID] = []
+    for round_key in _ROUND_ORDER:
+        pool = [winner_slot(tie_id) for tie_id in sorted(previous_ids, key=lambda c: c.hex)]
+        pool.extend(
+            club_slot(club)
+            for club in sorted(
+                (club for club, entry in entry_round.items() if entry == round_key),
+                key=lambda c: c.hex,
+            )
+        )
+        drawn = _shuffled(pool, seed=seed, key=draw_key(round_key, "pool"))
+        previous_ids = []
+        for index in range(_ROUND_TIE_COUNTS[round_key]):
+            tie = make_tie(
+                round_key,
+                index,
+                drawn[2 * index],
+                drawn[2 * index + 1],
+                neutral=round_key == "final",
+            )
+            ties.append(tie)
+            previous_ids.append(tie.id)
 
     ordered_entries = tuple(sorted(snapshot, key=lambda entry: entry.tier))
     bracket = CupBracket(
@@ -633,32 +624,6 @@ def _check_winners_shape(bracket: CupBracket, winners: Mapping[UUID, UUID]) -> N
             raise ValueError("Winner is not a cup entrant")
 
 
-def _feeders_of(bracket: CupBracket) -> dict[UUID, tuple[UUID, ...]]:
-    index = _tie_index(bracket)
-    feeders: dict[UUID, tuple[UUID, ...]] = {}
-    for tie in bracket.ties:
-        refs: list[UUID] = []
-        for slot in (tie.home, tie.away):
-            if slot.kind == "winner" and slot.tie_id is not None:
-                if slot.tie_id not in index:
-                    raise ValueError("Winner slot references an unknown tie")
-                refs.append(slot.tie_id)
-        feeders[tie.id] = tuple(refs)
-    return feeders
-
-
-def _ancestors(feeders: dict[UUID, tuple[UUID, ...]], tie_id: UUID) -> frozenset[UUID]:
-    seen: set[UUID] = set()
-    stack = list(feeders.get(tie_id, ()))
-    while stack:
-        current = stack.pop()
-        if current in seen:
-            continue
-        seen.add(current)
-        stack.extend(feeders.get(current, ()))
-    return frozenset(seen)
-
-
 def _possible_slot_inner(
     index: dict[UUID, CupTie],
     clubs: frozenset[UUID],
@@ -701,8 +666,7 @@ def resolve_slot(bracket: CupBracket, slot: CupSlot, winners: Mapping[UUID, UUID
         raise ValueError("Bracket must be a CupBracket")
     if not isinstance(slot, CupSlot):
         raise ValueError("Slot must be a CupSlot")
-    if not isinstance(winners, Mapping):
-        raise ValueError("Winners must be a mapping of tie ID to club ID")
+    validate_winners(bracket, winners)
     clubs = _direct_clubs(bracket)
     index = _tie_index(bracket)
     if slot.kind == "club":
@@ -731,10 +695,7 @@ def possible_clubs(
         raise ValueError("Bracket must be a CupBracket")
     if winners is None:
         winners = {}
-    if not isinstance(winners, Mapping):
-        raise ValueError("Winners must be a mapping of tie ID to club ID")
-    if winners:
-        _check_winners_shape(bracket, winners)
+    validate_winners(bracket, winners)
     clubs = _direct_clubs(bracket)
     index = _tie_index(bracket)
     return _possible_slot_inner(index, clubs, slot, winners, frozenset())
@@ -747,10 +708,7 @@ def possible_tie_clubs(
     tie = tie_by_id(bracket, tie_id)
     if winners is None:
         winners = {}
-    if not isinstance(winners, Mapping):
-        raise ValueError("Winners must be a mapping of tie ID to club ID")
-    if winners:
-        _check_winners_shape(bracket, winners)
+    validate_winners(bracket, winners)
     clubs = _direct_clubs(bracket)
     index = _tie_index(bracket)
     next_trail = frozenset({tie.id})
@@ -764,51 +722,33 @@ def validate_winners(bracket: CupBracket, winners: Mapping[UUID, UUID]) -> None:
 
     Rejects unknown ties, foreign clubs, winners outside the tie's subtree,
     downstream winners incompatible with decided feeders, the same club
-    winning unrelated branches and dependency cycles.  Draws are never valid:
-    every winner must be a single club UUID from the 50 entrants.
+    winning unrelated branches or an unresolved feeder. Draws are never valid:
+    every winner must be one of the two resolved participants. Graph cycles and
+    reused feeders have already been rejected at CupBracket construction.
     """
     if not isinstance(bracket, CupBracket):
         raise ValueError("Bracket must be a CupBracket")
     if not isinstance(winners, Mapping):
         raise ValueError("Winners must be a mapping of tie ID to club ID")
     _check_winners_shape(bracket, winners)
-    _require_acyclic(bracket.ties)
-    if not winners:
-        return
-    index = _tie_index(bracket)
-    clubs = _direct_clubs(bracket)
-    feeders = _feeders_of(bracket)
-
-    for tie_id, winner in winners.items():
-        tie = index[tie_id]
-        # Unconditional subtree check (no self-justification).
-        base = _possible_slot_inner(
-            index, clubs, tie.home, {}, frozenset({tie.id})
-        ) | _possible_slot_inner(index, clubs, tie.away, {}, frozenset({tie.id}))
-        if winner not in base:
-            raise ValueError("Winner cannot reach this tie")
-        # Conditional check against decided feeders only.
-        rest = {key: value for key, value in winners.items() if key != tie_id}
-        conditional = _possible_slot_inner(
-            index, clubs, tie.home, rest, frozenset({tie.id})
-        ) | _possible_slot_inner(index, clubs, tie.away, rest, frozenset({tie.id}))
-        if winner not in conditional:
-            raise ValueError("Winner is incompatible with decided feeders")
-
-    # Same club on unrelated branches is impossible (progression shares ancestry).
-    decided = list(winners.items())
-    ancestor_cache = {tie_id: _ancestors(feeders, tie_id) for tie_id in winners}
-    for pos, (first_tie, first_winner) in enumerate(decided):
-        for second_tie, second_winner in decided[pos + 1 :]:
-            if first_winner != second_winner:
-                continue
-            if first_tie == second_tie:
-                continue
-            if first_tie in ancestor_cache[second_tie]:
-                continue
-            if second_tie in ancestor_cache[first_tie]:
-                continue
-            raise ValueError("Duplicated winner on unrelated ties")
+    # A recorded final result can only use two already known participants.
+    # Independent completed branches may be omitted; ancestors of a decided tie
+    # must be present, so a champion cannot be invented from an unresolved graph.
+    for tie in bracket.ties:
+        if tie.id not in winners:
+            continue
+        participants: set[UUID] = set()
+        for slot in (tie.home, tie.away):
+            if slot.kind == "club":
+                assert slot.club_id is not None
+                participants.add(slot.club_id)
+            else:
+                assert slot.tie_id is not None
+                if slot.tie_id not in winners:
+                    raise ValueError("Tie winner requires decided feeder ties")
+                participants.add(winners[slot.tie_id])
+        if winners[tie.id] not in participants:
+            raise ValueError("Winner is incompatible with decided participants")
 
 
 def champion(bracket: CupBracket, winners: Mapping[UUID, UUID]) -> UUID | None:

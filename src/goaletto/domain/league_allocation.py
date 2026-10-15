@@ -39,7 +39,7 @@ Validation (pure API, orchestration owns deeper compatibility):
   league or across the cohort), wrong order length, non-UUID ids,
   mixed ``cohort_key`` values, missing tiers 1..5, unbalanced per-tier
   counts and incomplete per-set verticals (each ``league_set_id`` must own
-  exactly tiers 1..5).
+  exactly tiers 1..5). Each set uses one season; a season belongs to one set.
 * Rejects invalid ``seed`` (must fit nonnegative BIGINT, ``bool`` rejected).
 
 Lifecycle note: the result only carries destination tier/league per club.
@@ -249,10 +249,18 @@ def allocate(standings: Sequence[LeagueSnapshot], *, seed: int) -> AllocationRes
     by_set: dict[UUID, list[LeagueSnapshot]] = {}
     for snapshot in snapshots:
         by_set.setdefault(snapshot.league_set_id, []).append(snapshot)
+    season_sets: dict[UUID, UUID] = {}
     for league_set_id, leagues in by_set.items():
         tiers = sorted(snapshot.tier for snapshot in leagues)
         if tiers != [1, 2, 3, 4, 5]:
             raise ValueError(f"Incomplete league set {league_set_id}: tiers 1..5 are required")
+        seasons = {snapshot.season_id for snapshot in leagues}
+        if len(seasons) != 1:
+            raise ValueError("Each league set must use one frozen season")
+        season_id = next(iter(seasons))
+        if season_id in season_sets:
+            raise ValueError("A season cannot belong to different league sets")
+        season_sets[season_id] = league_set_id
 
     # Deterministic base order independent of input permutation.
     ordered = sorted(snapshots, key=lambda s: (s.league_set_id.hex, s.tier, s.league_id.hex))

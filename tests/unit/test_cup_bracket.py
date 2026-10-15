@@ -492,3 +492,80 @@ def test_no_reserve_day_match_and_bracket_helpers() -> None:
     assert tie_by_id(bracket, sample.id) == sample
     with pytest.raises(AttributeError):
         bracket.ties.append(sample)  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("reader", ["resolve", "possible", "tie", "champion"])
+def test_all_readers_reject_a_winner_from_another_branch(reader):
+    bracket = build()
+    tie = bracket.ties[0]
+    unrelated = next(e.order[0] for e in bracket.entries if e.tier == 1)
+    winners = {tie.id: unrelated}
+    with pytest.raises(ValueError):
+        if reader == "resolve":
+            resolve_slot(bracket, winner_slot(tie.id), winners)
+        elif reader == "possible":
+            possible_clubs(bracket, winner_slot(tie.id), winners)
+        elif reader == "tie":
+            possible_tie_clubs(bracket, final_tie(bracket).id, winners)
+        else:
+            champion(bracket, winners)
+
+
+def test_champion_requires_resolved_ancestors_and_losers_cannot_return():
+    bracket = build()
+    final = final_tie(bracket)
+    entrant = bracket.entries[0].order[0]
+    with pytest.raises(ValueError, match="feeder"):
+        champion(bracket, {final.id: entrant})
+    winners = play_full(bracket, seed=56)
+    first = bracket.ties[0]
+    loser = next(c for c in (first.home.club_id, first.away.club_id) if c != winners[first.id])
+    winners[final.id] = loser
+    with pytest.raises(ValueError):
+        possible_clubs(bracket, winner_slot(final.id), winners)
+
+
+@pytest.mark.parametrize("damage", ["missing", "entrant", "shared_feeder", "entry_stage"])
+def test_restored_bracket_rejects_invalid_full_graph(damage):
+    from dataclasses import replace
+
+    bracket = build()
+    ties = list(bracket.ties)
+    if damage == "missing":
+        ties.pop()
+    elif damage == "entrant":
+        ties[0] = replace(ties[0], home=club_slot(uuid5(NAMESPACE, "not-in-entry-snapshot")))
+    elif damage == "shared_feeder":
+        consumers = [
+            (i, side, slot)
+            for i, tie in enumerate(ties)
+            for side, slot in (("home", tie.home), ("away", tie.away))
+            if slot.kind == "winner" and tie.round_key == "entry-16"
+        ]
+        i, side, slot = consumers[0]
+        j, other_side, _ = next(c for c in consumers[1:] if c[0] != i)
+        ties[j] = replace(ties[j], **{other_side: slot})
+    else:
+        # Swap a new top-tier entrant with an early fifth-tier entrant while
+        # retaining all 50 club identities: counts alone cannot catch this.
+        late_index = next(
+            i for i, t in enumerate(ties) if t.round_key == "round-32" and t.home.kind == "club"
+        )
+        early, late = ties[0], ties[late_index]
+        ties[0] = replace(early, home=late.home)
+        ties[late_index] = replace(late, home=early.home)
+    with pytest.raises(ValueError):
+        replace(bracket, ties=tuple(ties))
+
+
+def test_tie_and_leg_reject_duplicate_days_and_mismatched_neutrality():
+    from dataclasses import replace
+
+    tie = build().ties[0]
+    for days in ((1, 1), (2, 1), (3, 4)):
+        with pytest.raises(ValueError):
+            replace(tie, cup_days=days)
+    leg = legs_of(tie)[0]
+    for fields in ({"leg_number": 3}, {"cup_day": 2}, {"neutral": True}):
+        with pytest.raises(ValueError):
+            replace(leg, **fields)

@@ -190,3 +190,10 @@
 
 - User update 2026-10-15: head coaches cannot be dismissed without a replacement.
   Keep the atomic hire-and-replace flow; reject legacy dismissal confirmations too.
+
+- Accepted pure modules for AND-119/123/125: domain.league_allocation.allocate,
+  domain.cup_bracket.build_bracket/progression, domain.neutral_final.settle_neutral_final.
+  See docs/tournament-domain.md for contracts and remaining durable integration.
+  Cup winner mappings must include decided ancestors; all readers validate them.
+  These calculators do not activate cross-set rollover, cup jobs or ledger payouts.
+  Keep parents open until persisted runtime/DB/UI acceptance is complete.

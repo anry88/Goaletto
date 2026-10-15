@@ -297,3 +297,19 @@ def test_venue_identity_carries_no_payout_even_on_finalist_ground() -> None:
     assert isinstance(on_a_ground, NeutralFinalResult)
     fresh_venue = settle_neutral_final(make_snapshot(venue_id=uuid4()))
     assert fresh_venue.payout_a + fresh_venue.payout_b == fresh_venue.gross
+
+
+@pytest.mark.parametrize("damage", ["recipient", "amounts", "both", "crowd"])
+def test_restored_result_rejects_contradictory_demand_or_remainder(damage):
+    result = settle_neutral_final(make_snapshot(supporters_a=1, supporters_b=1, ticket_price=1))
+    other = CLUB_B if result.odd_recipient == CLUB_A else CLUB_A
+    fields = {}
+    if damage in ("recipient", "both"):
+        fields["odd_recipient"] = other
+    if damage in ("amounts", "both"):
+        fields.update(payout_a=result.payout_b, payout_b=result.payout_a)
+    if damage == "crowd":
+        result = settle_neutral_final(make_snapshot(supporters_a=0, supporters_b=0, ticket_price=2))
+        fields.update(crowd=1, gross=2, payout_a=1, payout_b=1)
+    with pytest.raises(ValueError):
+        dataclasses.replace(result, **fields)

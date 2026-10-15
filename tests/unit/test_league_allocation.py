@@ -270,3 +270,22 @@ def test_result_helpers_and_immutability() -> None:
     assert all(len(clubs) == 10 for clubs in grouped.values())
     with pytest.raises(AttributeError):
         result.assignments.append(result.assignments[0])  # type: ignore[attr-defined]
+
+
+def test_one_set_cannot_mix_final_tables_from_different_seasons():
+    from dataclasses import replace
+
+    snapshots = make_cohort(1)
+    snapshots[0] = replace(snapshots[0], season_id=uuid5(NAMESPACE, "different-season"))
+    with pytest.raises(ValueError, match="season"):
+        allocate(snapshots, seed=7)
+
+
+def test_one_season_cannot_be_reused_for_two_sets():
+    from dataclasses import replace
+
+    snapshots = make_cohort(2)
+    season = snapshots[0].season_id
+    snapshots = [replace(s, season_id=season) for s in snapshots]
+    with pytest.raises(ValueError, match="season"):
+        allocate(snapshots, seed=7)
