@@ -5,6 +5,7 @@ from uuid import UUID
 from goaletto.domain.finances import STAFF_WAGES, player_wage, staff_wage
 from goaletto.domain.names import international_catalog
 from goaletto.domain.season_rollover import youth_profile
+from goaletto.domain.staff_quality import generated_staff
 from goaletto.domain.world import stable_seed
 
 POOL_POLICY = "candidate-pool-v1"
@@ -34,5 +35,6 @@ def candidate_profile(
         catalog = international_catalog(seed)
         _, name = catalog[seed % len(catalog)]
         wage = staff_wage(profile)
-        return name, 40, (6 + seed % 5,), 4 * wage, wage
+        age, skill = generated_staff(person_id, profile)
+        return name, age, (skill,), 4 * wage, wage
     raise ValueError("Unsupported candidate profile")

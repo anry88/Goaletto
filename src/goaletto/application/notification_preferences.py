@@ -43,6 +43,9 @@ class SettingsState:
     expires_at: datetime | None
     last_game_action_at: datetime | None
     locale: str = "ru"
+    timezone_name: str = "UTC"
+    preferred_kickoff_minute: int | None = None
+    observed_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -88,6 +91,9 @@ async def get_settings(session: AsyncSession, actor: Actor) -> SettingsState:
     if ownership is None or ownership.expires_at <= actor.at:
         return SettingsState(
             locale=manager.locale,
+            timezone_name=manager.timezone_name,
+            preferred_kickoff_minute=manager.preferred_kickoff_minute,
+            observed_at=actor.at,
             manager_id=manager.id,
             telegram_id=manager.telegram_id,
             reminders_enabled=bool(manager.reminders_enabled),
@@ -104,6 +110,9 @@ async def get_settings(session: AsyncSession, actor: Actor) -> SettingsState:
         raise PermissionDenied("Current club ownership does not match the actor")
     return SettingsState(
         locale=manager.locale,
+        timezone_name=manager.timezone_name,
+        preferred_kickoff_minute=manager.preferred_kickoff_minute,
+        observed_at=actor.at,
         manager_id=manager.id,
         telegram_id=manager.telegram_id,
         reminders_enabled=bool(manager.reminders_enabled),

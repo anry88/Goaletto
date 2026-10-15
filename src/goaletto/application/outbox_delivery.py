@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import JourneyEvent, Origin, Reason, Surface, require_utc
 from goaletto.application.match_commentary import commentary_html
+from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.names import latin_name
 from goaletto.infrastructure.analytics import CoverageNotStarted, record_event
 from goaletto.infrastructure.models import (
@@ -271,7 +272,7 @@ def valid_payload(payload: dict[str, Any]) -> bool:
     )
 
 
-def render_text(payload: dict[str, Any]) -> str:
+def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
@@ -345,7 +346,7 @@ def render_text(payload: dict[str, Any]) -> str:
             player=player,
         )
     if kind == "match_recovery":
-        deadline = datetime.fromisoformat(payload["resume_deadline"]).strftime("%H:%M:%S UTC")
+        deadline = local_datetime(datetime.fromisoformat(payload["resume_deadline"]), timezone_name)
         return tr(
             "⏸ Матч продолжится с {p0}′ в {p1}. Счёт и принятые команды сохранены. "
             "До этого можно отправить команды через /match.",
@@ -960,11 +961,12 @@ async def deliver_claimed(
     now: datetime,
     *,
     existing_board_message_id: int | None = None,
+    timezone_name: str = "UTC",
 ) -> tuple[Outcome, int | None, float | None]:
     """Call after preflight commit, without an open database transaction."""
     require_utc(now)
     try:
-        text = render_text(message.payload)
+        text = render_text(message.payload, timezone_name=timezone_name)
         if message.payload["kind"] == "match_board" and existing_board_message_id is not None:
             try:
                 await transport.edit_text(message.chat_id, existing_board_message_id, text)

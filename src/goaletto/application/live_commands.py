@@ -26,6 +26,7 @@ from goaletto.infrastructure.models import (
     AcceptedCommand,
     Club,
     Fixture,
+    Manager,
     Match,
     OwnershipPeriod,
     Person,
@@ -69,6 +70,7 @@ class LiveScreen:
     next_lineup_lock_at: datetime | None = None
     next_is_home: bool = False
     next_locked: bool = False
+    timezone_name: str = "UTC"
 
 
 async def _context(
@@ -244,6 +246,7 @@ async def load_live_screen(
                 next_lineup_lock_at = upcoming.lineup_lock_at
                 next_is_home = upcoming.home_club_id == club.id
                 next_locked = at >= upcoming.lineup_lock_at
+    manager = await session.get(Manager, actor.manager_id)
     return LiveScreen(
         ownership.id,
         club.id,
@@ -263,6 +266,7 @@ async def load_live_screen(
         next_lineup_lock_at,
         next_is_home,
         next_locked,
+        manager.timezone_name if manager is not None else "UTC",
     )
 
 

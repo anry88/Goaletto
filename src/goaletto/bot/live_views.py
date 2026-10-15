@@ -11,6 +11,7 @@ from goaletto.application.match_commentary import commentary_html
 from goaletto.bot.history_callbacks import match_callback
 from goaletto.bot.lineup_views import MENTALITY_LABELS, TACTIC_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.match_types import Instruction, Mentality, Side, Tactic
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
@@ -235,7 +236,7 @@ def render(
                 "\nСледующий матч: {p0} — {p1}\n{p2}",
                 p0=escape(latin_name(home)),
                 p1=escape(latin_name(away)),
-                p2=kickoff.strftime("%d.%m.%Y %H:%M UTC"),
+                p2=local_datetime(kickoff, screen.timezone_name),
             )
         )
         lines.append(tr("Вы играете дома.") if screen.next_is_home else tr("Вы играете в гостях."))
@@ -245,7 +246,7 @@ def render(
             else:
                 lines.append(
                     tr("Сохраните состав до ")
-                    + screen.next_lineup_lock_at.strftime("%d.%m.%Y %H:%M UTC")
+                    + local_datetime(screen.next_lineup_lock_at, screen.timezone_name)
                     + "."
                 )
         rows.append([_button(tr("📋 Подготовить состав"), "ln:open")])

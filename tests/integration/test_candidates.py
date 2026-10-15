@@ -399,3 +399,38 @@ async def test_free_player_can_enter_staff_pool_with_separate_career_receipts(se
             )
             == 2
         )
+
+
+async def test_new_staff_quality_is_persisted_and_people_are_not_regenerated(sessions):
+    from goaletto.domain.staff_quality import quality_tier
+    from goaletto.infrastructure.models import StaffQualification
+
+    _, actor, _ = await funded(sessions)
+    async with sessions.begin() as session:
+        screen = await load_candidates(session, action(actor), "staff")
+        identities = {
+            i.person.id: (
+                i.person.age,
+                i.person.appearance_identity_id,
+                i.person.appearance_variant_id,
+            )
+            for i in screen.items
+        }
+        assert len(identities) == 14
+        assert all(50 <= i.person.age <= 56 for i in screen.items)
+        for item in screen.items:
+            qualification = await session.get(
+                StaffQualification, (item.person.id, item.offer.profile)
+            )
+            assert qualification.quality_tier == quality_tier(item.skills[0])
+            assert qualification.policy_version == "staff-quality-v1"
+    async with sessions.begin() as session:
+        screen = await load_candidates(session, action(actor), "staff")
+        assert identities == {
+            i.person.id: (
+                i.person.age,
+                i.person.appearance_identity_id,
+                i.person.appearance_variant_id,
+            )
+            for i in screen.items
+        }

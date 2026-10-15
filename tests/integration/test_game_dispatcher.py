@@ -212,4 +212,18 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     async with sessions.begin() as session:
         manager = await session.scalar(select(Manager).where(Manager.telegram_id == user.id))
         assert manager.locale == "en"
+    response = await command("/timezone Belgrade")
+    assert "Europe/Belgrade" in response.text and "2026" in response.text
+    response = await callback("tz:Europe/Belgrade")
+    assert "Europe/Belgrade" in response.text
+    response = await command("/kickoff 19:15")
+    assert "19:15" in response.text
+    async with sessions.begin() as session:
+        manager = await session.scalar(select(Manager).where(Manager.telegram_id == user.id))
+        assert manager.timezone_name == "Europe/Belgrade"
+        assert manager.preferred_kickoff_minute == 1155
+    response = await command("/kickoff 25:00")
+    assert "HH" not in response.text and "/kickoff 19:30" in response.text
+    response = await command("/timezone MissingCity")
+    assert "Timezone not found" in response.text
     await bot.session.close()

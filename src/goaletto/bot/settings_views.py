@@ -13,6 +13,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from goaletto.application.notification_preferences import SettingsState
 from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import tr
 
@@ -70,7 +71,33 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
         lines.append(
             tr("Отправка сейчас недоступна; доступность подтверждает /start, а не настройки.")
         )
-    buttons: list[list[InlineKeyboardButton]] = []
+    lines.extend(("", tr("🌐 Часовой пояс: {zone}", zone=escape(state.timezone_name))))
+    if state.observed_at is not None:
+        lines.append(
+            tr(
+                "Сейчас: {time}",
+                time=escape(local_datetime(state.observed_at, state.timezone_name)),
+            )
+        )
+    chosen = state.preferred_kickoff_minute
+    if chosen is None:
+        lines.append(tr("Время матча не выбрано: по умолчанию 18:00 UTC."))
+    else:
+        lines.append(
+            tr("Удобное местное время матча: {time}", time=f"{chosen // 60:02}:{chosen % 60:02}")
+        )
+    lines.extend(
+        (
+            tr("Изменить время: /kickoff 19:30"),
+            tr(
+                "Назначенные матчи сохраняют время. "
+                "Новое предпочтение учтётся при следующих назначениях."
+            ),
+        )
+    )
+    buttons: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton(text=tr("🌐 Выбрать часовой пояс"), callback_data="tz:open")]
+    ]
     if state.has_ownership and state.ownership_id is not None:
         if state.reminders_enabled:
             buttons.append(

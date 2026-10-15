@@ -8,6 +8,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -177,17 +178,62 @@ class OutboxDeliveryAttempt(Base):
 
 class Manager(Base):
     __tablename__ = "managers"
-    __table_args__ = (CheckConstraint("telegram_id > 0", name="ck_manager_telegram_id"),)
+    __table_args__ = (
+        CheckConstraint("telegram_id > 0", name="ck_manager_telegram_id"),
+        CheckConstraint(
+            "preferred_kickoff_minute BETWEEN 0 AND 1439", name="ck_manager_kickoff_minute"
+        ),
+    )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True)
     locale: Mapped[str] = mapped_column(String(16), server_default="ru")
     is_internal: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    timezone_name: Mapped[str] = mapped_column(String(64), server_default="UTC")
+    preferred_kickoff_minute: Mapped[int | None] = mapped_column(SmallInteger)
     # NULL for legacy/imported managers; preview /start does not create a launch cohort.
     first_game_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reminders_enabled: Mapped[bool] = mapped_column(Boolean, server_default="true")
     bot_available: Mapped[bool] = mapped_column(Boolean, server_default="true")
     bot_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class KickoffPreferenceReceipt(Base):
+    __tablename__ = "kickoff_preference_receipts"
+    __table_args__ = (
+        CheckConstraint(
+            "timezone_name IS NOT NULL OR preferred_minute IS NOT NULL",
+            name="ck_kickoff_receipt_value",
+        ),
+        CheckConstraint("preferred_minute BETWEEN 0 AND 1439", name="ck_kickoff_receipt_minute"),
+    )
+    operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    manager_id: Mapped[UUID] = mapped_column(ForeignKey("managers.id"))
+    timezone_name: Mapped[str | None] = mapped_column(String(64))
+    preferred_minute: Mapped[int | None] = mapped_column(SmallInteger)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class KickoffDecisionReceipt(Base):
+    """Immutable announced decision, also usable before a planned fixture is materialized."""
+
+    __tablename__ = "kickoff_decision_receipts"
+    __table_args__ = (
+        CheckConstraint("seed >= 0", name="ck_kickoff_decision_seed"),
+        CheckConstraint("tie_break IN (0, 1)", name="ck_kickoff_decision_tie"),
+        CheckConstraint(
+            "(kickoff AT TIME ZONE 'UTC')::date = assigned_day", name="ck_kickoff_decision_day"
+        ),
+    )
+    fixture_key: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    home_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    away_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    assigned_day: Mapped[date] = mapped_column(Date)
+    seed: Mapped[int] = mapped_column(BigInteger)
+    kickoff: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    policy_version: Mapped[str] = mapped_column(String(40))
+    tie_break: Mapped[int | None] = mapped_column(SmallInteger)
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class AnalyticsManager(Base):
@@ -480,6 +526,10 @@ class StaffQualification(Base):
     person_id: Mapped[UUID] = mapped_column(ForeignKey("staff.person_id"), primary_key=True)
     role: Mapped[str] = mapped_column(String(32), primary_key=True)
     skill: Mapped[int] = mapped_column(SmallInteger)
+    quality_tier: Mapped[int] = mapped_column(
+        SmallInteger, Computed("((skill - 1) / 4) + 1", persisted=True)
+    )
+    policy_version: Mapped[str] = mapped_column(String(40), server_default="staff-quality-v1")
     qualified_for_season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
 
 

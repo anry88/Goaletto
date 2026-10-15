@@ -260,7 +260,7 @@ async def replenish_pool(
         return 0  # No portrait assignment, randomness or person creation above the threshold.
     bank = "players" if kind == "player" else "staff"
     catalog = load_whole_catalog()
-    stage = "player-youth" if kind == "player" else "staff-early"
+    stage = "player-youth" if kind == "player" else "staff-middle"
     eligible = tuple(
         key
         for key, entry in catalog["variants"].items()
@@ -270,7 +270,7 @@ async def replenish_pool(
             or (
                 17 <= entry.get("depicted_age", 0) <= 21
                 if kind == "player"
-                else 35 <= entry.get("depicted_age", 0) <= 45
+                else 45 <= entry.get("depicted_age", 0) <= 59
             )
         )
     )

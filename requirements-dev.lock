@@ -43,5 +43,6 @@ ruff==0.17.0
 tinycss2==1.5.1
 typing-inspection==0.4.4
 typing_extensions==4.16.0
+tzdata==2026.5
 webencodings==0.6.1
 yarl==1.25.1

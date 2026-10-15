@@ -106,3 +106,70 @@ async def language_callback(query: CallbackQuery, database: Database) -> None:
                 scope=BotCommandScopeChat(chat_id=query.message.chat.id),
                 language_code=code,
             )
+
+
+@router.message(Command("timezone"))
+async def timezone_command(message: Message, database: Database, event_update: Update) -> None:
+    if message.from_user is None or message.chat.type != "private":
+        return
+    from goaletto.bot.time_settings_views import zone_search_view
+
+    query = (message.text or "").partition(" ")[2].strip()
+    at = datetime.now(UTC)
+    try:
+        async with database.transaction() as session:
+            await actor_for(session, message.from_user.id, event_update.update_id, at)
+    except PermissionDenied:
+        await message.answer(tr("Сначала откройте /start, затем /settings."))
+        return
+    text, keyboard = zone_search_view(query, at)
+    await message.answer(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("tz:"))
+async def timezone_callback(query: CallbackQuery, database: Database) -> None:
+    await query.answer()
+    if not isinstance(query.message, Message) or query.message.chat.type != "private":
+        return
+    from goaletto.application.kickoff_preferences import set_kickoff_preference
+    from goaletto.bot.time_settings_views import zone_search_view
+
+    at = datetime.now(UTC)
+    if query.data == "tz:open":
+        text, keyboard = zone_search_view("", at)
+    else:
+        try:
+            async with database.transaction() as session:
+                actor = await actor_for_callback(
+                    session, telegram_id=query.from_user.id, callback_id=query.id, at=at
+                )
+                await set_kickoff_preference(session, actor, zone=(query.data or "")[3:])
+                text, keyboard = settings_view(await get_settings(session, actor))
+        except (PermissionDenied, ValueError):
+            text, keyboard = stale_settings_view()
+    await edit_response(query.message, text, keyboard)
+
+
+@router.message(Command("kickoff"))
+async def kickoff_command(message: Message, database: Database, event_update: Update) -> None:
+    if message.from_user is None or message.chat.type != "private":
+        return
+    from goaletto.application.kickoff_preferences import set_kickoff_preference
+    from goaletto.domain.kickoff import parse_local_time
+
+    try:
+        minute = parse_local_time((message.text or "").partition(" ")[2].strip())
+    except ValueError:
+        await message.answer(tr("Введите удобное местное время: /kickoff 19:30"))
+        return
+    try:
+        async with database.transaction() as session:
+            actor = await actor_for(
+                session, message.from_user.id, event_update.update_id, datetime.now(UTC)
+            )
+            await set_kickoff_preference(session, actor, minute=minute)
+            text, keyboard = settings_view(await get_settings(session, actor))
+    except PermissionDenied:
+        await message.answer(tr("Сначала откройте /start, затем /settings."))
+        return
+    await message.answer(text, reply_markup=keyboard)

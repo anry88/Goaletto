@@ -56,9 +56,11 @@ async def process_one_delivery(
             ready = await preflight_delivery(
                 session, message_id, clock(), lease_owner=token, attempt=attempt
             )
-            chosen = await session.scalar(
-                select(Manager.locale).where(Manager.telegram_id == row.chat_id)
+            manager = await session.scalar(
+                select(Manager).where(Manager.telegram_id == row.chat_id)
             )
+            chosen = manager.locale if manager is not None else "ru"
+            timezone_name = (manager.timezone_name if manager is not None else None) or "UTC"
         if ready is None:
             return DeliveryStep(True)
         row, board_id = ready
@@ -66,7 +68,11 @@ async def process_one_delivery(
             with using_locale(chosen if chosen in {"ru", "en"} else "ru"):
                 async with asyncio.timeout(30):
                     outcome, telegram_id, retry_after = await deliver_claimed(
-                        row, transport, clock(), existing_board_message_id=board_id
+                        row,
+                        transport,
+                        clock(),
+                        existing_board_message_id=board_id,
+                        timezone_name=timezone_name,
                     )
         except TimeoutError:
             outcome, telegram_id, retry_after = Outcome.UNKNOWN, None, None

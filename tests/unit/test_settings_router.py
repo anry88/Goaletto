@@ -70,7 +70,11 @@ class FakeDatabase:
     def __init__(self) -> None:
         self.depth = 0
         self.manager = Manager(
-            id=uuid4(), telegram_id=123, reminders_enabled=True, bot_available=True
+            timezone_name="UTC",
+            id=uuid4(),
+            telegram_id=123,
+            reminders_enabled=True,
+            bot_available=True,
         )
         self.club = Club(
             id=uuid4(), league_id=uuid4(), name="Club", owner_telegram_id=123, budget=100

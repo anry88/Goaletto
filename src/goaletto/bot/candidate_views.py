@@ -11,6 +11,7 @@ from goaletto.bot.market_views import button
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.market import decode_price, encode_price
 from goaletto.domain.names import latin_name
+from goaletto.domain.staff_quality import QUALITY_NAMES, quality_tier
 from goaletto.presentation.i18n import LabelMap, tr
 
 ROLES = LabelMap(
@@ -24,6 +25,7 @@ ROLES = LabelMap(
         "scout": "Скаут",
     }
 )
+QUALITY_LABELS = LabelMap(dict(enumerate(QUALITY_NAMES, 1)))
 PAGE_SIZE = 4
 
 
@@ -65,7 +67,8 @@ def candidate_list(
     if kind == "staff" and screen.employed:
         lines.append(tr("В клубе:"))
         lines.extend(
-            f"{ROLES[role]} · {escape(latin_name(name))} · {age} · {skill}/20"
+            f"{ROLES[role]} · {escape(latin_name(name))} · {age} · "
+            f"{QUALITY_LABELS[quality_tier(skill)]} · {skill}/20"
             + (" · " + tr("⏳ Последний рабочий сезон") if status == "last_season" else "")
             for role, name, age, skill, status in screen.employed
         )
@@ -76,7 +79,11 @@ def candidate_list(
         offer, person = item.offer, item.person
         role = offer.profile if kind == "player" else ROLES[offer.profile]
         ability = (
-            tr("Навык: {skill}/20", skill=item.skills[0])
+            tr(
+                "Квалификация: {quality} · {skill}/20",
+                quality=QUALITY_LABELS[quality_tier(item.skills[0])],
+                skill=item.skills[0],
+            )
             if kind == "staff"
             else tr(
                 "Вратарь {gk} · защита {defence} · пас {passing} · фланг {winger}\n"
@@ -155,6 +162,12 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
         fee=amount(offer.fee),
         wage=amount(offer.weekly_rate),
     )
+    if offer.kind == "staff":
+        text += "\n" + tr(
+            "Квалификация: {quality} · {skill}/20",
+            quality=QUALITY_LABELS[quality_tier(item.skills[0])],
+            skill=item.skills[0],
+        )
     prefix = "p" if offer.kind == "player" else "s"
     return text, Keyboard(
         inline_keyboard=[
