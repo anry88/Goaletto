@@ -35,8 +35,8 @@ async def test_public_adults_have_stable_caps_and_exact_quotes_through_purchase(
         item = screen.items[0]
         fee, wage = item.offer.fee, item.offer.weekly_rate
         person_id, age, face = item.person.id, item.person.age, item.person.appearance_identity_id
-        assert fee == player_fee(item.skills, age, item.offer.profile)
-        assert wage == player_wage(item.skills, age, item.offer.profile)
+        assert fee == player_fee(item.skills, age, item.offer.profile, 1 + len(item.alternatives))
+        assert wage == player_wage(item.skills, age, item.offer.profile, 1 + len(item.alternatives))
         caps = dict((await session.get(PlayerDevelopment, person_id)).caps)
         assert set(caps.values()) != {20}
         # A quote is a contract snapshot; later skills never change its wage or price.

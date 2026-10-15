@@ -5,6 +5,7 @@ from random import Random
 from uuid import UUID
 
 from goaletto.domain.finances import PRIMARY
+from goaletto.domain.player_positions import alternative_positions
 from goaletto.domain.world import SKILL_NAMES, stable_seed
 
 PLAYER_MARKET_POLICY = "market-players-v2"
@@ -16,6 +17,7 @@ class MarketPlayer:
     age: int
     skills: tuple[int, ...]
     caps: dict[str, int]
+    alternatives: tuple[str, ...] = ()
 
 
 def market_player(person_id: UUID, position: str) -> MarketPlayer:
@@ -36,4 +38,9 @@ def market_player(person_id: UUID, position: str) -> MarketPlayer:
         key: min(20, value + rng.randint(0, 4))
         for key, value in zip(SKILL_NAMES[:8], values, strict=True)
     }
-    return MarketPlayer(age, (*values, rng.randint(1, 20), rng.randint(1, 20)), caps)
+    return MarketPlayer(
+        age,
+        (*values, rng.randint(1, 20), rng.randint(1, 20)),
+        caps,
+        alternative_positions(person_id, position),
+    )

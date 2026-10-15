@@ -14,6 +14,7 @@ COMMANDS = (
     ("squad", "Состав и карточки игроков", "Squad and player cards"),
     ("lineup", "Расстановка и тактика", "Lineup and tactics"),
     ("freeagents", "Свободные футболисты", "Free agents"),
+    ("scout", "Скаутские задания и находки", "Scouting searches and findings"),
     ("staff", "Персонал и найм", "Staff and hiring"),
     ("market", "Аукционы и продажа игроков", "Auctions and player sales"),
     ("stadium", "Стадион и посещаемость", "Stadium and attendance"),

@@ -28,6 +28,8 @@ KINDS = LabelMap(
         "transfer_in": "Продажа игрока",
         "transfer_out": "Покупка игрока",
         "arrears_paid": "Погашение задолженности",
+        "scout_search": "Скаутский поиск",
+        "signing_fee": "Подписание",
         "stadium_upgrade": "Расширение стадиона",
     }
 )

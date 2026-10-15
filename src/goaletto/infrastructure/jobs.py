@@ -17,6 +17,7 @@ from goaletto.application.match_runtime import (
     job_refs,
 )
 from goaletto.application.persons import AppearanceExhausted
+from goaletto.application.scouting import complete_search
 from goaletto.application.season_rollover import rollover_season
 from goaletto.application.stadium import complete_expansion
 from goaletto.application.training import apply_training
@@ -80,6 +81,8 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         "market.cancel_player",
         "feedback.cleanup",
         "season.rollover",
+        "scout.complete",
+        "scout.expire",
     }:
         try:
             async with session.begin_nested():
@@ -133,6 +136,8 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
                     if current is not None and current.status in {"scheduled", "active"}:
                         job.due_at = at + timedelta(hours=1)
                         rescheduled = True
+                elif job.kind in {"scout.complete", "scout.expire"}:
+                    await complete_search(session, job, at)
                 elif job.kind == "finance.cycle":
                     await cycle_finances(session, job, at)
                 elif job.kind == "training.apply":

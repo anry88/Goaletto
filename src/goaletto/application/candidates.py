@@ -49,6 +49,7 @@ from goaletto.infrastructure.models import (
     PersonSeasonEvent,
     Player,
     PlayerDevelopment,
+    ScoutDiscovery,
     Season,
     Staff,
     StaffQualification,
@@ -64,6 +65,7 @@ class CandidateItem:
     offer: CandidateOffer
     person: Person
     skills: tuple[int, ...]
+    alternatives: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -113,7 +115,15 @@ async def supply_count(session: AsyncSession, kind: str, profile: str, at: datet
                 .select_from(Player)
                 .join(Person)
                 .where(
-                    Player.club_id.is_(None), Player.status == "active", Person.career == "player"
+                    Player.club_id.is_(None),
+                    Player.status == "active",
+                    Person.career == "player",
+                    ~select(ScoutDiscovery.person_id)
+                    .where(
+                        ScoutDiscovery.person_id == Player.person_id,
+                        ScoutDiscovery.signed_at.is_(None),
+                    )
+                    .exists(),
                 )
             )
             or 0
@@ -186,6 +196,9 @@ async def _former_player(
         .join(Player)
         .where(
             Player.status == "retired",
+            ~select(ScoutDiscovery.person_id)
+            .where(ScoutDiscovery.person_id == Player.person_id, ScoutDiscovery.signed_at.is_(None))
+            .exists(),
             Person.career == "retired",
             Person.age < 60,
             ~select(Staff.person_id).where(Staff.person_id == Person.id).exists(),
@@ -310,6 +323,7 @@ async def replenish_pool(
                     Player(
                         person_id=person.id,
                         position=selected,
+                        alternative_positions=list(market_player(person.id, selected).alternatives),
                         **dict(zip(SKILL_NAMES, skills, strict=True)),
                         form=6,
                         experience=0,
@@ -434,7 +448,14 @@ async def load_candidates(
                 or 0,
             )
         )
-        items.append(CandidateItem(offer, person, skill_values))
+        items.append(
+            CandidateItem(
+                offer,
+                person,
+                skill_values,
+                tuple(worker.alternative_positions) if isinstance(worker, Player) else (),
+            )
+        )
     employed = (
         await session.execute(
             select(Staff.role, Person.name, Person.age, StaffQualification.skill, Staff.status)
@@ -616,6 +637,12 @@ async def _adopt_free_people(session: AsyncSession, kind: str, profile: str, at:
                 .join(Person)
                 .where(
                     Player.club_id.is_(None),
+                    ~select(ScoutDiscovery.person_id)
+                    .where(
+                        ScoutDiscovery.person_id == Player.person_id,
+                        ScoutDiscovery.signed_at.is_(None),
+                    )
+                    .exists(),
                     Player.status == "active",
                     Person.career == "player",
                     missing_offer,

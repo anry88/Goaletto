@@ -106,7 +106,8 @@ def market_view(screen: MarketScreen, notice: str | None = None) -> tuple[str, K
             (
                 "",
                 f"{escape(latin_name(item.person.name))} · "
-                f"{item.person.age} · {item.player.position}",
+                f"{item.person.age} · "
+                + "/".join((item.player.position, *item.player.alternative_positions)),
                 tr(
                     "{club} · {price} · до {date} UTC",
                     club=escape(latin_name(item.seller_name)),
@@ -147,7 +148,8 @@ def seller_view(screen: MarketScreen, page: int) -> tuple[str, Keyboard]:
         rows.append(
             [
                 button(
-                    f"{latin_name(person.name)} · {person.age} · {player.position}",
+                    f"{latin_name(person.name)} · {person.age} · "
+                    + "/".join((player.position, *player.alternative_positions)),
                     f"mk:q:{compact_id(person.id)}:{compact_id(screen.ownership_id)}",
                 )
             ]
@@ -198,7 +200,7 @@ def auction_view(
             "Клуб: {club} · {age} лет · {position}",
             club=escape(latin_name(item.seller_name)),
             age=item.person.age,
-            position=item.player.position,
+            position="/".join((item.player.position, *item.player.alternative_positions)),
         ),
         tr(
             "Статус: {state}",

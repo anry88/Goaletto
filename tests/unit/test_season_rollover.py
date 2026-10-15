@@ -12,6 +12,7 @@ from goaletto.domain.candidates import (
     deficit,
 )
 from goaletto.domain.finances import player_fee, player_wage
+from goaletto.domain.market_players import market_player
 from goaletto.domain.names import international_catalog
 from goaletto.domain.retirement import STAFF_PROBABILITIES_BPS, staff_last_season
 from goaletto.domain.season_rollover import rollover_kickoff
@@ -64,8 +65,12 @@ def test_new_baseline_players_cover_positions_reproducibly(position):
     assert name in {name for _, name in international_catalog(seed)}
     assert name and 26 <= age <= 30 and len(skills) == 10
     assert all(1 <= skill <= 20 for skill in skills)
-    assert fee == player_fee(skills[:8], age, position)
-    assert wage == player_wage(skills[:8], age, position)
+    assert fee == player_fee(
+        skills[:8], age, position, 1 + len(market_player(person_id, position).alternatives)
+    )
+    assert wage == player_wage(
+        skills[:8], age, position, 1 + len(market_player(person_id, position).alternatives)
+    )
 
 
 @pytest.mark.parametrize("kind", ["player_lifecycle", "staff_lifecycle"])

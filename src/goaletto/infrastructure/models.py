@@ -1019,6 +1019,8 @@ JOURNEY_NAMES = (
     "start_accepted",
     "training_opened",
     "training_plan_saved",
+    "scout_search_started",
+    "scout_search_cancelled",
 )
 
 
@@ -1229,7 +1231,8 @@ class GameActionReceipt(Base):
             "'lineup_saved','match_command_accepted','match_opened','match_report_opened',"
             "'next_fixture_opened','notification_preferences',"
             "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered','market_opened',"
-            "'market_listing_created','market_bid_accepted','market_listing_cancelled','candidate_signed')",
+            "'market_listing_created','market_bid_accepted','market_listing_cancelled','candidate_signed',"
+            "'scout_search_started','scout_search_cancelled')",
             name="ck_action_kind",
         ),
     )
@@ -1360,7 +1363,7 @@ class LedgerEntry(Base):
         CheckConstraint(
             "kind IN ('opening','grant','tickets','sponsor','merchandise',"
             "'player_salary','staff_salary','stadium_upkeep','prize','reserve','release',"
-            "'transfer_in','transfer_out','arrears_paid','stadium_upgrade','signing_fee')",
+            "'transfer_in','transfer_out','arrears_paid','stadium_upgrade','signing_fee','scout_search')",
             name="ck_ledger_kind",
         ),
         Index("ix_ledger_club_page", "club_id", "sequence"),
@@ -1690,3 +1693,85 @@ class PlayerRecovery(Base):
     age: Mapped[int] = mapped_column(SmallInteger)
     active_match_id: Mapped[UUID | None] = mapped_column(ForeignKey("matches.id"))
     policy_version: Mapped[str] = mapped_column(String(32), default="recovery-v1")
+
+
+class ScoutMission(Base):
+    __tablename__ = "scout_missions"
+    __table_args__ = (
+        UniqueConstraint("operation_id", name="uq_scout_start_operation"),
+        CheckConstraint(f"position IN ({POSITIONS_SQL})", name="ck_scout_position"),
+        CheckConstraint(
+            "skill BETWEEN 1 AND 20 AND days IN (4,8,12,16) AND fee > 0", name="ck_scout_terms"
+        ),
+        CheckConstraint(
+            "policy_version = 'scouting-v1' AND economy_policy = 'economy-cycle-v2'",
+            name="ck_scout_policy",
+        ),
+        CheckConstraint("due_at = started_at + days * interval '1 day'", name="ck_scout_duration"),
+        CheckConstraint(
+            "status IN ('active','completed','cancelled','expired') "
+            "AND (status = 'active') = (finished_at IS NULL)",
+            name="ck_scout_state",
+        ),
+        CheckConstraint("finished_at IS NULL OR finished_at >= started_at", name="ck_scout_finish"),
+        CheckConstraint(
+            "(status IN ('completed','expired')) = (expires_at IS NOT NULL)", name="ck_scout_expiry"
+        ),
+        Index("uq_scout_active_club", "club_id", unique=True, postgresql_where="status = 'active'"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    operation_id: Mapped[UUID] = mapped_column(Uuid)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    scout_id: Mapped[UUID] = mapped_column(ForeignKey("staff.person_id"))
+    skill: Mapped[int] = mapped_column(SmallInteger)
+    position: Mapped[str] = mapped_column(String(4))
+    days: Mapped[int] = mapped_column(SmallInteger)
+    fee: Mapped[int] = mapped_column(BigInteger)
+    policy_version: Mapped[str] = mapped_column(String(32))
+    economy_policy: Mapped[str] = mapped_column(String(32))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16))
+
+
+class ScoutDiscovery(Base):
+    __tablename__ = "scout_discoveries"
+    __table_args__ = (
+        UniqueConstraint("mission_id", "rank", name="uq_scout_rank"),
+        CheckConstraint(
+            "potential_low BETWEEN 1 AND 20 AND potential_high BETWEEN potential_low AND 20 "
+            "AND NOT (signed_at IS NOT NULL AND declined_at IS NOT NULL)",
+            name="ck_scout_potential",
+        ),
+        CheckConstraint(
+            "rank BETWEEN 1 AND 4 AND fee > 0 AND cycle_rate > 0", name="ck_scout_discovery"
+        ),
+    )
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("players.person_id"), primary_key=True)
+    mission_id: Mapped[UUID] = mapped_column(ForeignKey("scout_missions.id"), index=True)
+    rank: Mapped[int] = mapped_column(SmallInteger)
+    fee: Mapped[int] = mapped_column(BigInteger)
+    cycle_rate: Mapped[int] = mapped_column(BigInteger)
+    potential_low: Mapped[int] = mapped_column(SmallInteger)
+    potential_high: Mapped[int] = mapped_column(SmallInteger)
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    declined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ScoutSigning(Base):
+    __tablename__ = "scout_signings"
+    __table_args__ = (
+        UniqueConstraint("person_id", name="uq_scout_person_signing"),
+        CheckConstraint("fee > 0 AND cycle_rate > 0", name="ck_scout_signing_money"),
+    )
+    operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("scout_discoveries.person_id"))
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    fee: Mapped[int] = mapped_column(BigInteger)
+    cycle_rate: Mapped[int] = mapped_column(BigInteger)
+    economy_policy: Mapped[str] = mapped_column(String(32))
+    signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

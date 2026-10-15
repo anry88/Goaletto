@@ -78,7 +78,11 @@ def candidate_list(
     rows = []
     for item in available[page * PAGE_SIZE : (page + 1) * PAGE_SIZE]:
         offer, person = item.offer, item.person
-        role = offer.profile if kind == "player" else ROLES[offer.profile]
+        role = (
+            "/".join((offer.profile, *item.alternatives))
+            if kind == "player"
+            else ROLES[offer.profile]
+        )
         ability = (
             tr(
                 "Квалификация: {quality} · {skill}/20",
@@ -150,6 +154,8 @@ def candidate_list(
         nav.append(button("▶️", f"cg:{prefix}:{page + 1}"))
     if nav:
         rows.append(nav)
+    if kind == "staff":
+        rows.append([button(tr("🔎 Скаутские задания"), "ss:open")])
     rows.extend(
         (
             [button(tr("↻ Обновить"), f"cg:{prefix}:{page}")],
@@ -161,7 +167,11 @@ def candidate_list(
 
 def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keyboard]:
     offer, person = item.offer, item.person
-    role = offer.profile if offer.kind == "player" else ROLES[offer.profile]
+    role = (
+        "/".join((offer.profile, *item.alternatives))
+        if offer.kind == "player"
+        else ROLES[offer.profile]
+    )
     text = tr(
         "Подписать {name} · {role}?\nРазово: {fee}\nЗарплата: {wage}/4 дня",
         name=escape(latin_name(person.name)),

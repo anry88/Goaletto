@@ -54,7 +54,7 @@ def _badges(person_id: UUID, slot: str, data: LineupData) -> str:
     if member is not None and member.injured:
         marks += " 🤕"
     if member is not None and slot != member.position:
-        marks += " ⚠️"
+        marks += " ↔85%" if slot in member.alternatives else " ⚠️60%"
     return marks
 
 
@@ -86,13 +86,19 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
         lines.append(
             f"{index}. {escape(latin_name(member.name))} ({escape(member.slot_position)})"
             f"{_badges(member.person_id, member.slot_position, data)}"
-            f" · ⚡ {member.energy_bps / 100:.0f}%"
+            + (
+                f" · {'/'.join((member.position, *member.alternatives))}"
+                if member.alternatives
+                else ""
+            )
+            + f" · ⚡ {member.energy_bps / 100:.0f}%"
         )
     lines.append("")
     lines.append(tr("<b>Запас:</b>"))
     for index, member in enumerate(data.bench, start=12):
         lines.append(
-            f"{index}. {escape(latin_name(member.name))} ({escape(member.position)})"
+            f"{index}. {escape(latin_name(member.name))} "
+            f"({escape('/'.join((member.position, *member.alternatives)))})"
             f"{_badges(member.person_id, member.position, data)}"
             f" · ⚡ {member.energy_bps / 100:.0f}%"
         )
@@ -101,7 +107,8 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
         lines.extend(("", tr("<b>Вне заявки:</b>")))
         for member in data.reserves:
             lines.append(
-                f"{escape(latin_name(member.name))} ({escape(member.position)})"
+                f"{escape(latin_name(member.name))} "
+                f"({escape('/'.join((member.position, *member.alternatives)))})"
                 f"{_badges(member.person_id, member.position, data)}"
                 f" · ⚡ {member.energy_bps / 100:.0f}%"
             )
@@ -112,7 +119,9 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
             roster=len(data.starters) + len(data.bench) + len(data.reserves),
         )
     )
-    lines.append(tr("🔶 — последний сезон (играет). ⚠️ — не на позиции. 🤕 — травма."))
+    lines.append(
+        tr("🔶 — последний сезон. ↔85% — дополнительная позиция. ⚠️60% — чужая. 🤕 — травма.")
+    )
     if notice:
         lines.append("")
         lines.append(escape(notice))

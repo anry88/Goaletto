@@ -128,7 +128,7 @@
   and policy through settlement. Existing contracts and ledger keep original terms.
   Starting capital remains 600K after the 20-cycle calculation. Scout findings vary
   in price: at age 19, q6/q10/q18 plus a Q2 scout mission cost 225K/400K/1,016K.
-  Mission flow remains AND-116; do not treat every discovery as an elite-price player.
+  Mission flow is implemented in AND-116; do not treat every discovery as an elite-price player.
   See docs/economy-calculation.md. AND-117 still owns persisted seasonal sponsorship.
 
 - Latest scout clarification 2026-10-15 supersedes automatic weekly findings:
@@ -138,4 +138,15 @@
   active search per club. Do not enforce one candidate in the report's cycle
   against a multi-cycle batch. Charge each chosen player's signing separately.
   Findings use individual skills/potential/prices, not three fixed categories.
-  docs/scouting.md and AND-116 are authoritative; gameplay flow is still pending.
+  docs/scouting.md and AND-116 are authoritative; gameplay flow is implemented.
+
+- AND-108 implements player-positions-v1 for new market/scout people; preserve
+  old positions/snapshots and fixed bot youth baselines. Adjacent skills use the
+  existing 85% match factor; unfamiliar outfield positions use 60%. See docs/player-positions.md.
+- AND-116 implements /scout, one paid active mission per club, final 1/2/3/4
+  candidates after 4/8/12/16 days, immutable terms and private ScoutDiscovery rows.
+  Always exclude unsigned ScoutDiscovery people from public supply/adoption and
+  former-player staff conversion, even after decline/expiry. Signing does not
+  replenish the public pool. Report lasts >=8 days and through the next window.
+  Future staff dismissal/replacement should call scouting.cancel_invalid; active
+  missions stop on lost scout/ownership without refund or extra dismissal fee.

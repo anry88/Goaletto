@@ -46,6 +46,7 @@ SUPPORTED_KINDS = frozenset(
         "ownership_reminder",
         "match_recovery",
         "market_notice",
+        "scout_report",
         "player_lifecycle",
         "staff_lifecycle",
     }
@@ -57,6 +58,7 @@ BACKOFF_CAP_SECONDS = 600.0
 PRIORITY_BY_KIND = {
     "match_result": 100,
     "market_notice": 70,
+    "scout_report": 70,
     "player_lifecycle": 80,
     "staff_lifecycle": 80,
     "match_recovery": 90,
@@ -184,6 +186,13 @@ def valid_payload(payload: dict[str, Any]) -> bool:
             and isinstance(payload.get("player_name"), str)
             and 0 < len(payload["player_name"]) <= 120
         )
+    if kind == "scout_report":
+        return (
+            _payload_uuid(payload, "mission_id") is not None
+            and _payload_uuid(payload, "club_id") is not None
+            and type(payload.get("count")) is int
+            and 1 <= payload["count"] <= 4
+        )
     if kind == "market_notice":
         return (
             _payload_uuid(payload, "auction_id") is not None
@@ -276,6 +285,11 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "scout_report":
+        return tr(
+            "🔎 Поиск завершён. Найдено игроков: {count}. Итоговый список и цены — /scout.",
+            count=payload["count"],
+        )
     if kind in {"player_lifecycle", "staff_lifecycle"}:
         if kind == "staff_lifecycle":
             person = escape(latin_name(payload["player_name"]))
@@ -468,6 +482,20 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     if not manager.bot_available:
         return Decision.SKIP_UNAVAILABLE
     kind = payload["kind"]
+    if kind == "scout_report":
+        from goaletto.infrastructure.models import ScoutMission
+
+        mission = await session.get(ScoutMission, _payload_uuid(payload, "mission_id"))
+        return (
+            Decision.DELIVER
+            if mission
+            and mission.ownership_id == ownership.id
+            and mission.club_id == club.id
+            and mission.status == "completed"
+            and mission.expires_at
+            and now < mission.expires_at
+            else Decision.SKIP_STALE
+        )
     if kind in {"player_lifecycle", "staff_lifecycle"}:
         from goaletto.infrastructure.models import PersonSeasonEvent, Player, Staff
 

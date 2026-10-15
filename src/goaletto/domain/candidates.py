@@ -34,8 +34,8 @@ def candidate_profile(
             name,
             player.age,
             player.skills,
-            player_fee(player.skills[:8], player.age, profile),
-            player_wage(player.skills[:8], player.age, profile),
+            player_fee(player.skills[:8], player.age, profile, 1 + len(player.alternatives)),
+            player_wage(player.skills[:8], player.age, profile, 1 + len(player.alternatives)),
         )
     if kind == "staff" and profile in STAFF_ROLES:
         catalog = international_catalog(seed)

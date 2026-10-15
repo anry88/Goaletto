@@ -61,6 +61,7 @@ def build_dispatcher(
         navigation,
         player_router,
         schedule_router,
+        scouting_router,
         settings_router,
         squad_router,
         stadium_router,
@@ -86,6 +87,7 @@ def build_dispatcher(
         player_router,
         settings_router,
         schedule_router,
+        scouting_router,
         history_router,
         club_router,
     ):

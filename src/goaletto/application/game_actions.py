@@ -76,6 +76,8 @@ GAME_ACTIONS = frozenset(
         "market_bid_accepted",
         "market_listing_cancelled",
         "candidate_signed",
+        "scout_search_started",
+        "scout_search_cancelled",
         "stadium_opened",
         "stadium_expansion_ordered",
         "training_opened",
