@@ -60,14 +60,14 @@ def test_market_varies_ages_quality_and_potential_without_changing_youth():
 
 
 def test_scout_idleness_is_cheap_but_repeated_discoveries_are_not_a_youth_faucet():
-    mission = scout_mission_fee(5)
+    mission = scout_mission_fee(5, 4)
     signing = scout_signing_fee((10,) * 8, 19, "MC")
     assert staff_wage("scout", 5, 50) * 50 < mission
     assert mission + signing == 400000
     assert 3 * mission > INITIAL_CAPITAL // 2
     assert 20 * (mission + signing) > 10 * INITIAL_CAPITAL
     # Even the weakest discovery has a substantial combined price.
-    assert scout_mission_fee(1) + scout_signing_fee((1,) * 8, 21, "MC") > INITIAL_CAPITAL // 4
+    assert scout_mission_fee(1, 4) + scout_signing_fee((1,) * 8, 21, "MC") > INITIAL_CAPITAL // 4
     assert scout_signing_fee((18,) * 8, 19, "MC") + mission > 1000000
 
 
@@ -79,7 +79,7 @@ def test_scout_idleness_is_cheap_but_repeated_discoveries_are_not_a_youth_faucet
         lambda: player_fee((10,) * 8, 26, "MC", 4),
         lambda: staff_wage("scout", 0),
         lambda: staff_wage("head_coach", 1, True),
-        lambda: scout_mission_fee(True),
+        lambda: scout_mission_fee(True, 4),
         lambda: scout_signing_fee((10,) * 8, 26, "MC"),
         lambda: player_quality((10,) * 8, "XX"),
         lambda: market_player(UUID(int=1), "XX"),
@@ -88,3 +88,19 @@ def test_scout_idleness_is_cheap_but_repeated_discoveries_are_not_a_youth_faucet
 def test_invalid_policy_inputs_fail_closed(call):
     with pytest.raises(ValueError):
         call()
+
+
+@pytest.mark.parametrize("days", [0, 1, 3, 5, 20, True, 4.0])
+def test_scout_rejects_unsupported_search_duration(days):
+    with pytest.raises(ValueError):
+        scout_mission_fee(5, days)
+
+
+def test_long_search_price_and_individual_findings_are_not_three_fixed_bands():
+    assert [scout_mission_fee(5, d) for d in (4, 8, 12, 16)] == [125000, 250000, 375000, 500000]
+    base = (10,) * 8
+    near = (*base[:6], 11, base[7])
+    assert player_quality(base, "MC") == player_quality(near, "MC") == 10
+    assert scout_signing_fee(base, 19, "MC") == 275000
+    assert scout_signing_fee(near, 19, "MC") == 286110
+    assert len({scout_signing_fee((q,) * 8, 19, "MC") for q in range(1, 21)}) > 10

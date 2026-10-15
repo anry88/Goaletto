@@ -4,6 +4,7 @@ POLICY_VERSION = "economy-cycle-v2"
 SALARY_POLICIES = ("economy-cycle-v1", POLICY_VERSION)
 INITIAL_CAPITAL = 600_000
 MAX_MONEY = 2**63 - 1
+SCOUT_SEARCH_DAYS = (4, 8, 12, 16)
 # Tier 1..5; age changes the new quote, never an existing contract.
 STAFF_RATES = {
     "head_coach": (8_000, 14_000, 26_000, 48_000, 80_000),
@@ -40,12 +41,16 @@ def money(value: int) -> int:
     return value
 
 
-def player_quality(skills: tuple[int, ...], position: str = "MC") -> int:
+def _quality_units(skills: tuple[int, ...], position: str) -> int:
     if len(skills) != 8 or any(type(s) is not int or not 1 <= s <= 20 for s in skills):
         raise ValueError("Invalid wage skills")
     if position not in PRIMARY:
         raise ValueError("Invalid valuation position")
-    return (3 * skills[PRIMARY[position]] + skills[6] + skills[7]) // 5
+    return 3 * skills[PRIMARY[position]] + skills[6] + skills[7]
+
+
+def player_quality(skills: tuple[int, ...], position: str = "MC") -> int:
+    return _quality_units(skills, position) // 5
 
 
 def _player_inputs(age: int, positions: int) -> None:
@@ -87,18 +92,21 @@ def staff_fee(role: str, skill: int, age: int) -> int:
     return money(4 * rate * max(3_000, factor) // 10_000)
 
 
-def scout_mission_fee(skill: int) -> int:
+def scout_mission_fee(skill: int, days: int) -> int:
     if type(skill) is not int or not 1 <= skill <= 20:
         raise ValueError("Invalid scout skill")
-    return 100_000 + 5_000 * skill
+    if type(days) is not int or days not in SCOUT_SEARCH_DAYS:
+        raise ValueError("Scout search must last 4, 8, 12 or 16 days")
+    return (100_000 + 5_000 * skill) * (days // 4)
 
 
 def scout_signing_fee(skills: tuple[int, ...], age: int, position: str, positions: int = 1) -> int:
     if type(age) is not int or not 17 <= age <= 21:
         raise ValueError("Scout discoveries must be 17..21")
     _player_inputs(age, positions)
-    q = player_quality(skills, position)
-    base = max(100_000, 2_500 * q * q * (100 + (21 - age) * 5) // 100)
+    # Preserve fifth-point resolution; examples q6/q10/q18 are not price bands.
+    q = _quality_units(skills, position)
+    base = max(100_000, 2_500 * q * q * (100 + (21 - age) * 5) // (25 * 100))
     return money(base * (100 + 15 * (positions - 1)) // 100)
 
 

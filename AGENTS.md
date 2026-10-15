@@ -64,7 +64,7 @@
   one mentality change per match; substitution limits are equal for all coaches.
   Specialists unlock training; modest match growth depends on minutes, age and
   staff. Scouts can find a private player age 17-21 via an explicit paid assignment,
-  limited to one per four-day game cycle; unsigned discoveries
+  with duration-based final reports; unsigned discoveries
   never enter the public market. Renew sponsorship after each season using final
   place, supporters and league level. Recalculate starting money and coefficients.
   These are pending gameplay tasks, not claims of implemented functionality.
@@ -130,3 +130,12 @@
   in price: at age 19, q6/q10/q18 plus a Q2 scout mission cost 225K/400K/1,016K.
   Mission flow remains AND-116; do not treat every discovery as an elite-price player.
   See docs/economy-calculation.md. AND-117 still owns persisted seasonal sponsorship.
+
+- Latest scout clarification 2026-10-15 supersedes automatic weekly findings:
+  manager selects target position and 4/8/12/16 elapsed days, pays the search fee,
+  then receives one final shortlist at completion. No intermediate weekly reports.
+  Longer search gives more choices; initial design is 1/2/3/4 candidates and one
+  active search per club. Do not enforce one candidate in the report's cycle
+  against a multi-cycle batch. Charge each chosen player's signing separately.
+  Findings use individual skills/potential/prices, not three fixed categories.
+  docs/scouting.md and AND-116 are authoritative; gameplay flow is still pending.
