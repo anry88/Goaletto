@@ -1,6 +1,7 @@
 """Reproduce economy-v2 cash, scout and daily-load scenarios without a database."""
 
 import csv
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -368,6 +369,7 @@ def load_report() -> str:
             6,
             0,
         )
+        budget = None
         energy, remainder, minimum, training_days = 10000, 0, 10000, 0
         for day in range(72):
             phase, cycle = day % 4, day // 4
@@ -385,19 +387,22 @@ def load_report() -> str:
                     Focus.PHYSICAL,
                     Intensity.HIGH,
                     seed=f"economy:{day}",
-                    bonus_bps=2000,
+                    trainer_skill=10,
+                    head_skill=1,
+                    budget=budget,
                     physio_skill=10,
                 )
+                budget = result.budget
                 # Ignore injuries here to upper-bound seasonal development.
-                player = TrainingPlayer(
-                    person_id,
-                    27,
-                    "MC",
-                    result.skills,
-                    player.caps,
-                    result.progress,
-                    result.form,
-                    result.experience,
+                player = replace(
+                    player,
+                    skills=result.skills,
+                    progress=result.progress,
+                    form=result.form,
+                    experience=result.experience,
+                    morale=result.morale,
+                    leadership=result.leadership,
+                    leadership_progress=result.leadership_progress,
                 )
                 energy = max(0, energy - 220)
             minimum = min(minimum, energy)
@@ -407,7 +412,7 @@ def load_report() -> str:
         )
     return (
         "Каждый из 72 UTC-дней: матч либо одна тренировка; возраст 27, физиотерапевт 10, "
-        "HIGH/физика, бонус 20%, скрытые потолки, дневной эффект train_player. "
+        "HIGH/физика, фитнес-тренер 10/20, скрытые потолки, дневной эффект train_player. "
         + " ".join(rows)
         + " Допвремя во всех кубковых играх — стресс, не среднее. "
         "Не гарантирует полную энергию при соседних датах: интервалы меньше 24h требуют ротации."

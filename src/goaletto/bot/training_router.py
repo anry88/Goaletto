@@ -66,7 +66,7 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
                         TrainingPlan.id == expand_id(parts[2]),
                         TrainingPlan.club_id == club.id,
                         TrainingPlan.ownership_id == ownership.id,
-                        TrainingPlan.status == "applied",
+                        TrainingPlan.status.in_(("applied", "cancelled")),
                     )
                 )
                 if plan is None:
@@ -107,7 +107,10 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
     except (PermissionDenied, ValueError):
         await edit_response(
             query.message,
-            tr("Тренировка не сохранена: кнопка устарела или игрок недоступен. Откройте /train."),
+            tr(
+                "Тренировка не сохранена: проверьте дату, свободный день, доступного игрока "
+                "и нужного специалиста в /staff. Откройте /train."
+            ),
         )
         return
     await edit_response(query.message, text, keyboard)

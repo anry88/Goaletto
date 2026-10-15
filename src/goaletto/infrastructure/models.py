@@ -1322,8 +1322,20 @@ class PlayerDevelopment(Base):
             name="ck_development_objects",
         ),
         CheckConstraint("policy_version = 'training-v1'", name="ck_development_policy"),
+        CheckConstraint(
+            "growth_age BETWEEN 0 AND 150 AND leadership_progress BETWEEN 0 AND 9999",
+            name="ck_development_season",
+        ),
+        CheckConstraint("jsonb_typeof(season_gains) = 'object'", name="ck_development_gains"),
+        CheckConstraint(
+            "growth_policy = 'development-budget-v1'", name="ck_development_growth_policy"
+        ),
     )
     person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
+    growth_policy: Mapped[str] = mapped_column(String(32), server_default="development-budget-v1")
+    growth_age: Mapped[int] = mapped_column(SmallInteger, server_default="0")
+    season_gains: Mapped[dict[str, int]] = mapped_column(JSONB, server_default="{}")
+    leadership_progress: Mapped[int] = mapped_column(SmallInteger, server_default="0")
     caps: Mapped[dict[str, int]] = mapped_column(JSONB)
     progress: Mapped[dict[str, int]] = mapped_column(JSONB)
     policy_version: Mapped[str] = mapped_column(String(32))
@@ -1351,7 +1363,10 @@ class TrainingPlan(Base):
         CheckConstraint(
             "focus <> 'set_pieces' OR executor_id IS NOT NULL", name="ck_training_executor"
         ),
-        CheckConstraint("policy_version = 'training-daily-v1'", name="ck_training_policy"),
+        CheckConstraint(
+            "policy_version IN ('training-daily-v1','training-specialists-v2')",
+            name="ck_training_policy",
+        ),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
@@ -1365,6 +1380,7 @@ class TrainingPlan(Base):
     status: Mapped[str] = mapped_column(String(16))
     policy_version: Mapped[str] = mapped_column(String(32))
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    staff_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     results: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
 

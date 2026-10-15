@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import func, select
 
+from goaletto.application.candidates import load_candidates, sign_candidate
 from goaletto.application.game_actions import PermissionDenied, end_expired
 from goaletto.application.training import apply_training, load_training, select_training, week_start
 from goaletto.domain.training import SKILLS, Focus, Intensity, initial_caps
@@ -17,13 +18,26 @@ from goaletto.infrastructure.models import (
     TrainingDecision,
     TrainingPlan,
 )
-from tests.integration.test_agent_wave import NOW, setup_world
+from tests.integration.test_agent_wave import NOW
+from tests.integration.test_candidates import action, funded
 
 pytestmark = pytest.mark.integration
 
 
+async def training_world(sessions):
+    result, actor, club_id = await funded(sessions)
+    async with sessions.begin() as session:
+        screen = await load_candidates(session, action(actor), "staff")
+        for role in ("fitness_coach", "attack_coach"):
+            item = next(i for i in screen.items if i.offer.profile == role)
+            await sign_candidate(
+                session, action(actor), screen.ownership_id, item.person.id, item.offer.fee, at=NOW
+            )
+    return result, actor, club_id
+
+
 async def test_weekly_training_retry_fractional_progress_rollback_and_owner_expiry(sessions):
-    _, actor, club_id = await setup_world(sessions)
+    _, actor, club_id = await training_world(sessions)
     actor = replace(actor, operation_id=uuid4(), update_id=5)
     week = week_start(NOW)
     async with sessions.begin() as session:
@@ -139,7 +153,7 @@ async def test_weekly_training_retry_fractional_progress_rollback_and_owner_expi
 
 
 async def test_concurrent_training_save_worker_and_stale_executor(sessions):
-    _, actor, club_id = await setup_world(sessions)
+    _, actor, club_id = await training_world(sessions)
     actor = replace(actor, operation_id=uuid4(), update_id=5)
     async with sessions.begin() as session:
         screen = await load_training(session, actor, record=False)

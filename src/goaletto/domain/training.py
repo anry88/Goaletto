@@ -1,24 +1,18 @@
-"""Pure, versioned weekly development. Integer progress and deterministic draws."""
+"""Pure specialist sessions with bounded, fractional age-season development."""
 
 import hashlib
 from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
+from goaletto.domain.development import SKILLS as SKILLS
+from goaletto.domain.development import GrowthBudget, grant_growth
 from goaletto.domain.match_types import POSITIONS as VALID_POSITIONS
+from goaletto.domain.staff_effects import mentor_session, seeded_draw
 
-SKILLS = (
-    "goalkeeping",
-    "defending",
-    "playmaking",
-    "winger",
-    "attacking",
-    "set_pieces",
-    "stamina",
-    "pace",
-)
 PROGRESS_KEYS = (*SKILLS, "experience")
-POLICY_VERSION = "training-v1"
+POLICY_VERSION = "training-v1"  # Persistent potential/fraction schema, unchanged.
+SESSION_POLICY = "training-specialists-v2"
 
 
 class Focus(StrEnum):
@@ -40,15 +34,18 @@ class Intensity(StrEnum):
 
 POSITIONS = {
     Focus.GOALKEEPING: frozenset({"GK"}),
-    Focus.DEFENDING: frozenset({"DC", "DL", "DR"}),
-    Focus.PLAYMAKING: frozenset({"MC"}),
-    Focus.WINGER: frozenset({"ML", "MR", "DL", "DR"}),
+    Focus.DEFENDING: frozenset({"DC", "DL", "DR", "DM"}),
+    Focus.PLAYMAKING: frozenset({"DM", "MC", "AMC"}),
+    Focus.WINGER: frozenset({"ML", "MR", "DL", "DR", "AML", "AMR"}),
     Focus.ATTACKING: frozenset({"FC", "AMC", "AML", "AMR"}),
 }
 SPECIALISTS = {
     Focus.GOALKEEPING: "goalkeeping_coach",
     Focus.DEFENDING: "defence_coach",
     Focus.ATTACKING: "attack_coach",
+    Focus.PLAYMAKING: "attack_coach",
+    Focus.WINGER: "attack_coach",
+    Focus.SET_PIECES: "attack_coach",
     Focus.PHYSICAL: "fitness_coach",
 }
 
@@ -87,12 +84,28 @@ def age_multiplier(age: int) -> int:
     return 3000
 
 
-def coach_bonus(focus: Focus, qualifications: dict[str, int]) -> int:
-    if any(type(v) is not int or not 1 <= v <= 20 for v in qualifications.values()):
-        raise ValueError("Invalid coach skill")
-    main = qualifications.get("head_coach", 0) * 100
-    specialist = qualifications.get(SPECIALISTS.get(focus, ""), 0) * 150
-    return min(5000, main + specialist)
+def available_focus(focus: Focus, qualifications: dict[str, int]) -> bool:
+    if not isinstance(focus, Focus) or any(
+        type(v) is not int or not 1 <= v <= 20 for v in qualifications.values()
+    ):
+        raise ValueError("Invalid training staff")
+    return focus == Focus.TEAM or SPECIALISTS[focus] in qualifications
+
+
+PRIMARY_SKILLS = {
+    "GK": "goalkeeping",
+    "DC": "defending",
+    "DL": "defending",
+    "DR": "defending",
+    "DM": "defending",
+    "MC": "playmaking",
+    "ML": "winger",
+    "MR": "winger",
+    "AML": "winger",
+    "AMR": "winger",
+    "AMC": "attacking",
+    "FC": "attacking",
+}
 
 
 @dataclass(frozen=True)
@@ -106,11 +119,22 @@ class TrainingPlayer:
     form: int
     experience: int
     injured: bool = False
+    morale: int = 50
+    leadership: int = 10
+    leadership_progress: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, UUID) or self.position not in VALID_POSITIONS:
             raise ValueError("Invalid training player")
         age_multiplier(self.age)
+        if any(
+            type(v) is not int for v in (self.morale, self.leadership, self.leadership_progress)
+        ) or not (
+            0 <= self.morale <= 100
+            and 1 <= self.leadership <= 20
+            and 0 <= self.leadership_progress < 10000
+        ):
+            raise ValueError("Invalid morale/leadership")
         if set(self.skills) != set(SKILLS) or set(self.caps) != set(SKILLS):
             raise ValueError("Invalid development skill keys")
         if set(self.progress) != set(PROGRESS_KEYS):
@@ -142,6 +166,11 @@ class TrainingResult:
     injured: bool
     trained: bool
     gain_bps: int
+    budget: GrowthBudget
+    morale: int
+    leadership: int
+    leadership_progress: int
+    leadership_gain: int
 
 
 def train_player(
@@ -150,61 +179,103 @@ def train_player(
     intensity: Intensity,
     *,
     seed: str,
-    bonus_bps: int = 0,
+    trainer_skill: int,
+    head_skill: int = 0,
     physio_skill: int = 0,
     executor_id: UUID | None = None,
+    budget: GrowthBudget | None = None,
 ) -> TrainingResult:
     if not isinstance(focus, Focus) or not isinstance(intensity, Intensity):
         raise ValueError("Invalid training choice")
     if (
-        type(bonus_bps) is not int
-        or not 0 <= bonus_bps <= 5000
-        or type(physio_skill) is not int
-        or not 0 <= physio_skill <= 20
+        any(
+            type(v) is not int or not 0 <= v <= 20
+            for v in (trainer_skill, head_skill, physio_skill)
+        )
         or type(seed) is not str
         or not seed
     ):
-        raise ValueError("Invalid training policy input")
+        raise ValueError("Invalid training staff or seed")
+    if focus != Focus.TEAM and trainer_skill == 0:
+        raise ValueError("Specialist required")
+    budget = budget or GrowthBudget(player.age)
+    if budget.age != player.age:
+        raise ValueError("Development budget age differs from player")
     targeted = focus in (Focus.PHYSICAL, Focus.TEAM) or player.position in POSITIONS.get(focus, ())
     if focus == Focus.SET_PIECES:
         targeted = player.id == executor_id
     trained = targeted and not player.injured
-    skills, progress = dict(player.skills), dict(player.progress)
-    form, experience = player.form, player.experience
+    strength = 5000 + trainer_skill * 500
     gain = (
-        4000
-        * (10000 + bonus_bps)
-        * age_multiplier(player.age)
-        * {Intensity.LOW: 6000, Intensity.MEDIUM: 10000, Intensity.HIGH: 13000}[intensity]
-        // (7 * 10000**3)
+        (
+            (60 if focus == Focus.TEAM else 180)
+            * strength
+            * age_multiplier(player.age)
+            * {Intensity.LOW: 6000, Intensity.MEDIUM: 10000, Intensity.HIGH: 13000}[intensity]
+            // 10000**3
+        )
         if trained
         else 0
     )
     keys = (
         ("stamina", "pace")
         if focus == Focus.PHYSICAL
-        else ("experience",)
+        else (PRIMARY_SKILLS[player.position],)
         if focus == Focus.TEAM
         else (focus.value,)
     )
-    for key in keys if trained else ():
-        before = experience if key == "experience" else skills[key]
-        cap = 2**31 - 1 if key == "experience" else player.caps[key]
-        whole, fraction = divmod(progress[key] + gain, 10000)
-        after = min(cap, before + whole)
-        progress[key] = fraction if after < cap else 0
-        if key == "experience":
-            experience = after
-        else:
-            skills[key] = after
-
-    def draw(kind: str) -> int:
-        digest = hashlib.sha256(f"{POLICY_VERSION}:{seed}:{player.id}:{kind}".encode()).digest()
-        return int.from_bytes(digest[:8], "big") % 10000
-
-    # Daily effects preserve the modest weekly baseline across seven free dates.
-    if trained and draw("form") < (1500 if intensity == Intensity.LOW else 1000) // 7:
-        form = min(8, form + 1)
-    injury_rate = 100 * (10000 - physio_skill * 150) // 10000 if intensity == Intensity.HIGH else 0
-    injured = trained and draw("injury") < injury_rate // 7
-    return TrainingResult(skills, progress, form, experience, injured, trained, gain)
+    requested = {
+        key: gain // len(keys) + (1 if index < gain % len(keys) else 0)
+        for index, key in enumerate(keys)
+    }
+    growth = grant_growth(
+        player.skills, player.caps, player.progress, budget, requested, source="training"
+    )
+    progress = dict(growth.progress)
+    experience = player.experience
+    form = player.form
+    morale, leadership, fraction, leadership_gain = (
+        player.morale,
+        player.leadership,
+        player.leadership_progress,
+        0,
+    )
+    budget = growth.budget
+    if trained:
+        experience_gain = (10 + trainer_skill) * age_multiplier(player.age) // 10000
+        whole, progress["experience"] = divmod(progress["experience"] + experience_gain, 10000)
+        experience += whole
+        mentoring = mentor_session(
+            player.id, morale, leadership, fraction, budget, head_skill=head_skill, seed=seed
+        )
+        morale, leadership, fraction, leadership_gain, budget = (
+            mentoring.morale,
+            mentoring.leadership,
+            mentoring.leadership_progress,
+            mentoring.leadership_gain,
+            mentoring.budget,
+        )
+        if seeded_draw(seed, player.id, "form", policy=SESSION_POLICY) < (
+            200 if intensity == Intensity.LOW else 100
+        ):
+            form = min(8, form + 1)
+    injury_rate = (
+        (14 * (10000 - physio_skill * 150) + 9999) // 10000 if intensity == Intensity.HIGH else 0
+    )
+    injured = (
+        trained and seeded_draw(seed, player.id, "injury", policy=SESSION_POLICY) < injury_rate
+    )
+    return TrainingResult(
+        growth.skills,
+        progress,
+        form,
+        experience,
+        injured,
+        trained,
+        sum(growth.granted.values()),
+        budget,
+        morale,
+        leadership,
+        fraction,
+        leadership_gain,
+    )

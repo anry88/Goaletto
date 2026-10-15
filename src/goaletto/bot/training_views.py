@@ -8,10 +8,11 @@ from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup as Keyboard
 
 from goaletto.application.training import TrainingScreen
+from goaletto.bot.candidate_views import ROLES
 from goaletto.bot.club_cards import SKILL_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
-from goaletto.domain.training import Focus, Intensity
+from goaletto.domain.training import SPECIALISTS, Focus, Intensity
 from goaletto.infrastructure.models import TrainingPlan
 from goaletto.presentation.i18n import LabelMap, tr
 
@@ -33,13 +34,13 @@ INTENSITY_LABELS = LabelMap(
 TARGETS = LabelMap(
     {
         Focus.GOALKEEPING: "вратари · вратарское мастерство",
-        Focus.DEFENDING: "DC, DL, DR · защита",
-        Focus.PLAYMAKING: "MC · плеймейкинг",
-        Focus.WINGER: "ML, MR, DL, DR · фланговая игра",
+        Focus.DEFENDING: "DC, DL, DR, DM · защита",
+        Focus.PLAYMAKING: "DM, MC, AMC · плеймейкинг",
+        Focus.WINGER: "ML, MR, DL, DR, AML, AMR · фланговая игра",
         Focus.ATTACKING: "FC, AMC, AML, AMR · атака",
         Focus.SET_PIECES: "выбранный исполнитель · стандарты",
         Focus.PHYSICAL: "вся команда · выносливость и скорость",
-        Focus.TEAM: "вся команда · опыт",
+        Focus.TEAM: "вся команда · профильный навык, опыт и командная подготовка",
     }
 )
 
@@ -114,13 +115,27 @@ def training_view(
         "",
     ]
     if screen.blocked:
+        rows = []
+        if screen.last_result:
+            rows.append(
+                [
+                    _button(
+                        tr("📋 Последний результат"), f"tr:r:{compact_id(screen.last_result.id)}:1"
+                    )
+                ]
+            )
+        rows.append([_button(tr("🏟 Клуб"), "vc:c")])
         return tr("Сегодня у клуба матч. Выберите тренировку в свободный UTC-день."), Keyboard(
-            inline_keyboard=[[Button(text=tr("🏟 Клуб"), callback_data="vc:c")]]
+            inline_keyboard=rows
         )
+    if screen.staff_changed:
+        lines.append(tr("Штаб изменился. Выберите тренировку заново, чтобы она состоялась."))
     if screen.plan:
         plan = screen.plan
+        if plan.status == "cancelled":
+            lines.append(cancellation_reason(plan))
         lines.append(
-            tr("Сохранено: ")
+            (tr("Сохранено: ") if plan.status == "scheduled" else tr("План дня: "))
             + FOCUS_LABELS[Focus(plan.focus)]
             + " · "
             + INTENSITY_LABELS[Intensity(plan.intensity)].lower()
@@ -129,12 +144,32 @@ def training_view(
         lines.append(tr("На сегодня тренировка ещё не выбрана."))
     if notice:
         lines.append(escape(notice))
+    if focus is not None and focus not in screen.available:
+        required = ROLES[SPECIALISTS[focus]]
+        notice = tr(
+            "Для этого занятия нужен {role}. Наймите специалиста в /staff "
+            "или выберите общую подготовку.",
+            role=required,
+        )
+        lines.append(notice)
+        focus = None
     if focus is None:
         rows = [
             [_button(label, choice_callback("f", screen, value, Intensity.MEDIUM))]
             for value, label in FOCUS_LABELS.items()
+            if value in screen.available
         ]
         lines.append(tr("Выберите фокус тренировки."))
+        for value in Focus:
+            if value not in screen.available:
+                lines.append(
+                    tr(
+                        "🔒 {focus} — нужен {role}",
+                        focus=FOCUS_LABELS[value],
+                        role=ROLES[SPECIALISTS[value]],
+                    )
+                )
+        rows.append([_button(tr("👥 Персонал"), "cg:s:0")])
     else:
         intensity = intensity or Intensity.MEDIUM
         lines.extend(
@@ -188,6 +223,12 @@ def training_view(
 
 
 def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[str, Keyboard]:
+    if plan.status == "cancelled":
+        return cancellation_reason(plan), Keyboard(
+            inline_keyboard=[
+                [_button(tr("← Тренировки"), "tr:open"), _button(tr("👥 Персонал"), "cg:s:0")]
+            ]
+        )
     pages = max(1, (len(plan.results) + 4) // 5)
     if type(page) is not int or not 1 <= page <= pages:
         raise ValueError("Invalid training report page")
@@ -217,6 +258,28 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
             lines.append(
                 tr("Опыт: {p0} → {p1}", p0=row["experience_before"], p1=row["experience_after"])
             )
+        if "gain_bps" in row:
+            lines.append(tr("Рост навыков: +{gain}% балла", gain=f"{row['gain_bps'] / 100:.2f}"))
+        if row.get("morale_before") != row.get("morale_after"):
+            lines.append(
+                tr(
+                    "Мораль: {before} → {after}",
+                    before=row["morale_before"],
+                    after=row["morale_after"],
+                )
+            )
+        if row.get("leadership_before") != row.get("leadership_after"):
+            lines.append(
+                tr(
+                    "Лидерство: {before} → {after}",
+                    before=row["leadership_before"],
+                    after=row["leadership_after"],
+                )
+            )
+        elif row.get("leadership_gain", 0):
+            lines.append(
+                tr("Развитие лидерства: +{gain}% балла", gain=f"{row['leadership_gain'] / 100:.2f}")
+            )
         if row["injured"]:
             lines.append(tr("🤕 Травма на тренировке · восстановление 7 дней."))
         lines.append("")
@@ -232,3 +295,18 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
         rows.append(nav)
     rows.append([_button(tr("← Тренировки"), "tr:open"), _button(tr("🏟 Клуб"), "vc:c")])
     return "\n".join(lines).rstrip(), Keyboard(inline_keyboard=rows)
+
+
+def cancellation_reason(plan: TrainingPlan) -> str:
+    reason = str(plan.results[0].get("reason", "")) if plan.results else ""
+    return {
+        "staff_changed": tr(
+            "Тренировка не состоялась: состав или квалификация штаба изменились. "
+            "Выберите новое занятие в свободный день; общая подготовка доступна всегда."
+        ),
+        "match_day": tr("Тренировка не состоялась: в этот день у клуба матч."),
+        "ownership_changed": tr("Тренировка отменена после смены или окончания владения клубом."),
+        "policy_updated": tr(
+            "Прежний план отменён. Выберите новое занятие в следующий свободный день."
+        ),
+    }.get(reason, tr("Тренировка отменена. Выберите новое занятие в свободный день."))

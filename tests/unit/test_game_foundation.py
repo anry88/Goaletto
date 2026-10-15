@@ -44,6 +44,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
         "fixture_plans",
         "finance_cycles",
         "training_plans",
+        "player_development",
     }
     dialect = postgresql.dialect()
     for table in Base.metadata.sorted_tables:

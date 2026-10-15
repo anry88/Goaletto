@@ -6,6 +6,7 @@ from uuid import UUID
 
 from goaletto.domain.finances import STAFF_WAGES
 from goaletto.domain.match_types import Tactic
+from goaletto.domain.training import SPECIALISTS, Focus
 from goaletto.domain.world import stable_seed
 
 STAFF_QUALITY_POLICY = "staff-quality-v1"
@@ -46,13 +47,11 @@ def staff_abilities(role: str, skill: int, version: str = STAFF_QUALITY_POLICY) 
     if version != STAFF_QUALITY_POLICY or role not in STAFF_WAGES:
         raise ValueError("Unknown staff qualification policy or role")
     tier = quality_tier(skill)
-    training = {
-        "head_coach": ("team",),
-        "goalkeeping_coach": ("goalkeeping",),
-        "defence_coach": ("defending",),
-        "attack_coach": ("attacking",),
-        "fitness_coach": ("physical",),
-    }.get(role, ())
+    training = tuple(
+        focus.value
+        for focus in Focus
+        if (focus == Focus.TEAM and role == "head_coach") or SPECIALISTS.get(focus) == role
+    )
     tactics = (
         Tactic.NORMAL,
         Tactic.DEFENCE,
@@ -67,7 +66,7 @@ def staff_abilities(role: str, skill: int, version: str = STAFF_QUALITY_POLICY) 
         tier,
         skill,
         training=training,
-        recovery=skill if role in {"physiotherapist", "fitness_coach"} else 0,
+        recovery=skill if role == "physiotherapist" else 0,
         morale=skill if role == "head_coach" else 0,
         leadership=skill if role == "head_coach" else 0,
         tactics=tactics[: (1, 2, 3, 5, 6)[tier - 1]] if role == "head_coach" else (),

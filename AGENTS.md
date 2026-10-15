@@ -150,3 +150,15 @@
   replenish the public pool. Report lasts >=8 days and through the next window.
   Future staff dismissal/replacement should call scouting.cancel_invalid; active
   missions stop on lost scout/ownership without refund or extra dismissal fee.
+
+- AND-111/112 implement training-specialists-v2 and staff-session-v1. See docs/training.md.
+  Profile focuses require their specialist at selection and application. Staff snapshots
+  pin person/skill/salary contract; rehire never revives an old selected profile.
+  Physical gain is split across stamina/pace; head coach does not multiply every
+  specialist bonus. Physio owns natural recovery, fitness owns physical drills.
+- Shared development-budget-v1 follows PlayerDevelopment.growth_age, never club/owner.
+  Use application.development.growth_budget/save_budget and domain.development.grant_growth
+  for future AND-113 match grants: 30000 total bps, 20000 training, 10000 match,
+  15000 per skill per age-season. Preserve fractions/caps on reset; transfers do not reset.
+  Leadership has its own fraction and 5000 new bps per age-season. Morale/leadership
+  mentoring applies once to attended chosen sessions, not automated bot training.

@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import Surface, require_utc
+from goaletto.application.development import growth_budget, save_budget
 from goaletto.application.game_actions import (
     Actor,
     PermissionDenied,
@@ -19,15 +20,18 @@ from goaletto.application.game_actions import (
 )
 from goaletto.application.match_runtime import NotReady
 from goaletto.application.recovery import recover_player
+from goaletto.application.training_staff import qualifications, staff_roster, training_staff
 from goaletto.domain.game_cycle import midnight
 from goaletto.domain.training import (
     POLICY_VERSION,
     PROGRESS_KEYS,
+    SESSION_POLICY,
     SKILLS,
+    SPECIALISTS,
     Focus,
     Intensity,
     TrainingPlayer,
-    coach_bonus,
+    available_focus,
     initial_caps,
     train_player,
 )
@@ -42,8 +46,6 @@ from goaletto.infrastructure.models import (
     Person,
     Player,
     PlayerDevelopment,
-    Staff,
-    StaffQualification,
     TrainingDecision,
     TrainingPlan,
 )
@@ -66,6 +68,8 @@ class TrainingScreen:
     last_result: TrainingPlan | None
     members: tuple[TrainingMember, ...]
     blocked: bool = False
+    available: tuple[Focus, ...] = (Focus.TEAM,)
+    staff_changed: bool = False
 
 
 def week_start(at: datetime) -> datetime:
@@ -106,7 +110,6 @@ async def load_training(
         select(TrainingPlan).where(
             TrainingPlan.club_id == club.id,
             TrainingPlan.week_start == week,
-            TrainingPlan.policy_version == "training-daily-v1",
             TrainingPlan.ownership_id == ownership.id,
         )
     )
@@ -115,7 +118,7 @@ async def load_training(
         .where(
             TrainingPlan.club_id == club.id,
             TrainingPlan.ownership_id == ownership.id,
-            TrainingPlan.status == "applied",
+            TrainingPlan.status.in_(("applied", "cancelled")),
         )
         .order_by(TrainingPlan.week_start.desc())
         .limit(1)
@@ -128,6 +131,13 @@ async def load_training(
             .order_by(Person.name, Player.person_id)
         )
     ).all()
+    roster = await staff_roster(session, club.id, actor.at)
+    allowed = tuple(f for f in Focus if available_focus(f, qualifications(roster)))
+    changed = bool(
+        plan
+        and plan.status == "scheduled"
+        and plan.staff_snapshot != training_staff(roster, Focus(plan.focus))
+    )
     if record:
         await user_effect(
             session, actor, "training_opened", Surface.CLUB, ownership=ownership, club_id=club.id
@@ -141,6 +151,8 @@ async def load_training(
         last,
         tuple(TrainingMember(*r) for r in players),
         await training_blocked(session, club.id, week),
+        allowed,
+        changed,
     )
 
 
@@ -181,6 +193,10 @@ async def select_training(
         if plan is None:
             raise ValueError("Training receipt has no plan")
         return plan
+    roster = await staff_roster(session, club.id, at)
+    if not available_focus(focus, qualifications(roster)):
+        raise ValueError("Training requires a specialist")
+    snapshot = training_staff(roster, focus)
     if focus == Focus.SET_PIECES:
         player = await session.scalar(
             select(Player)
@@ -200,7 +216,6 @@ async def select_training(
         .where(
             TrainingPlan.club_id == club.id,
             TrainingPlan.week_start == week,
-            TrainingPlan.policy_version == "training-daily-v1",
         )
         .with_for_update()
         .execution_options(populate_existing=True)
@@ -219,13 +234,15 @@ async def select_training(
             intensity=intensity.value,
             executor_id=executor_id,
             status="scheduled",
-            policy_version="training-daily-v1",
+            policy_version=SESSION_POLICY,
+            staff_snapshot=snapshot,
             results=[],
         )
         session.add(plan)
     else:
         plan.ownership_id, plan.selected_at = ownership.id, at
         plan.focus, plan.intensity, plan.executor_id = focus.value, intensity.value, executor_id
+        plan.staff_snapshot = snapshot
     await session.flush()
     session.add(
         TrainingDecision(
@@ -281,17 +298,17 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
     if plan.status != "scheduled":
         return
     if (
-        plan.policy_version != "training-daily-v1"
+        plan.policy_version != SESSION_POLICY
         or plan.due_at != plan.week_start + timedelta(days=1)
         or job.due_at != plan.due_at
     ):
         raise ValueError("Invalid training schedule or policy")
+    if at < plan.due_at:
+        raise NotReady("Training date has not ended")
     if await training_blocked(session, plan.club_id, plan.week_start):
         plan.status = "cancelled"
         plan.results = [{"reason": "match_day"}]
         return
-    if at < plan.due_at:
-        raise NotReady("Training date has not ended")
     ownership = await session.scalar(
         select(OwnershipPeriod)
         .where(OwnershipPeriod.id == plan.ownership_id)
@@ -310,6 +327,16 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
         or club.owner_telegram_id != manager.telegram_id
     ):
         plan.status = "cancelled"
+        plan.results = [{"reason": "ownership_changed"}]
+        return
+    roster = await staff_roster(session, club.id, at)
+    staff_skills = qualifications(roster)
+    focus, intensity = Focus(plan.focus), Intensity(plan.intensity)
+    if not available_focus(focus, staff_skills) or plan.staff_snapshot != training_staff(
+        roster, focus
+    ):
+        plan.status = "cancelled"
+        plan.results = [{"reason": "staff_changed"}]
         return
     players = (
         await session.scalars(
@@ -347,27 +374,14 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             )
         ).all()
     }
-    staff = (
-        await session.execute(
-            select(Staff.role, StaffQualification.skill)
-            .join(
-                StaffQualification,
-                (StaffQualification.person_id == Staff.person_id)
-                & (StaffQualification.role == Staff.role),
-            )
-            .where(Staff.club_id == club.id, Staff.status.in_(("active", "last_season")))
-        )
-    ).all()
-    qualifications: dict[str, int] = {}
-    for role, skill in staff:
-        qualifications[role] = max(qualifications.get(role, 0), skill)
-    focus, intensity = Focus(plan.focus), Intensity(plan.intensity)
     results = []
     for player in players:
         person = people[player.person_id]
         if person.career != "player":
             raise ValueError("Invalid player career")
         condition = await recover_player(session, person.id, at)
+        if condition.active_match_id is not None:
+            continue
         values = {key: getattr(player, key) for key in SKILLS}
         dev = development.get(person.id)
         if dev is None:
@@ -391,17 +405,25 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
                 player.form,
                 player.experience,
                 player.injured_until is not None and player.injured_until > at,
+                player.morale,
+                player.leadership,
+                dev.leadership_progress or 0,
             ),
             focus,
             intensity,
             seed=str(plan.id),
-            bonus_bps=coach_bonus(focus, qualifications),
-            physio_skill=qualifications.get("physiotherapist", 0),
+            trainer_skill=staff_skills.get(
+                "head_coach" if focus == Focus.TEAM else SPECIALISTS[focus], 0
+            ),
+            head_skill=staff_skills.get("head_coach", 0),
+            physio_skill=staff_skills.get("physiotherapist", 0),
+            budget=growth_budget(dev, person.age),
             executor_id=plan.executor_id,
         )
         if not trained.trained:
             continue
         form_before, experience_before = player.form, player.experience
+        morale_before, leadership_before = player.morale, player.leadership
         progress_before = dict(dev.progress)
         changes = {
             key: {"before": values[key], "after": trained.skills[key]}
@@ -411,6 +433,9 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
         for key, value in trained.skills.items():
             setattr(player, key, value)
         dev.progress = trained.progress
+        save_budget(dev, trained.budget)
+        dev.leadership_progress = trained.leadership_progress
+        player.morale, player.leadership = trained.morale, trained.leadership
         player.form, player.experience = trained.form, trained.experience
         condition.energy_bps = max(
             0,
@@ -434,6 +459,13 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
                 "experience_before": experience_before,
                 "experience_after": trained.experience,
                 "gain_bps": trained.gain_bps,
+                "morale_before": morale_before,
+                "morale_after": trained.morale,
+                "leadership_before": leadership_before,
+                "leadership_after": trained.leadership,
+                "leadership_gain": trained.leadership_gain,
+                "season_gains": dict(trained.budget.used),
+                "development_age": trained.budget.age,
                 "progressed": trained.progress != progress_before
                 or bool(changes)
                 or trained.experience != experience_before,

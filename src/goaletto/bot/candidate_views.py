@@ -72,6 +72,8 @@ def candidate_list(
             f"{ROLES[role]} · {escape(latin_name(name))} · {age} · "
             f"{QUALITY_LABELS[quality_tier(skill)]} · {skill}/20"
             + (" · " + tr("⏳ Последний рабочий сезон") if status == "last_season" else "")
+            + "\n"
+            + staff_contribution(role, skill)
             for role, name, age, skill, status in screen.employed
         )
     if notice:
@@ -236,6 +238,7 @@ def staff_change_view(change: StaffChange) -> tuple[str, Keyboard]:
                 wage=amount(person["wage"]),
             )
         )
+        lines.append(staff_contribution(change.role, person["skill"]))
         if person["status"] == "last_season":
             lines.append(tr("⏳ Последний рабочий сезон"))
         if change.role == "head_coach":
@@ -295,3 +298,20 @@ def staff_change_view(change: StaffChange) -> tuple[str, Keyboard]:
             [button(tr("Назад"), "cg:s:0")],
         ]
     )
+
+
+def staff_contribution(role: str, skill: int) -> str:
+    if role == "head_coach":
+        return tr(
+            "Общая подготовка, помощь морали до {target}/100 "
+            "и постепенное развитие лидерства на занятиях.",
+            target=50 + skill,
+        )
+    return {
+        "goalkeeping_coach": tr("Открывает вратарскую подготовку. Качество определяет прирост."),
+        "defence_coach": tr("Открывает оборонительную подготовку, включая опорников."),
+        "attack_coach": tr("Открывает атаку, плеймейкинг, фланги и стандарты."),
+        "fitness_coach": tr("Открывает физподготовку: развитие выносливости и скорости."),
+        "physiotherapist": tr("Ускоряет восстановление энергии и снижает риск травм на занятиях."),
+        "scout": tr("Ищет молодых игроков в платных заданиях и оценивает их потенциал."),
+    }[role]

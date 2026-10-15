@@ -30,7 +30,7 @@ def test_capabilities_are_role_specific_and_generation_is_separate_from_money(ro
         assert abilities.tier == quality_tier(skill)
         assert bool(abilities.tactics) == (role == "head_coach")
         assert bool(abilities.scouting) == (role == "scout")
-        assert bool(abilities.recovery) == (role in {"physiotherapist", "fitness_coach"})
+        assert bool(abilities.recovery) == (role == "physiotherapist")
         assert bool(abilities.morale) == (role == "head_coach")
         if role in {"scout", "physiotherapist"}:
             assert not abilities.training

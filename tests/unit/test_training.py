@@ -13,7 +13,7 @@ from goaletto.domain.training import (
     Intensity,
     TrainingPlayer,
     age_multiplier,
-    coach_bonus,
+    available_focus,
     initial_caps,
     train_player,
 )
@@ -35,40 +35,52 @@ def player(age=22, position="MC"):
 
 def test_progress_accumulates_without_float_drift_and_stops_at_potential():
     p = player()
-    for _ in range(21):
-        result = train_player(p, Focus.PLAYMAKING, Intensity.MEDIUM, seed="week")
+    budget = None
+    for _ in range(60):
+        result = train_player(
+            p, Focus.PLAYMAKING, Intensity.MEDIUM, seed="week", trainer_skill=10, budget=budget
+        )
+        budget = result.budget
         p = replace(p, skills=result.skills, progress=result.progress, form=result.form)
-    assert p.skills["playmaking"] == 11 and p.progress["playmaking"] == 4385
+    assert p.skills["playmaking"] == 11 and p.progress["playmaking"] == 2960
     capped = replace(
         p, skills={**p.skills, "playmaking": 15}, progress={**p.progress, "playmaking": 9900}
     )
-    result = train_player(capped, Focus.PLAYMAKING, Intensity.HIGH, seed="week")
+    result = train_player(capped, Focus.PLAYMAKING, Intensity.HIGH, seed="week", trainer_skill=10)
     assert result.skills["playmaking"] == 15 and result.progress["playmaking"] == 0
     assert p.skills["defending"] == 10 and p.progress["defending"] == 0
 
 
 def test_age_anchors_coaches_and_fractional_physical_gain():
     assert [age_multiplier(a) for a in (17, 22, 27, 32, 38)] == [15000, 12000, 8000, 3000, 3000]
-    assert coach_bonus(Focus.ATTACKING, {"head_coach": 20, "attack_coach": 20}) == 5000
-    assert coach_bonus(Focus.DEFENDING, {"head_coach": 20, "attack_coach": 20}) == 2000
-    result = train_player(player(17), Focus.PHYSICAL, Intensity.HIGH, seed="first", bonus_bps=5000)
+    assert available_focus(Focus.ATTACKING, {"attack_coach": 20})
+    assert not available_focus(Focus.DEFENDING, {"head_coach": 20, "attack_coach": 20})
+    result = train_player(
+        player(17), Focus.PHYSICAL, Intensity.HIGH, seed="first", trainer_skill=20
+    )
     assert result.skills["stamina"] == 10 and result.skills["pace"] == 10
-    assert result.progress["pace"] == result.progress["stamina"] == 1671
-    result = train_player(player(32), Focus.TEAM, Intensity.LOW, seed="first")
-    assert result.progress["experience"] == 102
+    assert result.progress["pace"] == result.progress["stamina"] == 263
+    result = train_player(player(32), Focus.TEAM, Intensity.LOW, seed="first", trainer_skill=10)
+    assert result.progress["experience"] == 6
 
 
 def test_eligible_positions_executor_and_injury_skip():
     p = player(position="GK")
-    assert not train_player(p, Focus.ATTACKING, Intensity.MEDIUM, seed="week").trained
-    assert train_player(p, Focus.GOALKEEPING, Intensity.MEDIUM, seed="week").trained
     assert not train_player(
-        p, Focus.SET_PIECES, Intensity.MEDIUM, seed="week", executor_id=uuid4()
+        p, Focus.ATTACKING, Intensity.MEDIUM, seed="week", trainer_skill=10
     ).trained
     assert train_player(
-        p, Focus.SET_PIECES, Intensity.MEDIUM, seed="week", executor_id=p.id
+        p, Focus.GOALKEEPING, Intensity.MEDIUM, seed="week", trainer_skill=10
     ).trained
-    result = train_player(replace(p, injured=True), Focus.PHYSICAL, Intensity.HIGH, seed="week")
+    assert not train_player(
+        p, Focus.SET_PIECES, Intensity.MEDIUM, seed="week", trainer_skill=10, executor_id=uuid4()
+    ).trained
+    assert train_player(
+        p, Focus.SET_PIECES, Intensity.MEDIUM, seed="week", trainer_skill=10, executor_id=p.id
+    ).trained
+    result = train_player(
+        replace(p, injured=True), Focus.PHYSICAL, Intensity.HIGH, seed="week", trainer_skill=10
+    )
     assert not result.trained and result.skills == p.skills and result.progress == p.progress
     assert result.form == p.form and not result.injured
 
@@ -78,16 +90,20 @@ def test_seeded_risk_is_repeatable_and_physio_can_only_reduce_it():
     injury_seeds = [
         str(i)
         for i in range(10000)
-        if train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=str(i)).injured
+        if train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=str(i), trainer_skill=10).injured
     ]
     assert 1 <= len(injury_seeds) <= 25
     for seed in injury_seeds:
-        first = train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=seed)
-        assert first == train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=seed)
-        assert not train_player(p, Focus.PHYSICAL, Intensity.MEDIUM, seed=seed).injured
+        first = train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=seed, trainer_skill=10)
+        assert first == train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=seed, trainer_skill=10)
+        assert not train_player(
+            p, Focus.PHYSICAL, Intensity.MEDIUM, seed=seed, trainer_skill=10
+        ).injured
     for i in range(100):
-        normal = train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=str(i))
-        reduced = train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=str(i), physio_skill=20)
+        normal = train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=str(i), trainer_skill=10)
+        reduced = train_player(
+            p, Focus.PHYSICAL, Intensity.HIGH, seed=str(i), trainer_skill=10, physio_skill=20
+        )
         assert not reduced.injured or normal.injured
     caps = initial_caps(p.id, p.skills)
     assert caps == initial_caps(p.id, p.skills) and all(12 <= v <= 20 for v in caps.values())
@@ -105,6 +121,7 @@ def test_week_callbacks_are_stable_and_fit_with_both_full_uuids():
         None,
         None,
         (TrainingMember(uuid4(), "<Игрок>", "MC"),),
+        available=tuple(Focus),
     )
     for f in Focus:
         for i in Intensity:

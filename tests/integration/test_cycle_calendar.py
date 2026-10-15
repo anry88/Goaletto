@@ -129,7 +129,8 @@ async def test_cycle_finances_partial_opening_and_four_day_salary_no_duplicate(s
                 await session.scalars(select(SalaryContract).where(SalaryContract.club_id == club))
             ).all()
         )
-        assert all(c.policy_version == "economy-cycle-v1" for c in contracts)
+        assert len(contracts) == 21
+        assert all(c.policy_version == "economy-cycle-v2" for c in contracts)
         await cycle_finances(session, job, job.due_at)
         receipt = await session.scalar(select(FinanceCycle).where(FinanceCycle.club_id == club))
         assert all(row["period_seconds"] == 345600 for row in receipt.snapshot["contracts"])
@@ -158,11 +159,11 @@ async def test_daily_training_uses_free_date_and_does_not_apply_weekly_growth(se
             replace(actor, operation_id=uuid4()),
             ownership_id=screen.ownership_id,
             week=screen.week_start,
-            focus=Focus.PHYSICAL,
+            focus=Focus.TEAM,
             intensity=Intensity.MEDIUM,
             clock=lambda: AT,
         )
-        assert plan.policy_version == "training-daily-v1"
+        assert plan.policy_version == "training-specialists-v2"
         job = await session.scalar(
             select(Job).where(
                 Job.kind == "training.apply", Job.payload["plan_id"].astext == str(plan.id)
@@ -191,7 +192,7 @@ async def test_daily_training_uses_free_date_and_does_not_apply_weekly_growth(se
                 actor,
                 ownership_id=screen.ownership_id,
                 week=screen.week_start,
-                focus=Focus.PHYSICAL,
+                focus=Focus.TEAM,
                 intensity=Intensity.MEDIUM,
                 clock=lambda: FIRST,
             )
