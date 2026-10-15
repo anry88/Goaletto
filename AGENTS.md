@@ -208,3 +208,7 @@
 - Accepted external AND-124/126/71 subpackages: domain.knockout,
   domain.champions_groups and scripts/audit_gameplay_balance.py.
   See docs/agent-wave6-review.md; shared runtime/DB wiring remains unfinished.
+- Accepted AND-130 match_practice (proposal coefficients) and AND-126
+  champions_bracket; see docs/agent-wave7-review.md. Do not confuse accepted pure
+  modules with completed game wiring. Preserve match-development-v1 receipts;
+  zero-minute practice must preserve every fraction, including capped skills.

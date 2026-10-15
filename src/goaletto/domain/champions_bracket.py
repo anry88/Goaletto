@@ -167,6 +167,15 @@ class ChampionsTie:
             raise ValueError("A tie requires two different participants")
         if type(self.neutral) is not bool:
             raise ValueError("Champions tie neutral flag must be bool")
+        if not 1 <= self.round_number <= 9 or (self.neutral and self.round_number < 3):
+            raise ValueError("Champions tie round is outside the supported tournament sizes")
+        expected = (
+            (2 * self.round_number - 1,)
+            if self.neutral
+            else (2 * self.round_number - 1, 2 * self.round_number)
+        )
+        if self.champions_cycles != expected:
+            raise ValueError("Tie cycles differ from the round schedule")
 
 
 @dataclass(frozen=True)
@@ -199,6 +208,12 @@ class ChampionsLeg:
             raise ValueError("Champions phase day must be day 2")
         if self.home == self.away:
             raise ValueError("A match requires two different participants")
+        if not 1 <= self.round_number <= 9 or (self.neutral and self.round_number < 3):
+            raise ValueError("Champions leg round is outside the supported tournament sizes")
+        if self.leg_number > (1 if self.neutral else 2):
+            raise ValueError("Invalid leg number for this tie format")
+        if self.champions_cycle != 2 * self.round_number - 2 + self.leg_number:
+            raise ValueError("Leg cycle differs from its round and leg number")
 
 
 @dataclass(frozen=True)
@@ -385,8 +400,7 @@ def _validate_layout(bracket: ChampionsBracket) -> None:
         )
         if tie.id != expected_id:
             raise ValueError("Tie ID differs from the tournament namespace")
-        by_round = [other for other in bracket.ties if other.round_number == tie.round_number]
-        if not 0 <= tie.tie_index < len(by_round):
+        if not 0 <= tie.tie_index < expected_counts[tie.round_number]:
             raise ValueError("Tie index out of range for its round")
         if tie.round_number == 1:
             for slot in (tie.home, tie.away):

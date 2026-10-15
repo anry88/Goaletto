@@ -621,7 +621,11 @@ def test_knockout_winners_with_extra_time_and_pens_feed_bracket() -> None:
     # Single neutral final through extra time: the same knockout API decides it.
     final = final_tie(bracket)
     assert final.neutral is True
-    finalists = sorted(possible_tie_clubs(bracket, final.id, {}), key=lambda club: club.hex)[:2]
+    decided = play_full(bracket, seed=56)
+    finalists = [
+        resolve_slot(bracket, final.home, decided),
+        resolve_slot(bracket, final.away, decided),
+    ]
     assert len(finalists) == 2
     single = KnockoutTie(
         policy_version=KNOCKOUT_POLICY,
@@ -690,3 +694,52 @@ def test_bracket_helpers_reject_bad_shapes() -> None:
         replace(leg, champions_cycle=18)
     with pytest.raises(ValueError):
         replace(sample, champions_cycles=(18,))
+
+
+@pytest.mark.parametrize("damage", [{"leg_number": 3}, {"champions_cycle": 2}, {"round_number": 2}])
+def test_standalone_leg_rejects_invalid_round_or_leg(damage):
+    sample = legs_of(build(num_sets=1, seed=7).ties[0])[0]
+    with pytest.raises(ValueError):
+        replace(sample, **damage)
+
+
+def test_champions_tie_and_player_practice_share_actual_match_minutes():
+    from goaletto.domain.development import GrowthBudget
+    from goaletto.domain.match_practice import develop_match_practice
+    from tests.unit.test_match_practice import make_player
+
+    bracket = build(num_sets=1, seed=7)
+    tie = bracket.ties[0]
+    a = resolve_slot(bracket, tie.home, {})
+    b = resolve_slot(bracket, tie.away, {})
+    assert a is not None and b is not None
+    decision = decide_tie(
+        tie=KnockoutTie(KNOCKOUT_POLICY, a, b, "two-leg"),
+        first_match=MatchResult("leg1", a, b, 1, 0, True),
+        second_match=MatchResult("leg2", b, a, 1, 0, True),
+        extra_time=MatchResult("leg2-et", b, a, 0, 1, True),
+    )
+    assert decision.winner == a
+    validate_winners(bracket, {tie.id: decision.winner})
+    player = make_player(age=18)
+    first = develop_match_practice(
+        player, "champions", 90, {"attack_coach": 10}, GrowthBudget(18), match_seed="first-leg"
+    )
+    second = develop_match_practice(
+        replace(
+            player,
+            skills=first.skills,
+            progress=first.progress,
+            experience=first.experience,
+            form=first.form,
+        ),
+        "champions",
+        120,
+        {"attack_coach": 10},
+        first.growth.budget,
+        match_seed="second-leg",
+    )
+    # Actual 90 + 120 across two fixtures, not 90 + 90 + another full ET reward.
+    assert sum(first.granted.values()) == 345
+    assert sum(second.granted.values()) == 460
+    assert second.growth.budget.used["match"] == 805

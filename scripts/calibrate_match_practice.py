@@ -53,11 +53,16 @@ def official_parity() -> list[str]:
         new = develop_match_practice(
             player(age), "league", 90, STAFF, GrowthBudget(age), match_seed="parity"
         )
+        parity = (
+            new.growth == old.growth
+            and new.experience == old.experience
+            and new.experience_gain == old.experience_gain
+        )
         lines.append(
             f"age {age}: v1 granted={sum(old.growth.granted.values())} "
             f"practice granted={sum(new.granted.values())} "
             f"exp {old.experience_gain}={new.experience_gain} "
-            f"match={old == old and new.granted == old.growth.granted}"
+            f"match={parity}"
         )
     return lines
 
@@ -87,8 +92,8 @@ def factor_table() -> list[str]:
         lines.append("".join(row) + " " + "".join(exps))
     lines.append(
         "Choice proposal: 50% (5000 bps). 25% makes friendlies near-noise for "
-        "veterans (30y: 30 vs 120 official); 75% closes the gap so a friendly "
-        "plus training rivals an official week. 50% keeps friendlies positive "
+        "veterans (30y: 30 vs 120 official); 75% is closer to official "
+        "development. 50% is an intermediate proposal keeping friendlies positive "
         "but clearly below official at every age."
     )
     return lines
@@ -195,7 +200,14 @@ def simulate_season(seed: int, dense: bool, friendly_factor: int) -> dict[str, i
             )
             training_bps += outcome.gain_bps
             budget = outcome.budget
-            current = replace(current, skills=outcome.skills, progress=outcome.progress)
+            current = replace(
+                current,
+                skills=outcome.skills,
+                progress=outcome.progress,
+                morale=outcome.morale,
+                leadership=outcome.leadership,
+                leadership_progress=outcome.leadership_progress,
+            )
             form, experience = outcome.form, outcome.experience
             trainings += 1
     return {
@@ -237,8 +249,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Calibrate AND-130 match practice.")
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
-    if type(args.seed) is not int or args.seed < 0:
-        raise ValueError("Seed must be a nonnegative int")
+    if type(args.seed) is not int or not 0 <= args.seed < 2**63:
+        parser.error("Seed must fit nonnegative BIGINT")
     sections = [
         official_parity(),
         factor_table(),

@@ -263,7 +263,11 @@ def test_budget_fractions_carry_over_and_transfer_does_not_reset():
     assert carried.growth.budget.used["match"] == (
         first.growth.budget.used["match"] + sum(carried.granted.values())
     )
-    assert carried.progress["playmaking"] == first.progress["playmaking"] or True
+    assert (carried.skills["playmaking"] * 10000 + carried.progress["playmaking"]) == (
+        first.skills["playmaking"] * 10000
+        + first.progress["playmaking"]
+        + carried.granted["playmaking"]
+    )
     # Same budget object follows the person across clubs/owners: no new budget.
 
 
@@ -400,3 +404,16 @@ def test_unknown_policy_and_bad_seed_staff_rejected():
         )
     with pytest.raises(ValueError):
         develop_match_practice(make_player(22), "league", 90, {}, GrowthBudget(30), match_seed="x")
+
+
+@pytest.mark.parametrize("competition", tuple(Competition))
+def test_unused_player_preserves_capped_fractional_progress(competition):
+    player = make_player(skill=10, cap=10)
+    player = replace(player, progress={**player.progress, "playmaking": 1234, "experience": 9999})
+    budget = GrowthBudget(player.age)
+    result = develop_match_practice(player, competition, 0, {}, budget, match_seed="unused")
+    assert result.progress == player.progress
+    assert result.skills == player.skills and result.form == player.form
+    assert result.experience == player.experience and result.experience_gain == 0
+    assert result.growth.budget.used == budget.used
+    assert not any(result.granted.values())

@@ -238,13 +238,22 @@ def develop_match_practice(
         strength = 3000 + staff_snapshot.get("head_coach", 0) * 100
     official_gain = 240 * age_multiplier(player.age) * strength * minutes // (10000**2 * 90)
     requested_gain = official_gain * skill_factor // 10000
-    growth = grant_growth(
-        dict(player.skills),
-        dict(player.caps),
-        dict(player.progress),
-        budget,
-        {PRIMARY_SKILLS[player.position]: requested_gain},
-        source="match",
+    growth = (
+        SkillGrowth(
+            dict(player.skills),
+            dict(player.progress),
+            GrowthBudget(budget.age, dict(budget.used)),
+            dict.fromkeys(player.skills, 0),
+        )
+        if minutes == 0
+        else grant_growth(
+            dict(player.skills),
+            dict(player.caps),
+            dict(player.progress),
+            budget,
+            {PRIMARY_SKILLS[player.position]: requested_gain},
+            source="match",
+        )
     )
 
     official_experience = 1000 * age_multiplier(player.age) * minutes // (10000 * 90)

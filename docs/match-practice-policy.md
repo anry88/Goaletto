@@ -6,6 +6,10 @@
 receipts/replay остаются в силе. Полная приёмка AND-130 требует persisted
 pin/apply и runtime — данный пакет её не закрывает.
 
+[Приёмка и исправления](agent-wave7-review.md): 0 минут сохраняют также дроби
+на потолке навыка. Односторонняя 0/+1 форма требует долгосрочной калибровки:
+значение 8 в этой proposal является поглощающим, спад здесь не моделируется.
+
 ## Контракт
 
 Модуль `src/goaletto/domain/match_practice.py`, чистый (без aiogram,
@@ -37,7 +41,11 @@ SQLAlchemy, часов и unseeded RNG):
 from goaletto.domain.match_practice import Competition, develop_match_practice
 
 result = develop_match_practice(
-    player, Competition.CUP, 90, {"attack_coach": 10}, budget,
+    player,
+    Competition.CUP,
+    90,
+    {"attack_coach": 10},
+    budget,
     match_seed="cup-2026-11-02:match:<uuid>",
 )
 result.form, result.experience, result.granted, result.terms

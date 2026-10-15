@@ -107,12 +107,20 @@ knockout_tie = KnockoutTie(
 decision = decide_tie(
     tie=knockout_tie,
     first_match=MatchResult(
-        segment="leg1", home_id=club_a, away_id=club_b,
-        home_goals=2, away_goals=0, completed=True,
+        segment="leg1",
+        home_id=club_a,
+        away_id=club_b,
+        home_goals=2,
+        away_goals=0,
+        completed=True,
     ),
     second_match=MatchResult(
-        segment="leg2", home_id=club_b, away_id=club_a,
-        home_goals=1, away_goals=1, completed=True,
+        segment="leg2",
+        home_id=club_b,
+        away_id=club_a,
+        home_goals=1,
+        away_goals=1,
+        completed=True,
     ),
 )
 assert decision.status == "decided" and decision.winner is not None
