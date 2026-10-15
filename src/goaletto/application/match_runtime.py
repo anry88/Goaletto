@@ -118,15 +118,23 @@ async def activate_season(session: AsyncSession, season_id: UUID, at: datetime) 
     require_utc(at)
     if not session.in_transaction():
         raise ValueError("Runtime activation needs a transaction")
+    from goaletto.application.game_actions import allocation_lock
+
+    await allocation_lock(session)
     season = await session.scalar(select(Season).where(Season.id == season_id).with_for_update())
     if season is None or season.status not in {"scheduled", "active"}:
         raise ValueError("Season is not available for activation")
+    from goaletto.application.calendar_planning import plan_horizon
+
+    season.calendar_enabled = True
+    await session.flush()
+    await plan_horizon(session, season.id, at)
     await start_coverage(session, at)
     await session.execute(
         update(Job)
         .where(
             Job.status == "held",
-            Job.kind.in_(RUNTIME_KINDS | {"season.rollover"}),
+            Job.kind.in_(RUNTIME_KINDS | {"season.rollover", "calendar.materialize"}),
             Job.payload["season_id"].astext == str(season_id),
         )
         .values(status="pending")
@@ -139,7 +147,7 @@ async def activate_season(session: AsyncSession, season_id: UUID, at: datetime) 
         update(Job)
         .where(
             Job.status == "held",
-            Job.kind == "finance.weekly",
+            Job.kind == "finance.cycle",
             Job.payload["club_id"].astext.in_(
                 select(cast(SeasonClub.club_id, String)).where(SeasonClub.season_id == season_id)
             ),
@@ -576,6 +584,19 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
     match = await session.scalar(
         select(Match).where(Match.fixture_id == fixture.id).with_for_update()
     )
+    if job.kind in {"match.lock_lineup", "match.start"}:
+        other = await session.scalar(
+            select(Fixture.id)
+            .where(
+                Fixture.id != fixture.id,
+                Fixture.status.in_(("live", "paused")),
+                (Fixture.home_club_id.in_((fixture.home_club_id, fixture.away_club_id)))
+                | (Fixture.away_club_id.in_((fixture.home_club_id, fixture.away_club_id))),
+            )
+            .limit(1)
+        )
+        if other is not None:
+            raise NotReady("A club is still playing another match")
     if job.kind == "match.lock_lineup":
         if at < fixture.lineup_lock_at:
             raise NotReady("Lineup deadline is not due")

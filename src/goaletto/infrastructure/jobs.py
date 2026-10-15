@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
 from goaletto.application.feedback import cleanup_comments
-from goaletto.application.finances import weekly_finances
+from goaletto.application.finances import cycle_finances
 from goaletto.application.game_actions import allocation_lock, handle_lease_job
 from goaletto.application.market import close_auction, prohibit_player_trades
 from goaletto.application.match_runtime import (
@@ -73,7 +73,8 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         "ownership.remind",
         "ownership.expire",
         "training.apply",
-        "finance.weekly",
+        "finance.cycle",
+        "calendar.materialize",
         "stadium.complete",
         "market.close",
         "market.cancel_player",
@@ -116,8 +117,24 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
                     await prohibit_player_trades(session, UUID(job.payload["person_id"]), at)
                 elif job.kind == "stadium.complete":
                     await complete_expansion(session, job, at)
-                elif job.kind == "finance.weekly":
-                    await weekly_finances(session, job, at)
+                elif job.kind == "calendar.materialize":
+                    from uuid import UUID
+
+                    from goaletto.application.calendar_planning import plan_horizon
+
+                    if set(job.payload) != {"version", "season_id"} or job.payload["version"] != 1:
+                        raise ValueError("Invalid horizon job")
+                    if not await allocation_lock(session, try_lock=True):
+                        raise NotReady("Calendar allocation is busy")
+                    await plan_horizon(session, UUID(job.payload["season_id"]), at)
+                    from goaletto.infrastructure.models import Season
+
+                    current = await session.get(Season, UUID(job.payload["season_id"]))
+                    if current is not None and current.status in {"scheduled", "active"}:
+                        job.due_at = at + timedelta(hours=1)
+                        rescheduled = True
+                elif job.kind == "finance.cycle":
+                    await cycle_finances(session, job, at)
                 elif job.kind == "training.apply":
                     await apply_training(session, job, at)
                 else:

@@ -43,14 +43,14 @@ def test_supply_deficit_never_exceeds_threshold():
 
 def test_rollover_calendar_rest_and_delayed_completion():
     first = datetime(2026, 10, 17, 18, tzinfo=UTC)
-    finish = first + timedelta(weeks=17, minutes=33)
-    assert rollover_kickoff(first, finish, finish + timedelta(seconds=1)) == first + timedelta(
-        weeks=20
-    )
-    late = finish + timedelta(weeks=4, days=1)
-    assert rollover_kickoff(first, late, late) == first + timedelta(weeks=24)
-    at = first + timedelta(weeks=30, minutes=1)
-    assert rollover_kickoff(first, finish, at) == first + timedelta(weeks=31)
+    from goaletto.domain.game_cycle import season_end
+
+    finish = season_end(first)
+    assert rollover_kickoff(first, finish, finish) == first + timedelta(days=80)
+    late = finish + timedelta(days=5)
+    moved = rollover_kickoff(first, late, late)
+    assert moved > first + timedelta(days=80)
+    assert (moved.date() - first.date()).days % 4 == 0
 
 
 @pytest.mark.parametrize("position", PLAYER_POSITIONS)

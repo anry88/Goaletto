@@ -1,38 +1,12 @@
 """Financial opening rows for a new world, with explicit timestamps and IDs."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid5
 
 from goaletto.domain.finances import POLICY_VERSION, player_wage
+from goaletto.domain.game_cycle import CYCLE_SECONDS, midnight, season_epoch
 from goaletto.domain.world import WorldPlan
-
-
-def week_start(at: datetime) -> datetime:
-    if at.tzinfo is None or at.utcoffset() != timedelta(0):
-        raise ValueError("Finance week must be UTC")
-    return (at.astimezone(UTC) - timedelta(days=at.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
-
-
-def weekly_job(club_id: UUID, week: datetime, *, status: str = "pending") -> dict[str, Any]:
-    key = f"finance:v1:{club_id}:{week.isoformat()}"
-    return {
-        "id": uuid5(club_id, key),
-        "dedupe_key": key,
-        "kind": "finance.weekly",
-        "due_at": week,
-        "status": status,
-        "attempts": 0,
-        "last_error": None,
-        "payload": {
-            "version": 1,
-            "club_id": str(club_id),
-            "week_start": week.isoformat(),
-            "policy": POLICY_VERSION,
-        },
-    }
 
 
 def opening_rows(plan: WorldPlan, at: datetime) -> tuple[list[dict[str, Any]], ...]:
@@ -69,7 +43,32 @@ def opening_rows(plan: WorldPlan, at: datetime) -> tuple[list[dict[str, Any]], .
         }
         for p in plan.players
     ]
-    # A new world keeps its work held until the explicit launch activation.
-    first = week_start(plan.options.first_kickoff) + timedelta(days=7)
-    jobs = [weekly_job(club.id, first, status="held") for club in clubs]
+    first = midnight(season_epoch(plan.options.first_kickoff))
+    duration = timedelta(seconds=CYCLE_SECONDS)
+    first += ((at - first) // duration + 1) * duration
+    jobs = [cycle_job(club.id, at, status="held") for club in clubs]
+    for job in jobs:
+        job["due_at"] = first
+        job["payload"]["period_end"] = first.isoformat()
     return accounts, entries, salaries, jobs
+
+
+def cycle_job(club_id: UUID, start: datetime, *, status: str = "pending") -> dict[str, Any]:
+    end = start + timedelta(seconds=CYCLE_SECONDS)
+    key = f"finance:cycle-v1:{club_id}:{start.isoformat()}"
+    return {
+        "id": uuid5(club_id, key),
+        "dedupe_key": key,
+        "kind": "finance.cycle",
+        "due_at": end,
+        "status": status,
+        "attempts": 0,
+        "last_error": None,
+        "payload": {
+            "version": 2,
+            "club_id": str(club_id),
+            "period_start": start.isoformat(),
+            "period_end": end.isoformat(),
+            "policy": "economy-cycle-v1",
+        },
+    }

@@ -113,7 +113,7 @@ def candidate_list(
                 f"<b>{escape(latin_name(person.name))}</b> · {person.age} · {role}",
                 ability,
                 tr(
-                    "Подписание: {fee} · зарплата: {wage}/неделю",
+                    "Подписание: {fee} · зарплата: {wage}/период клуба",
                     fee=amount(offer.fee),
                     wage=amount(offer.weekly_rate),
                 ),
@@ -156,7 +156,7 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
     offer, person = item.offer, item.person
     role = offer.profile if offer.kind == "player" else ROLES[offer.profile]
     text = tr(
-        "Подписать {name} · {role}?\nРазово: {fee}\nЗарплата: {wage}/неделю",
+        "Подписать {name} · {role}?\nРазово: {fee}\nЗарплата: {wage}/период клуба",
         name=escape(latin_name(person.name)),
         role=role,
         fee=amount(offer.fee),

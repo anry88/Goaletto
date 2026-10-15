@@ -27,8 +27,8 @@ from goaletto.domain.stadium import (
     EXPANSION_DAYS,
     Attendance,
     attendance,
+    period_upkeep,
     stadium_level,
-    weekly_upkeep,
 )
 from goaletto.infrastructure.models import (
     Club,
@@ -253,8 +253,12 @@ async def complete_expansion(session: AsyncSession, job: Job, at: datetime) -> N
     await session.flush()
 
 
-async def upkeep_for_week(
-    session: AsyncSession, club: Club, week: datetime
+async def upkeep_for_period(
+    session: AsyncSession,
+    club: Club,
+    week: datetime,
+    *,
+    period_start: datetime,
 ) -> tuple[int, list[dict[str, str | int]]]:
     rows = (
         await session.scalars(
@@ -268,7 +272,7 @@ async def upkeep_for_week(
         (row for row in rows if row.completed_at is not None),
         key=lambda row: row.completed_at or week,
     )
-    start = week - timedelta(days=7)
+    start = period_start
     changes: list[tuple[datetime, int]] = []
     for row in finished:
         if row.completed_at is None:
@@ -277,4 +281,4 @@ async def upkeep_for_week(
             capacity = row.to_capacity
         elif row.completed_at < week:
             changes.append((row.completed_at, row.to_capacity))
-    return weekly_upkeep(capacity, start, week, tuple(changes))
+    return period_upkeep(capacity, start, week, tuple(changes))

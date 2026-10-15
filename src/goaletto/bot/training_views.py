@@ -1,4 +1,4 @@
-"""Stateless weekly training controls. Choices pin ownership and the UTC week."""
+"""Stateless daily training controls. Choices pin ownership and the UTC date."""
 
 from datetime import UTC, datetime
 from html import escape
@@ -82,7 +82,7 @@ def parse_choice(value: str) -> tuple[str, UUID, datetime, Focus, Intensity, UUI
         raise ValueError("Invalid training selection")
     week = datetime.strptime(parts[5], "%Y%m%d").replace(tzinfo=UTC)
     if week.strftime("%Y%m%d") != parts[5]:
-        raise ValueError("Invalid training week")
+        raise ValueError("Invalid training date")
     return (
         parts[1],
         expand_id(parts[4]),
@@ -109,10 +109,14 @@ def training_view(
 ) -> tuple[str, Keyboard]:
     lines = [
         tr("🏋️ <b>{p0}</b> · Тренировки", p0=escape(latin_name(screen.club_name))),
-        tr("Неделя с {p0}", p0=screen.week_start.strftime("%d.%m.%Y")),
+        tr("Дата тренировки: {p0}", p0=screen.week_start.strftime("%d.%m.%Y")),
         tr("Результат: ") + screen.due_at.strftime("%d.%m.%Y %H:%M UTC"),
         "",
     ]
+    if screen.blocked:
+        return tr("Сегодня у клуба матч. Выберите тренировку в свободный UTC-день."), Keyboard(
+            inline_keyboard=[[Button(text=tr("🏟 Клуб"), callback_data="vc:c")]]
+        )
     if screen.plan:
         plan = screen.plan
         lines.append(
@@ -122,7 +126,7 @@ def training_view(
             + INTENSITY_LABELS[Intensity(plan.intensity)].lower()
         )
     else:
-        lines.append(tr("На эту неделю тренировка ещё не выбрана."))
+        lines.append(tr("На сегодня тренировка ещё не выбрана."))
     if notice:
         lines.append(escape(notice))
     if focus is None:
@@ -178,7 +182,7 @@ def training_view(
         rows.append(
             [_button(tr("📋 Последний результат"), f"tr:r:{compact_id(screen.last_result.id)}:1")]
         )
-    lines.append(tr("Выбор можно менять до окончания недели. Без выбора тренировок нет."))
+    lines.append(tr("Выбор можно менять до конца UTC-дня. Без выбора тренировки нет."))
     rows.append([_button(tr("🏟 Клуб"), "vc:c"), _button(tr("🏠 Главное меню"), "vc:menu")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)
 
@@ -189,7 +193,7 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
         raise ValueError("Invalid training report page")
     lines = [
         tr("🏋️ <b>{p0}</b> · Результат тренировки", p0=escape(latin_name(club_name))),
-        plan.week_start.strftime(tr("Неделя с %d.%m.%Y")),
+        plan.week_start.strftime("%d.%m.%Y UTC"),
         FOCUS_LABELS[Focus(plan.focus)]
         + " · "
         + INTENSITY_LABELS[Intensity(plan.intensity)].lower(),

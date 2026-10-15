@@ -12,7 +12,11 @@ from goaletto.application.world import initialize_world
 from goaletto.domain.world import WORLD_POLICY, WorldOptions, build_world
 from goaletto.infrastructure.models import WorldSeedReceipt
 
-OPTIONS = WorldOptions(key="initial", seed=0, first_kickoff=datetime(2026, 10, 17, 18, tzinfo=UTC))
+OPTIONS = WorldOptions(
+    key="initial",
+    seed=0,
+    first_kickoff=datetime(2026, 10, 17, 18, tzinfo=UTC),
+)
 NOW = datetime(2026, 10, 12, tzinfo=UTC)
 
 
@@ -72,7 +76,11 @@ async def test_retry_after_matches_and_catalog_changes_does_not_reset_world(monk
 
 async def test_reusing_key_with_changed_configuration_is_rejected() -> None:
     session = SQLRecorder(receipt())
-    changed = WorldOptions(key="initial", seed=1, first_kickoff=OPTIONS.first_kickoff)
+    changed = WorldOptions(
+        key="initial",
+        seed=1,
+        first_kickoff=OPTIONS.first_kickoff,
+    )
     with pytest.raises(ValueError, match="different seed"):
         await initialize_world(cast(AsyncSession, session), changed, initialized_at=NOW)
     assert session.writes == []
@@ -101,11 +109,13 @@ async def test_seed_batch_reserves_unique_people_and_keeps_all_jobs_held(monkeyp
             )
         if statement.table.name == "jobs":
             job_statuses.extend(
-                value for key, value in compiled.params.items() if key.startswith("status_m")
+                value
+                for key, value in compiled.params.items()
+                if key.startswith("status_m") or key == "status"
             )
         assert statement.table.name not in {"managers", "staff", "matches", "outbox_messages"}
     assert len(people) == len(set(people)) == 1000
-    assert len(job_statuses) == 15352 and set(job_statuses) == {"held"}
+    assert len(job_statuses) == 53 and set(job_statuses) == {"held"}
 
 
 async def test_closed_preparation_window_is_rejected_before_any_population_write() -> None:

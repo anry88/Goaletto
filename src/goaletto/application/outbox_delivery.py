@@ -324,8 +324,8 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
             )
         if event == "bought":
             return tr(
-                "✅ Вы выиграли аукцион: {player} · {amount}. Зарплата: {wage}/неде"
-                "лю. Выберите заявку в /lineup.",
+                "✅ Вы выиграли аукцион: {player} · {amount}. Зарплата: {wage}/период клуба. "
+                "Выберите заявку в /lineup.",
                 player=player,
                 amount=amount,
                 wage=wage,

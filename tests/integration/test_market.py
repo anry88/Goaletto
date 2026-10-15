@@ -35,7 +35,7 @@ from goaletto.infrastructure.models import (
     SalaryContract,
     TransferReceipt,
 )
-from tests.integration.test_agent_wave import NOW, setup_world
+from tests.integration.test_agent_wave import NOW, OPTIONS, setup_world
 
 pytestmark = pytest.mark.integration
 
@@ -45,7 +45,9 @@ def action(actor, at=NOW):
 
 
 async def market_world(sessions):
-    _, seller, seller_id = await setup_world(sessions)
+    _, seller, seller_id = await setup_world(
+        sessions, options=replace(OPTIONS, first_kickoff=OPTIONS.first_kickoff + timedelta(days=4))
+    )
     actors = [(seller, seller_id)]
     async with sessions.begin() as session:
         for telegram_id in (1002, 1003):
@@ -257,7 +259,9 @@ async def test_busy_match_defers_settlement_and_fault_rolls_back_entire_trade(se
         auction = await session.get(Auction, auction_id)
         due = auction.ends_at
         fixture = await session.scalar(
-            select(Fixture).where(Fixture.home_club_id == people[0][1]).limit(1)
+            select(Fixture)
+            .where((Fixture.home_club_id == people[0][1]) | (Fixture.away_club_id == people[0][1]))
+            .limit(1)
         )
         fixture.lineup_lock_at = due - timedelta(minutes=5)
         fixture.scheduled_start_at = due

@@ -212,7 +212,7 @@ def auction_view(
             bid=amount(bid.amount) if bid else tr("— нет"),
         ),
         tr("Завершение: {date} UTC", date=auc.ends_at.strftime("%d.%m %H:%M")),
-        tr("Зарплата покупателя: {wage}/неделю", wage=amount(auc.weekly_rate)),
+        tr("Зарплата покупателя: {wage}/период клуба", wage=amount(auc.weekly_rate)),
     ]
     if auc.close_reason:
         lines.append(REASONS[auc.close_reason])

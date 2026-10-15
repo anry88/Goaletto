@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-from goaletto.application.finance_seed import week_start
 from goaletto.application.finances import FinanceScreen
+from goaletto.application.training import week_start
 from goaletto.bot.finance_views import finance_view, parse_page
 from goaletto.domain.finances import (
     INITIAL_CAPITAL,
@@ -26,7 +26,9 @@ from tests.unit.test_language import assert_english
 def test_starter_wages_and_guaranteed_income_cover_head_coach_without_tickets():
     world = build_world(
         WorldOptions(
-            key="finance-test", seed=0, first_kickoff=datetime(2026, 10, 17, 18, tzinfo=UTC)
+            key="finance-test",
+            seed=0,
+            first_kickoff=datetime(2026, 10, 17, 18, tzinfo=UTC),
         )
     )
     for league in world.leagues:
@@ -35,8 +37,8 @@ def test_starter_wages_and_guaranteed_income_cover_head_coach_without_tickets():
             assert wages == 16270
             assert sponsor_income(club.tier, 10) + 2500 > wages + 50000 + 3000
     assert INITIAL_CAPITAL >= (400000 + 2 * (16270 + 1000 + 50000 + 4000)) * 110 // 100
-    assert accrued_wage(50000, 604800) == 50000
-    assert accrued_wage(50000, 302400) == 25000
+    assert accrued_wage(50000, 345600) == 50000
+    assert accrued_wage(50000, 172800) == 25000
     assert accrued_wage(50000, 1) == 1
     assert ticket_income(2500, 5000) == 12500
     for bad in (-1, True, 2**63):

@@ -63,7 +63,8 @@
   A weak head coach starts in each club: one tactic, one instruction change and
   one mentality change per match; substitution limits are equal for all coaches.
   Specialists unlock training; modest match growth depends on minutes, age and
-  staff. Scouts offer a private player age 17-21 per four-day game cycle; unsigned discoveries
+  staff. Scouts can find a private player age 17-21 via an explicit paid assignment,
+  limited to one per four-day game cycle; unsigned discoveries
   never enter the public market. Renew sponsorship after each season using final
   place, supporters and league level. Recalculate starting money and coefficients.
   These are pending gameplay tasks, not claims of implemented functionality.
@@ -104,3 +105,11 @@
   Verify the exact Goaletto target before any reset. Never reset another project.
   Once real players/data exist, this development reset authorization no longer
   applies. Never print tokens or credential-bearing database URLs.
+
+- User update 2026-10-15: offseason is 8 days / 2 four-day cycles; the full
+  turnover is 18 + 2 = 20 game weeks / 80 days. The player-free development world
+  may be reset and regenerated; do not build legacy calendar compatibility.
+- Scouts must be cheap while idle; explicitly sending one on a mission costs
+  substantial money, and signing discoveries also costs substantial money. Balance
+  combined costs to prevent cheap rapid squad rejuvenation. No automatic costly
+  assignments merely because a scout is employed. Track in AND-105/116/61.

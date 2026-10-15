@@ -18,10 +18,10 @@ from goaletto.domain.market import (
 def test_windows_prices_and_antisnipe_boundaries():
     first = datetime(2026, 10, 17, 18, tzinfo=UTC)
     end = first + timedelta(weeks=18)
-    assert market_window(first, end, first - timedelta(days=1)).contains(first - timedelta(days=1))
+    assert market_window(first, end, first - timedelta(days=4)).contains(first - timedelta(days=4))
     assert not market_window(first, end, first).contains(first)
     middle = market_window(first, end, first)
-    assert middle.opens_at == datetime(2026, 12, 7, tzinfo=UTC)
+    assert middle.opens_at == datetime(2026, 11, 15, tzinfo=UTC)
     assert middle.contains(middle.opens_at)
     assert not middle.contains(middle.closes_at)
     assert market_window(first, end, middle.closes_at).kind == "offseason"

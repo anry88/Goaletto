@@ -52,7 +52,18 @@ def preview_document(world: PreparedWorld) -> dict[str, Any]:
     return {
         "summary": world_summary(world),
         "leagues": leagues,
-        "fixtures": [asdict(f) for f in world.fixtures],
+        "fixtures": [
+            {
+                "id": str(f.id),
+                "season_id": str(f.season_id),
+                "league_id": str(f.league_id),
+                "home_club_id": str(f.home_club_id),
+                "away_club_id": str(f.away_club_id),
+                "round_number": f.round_number,
+                "assigned_day": f.kickoff.date().isoformat(),
+            }
+            for f in world.fixtures
+        ],
         "work_status": "held",
         "work": [asdict(job) for job in world.work],
         "database_written": False,
@@ -80,7 +91,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Preview or initialize a Goaletto league set")
     parser.add_argument("--key", default="initial")
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--first-kickoff", required=True, help="Saturday 18:00 UTC, ISO 8601")
+    parser.add_argument(
+        "--first-kickoff", required=True, help="First league UTC day (phase 4), ISO 8601"
+    )
     parser.add_argument(
         "--budget", type=int, default=INITIAL_CAPITAL, help="Common starting budget, integer units"
     )
@@ -98,7 +111,7 @@ def main() -> None:
             initial_budget=args.budget,
         )
     except ValueError:
-        parser.error("Use a short slug, valid seed/budget and Saturday 18:00 UTC kickoff")
+        parser.error("Use a short slug, valid seed/budget and UTC kickoff")
     try:
         if args.apply:
             result = asyncio.run(_apply(options, args.portrait_root))

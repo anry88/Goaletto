@@ -319,6 +319,9 @@ class Season(Base):
     seed: Mapped[int] = mapped_column(BigInteger)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    calendar_policy: Mapped[str] = mapped_column(String(40), server_default="four-day-calendar-v1")
+    calendar_enabled: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    cycle_epoch: Mapped[date | None] = mapped_column(Date)
     rollover_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -707,6 +710,41 @@ class Fixture(Base):
     actual_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     actual_finish_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16), default="scheduled")
+
+
+class FixturePlan(Base):
+    """Season structure only. No kickoff or match jobs until announcement."""
+
+    __tablename__ = "fixture_plans"
+    __table_args__ = (
+        CheckConstraint(
+            "competition IN ('league','cup','champions','friendly')", name="ck_plan_competition"
+        ),
+        CheckConstraint("revision > 0", name="ck_plan_revision"),
+        CheckConstraint(
+            "home_club_id IS NULL OR away_club_id IS NULL OR home_club_id <> away_club_id",
+            name="ck_plan_distinct",
+        ),
+        CheckConstraint(
+            "(home_club_id IS NOT NULL AND away_club_id IS NOT NULL) "
+            "OR conditional_ref IS NOT NULL",
+            name="ck_plan_participants",
+        ),
+        Index("ix_plan_day", "assigned_day", "announced_at"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    league_id: Mapped[UUID | None] = mapped_column(ForeignKey("leagues.id"))
+    competition: Mapped[str] = mapped_column(String(16), server_default="league")
+    round_number: Mapped[int] = mapped_column(SmallInteger)
+    home_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"))
+    away_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"))
+    conditional_ref: Mapped[str | None] = mapped_column(String(200))
+    assigned_day: Mapped[date] = mapped_column(Date)
+    revision: Mapped[int] = mapped_column(Integer, server_default="1")
+    announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    planning_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    blocked_reason: Mapped[str | None] = mapped_column(String(40))
 
 
 class Match(Base):
@@ -1245,14 +1283,14 @@ class TrainingPlan(Base):
             "(status = 'applied') = (applied_at IS NOT NULL)", name="ck_training_applied"
         ),
         CheckConstraint(
-            "due_at = week_start + interval '7 days' AND selected_at >= week_start "
+            "due_at = week_start + interval '1 day' AND selected_at >= week_start "
             "AND selected_at < due_at",
             name="ck_training_week",
         ),
         CheckConstraint(
             "focus <> 'set_pieces' OR executor_id IS NOT NULL", name="ck_training_executor"
         ),
-        CheckConstraint("policy_version = 'training-v1'", name="ck_training_policy"),
+        CheckConstraint("policy_version = 'training-daily-v1'", name="ck_training_policy"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
@@ -1360,7 +1398,7 @@ class SalaryContract(Base):
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
     role: Mapped[str] = mapped_column(String(32))
     weekly_rate: Mapped[int] = mapped_column(BigInteger)
-    policy_version: Mapped[str] = mapped_column(String(32), server_default="economy-v1")
+    policy_version: Mapped[str] = mapped_column(String(32), server_default="economy-cycle-v1")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -1369,7 +1407,7 @@ class FinanceCycle(Base):
     __tablename__ = "finance_cycles"
     __table_args__ = (
         UniqueConstraint("club_id", "week_start", name="uq_finance_week"),
-        CheckConstraint("policy_version = 'economy-v1'", name="ck_finance_policy"),
+        CheckConstraint("policy_version = 'economy-cycle-v1'", name="ck_finance_policy"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))

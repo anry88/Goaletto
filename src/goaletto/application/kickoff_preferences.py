@@ -97,6 +97,36 @@ async def fixture_kickoff_decision(
         ):
             raise ValueError("Kickoff decision identity reused")
         return KickoffDecision(receipt.kickoff, receipt.policy_version, receipt.tie_break)
+    decision = await preview_fixture_kickoff(
+        session, day=day, home_club_id=home_club_id, away_club_id=away_club_id, at=at, seed=seed
+    )
+    session.add(
+        KickoffDecisionReceipt(
+            fixture_key=fixture_key,
+            home_club_id=home_club_id,
+            away_club_id=away_club_id,
+            assigned_day=day,
+            seed=seed,
+            kickoff=decision.kickoff,
+            policy_version=decision.policy_version,
+            tie_break=decision.tie_break,
+            decided_at=at,
+        )
+    )
+    await session.flush()
+    return decision
+
+
+async def preview_fixture_kickoff(
+    session: AsyncSession,
+    *,
+    day: date,
+    home_club_id: UUID,
+    away_club_id: UUID,
+    at: datetime,
+    seed: int,
+) -> KickoffDecision:
+    """Read preferences in the caller's allocation lock, without pinning a result."""
     preferences: list[KickoffPreference | None] = []
     for club_id in (home_club_id, away_club_id):
         manager = await session.scalar(
@@ -115,19 +145,4 @@ async def fixture_kickoff_decision(
             if manager is not None
             else None
         )
-    decision = choose_kickoff(day, *preferences, seed=seed)
-    session.add(
-        KickoffDecisionReceipt(
-            fixture_key=fixture_key,
-            home_club_id=home_club_id,
-            away_club_id=away_club_id,
-            assigned_day=day,
-            seed=seed,
-            kickoff=decision.kickoff,
-            policy_version=decision.policy_version,
-            tie_break=decision.tie_break,
-            decided_at=at,
-        )
-    )
-    await session.flush()
-    return decision
+    return choose_kickoff(day, *preferences, seed=seed)

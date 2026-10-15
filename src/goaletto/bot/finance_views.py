@@ -70,7 +70,7 @@ def finance_view(screen: FinanceScreen) -> tuple[str, Keyboard]:
         ),
         tr("Задолженность: {arrears}", arrears=amount(screen.arrears)),
         "",
-        tr("<b>Прогноз на неделю</b>"),
+        tr("<b>Прогноз на 4 дня</b>"),
         tr(
             "Спонсор: +{sponsor} · мерч: +{merchandise}",
             sponsor=amount(screen.sponsor),

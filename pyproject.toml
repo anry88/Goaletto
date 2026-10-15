@@ -27,6 +27,7 @@ art = ["CairoSVG>=2.7,<3"]
 [project.scripts]
 goaletto-bot = "goaletto.bot.main:main"
 goaletto-worker = "goaletto.worker.main:main"
+goaletto-calendar = "goaletto.application.calendar_cli:main"
 goaletto-world = "goaletto.application.world_cli:main"
 goaletto-match = "goaletto.application.match_cli:main"
 goaletto-runtime = "goaletto.application.runtime_cli:main"

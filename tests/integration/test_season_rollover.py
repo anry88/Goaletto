@@ -27,6 +27,7 @@ from goaletto.infrastructure.models import (
     Auction,
     Club,
     Fixture,
+    FixturePlan,
     Job,
     League,
     LineupSlot,
@@ -71,6 +72,14 @@ async def complete_season(sessions, season_id):
             )
         ).all()
         snapshots = {c.id: await team_snapshot(session, c, season.starts_at) for c in clubs}
+        from goaletto.application.calendar_planning import plan_horizon
+
+        for offset in range(18):
+            await plan_horizon(
+                session,
+                season_id,
+                season.starts_at - timedelta(days=1) + timedelta(days=4 * offset),
+            )
         fixtures = (
             await session.scalars(
                 select(Fixture)
@@ -111,7 +120,7 @@ async def complete_season(sessions, season_id):
             )
             await session.flush()
             assert await finalize_result(session, f.id, f.actual_finish_at)
-        at = max(f.actual_finish_at for f in fixtures) + timedelta(seconds=1)
+        at = max(season.ends_at, max(f.actual_finish_at for f in fixtures) + timedelta(seconds=1))
         await session.execute(update(Job).values(status="done"))
         rollover_job = await session.scalar(
             select(Job).where(
@@ -160,7 +169,7 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
         assert (await session.get(Season, season_id)).status == "rolled_over"
         next_season = await session.get(Season, receipt.next_season_id)
         assert next_season.number == 2 and next_season.status == "scheduled"
-        assert next_season.starts_at >= at + timedelta(days=14)
+        assert next_season.starts_at >= at + timedelta(days=8)
         replay = await rollover_season(session, season_id, at + timedelta(hours=1))
         assert not replay.created and replay.next_season_id == next_season.id
         assert replay.aged + replay.retired == 1000
@@ -195,7 +204,9 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
         )
         assert (
             await session.scalar(
-                select(func.count()).select_from(Fixture).where(Fixture.season_id == next_season.id)
+                select(func.count())
+                .select_from(FixturePlan)
+                .where(FixturePlan.season_id == next_season.id)
             )
             == 450
         )
@@ -207,7 +218,7 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
                     Job.payload["season_id"].astext == str(next_season.id), Job.status == "pending"
                 )
             )
-            == 15302
+            == 3
         )
         assert all(
             s.played == s.points == 0

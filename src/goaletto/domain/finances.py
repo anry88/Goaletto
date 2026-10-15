@@ -1,6 +1,6 @@
 """Integer prototype economy. All coefficients pin to economy-v1."""
 
-POLICY_VERSION = "economy-v1"
+POLICY_VERSION = "economy-cycle-v1"
 INITIAL_CAPITAL = 600_000
 MAX_MONEY = 2**63 - 1
 STAFF_WAGES = {
@@ -73,8 +73,12 @@ def stadium_upkeep(capacity: int) -> int:
     return money(2_000 + capacity // 5)
 
 
-def accrued_wage(weekly: int, seconds: int) -> int:
+def accrued_wage(weekly: int, seconds: int, period_seconds: int = 345_600) -> int:
     money(weekly)
-    if type(seconds) is not int or not 0 <= seconds <= 604_800:
+    if (
+        period_seconds not in (86400, 345600, 604800)
+        or type(seconds) is not int
+        or not 0 <= seconds <= period_seconds
+    ):
         raise ValueError("Invalid salary duration")
-    return money((weekly * seconds + 604_799) // 604_800)
+    return money((weekly * seconds + period_seconds - 1) // period_seconds)

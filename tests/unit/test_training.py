@@ -35,10 +35,10 @@ def player(age=22, position="MC"):
 
 def test_progress_accumulates_without_float_drift_and_stops_at_potential():
     p = player()
-    for _ in range(3):
+    for _ in range(21):
         result = train_player(p, Focus.PLAYMAKING, Intensity.MEDIUM, seed="week")
         p = replace(p, skills=result.skills, progress=result.progress, form=result.form)
-    assert p.skills["playmaking"] == 11 and p.progress["playmaking"] == 4400
+    assert p.skills["playmaking"] == 11 and p.progress["playmaking"] == 4385
     capped = replace(
         p, skills={**p.skills, "playmaking": 15}, progress={**p.progress, "playmaking": 9900}
     )
@@ -52,10 +52,10 @@ def test_age_anchors_coaches_and_fractional_physical_gain():
     assert coach_bonus(Focus.ATTACKING, {"head_coach": 20, "attack_coach": 20}) == 5000
     assert coach_bonus(Focus.DEFENDING, {"head_coach": 20, "attack_coach": 20}) == 2000
     result = train_player(player(17), Focus.PHYSICAL, Intensity.HIGH, seed="first", bonus_bps=5000)
-    assert result.skills["stamina"] == 11 and result.skills["pace"] == 11
-    assert result.progress["pace"] == result.progress["stamina"] == 1700
+    assert result.skills["stamina"] == 10 and result.skills["pace"] == 10
+    assert result.progress["pace"] == result.progress["stamina"] == 1671
     result = train_player(player(32), Focus.TEAM, Intensity.LOW, seed="first")
-    assert result.progress["experience"] == 720
+    assert result.progress["experience"] == 102
 
 
 def test_eligible_positions_executor_and_injury_skip():
@@ -77,7 +77,7 @@ def test_seeded_risk_is_repeatable_and_physio_can_only_reduce_it():
     p = player()
     injury_seeds = [
         str(i)
-        for i in range(1000)
+        for i in range(10000)
         if train_player(p, Focus.PHYSICAL, Intensity.HIGH, seed=str(i)).injured
     ]
     assert 1 <= len(injury_seeds) <= 25
@@ -96,12 +96,12 @@ def test_seeded_risk_is_repeatable_and_physio_can_only_reduce_it():
 def test_week_callbacks_are_stable_and_fit_with_both_full_uuids():
     at = datetime(2026, 10, 18, 23, 59, tzinfo=UTC)
     week = week_start(at)
-    assert week == datetime(2026, 10, 12, tzinfo=UTC)
+    assert week == datetime(2026, 10, 18, tzinfo=UTC)
     screen = TrainingScreen(
         "<Клуб>",
         uuid4(),
         week,
-        week + timedelta(days=7),
+        week + timedelta(days=1),
         None,
         None,
         (TrainingMember(uuid4(), "<Игрок>", "MC"),),

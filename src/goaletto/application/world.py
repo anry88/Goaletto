@@ -12,14 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from goaletto.application.finance_seed import opening_rows
 from goaletto.application.world_portraits import assign_world_portraits
 from goaletto.domain.calendar import (
-    CALENDAR_VERSION,
     ScheduledFixture,
     ScheduledWork,
-    fixture_work,
     league_calendar,
     next_season_kickoff,
-    season_finish_at,
 )
+from goaletto.domain.game_cycle import CYCLE_CALENDAR, season_end, season_epoch
 from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS, SKILLS, initial_caps
 from goaletto.domain.world import SKILL_NAMES, WORLD_POLICY, WorldOptions, WorldPlan, build_world
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
@@ -28,7 +26,6 @@ from goaletto.infrastructure.models import (
     Club,
     ClubLineup,
     FinanceAccount,
-    Fixture,
     Job,
     League,
     LeagueSet,
@@ -75,18 +72,9 @@ def prepare_world(
             seed=options.seed,
         )
     )
-    work = tuple(job for fixture in fixtures for job in fixture_work(fixture)) + (
-        ScheduledWork(
-            f"calendar:v1:season:{plan.season_id}:open",
-            "season.open",
-            options.first_kickoff - timedelta(minutes=5, seconds=1),
-        ),
-        ScheduledWork(
-            f"calendar:v1:season:{plan.season_id}:rollover",
-            "season.rollover",
-            season_finish_at(options.first_kickoff) + timedelta(seconds=1),
-        ),
-    )
+    from goaletto.application.calendar_planning import season_work
+
+    work = season_work(plan.season_id, options.first_kickoff)
     return PreparedWorld(plan, portraits, fixtures, work)
 
 
@@ -104,9 +92,10 @@ def world_summary(world: PreparedWorld) -> dict[str, Any]:
         "players": len(world.plan.players),
         "unique_faces": len({recipe.identity_id for recipe in world.portraits.values()}),
         "fixtures": len(world.fixtures),
-        "held_jobs": len(world.work) + 50,
+        "held_jobs": len(world.work) + 50 + 1,
+        "calendar_policy": CYCLE_CALENDAR,
         "first_kickoff": world.plan.options.first_kickoff.isoformat(),
-        "season_finish": season_finish_at(world.plan.options.first_kickoff).isoformat(),
+        "season_finish": season_end(world.plan.options.first_kickoff).isoformat(),
         "next_season_kickoff": next_season_kickoff(world.plan.options.first_kickoff).isoformat(),
         "last_season_players": sum(p.retirement.is_last_season for p in world.plan.players),
         "core_skill_mean_min": min(core_means),
@@ -198,7 +187,10 @@ async def initialize_world(
                 "status": "scheduled",
                 "seed": options.seed,
                 "starts_at": options.first_kickoff,
-                "ends_at": season_finish_at(options.first_kickoff),
+                "ends_at": season_end(options.first_kickoff),
+                "calendar_policy": CYCLE_CALENDAR,
+                "cycle_epoch": season_epoch(options.first_kickoff),
+                "calendar_enabled": False,
                 "rollover_completed_at": None,
             }
         ],
@@ -339,47 +331,13 @@ async def initialize_world(
             for club in clubs
         ],
     )
-    await write(
-        Fixture,
-        [
-            {
-                "id": f.id,
-                "season_id": f.season_id,
-                "league_id": f.league_id,
-                "home_club_id": f.home_club_id,
-                "away_club_id": f.away_club_id,
-                "round_number": f.round_number,
-                "scheduled_start_at": f.kickoff,
-                "lineup_lock_at": f.lineup_lock_at,
-                "actual_start_at": None,
-                "actual_finish_at": None,
-                "status": "scheduled",
-            }
-            for f in prepared.fixtures
-        ],
-    )
-    await write(
-        Job,
-        [
-            {
-                "id": uuid5(plan.season_id, job.dedupe_key),
-                "dedupe_key": job.dedupe_key,
-                "kind": job.kind,
-                "due_at": job.due_at,
-                "status": "held",
-                "attempts": 0,
-                "last_error": None,
-                "payload": {
-                    "version": 1,
-                    "calendar_version": CALENDAR_VERSION,
-                    "season_id": str(plan.season_id),
-                    "fixture_id": str(job.fixture_id) if job.fixture_id else None,
-                    "tick_number": job.tick_number,
-                },
-            }
-            for job in prepared.work
-        ],
-    )
+    from goaletto.application.calendar_planning import add_plan, ensure_planner_job, job_row
+
+    for fixture in prepared.fixtures:
+        await add_plan(session, fixture)
+    for work in prepared.work:
+        await session.execute(insert(Job).values(**job_row(plan.season_id, work, "held")))
+    await ensure_planner_job(session, plan.season_id, initialized_at, held=True)
     account_rows, ledger_rows, salary_rows, finance_jobs = opening_rows(plan, initialized_at)
     await write(FinanceAccount, account_rows)
     await write(LedgerEntry, ledger_rows)
@@ -399,6 +357,7 @@ async def initialize_world(
                     "first_kickoff": options.first_kickoff.isoformat(),
                     "initial_budget": options.initial_budget,
                     "naming_policy": options.naming_policy,
+                    "calendar_policy": CYCLE_CALENDAR,
                 },
                 "created_at": initialized_at,
             }

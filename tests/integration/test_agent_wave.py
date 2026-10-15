@@ -44,14 +44,19 @@ from goaletto.infrastructure.portrait_files import load_file_id, store_file_id
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 10, 12, 12, tzinfo=UTC)
 KICKOFF = datetime(2026, 10, 17, 18, tzinfo=UTC)
-OPTIONS = WorldOptions(key="integration-wave", seed=0, first_kickoff=KICKOFF, initial_budget=50000)
+OPTIONS = WorldOptions(
+    key="integration-wave",
+    seed=0,
+    first_kickoff=KICKOFF,
+    initial_budget=50000,
+)
 
 
-async def setup_world(sessions):
+async def setup_world(sessions, *, options=OPTIONS, at=NOW):
     async with sessions.begin() as session:
-        result = await initialize_world(session, OPTIONS, initialized_at=NOW)
-        await activate_season(session, result.season_id, NOW)
-        entry = await begin_game(session, telegram_id=1001, update_id=1, payload=None, at=NOW)
+        result = await initialize_world(session, options, initialized_at=at)
+        await activate_season(session, result.season_id, at)
+        entry = await begin_game(session, telegram_id=1001, update_id=1, payload=None, at=at)
         claim_actor = replace(entry.actor, operation_id=uuid4(), update_id=4)
         owner = await claim_club(session, claim_actor, entry.offers[0].id)
         club_id = owner.club_id

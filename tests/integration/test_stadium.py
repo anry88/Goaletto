@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
 
-from goaletto.application.finances import weekly_finances
+from goaletto.application.finances import cycle_finances
 from goaletto.application.game_actions import end_expired
 from goaletto.application.money import (
     InsufficientFunds,
@@ -172,27 +172,38 @@ async def test_crowd_is_pinned_across_capacity_change_and_old_invoice_uses_histo
         assert state_hash(restore_state(match.starting_snapshot)) == original
         finance_job = await session.scalar(
             select(Job).where(
-                Job.kind == "finance.weekly", Job.payload["club_id"].astext == str(club_id)
+                Job.kind == "finance.cycle", Job.payload["club_id"].astext == str(club_id)
             )
         )
-        await weekly_finances(session, finance_job, completed_at + timedelta(hours=1))
+        await cycle_finances(session, finance_job, completed_at + timedelta(hours=1))
         finance_job.status = "done"
         first = await session.scalar(select(FinanceCycle).where(FinanceCycle.club_id == club_id))
-        assert first.snapshot["amounts"]["stadium_upkeep"] == 3000
+        assert first.snapshot["amounts"]["stadium_upkeep"] == 1125
         next_job = await session.scalar(
             select(Job).where(
-                Job.kind == "finance.weekly",
+                Job.kind == "finance.cycle",
                 Job.payload["club_id"].astext == str(club_id),
-                Job.due_at == finance_job.due_at + timedelta(days=7),
+                Job.due_at == finance_job.due_at + timedelta(days=4),
             )
         )
-        await weekly_finances(session, next_job, next_job.due_at)
+        # Two old-capacity periods precede the period containing completion.
+        for _ in range(3):
+            await cycle_finances(session, next_job, next_job.due_at)
+            next_job.status = "done"
+            final_due = next_job.due_at
+            next_job = await session.scalar(
+                select(Job).where(
+                    Job.kind == "finance.cycle",
+                    Job.payload["club_id"].astext == str(club_id),
+                    Job.due_at == final_due + timedelta(days=4),
+                )
+            )
         second = await session.scalar(
             select(FinanceCycle).where(
-                FinanceCycle.club_id == club_id, FinanceCycle.week_start == next_job.due_at
+                FinanceCycle.club_id == club_id, FinanceCycle.week_start == final_due
             )
         )
-        assert second.snapshot["amounts"]["stadium_upkeep"] == 3500
+        assert second.snapshot["amounts"]["stadium_upkeep"] == 3875
         assert [p["capacity"] for p in second.snapshot["capacity_periods"]] == [5000, 10000]
         screen = await load_stadium(
             session, replace(actor, at=next_job.due_at, operation_id=uuid4(), update_id=102)

@@ -1,7 +1,7 @@
 """Atomic season rollover. PostgreSQL owns every transition and accepted draw."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from random import Random
 from typing import Literal, cast
 from uuid import UUID, uuid5
@@ -18,17 +18,14 @@ from goaletto.application.persons import AppearanceExhausted, NewPerson, create_
 from goaletto.application.results import league_table
 from goaletto.application.world_portraits import age_band
 from goaletto.domain.calendar import (
-    CALENDAR_VERSION,
     ScheduledFixture,
-    ScheduledWork,
-    fixture_work,
     league_calendar,
-    season_finish_at,
 )
+from goaletto.domain.game_cycle import next_first_league, season_end, season_epoch
 from goaletto.domain.leagues import plan_season_movements
 from goaletto.domain.player_season_plan import PlayerSeasonEntry, plan_player_season
 from goaletto.domain.retirement import RetirementDecision, player_last_season, staff_last_season
-from goaletto.domain.season_rollover import ROLLOVER_POLICY, rollover_kickoff, youth_profile
+from goaletto.domain.season_rollover import ROLLOVER_POLICY, youth_profile
 from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS, SKILLS, initial_caps
 from goaletto.domain.world import SKILL_NAMES, stable_seed
 from goaletto.infrastructure.analytics import CoverageNotStarted, record_event
@@ -41,6 +38,7 @@ from goaletto.infrastructure.models import (
     Club,
     ClubLineup,
     Fixture,
+    FixturePlan,
     Job,
     League,
     LineupSlot,
@@ -209,8 +207,17 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         raise NotReady("Season opening has not committed")
     if season.status not in {"active", "finished"}:
         raise ValueError("Season is not ready for rollover")
+    if at < season.ends_at:
+        raise NotReady("Season calendar has not ended")
     if await session.get(Season, next_id) is not None:
         raise ValueError("Next season exists without a rollover receipt")
+    unannounced = await session.scalar(
+        select(FixturePlan.id)
+        .where(FixturePlan.season_id == season.id, FixturePlan.announced_at.is_(None))
+        .limit(1)
+    )
+    if unannounced is not None:
+        raise NotReady("Season has unresolved mandatory tournament plans")
     # Lock every fixture so the completion proof and transition share one snapshot.
     fixtures = list(
         (
@@ -249,7 +256,7 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         ):
             raise ValueError("Result differs from frozen fixture")
     last_finish = max(cast(datetime, f.actual_finish_at) for f in fixtures)
-    kickoff = rollover_kickoff(season.starts_at, last_finish, at)
+    kickoff = next_first_league(season.starts_at, last_finish, at)
     leagues = list(
         (
             await session.scalars(
@@ -379,7 +386,10 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
             status="scheduled",
             seed=next_seed,
             starts_at=kickoff,
-            ends_at=season_finish_at(kickoff),
+            ends_at=season_end(kickoff),
+            calendar_policy=season.calendar_policy,
+            calendar_enabled=True,
+            cycle_epoch=season_epoch(kickoff),
         )
     )
     await session.flush()
@@ -581,54 +591,20 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         )
     await session.flush()
     session.add_all([Standing(season_id=next_id, club_id=c.id) for c in clubs])
+    from goaletto.application.calendar_planning import (
+        add_plan,
+        ensure_planner_job,
+        job_row,
+        plan_horizon,
+        season_work,
+    )
+
     for planned in calendars:
-        session.add(
-            Fixture(
-                id=planned.id,
-                season_id=next_id,
-                league_id=planned.league_id,
-                home_club_id=planned.home_club_id,
-                away_club_id=planned.away_club_id,
-                round_number=planned.round_number,
-                scheduled_start_at=planned.kickoff,
-                lineup_lock_at=planned.lineup_lock_at,
-                status="scheduled",
-            )
-        )
-    await session.flush()
-    work = [job for f in calendars for job in fixture_work(f)] + [
-        ScheduledWork(
-            f"calendar:v1:season:{next_id}:open",
-            "season.open",
-            kickoff - timedelta(minutes=5, seconds=1),
-        ),
-        ScheduledWork(
-            f"calendar:v1:season:{next_id}:rollover",
-            "season.rollover",
-            season_finish_at(kickoff) + timedelta(seconds=1),
-        ),
-    ]
-    job_rows = [
-        {
-            "id": uuid5(next_id, j.dedupe_key),
-            "dedupe_key": j.dedupe_key,
-            "kind": j.kind,
-            "due_at": j.due_at,
-            "status": "pending",
-            "attempts": 0,
-            "last_error": None,
-            "payload": {
-                "version": 1,
-                "calendar_version": CALENDAR_VERSION,
-                "season_id": str(next_id),
-                "fixture_id": str(j.fixture_id) if j.fixture_id else None,
-                "tick_number": j.tick_number,
-            },
-        }
-        for j in work
-    ]
-    for offset in range(0, len(job_rows), 500):
-        await session.execute(insert(Job), job_rows[offset : offset + 500])
+        await add_plan(session, planned)
+    for season_job in season_work(next_id, kickoff):
+        await session.execute(insert(Job).values(**job_row(next_id, season_job)))
+    await ensure_planner_job(session, next_id, at)
+    await plan_horizon(session, next_id, at)
     # Replenish only pools that were opened already; rollover does not create an
     # unused staff market. The first set owns free-candidate aging, not availability.
     from goaletto.application.candidates import replenish_pool

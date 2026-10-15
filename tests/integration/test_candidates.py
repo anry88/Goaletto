@@ -35,8 +35,8 @@ def action(actor):
     return replace(actor, operation_id=uuid4(), update_id=uuid4().int % 1000000000)
 
 
-async def funded(sessions):
-    result, actor, club_id = await setup_world(sessions)
+async def funded(sessions, **kwargs):
+    result, actor, club_id = await setup_world(sessions, **kwargs)
     async with sessions.begin() as session:
         account = (await locked_accounts(session, club_id))[club_id]
         await credit_locked(session, account, "candidate-test-grant", "grant", 2000000, NOW)
@@ -204,7 +204,11 @@ async def test_one_global_pool_visible_in_another_set_without_more_people(sessio
         staff = await load_candidates(session, action(actor), "staff")
         second = await initialize_world(
             session,
-            WorldOptions(key="second-global-pool", seed=17, first_kickoff=KICKOFF),
+            WorldOptions(
+                key="second-global-pool",
+                seed=17,
+                first_kickoff=KICKOFF,
+            ),
             initialized_at=NOW + timedelta(minutes=1),
         )
         entry = await begin_game(
@@ -266,10 +270,15 @@ async def test_actual_telegram_router_signs_player_and_staff_after_commit(sessio
     from aiogram import Bot
     from aiogram.types import CallbackQuery, Chat, Message, Update, User
 
+    from goaletto.application.onboarding import next_initial_kickoff
     from goaletto.bot.main import build_dispatcher
+    from tests.integration.test_agent_wave import OPTIONS
     from tests.integration.test_game_dispatcher import Source, Telegram
 
-    _, _, club_id = await funded(sessions)
+    now = datetime.now(UTC)
+    _, _, club_id = await funded(
+        sessions, options=replace(OPTIONS, first_kickoff=next_initial_kickoff(now)), at=now
+    )
     source = Source(sessions)
     transport = Telegram(source)
     bot = Bot("123456:FAKE_LOCAL_TEST_TOKEN", session=transport)

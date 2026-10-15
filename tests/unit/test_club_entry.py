@@ -269,7 +269,7 @@ async def test_exhausted_faces_leave_expansion_unavailable_without_activation(mo
 def test_expansion_preparation_window_and_invalid_actor_identity():
     early = datetime(2026, 10, 17, 17, 54, 58, tzinfo=UTC)
     cutoff = early + timedelta(seconds=1)
-    assert next_initial_kickoff(early) == datetime(2026, 10, 17, 18, tzinfo=UTC)
-    assert next_initial_kickoff(cutoff) == datetime(2026, 10, 24, 18, tzinfo=UTC)
+    assert next_initial_kickoff(early) == datetime(2026, 10, 21, 18, tzinfo=UTC)
+    assert next_initial_kickoff(cutoff) == datetime(2026, 10, 21, 18, tzinfo=UTC)
     with pytest.raises(ValueError):
         Actor(uuid4(), True, None, uuid4(), NOW)

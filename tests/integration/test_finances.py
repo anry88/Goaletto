@@ -2,18 +2,19 @@
 
 import asyncio
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
 
+from goaletto.application.calendar_planning import plan_horizon
 from goaletto.application.finances import (
     close_salary,
+    cycle_finances,
     load_finances,
     pay_league_prizes,
-    weekly_finances,
 )
 from goaletto.application.money import (
     InsufficientFunds,
@@ -38,6 +39,7 @@ from goaletto.infrastructure.models import (
     MatchResult,
     OwnershipPeriod,
     SalaryContract,
+    Season,
     Standing,
 )
 from tests.integration.test_agent_wave import NOW, job, setup_world, start_fixture
@@ -130,7 +132,7 @@ async def test_bills_protect_reservations_and_income_repays_arrears(sessions):
             )
 
 
-async def test_weekly_invoice_fixed_prorated_contracts_idempotent_and_explicit_read(sessions):
+async def test_cycle_invoice_fixed_prorated_contracts_idempotent_and_explicit_read(sessions):
     _, actor, club_id = await setup_world(sessions)
     async with sessions.begin() as session:
         manager = await session.get(Manager, actor.manager_id)
@@ -150,20 +152,22 @@ async def test_weekly_invoice_fixed_prorated_contracts_idempotent_and_explicit_r
         await close_salary(session, contract.person_id, NOW + timedelta(days=3, hours=12))
         finance_job = await session.scalar(
             select(Job).where(
-                Job.kind == "finance.weekly", Job.payload["club_id"].astext == str(club_id)
+                Job.kind == "finance.cycle", Job.payload["club_id"].astext == str(club_id)
             )
         )
         assert finance_job.status == "pending"
         at = finance_job.due_at
-        await weekly_finances(session, finance_job, at)
+        await cycle_finances(session, finance_job, at)
         balance = (await locked_accounts(session, club_id))[club_id].club.budget
         finance_job.status = "done"
-        await weekly_finances(session, finance_job, at + timedelta(days=10))
+        await cycle_finances(session, finance_job, at + timedelta(days=10))
         assert (await locked_accounts(session, club_id))[club_id].club.budget == balance
         cycle = await session.scalar(select(FinanceCycle).where(FinanceCycle.club_id == club_id))
-        # First invoice covers Mon 00..Mon 00; contracts started Mon noon.
-        seconds = int((NOW + timedelta(days=3, hours=12) - NOW).total_seconds())
-        expected = (rate * seconds + 604799) // 604800
+        period_start = datetime.fromisoformat(finance_job.payload["period_start"])
+        seconds = int(
+            (min(contract.ended_at, at) - max(contract.started_at, period_start)).total_seconds()
+        )
+        expected = (rate * seconds + 345599) // 345600
         saved = next(row for row in cycle.snapshot["contracts"] if row["id"] == str(contract.id))
         assert saved["due"] == expected and saved["rate"] == rate
         assert ownership.last_game_action_at == original_activity
@@ -181,7 +185,7 @@ async def test_weekly_invoice_fixed_prorated_contracts_idempotent_and_explicit_r
         assert (
             screen.balance == balance
             and screen.last_cycle.id == cycle.id
-            and screen.due_at == at + timedelta(days=7)
+            and screen.due_at == at + timedelta(days=4)
         )
         assert ownership.last_game_action_at > original_activity
         with pytest.raises(ValueError, match="earlier owner"):
@@ -221,6 +225,13 @@ async def test_match_income_atomic_once_with_final_result(sessions):
 async def test_league_prizes_require_full_results_and_pay_once(sessions):
     result, _, club_id = await setup_world(sessions)
     async with sessions.begin() as session:
+        season = await session.get(Season, result.season_id)
+        for offset in range(18):
+            await plan_horizon(
+                session,
+                season.id,
+                season.starts_at - timedelta(days=1) + timedelta(days=4 * offset),
+            )
         club = await session.get(Club, club_id)
         assert not await pay_league_prizes(session, result.season_id, club.league_id, NOW)
         fixtures = (

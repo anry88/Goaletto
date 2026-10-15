@@ -1,4 +1,4 @@
-"""Weekly accounts, immutable wage contracts, match income and owned finance reads."""
+"""Four-day accounts, immutable wage contracts, match income and owned finance reads."""
 
 import math
 from dataclasses import dataclass
@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import Surface, require_utc
-from goaletto.application.finance_seed import week_start, weekly_job
+from goaletto.application.finance_seed import cycle_job
 from goaletto.application.game_actions import Actor, allocation_lock, owned_club, user_effect
 from goaletto.application.match_runtime import NotReady
 from goaletto.application.money import credit_locked, debit_locked, locked_accounts
@@ -25,6 +25,7 @@ from goaletto.domain.finances import (
     staff_wage,
     ticket_income,
 )
+from goaletto.domain.game_cycle import CYCLE_SECONDS
 from goaletto.domain.match_types import MatchState
 from goaletto.domain.standings import LeagueStanding, add_result, rank_league
 from goaletto.domain.world import SKILL_NAMES
@@ -97,7 +98,7 @@ async def salary_contract(
         .where(FinanceCycle.club_id == club_id, FinanceCycle.week_start > at)
         .limit(1)
     ):
-        raise ValueError("Cannot backdate salary into a settled week")
+        raise ValueError("Cannot backdate salary into a settled period")
     rate = (
         player_wage(tuple(getattr(worker, name) for name in SKILL_NAMES[:8]))
         if role == "player"
@@ -199,33 +200,36 @@ async def ranking_at(
     return season.id, tier, next(i for i, row in enumerate(ranked, 1) if row.club_id == club_id)
 
 
-async def weekly_finances(session: AsyncSession, job: Job, at: datetime) -> None:
+async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
     require_utc(at)
     p = job.payload
     if (
-        job.kind != "finance.weekly"
-        or set(p) != {"version", "club_id", "week_start", "policy"}
-        or type(p["version"]) is not int
-        or p["version"] != 1
-        or p["policy"] != POLICY_VERSION
+        job.kind != "finance.cycle"
+        or set(p) != {"version", "club_id", "period_start", "period_end", "policy"}
+        or p["version"] != 2
+        or p["policy"] != "economy-cycle-v1"
     ):
-        raise ValueError("Invalid finance job")
-    club_id, week = UUID(p["club_id"]), datetime.fromisoformat(p["week_start"])
-    if week_start(week) != week or job.due_at != week:
-        raise ValueError("Invalid finance week")
+        raise ValueError("Invalid cycle finance job")
+    club_id = UUID(p["club_id"])
+    start, week = datetime.fromisoformat(p["period_start"]), datetime.fromisoformat(p["period_end"])
+    require_utc(start)
+    require_utc(week)
+    if not timedelta(0) < week - start <= timedelta(seconds=CYCLE_SECONDS) or job.due_at != week:
+        raise ValueError("Invalid finance cycle")
+    period_seconds, policy = CYCLE_SECONDS, "economy-cycle-v1"
     if at < week:
-        raise NotReady("Finance week not finished")
+        raise NotReady("Finance period not finished")
     if not await allocation_lock(session, try_lock=True):
         raise NotReady("Busy finance account")
     account = (await locked_accounts(session, club_id))[club_id]
-    cycle_id = uuid5(club_id, "finance:v1:" + week.isoformat())
+    cycle_id = uuid5(club_id, "finance:cycle-v1:" + week.isoformat())
     prior = await session.get(FinanceCycle, cycle_id)
     if prior is None:
         # Settle in chronological order; never silently skip a missing invoice.
         older = await session.scalar(
             select(Job.id)
             .where(
-                Job.kind == "finance.weekly",
+                Job.kind == "finance.cycle",
                 Job.payload["club_id"].astext == str(club_id),
                 Job.due_at < week,
                 Job.status != "done",
@@ -240,8 +244,7 @@ async def weekly_finances(session: AsyncSession, job: Job, at: datetime) -> None
                 .where(
                     SalaryContract.club_id == club_id,
                     SalaryContract.started_at < week,
-                    (SalaryContract.ended_at.is_(None))
-                    | (SalaryContract.ended_at > week - timedelta(days=7)),
+                    (SalaryContract.ended_at.is_(None)) | (SalaryContract.ended_at > start),
                 )
                 .order_by(SalaryContract.id)
             )
@@ -253,32 +256,45 @@ async def weekly_finances(session: AsyncSession, job: Job, at: datetime) -> None
                 raise ValueError("Unsupported salary policy")
             seconds = math.ceil(
                 (
-                    min(week, contract.ended_at or week)
-                    - max(week - timedelta(days=7), contract.started_at)
+                    min(week, contract.ended_at or week) - max(start, contract.started_at)
                 ).total_seconds()
             )
-            due = accrued_wage(contract.weekly_rate, seconds)
+            due = accrued_wage(contract.weekly_rate, seconds, CYCLE_SECONDS)
             wages["player_salary" if contract.role == "player" else "staff_salary"] += due
             contract_snapshot.append(
                 {
                     "id": str(contract.id),
                     "seconds": seconds,
                     "rate": contract.weekly_rate,
+                    "period_seconds": CYCLE_SECONDS,
                     "due": due,
                 }
             )
         season_id, tier, place = await ranking_at(session, club_id, week)
-        from goaletto.application.stadium import upkeep_for_week
+        from goaletto.application.stadium import upkeep_for_period
 
-        upkeep, capacity_periods = await upkeep_for_week(session, account.club, week)
+        upkeep, capacity_periods = await upkeep_for_period(
+            session, account.club, week, period_start=start
+        )
         amounts = {
-            "sponsor": sponsor_income(tier, place),
-            "merchandise": merchandise_income(account.club.supporters),
+            "sponsor": accrued_wage(
+                sponsor_income(tier, place), int((week - start).total_seconds()), period_seconds
+            ),
+            "merchandise": accrued_wage(
+                merchandise_income(account.club.supporters),
+                int((week - start).total_seconds()),
+                period_seconds,
+            ),
             **wages,
             "stadium_upkeep": upkeep,
         }
-        key = "week:" + week.isoformat()
-        details = {"week_start": week.isoformat(), "policy": POLICY_VERSION}
+        key = "cycle:" + week.isoformat()
+        details = {
+            "period_start": start.isoformat(),
+            "period_end": week.isoformat(),
+            "period_seconds": period_seconds,
+            "policy": policy,
+        }
         for kind in ("sponsor", "merchandise"):
             if amounts[kind]:
                 await credit_locked(
@@ -302,7 +318,7 @@ async def weekly_finances(session: AsyncSession, job: Job, at: datetime) -> None
                 club_id=club_id,
                 week_start=week,
                 applied_at=at,
-                policy_version=POLICY_VERSION,
+                policy_version=policy,
                 snapshot={
                     "amounts": amounts,
                     "contracts": contract_snapshot,
@@ -318,11 +334,11 @@ async def weekly_finances(session: AsyncSession, job: Job, at: datetime) -> None
             )
         )
         await session.flush()
-    elif prior.week_start != week or prior.policy_version != POLICY_VERSION:
+    elif prior.week_start != week or prior.policy_version != policy:
         raise ValueError("Conflicting finance cycle")
     await session.execute(
         insert(Job)
-        .values(**weekly_job(club_id, week + timedelta(days=7)))
+        .values(**cycle_job(club_id, week))
         .on_conflict_do_nothing(index_elements=["dedupe_key"])
     )
 
@@ -455,7 +471,7 @@ async def load_finances(
     due = await session.scalar(
         select(Job.due_at)
         .where(
-            Job.kind == "finance.weekly",
+            Job.kind == "finance.cycle",
             Job.payload["club_id"].astext == str(club.id),
             Job.status.in_(("held", "pending")),
         )

@@ -47,7 +47,7 @@ async def test_dispatch_records_attempt_and_uses_savepoint_without_external_deli
         due_at=NOW,
         payload={
             "version": 1,
-            "calendar_version": "league-calendar-v1",
+            "calendar_version": "four-day-calendar-v1",
             "season_id": str(uuid4()),
             "fixture_id": str(fixture_id),
             "tick_number": 1,

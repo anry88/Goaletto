@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from goaletto.domain.finances import STADIUM_CAPACITIES, accrued_wage, money, stadium_upkeep
+from goaletto.domain.game_cycle import CYCLE_SECONDS
 
 DEMAND_POLICY = "stadium-demand-v1"
 EXPANSION_DAYS = 7
@@ -65,13 +66,16 @@ def stadium_level(capacity: int) -> int:
     return STADIUM_CAPACITIES.index(capacity) + 1
 
 
-def weekly_upkeep(
-    capacity: int, start: datetime, end: datetime, changes: tuple[tuple[datetime, int], ...]
+def period_upkeep(
+    capacity: int,
+    start: datetime,
+    end: datetime,
+    changes: tuple[tuple[datetime, int], ...],
 ) -> tuple[int, list[dict[str, str | int]]]:
     """Prorate effective capacity intervals. Explicit dates; no clock reads."""
     if any(
         v.tzinfo is None or v.utcoffset() != timedelta(0) for v in (start, end)
-    ) or end - start != timedelta(days=7):
+    ) or not timedelta(0) < end - start <= timedelta(seconds=CYCLE_SECONDS):
         raise ValueError("Invalid stadium billing period")
     cursor, total = start, 0
     rows: list[dict[str, str | int]] = []
@@ -81,9 +85,9 @@ def weekly_upkeep(
             or changed_at.utcoffset() != timedelta(0)
             or not cursor <= changed_at <= end
         ):
-            raise ValueError("Capacity changes must be ordered within the week")
+            raise ValueError("Capacity changes must be ordered within the period")
         seconds = math.ceil((changed_at - cursor).total_seconds())
-        charge = accrued_wage(stadium_upkeep(capacity), seconds)
+        charge = accrued_wage(stadium_upkeep(capacity), seconds, CYCLE_SECONDS)
         if seconds:
             rows.append(
                 {

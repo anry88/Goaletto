@@ -1,4 +1,4 @@
-"""Pure weekly league calendar. No clock reads, database or Telegram calls."""
+"""Pure four-day league calendar. No clock reads, database or Telegram calls."""
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -6,20 +6,16 @@ from random import Random
 from uuid import UUID, uuid5
 
 from goaletto.domain.clock import MatchClock
+from goaletto.domain.game_cycle import CYCLE_CALENDAR
 
-CALENDAR_VERSION = "league-calendar-v1"
+CALENDAR_VERSION = CYCLE_CALENDAR
 
 
 def validate_kickoff(value: datetime) -> None:
     if value.tzinfo is None or value.utcoffset() != timedelta(0):
         raise ValueError("Kickoff must be timezone-aware UTC")
-    if value.weekday() != 5 or (value.hour, value.minute, value.second, value.microsecond) != (
-        18,
-        0,
-        0,
-        0,
-    ):
-        raise ValueError("League kickoff must be Saturday at 18:00 UTC")
+    if value.second or value.microsecond:
+        raise ValueError("Kickoff must use whole minutes")
 
 
 @dataclass(frozen=True)
@@ -83,7 +79,7 @@ def league_calendar(
                         round_number=round_number,
                         home_club_id=left,
                         away_club_id=right,
-                        kickoff=first_kickoff + timedelta(weeks=round_number - 1),
+                        kickoff=first_kickoff + timedelta(days=4 * (round_number - 1)),
                     )
                 )
         order = [order[0], order[-1], *order[1:-1]]
@@ -118,11 +114,14 @@ def fixture_work(fixture: ScheduledFixture) -> tuple[ScheduledWork, ...]:
 
 
 def season_finish_at(first_kickoff: datetime) -> datetime:
+    from goaletto.domain.game_cycle import season_end
+
     validate_kickoff(first_kickoff)
-    return first_kickoff + timedelta(weeks=17, seconds=MatchClock().duration_seconds)
+    return season_end(first_kickoff)
 
 
 def next_season_kickoff(first_kickoff: datetime) -> datetime:
-    """Eighteen match weekends, then two weekends without league fixtures."""
-    validate_kickoff(first_kickoff)
-    return first_kickoff + timedelta(weeks=20)
+    from goaletto.domain.game_cycle import next_first_league
+
+    end = season_finish_at(first_kickoff)
+    return next_first_league(first_kickoff, end, end)

@@ -53,11 +53,8 @@ class ClubUnavailable(ValueError):
 
 def next_initial_kickoff(at: datetime) -> datetime:
     require_utc(at)
-    days = (5 - at.weekday()) % 7
-    kickoff = (at + timedelta(days=days)).replace(hour=18, minute=0, second=0, microsecond=0)
-    if kickoff - timedelta(minutes=5, seconds=1) <= at:
-        kickoff += timedelta(weeks=1)
-    return kickoff
+    # A new set begins with a full cycle; the first league date is day four.
+    return (at + timedelta(days=4)).replace(hour=18, minute=0, second=0, microsecond=0)
 
 
 async def offers(session: AsyncSession, page: int = 1) -> tuple[ClubOffer, ...]:

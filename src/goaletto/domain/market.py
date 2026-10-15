@@ -31,20 +31,17 @@ def market_window(first: datetime, end: datetime, at: datetime) -> MarketWindow:
         utc(value)
     if end <= first:
         raise ValueError("Invalid season calendar")
-    if at < first:
-        return MarketWindow(first - timedelta(days=14), first, "offseason")
+    from goaletto.domain.game_cycle import midnight, season_epoch
+
+    opening = midnight(season_epoch(first))
+    if at < opening:
+        return MarketWindow(opening - timedelta(days=8), opening, "offseason")
     if at >= end:
-        next_first = first + timedelta(weeks=20)
-        return MarketWindow(next_first - timedelta(days=14), next_first, "offseason")
-    monday = (first - timedelta(days=first.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
-    opens = monday + timedelta(weeks=8)
-    middle = MarketWindow(opens, opens + timedelta(days=7), "midseason")
-    if at >= middle.closes_at:
-        next_first = first + timedelta(weeks=20)
-        return MarketWindow(next_first - timedelta(days=14), next_first, "offseason")
-    return middle
+        return MarketWindow(end, end + timedelta(days=8), "offseason")
+    middle = MarketWindow(opening + timedelta(days=32), opening + timedelta(days=36), "midseason")
+    if at < middle.closes_at:
+        return middle
+    return MarketWindow(end, end + timedelta(days=8), "offseason")
 
 
 def minimum_bid(initial: int, current: int | None) -> int:

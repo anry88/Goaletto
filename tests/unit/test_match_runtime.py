@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import cast
+from unittest.mock import AsyncMock
 from uuid import uuid4, uuid5
 
 import pytest
@@ -85,6 +86,12 @@ class Recorder:
         return True
 
     async def scalar(self, statement, params=None):
+        if (
+            hasattr(statement, "column_descriptions")
+            and statement.column_descriptions[0]["name"] == "id"
+            and "fixtures.id !=" in str(statement)
+        ):
+            return None  # No second live fixture in this fixture-local recorder.
         self.statements.append(statement)
         if not hasattr(statement, "column_descriptions"):
             return True
@@ -171,7 +178,7 @@ def job(fixture, kind, tick=None):
         attempts=0,
         payload={
             "version": 1,
-            "calendar_version": "league-calendar-v1",
+            "calendar_version": "four-day-calendar-v1",
             "season_id": str(fixture.season_id),
             "fixture_id": str(fixture.id),
             "tick_number": tick,
@@ -443,6 +450,7 @@ async def test_activation_releases_only_supported_jobs_and_not_rollover_or_notif
         pass
 
     monkeypatch.setattr("goaletto.application.match_runtime.start_coverage", coverage)
+    monkeypatch.setattr("goaletto.application.calendar_planning.plan_horizon", AsyncMock())
     await activate_season(cast(AsyncSession, recorder), fixture.season_id, NOW)
     statement = recorder.statements[-1]
     params = statement.compile().params

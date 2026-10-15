@@ -30,7 +30,7 @@ def test_double_round_robin_is_complete_without_club_conflicts(seed: int) -> Non
         assert Counter(c for f in games for c in (f.home_club_id, f.away_club_id)) == dict.fromkeys(
             CLUBS, 1
         )
-        assert {f.kickoff for f in games} == {KICKOFF + timedelta(weeks=round_number - 1)}
+        assert {f.kickoff for f in games} == {KICKOFF + timedelta(days=4 * (round_number - 1))}
     assert Counter(f.home_club_id for f in fixtures) == dict.fromkeys(CLUBS, 9)
     assert Counter(f.away_club_id for f in fixtures) == dict.fromkeys(CLUBS, 9)
     assert fixtures == league_calendar(
@@ -61,9 +61,9 @@ def test_minute_deadlines_halftime_and_pre_match_actions() -> None:
 
 
 def test_two_empty_weekends_before_next_season_and_utc_survives_dst() -> None:
-    final_kickoff = KICKOFF + timedelta(weeks=17)
-    assert season_finish_at(KICKOFF) == final_kickoff + timedelta(minutes=33)
-    assert next_season_kickoff(KICKOFF) == final_kickoff + timedelta(weeks=3)
+    final_kickoff = KICKOFF + timedelta(days=68)
+    assert season_finish_at(KICKOFF) == (final_kickoff + timedelta(days=1)).replace(hour=0)
+    assert next_season_kickoff(KICKOFF) == KICKOFF + timedelta(days=80)
     fixtures = league_calendar(
         season_id=SEASON, league_id=LEAGUE, clubs=CLUBS, first_kickoff=KICKOFF, seed=0
     )
@@ -72,7 +72,11 @@ def test_two_empty_weekends_before_next_season_and_utc_survives_dst() -> None:
 
 @pytest.mark.parametrize(
     "kickoff",
-    [KICKOFF.replace(tzinfo=None), KICKOFF + timedelta(days=1), KICKOFF + timedelta(minutes=1)],
+    [
+        KICKOFF.replace(tzinfo=None),
+        KICKOFF + timedelta(seconds=1),
+        KICKOFF + timedelta(microseconds=1),
+    ],
 )
 def test_invalid_kickoff_is_rejected(kickoff: datetime) -> None:
     with pytest.raises(ValueError):

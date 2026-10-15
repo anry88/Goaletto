@@ -10,7 +10,11 @@ from goaletto.application.world_portraits import age_band, assign_world_portrait
 from goaletto.domain.world import PRIMARY_SKILL, ROSTER, SKILL_NAMES, WorldOptions, build_world
 from goaletto.portraits.whole import load_whole_catalog
 
-OPTIONS = WorldOptions(key="initial", seed=0, first_kickoff=datetime(2026, 10, 17, 18, tzinfo=UTC))
+OPTIONS = WorldOptions(
+    key="initial",
+    seed=0,
+    first_kickoff=datetime(2026, 10, 17, 18, tzinfo=UTC),
+)
 
 
 def test_world_population_coverage_and_equal_baseline() -> None:
@@ -98,7 +102,7 @@ def test_prepared_world_has_no_owners_or_extra_staff_population() -> None:
     summary = world_summary(world)
     assert summary["players"] == summary["unique_faces"] == 1000
     assert summary["fixtures"] == 450
-    assert summary["held_jobs"] == 450 * 34 + 52
+    assert summary["held_jobs"] == 53
     assert summary["core_skill_spread"] == 0
     assert all(p.retirement.is_last_season for p in world.plan.players if p.age == 38)
 
@@ -108,4 +112,9 @@ def test_prepared_world_has_no_owners_or_extra_staff_population() -> None:
 )
 def test_invalid_seed_configuration(key: str, seed: int, budget: int) -> None:
     with pytest.raises(ValueError):
-        WorldOptions(key=key, seed=seed, initial_budget=budget, first_kickoff=OPTIONS.first_kickoff)
+        WorldOptions(
+            key=key,
+            seed=seed,
+            initial_budget=budget,
+            first_kickoff=OPTIONS.first_kickoff,
+        )

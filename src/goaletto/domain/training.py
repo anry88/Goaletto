@@ -176,7 +176,7 @@ def train_player(
         * (10000 + bonus_bps)
         * age_multiplier(player.age)
         * {Intensity.LOW: 6000, Intensity.MEDIUM: 10000, Intensity.HIGH: 13000}[intensity]
-        // 10000**3
+        // (7 * 10000**3)
         if trained
         else 0
     )
@@ -202,9 +202,9 @@ def train_player(
         digest = hashlib.sha256(f"{POLICY_VERSION}:{seed}:{player.id}:{kind}".encode()).digest()
         return int.from_bytes(digest[:8], "big") % 10000
 
-    # Initial explicit weekly policy: modest preparation, high intensity carries risk.
-    if trained and draw("form") < (1500 if intensity == Intensity.LOW else 1000):
+    # Daily effects preserve the modest weekly baseline across seven free dates.
+    if trained and draw("form") < (1500 if intensity == Intensity.LOW else 1000) // 7:
         form = min(8, form + 1)
     injury_rate = 100 * (10000 - physio_skill * 150) // 10000 if intensity == Intensity.HIGH else 0
-    injured = trained and draw("injury") < injury_rate
+    injured = trained and draw("injury") < injury_rate // 7
     return TrainingResult(skills, progress, form, experience, injured, trained, gain)

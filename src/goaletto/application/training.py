@@ -1,4 +1,4 @@
-"""Durable weekly choices and atomic development; no Telegram/network calls."""
+"""Durable daily choices and atomic development; no Telegram/network calls."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -18,6 +18,7 @@ from goaletto.application.game_actions import (
     user_effect,
 )
 from goaletto.application.match_runtime import NotReady
+from goaletto.domain.game_cycle import midnight
 from goaletto.domain.training import (
     POLICY_VERSION,
     PROGRESS_KEYS,
@@ -31,6 +32,8 @@ from goaletto.domain.training import (
 )
 from goaletto.infrastructure.models import (
     Club,
+    Fixture,
+    FixturePlan,
     Job,
     LineupSlot,
     Manager,
@@ -61,12 +64,34 @@ class TrainingScreen:
     plan: TrainingPlan | None
     last_result: TrainingPlan | None
     members: tuple[TrainingMember, ...]
+    blocked: bool = False
 
 
 def week_start(at: datetime) -> datetime:
     require_utc(at)
-    at = at.astimezone(UTC)
-    return (at - timedelta(days=at.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    return midnight(at.date())
+
+
+async def training_blocked(session: AsyncSession, club_id: UUID, day: datetime) -> bool:
+    fixture = await session.scalar(
+        select(Fixture.id)
+        .where(
+            (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id),
+            Fixture.status != "cancelled",
+            Fixture.scheduled_start_at >= day,
+            Fixture.scheduled_start_at < day + timedelta(days=1),
+        )
+        .limit(1)
+    )
+    plan = await session.scalar(
+        select(FixturePlan.id)
+        .where(
+            (FixturePlan.home_club_id == club_id) | (FixturePlan.away_club_id == club_id),
+            FixturePlan.assigned_day == day.date(),
+        )
+        .limit(1)
+    )
+    return fixture is not None or plan is not None
 
 
 async def load_training(
@@ -78,6 +103,7 @@ async def load_training(
         select(TrainingPlan).where(
             TrainingPlan.club_id == club.id,
             TrainingPlan.week_start == week,
+            TrainingPlan.policy_version == "training-daily-v1",
             TrainingPlan.ownership_id == ownership.id,
         )
     )
@@ -107,10 +133,11 @@ async def load_training(
         club.name,
         ownership.id,
         week,
-        week + timedelta(days=7),
+        week + timedelta(days=1),
         plan,
         last,
         tuple(TrainingMember(*r) for r in players),
+        await training_blocked(session, club.id, week),
     )
 
 
@@ -132,8 +159,11 @@ async def select_training(
     require_utc(at)
     if ownership.id != ownership_id or ownership.expires_at <= at:
         raise PermissionDenied("Training requires the current owner")
-    if week != week_start(at):
-        raise ValueError("Training button belongs to a different week")
+    current = week_start(at)
+    if await training_blocked(session, club.id, current):
+        raise ValueError("Training is unavailable on a match day")
+    if week != current:
+        raise ValueError("Training button belongs to a different UTC date")
     payload = {
         "focus": focus.value,
         "intensity": intensity.value,
@@ -164,25 +194,29 @@ async def select_training(
         raise ValueError("Executor only applies to set pieces")
     plan = await session.scalar(
         select(TrainingPlan)
-        .where(TrainingPlan.club_id == club.id, TrainingPlan.week_start == week)
+        .where(
+            TrainingPlan.club_id == club.id,
+            TrainingPlan.week_start == week,
+            TrainingPlan.policy_version == "training-daily-v1",
+        )
         .with_for_update()
         .execution_options(populate_existing=True)
     )
     if plan is not None and plan.status != "scheduled":
-        raise ValueError("Training has already been processed this week")
+        raise ValueError("Training has already been processed for this UTC date")
     if plan is None:
         plan = TrainingPlan(
             id=uuid5(club.id, f"training:v1:{week.isoformat()}"),
             club_id=club.id,
             ownership_id=ownership.id,
             week_start=week,
-            due_at=week + timedelta(days=7),
+            due_at=week + timedelta(days=1),
             selected_at=at,
             focus=focus.value,
             intensity=intensity.value,
             executor_id=executor_id,
             status="scheduled",
-            policy_version=POLICY_VERSION,
+            policy_version="training-daily-v1",
             results=[],
         )
         session.add(plan)
@@ -244,13 +278,17 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
     if plan.status != "scheduled":
         return
     if (
-        plan.policy_version != POLICY_VERSION
-        or plan.due_at != week_start(plan.week_start) + timedelta(days=7)
+        plan.policy_version != "training-daily-v1"
+        or plan.due_at != plan.week_start + timedelta(days=1)
         or job.due_at != plan.due_at
     ):
         raise ValueError("Invalid training schedule or policy")
+    if await training_blocked(session, plan.club_id, plan.week_start):
+        plan.status = "cancelled"
+        plan.results = [{"reason": "match_day"}]
+        return
     if at < plan.due_at:
-        raise NotReady("Training week has not ended")
+        raise NotReady("Training date has not ended")
     ownership = await session.scalar(
         select(OwnershipPeriod)
         .where(OwnershipPeriod.id == plan.ownership_id)
