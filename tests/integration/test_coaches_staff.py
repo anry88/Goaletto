@@ -19,7 +19,7 @@ from goaletto.application.live_commands import (
     load_live_screen,
 )
 from goaletto.application.money import credit_locked, locked_accounts
-from goaletto.application.staff_changes import execute_change, quote_change
+from goaletto.application.staff_changes import HeadCoachRequired, execute_change, quote_change
 from goaletto.domain.finances import accrued_wage
 from goaletto.domain.lineup import LineupInvalid, StarterPick
 from goaletto.domain.match_codec import restore_state, state_hash
@@ -221,7 +221,7 @@ async def test_unaffordable_replace_and_interrupted_transaction_keep_old_contrac
         )
 
 
-async def test_dismiss_last_season_preserves_status_and_cannot_reissue_free_coach(sessions):
+async def test_coach_dismissal_is_blocked_but_last_season_replacement_and_rehire_work(sessions):
     result, actor, club_id = await funded(sessions)
     async with sessions.begin() as session:
         coach = await coach_snapshot(session, club_id)
@@ -232,10 +232,38 @@ async def test_dismiss_last_season_preserves_status_and_cannot_reissue_free_coac
                 OwnershipPeriod.club_id == club_id, OwnershipPeriod.ended_at.is_(None)
             )
         )
-        quote = await quote_change(session, action(actor), owner.id, outgoing_id=coach.person_id)
+        salary_id = await session.scalar(
+            select(SalaryContract.id).where(
+                SalaryContract.person_id == coach.person_id, SalaryContract.ended_at.is_(None)
+            )
+        )
+        ledger_count = await session.scalar(select(func.count()).select_from(LedgerEntry))
+        with pytest.raises(HeadCoachRequired):
+            await quote_change(session, action(actor), owner.id, outgoing_id=coach.person_id)
+        # Persisted pre-rule confirmations must be rejected on execution too.
+        legacy = StaffChange(
+            id=uuid4(),
+            club_id=club_id,
+            ownership_id=owner.id,
+            role="head_coach",
+            outgoing_id=coach.person_id,
+            incoming_id=None,
+            terms={},
+            created_at=NOW,
+        )
+        session.add(legacy)
+        await session.flush()
+        with pytest.raises(HeadCoachRequired):
+            await execute_change(session, action(actor), legacy.id, at=NOW)
+        assert legacy.executed_at is None
+        assert (await session.get(SalaryContract, salary_id)).ended_at is None
+        assert staff.club_id == club_id
+        assert ledger_count == await session.scalar(select(func.count()).select_from(LedgerEntry))
+        screen, item = await offer_for(session, actor)
+        quote = await quote_for(session, actor, item, screen.ownership_id)
         await execute_change(session, action(actor), quote.id, at=NOW)
         assert staff.status == "last_season" and staff.last_season_id == result.season_id
-        assert (await coach_snapshot(session, club_id)).person_id is None
+        assert (await coach_snapshot(session, club_id)).person_id == item.person.id
         assert await ensure_starting_coaches(session, NOW) == 0
         screen = await load_candidates(session, action(actor), "staff")
         assert any(i.person.id == coach.person_id for i in screen.items)

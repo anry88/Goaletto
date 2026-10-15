@@ -75,6 +75,9 @@
   a match for their club, including unused cup/champions days. Friendlies also
   exclude training that day. Training is not restricted to day 3 or once/cycle;
   plans/receipts use club+UTC date. Rebalance daily effects and seasonal growth.
+  User clarification 2026-10-15: day 3 is an optional free window, not a required
+  friendly or training. Managers may rest without penalty. No automatic friendly
+  matchmaking, invitations or match jobs without an explicit manager request.
   Time settings use an IANA zone and local preferred kickoff; human-vs-bot uses
   the human preference, human-vs-human the midpoint of the shortest UTC clock arc
   (23:00 and 01:00 -> 00:00), rounded to 30 minutes within the assigned UTC day.
@@ -178,3 +181,12 @@
   First refusal lasts 8 days; decline/timeout/unowned releases to global supply,
   preserving surplus. Origin club wage is floor(normal * 0.8) on every rehire;
   fee is unchanged. Use quoted_wage for club-specific offers and salary receipts.
+- AND-115/84 add staff photo cards and club kit images. Reuse existing identities;
+  a missing staff age variant falls back only to the person's known base variant.
+  card_images.photo_response sends outside transactions and reuses the existing
+  durable file cache; kit graphics use the club:<UUID>/club-kit-v3 namespace.
+  External pure-module briefs are in docs/agent-prompts; shared runtime/schema
+  integration stays with Codex and DB reset checks must never run concurrently.
+
+- User update 2026-10-15: head coaches cannot be dismissed without a replacement.
+  Keep the atomic hire-and-replace flow; reject legacy dismissal confirmations too.

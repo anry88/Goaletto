@@ -9,14 +9,17 @@ from aiogram.types import CallbackQuery, Message, Update
 from goaletto.application.candidates import load_candidates, sign_candidate
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied, actor_for
-from goaletto.application.staff_changes import execute_change, quote_change
+from goaletto.application.staff_cards import load_staff_card
+from goaletto.application.staff_changes import HeadCoachRequired, execute_change, quote_change
 from goaletto.bot.candidate_views import (
     candidate_list,
     candidate_quote,
     parse_candidate,
     staff_change_view,
 )
+from goaletto.bot.card_images import photo_response, staff_image
 from goaletto.bot.responses import edit_response
+from goaletto.bot.staff_cards import staff_card_view
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import CandidateOffer
 from goaletto.presentation.i18n import tr
@@ -48,6 +51,7 @@ async def candidates_callback(
     await query.answer()
     if not isinstance(query.message, Message):
         return
+    image = None
     try:
         async with database.transaction() as session:
             actor = await actor_for_callback(
@@ -58,7 +62,21 @@ async def candidates_callback(
                 update_id=event_update.update_id,
             )
             action, person_id, owner_id, value = parse_candidate(query.data or "")
-            if action in {"p", "s"}:
+            if action == "v":
+                if owner_id is None or person_id is None or not 0 <= value <= 999:
+                    raise ValueError("Invalid staff card")
+                card = await load_staff_card(session, actor, owner_id, person_id)
+                text, keyboard = staff_card_view(card, value)
+                image = staff_image(
+                    card.person.appearance_identity_id,
+                    card.person.appearance_variant_id,
+                    card.catalog_version,
+                    card.person.age,
+                    card.kit_primary,
+                    card.kit_secondary,
+                    card.kit_version,
+                )
+            elif action in {"p", "s"}:
                 kind = "player" if action == "p" else "staff"
                 text, keyboard = candidate_list(
                     await load_candidates(session, actor, kind), kind, value
@@ -119,6 +137,12 @@ async def candidates_callback(
                     if screen.ownership_id != owner_id or item is None or item.offer.fee != value:
                         raise ValueError("Old quote")
                     text, keyboard = candidate_quote(item, owner_id)
+    except HeadCoachRequired:
+        await edit_response(
+            query.message,
+            tr("Главного тренера можно только заменить через найм другого. Откройте /staff."),
+        )
+        return
     except (PermissionDenied, ValueError):
         await edit_response(
             query.message,
@@ -128,5 +152,7 @@ async def candidates_callback(
                 "окно. Откройте /market или /staff."
             ),
         )
+        return
+    if image is not None and await photo_response(query.message, database, text, keyboard, image):
         return
     await edit_response(query.message, text, keyboard)

@@ -19,6 +19,7 @@ from goaletto.application.onboarding import (
     preview_club,
 )
 from goaletto.bot.club_cards import club_view, format_money
+from goaletto.bot.club_kit import show_club
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
@@ -76,6 +77,7 @@ async def game_start(
 ) -> None:
     if message.from_user is None or message.chat.type != "private":
         return
+    card = None
     async with database.transaction() as session:
         entry = await begin_game(
             session,
@@ -86,10 +88,14 @@ async def game_start(
             internal=message.from_user.id in internal_telegram_ids,
         )
         if entry.club_id is not None:
-            text, keyboard = club_view(await get_owned_club(session, entry.actor, record=False))
+            card = await get_owned_club(session, entry.actor, record=False)
+            text, keyboard = club_view(card)
         else:
             text, keyboard = offer_view(entry.offers)
-    await message.answer(text, reply_markup=keyboard)
+    if card is not None:
+        await show_club(message, database, card, edit=False, view=(text, keyboard))
+    else:
+        await message.answer(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("en:"))
@@ -98,6 +104,7 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
     message = query.message
     if not isinstance(message, Message) or message.chat.type != "private":
         return
+    card = None
     try:
         parts = (query.data or "").split(":")
         if len(parts) not in {3, 4}:
@@ -164,7 +171,8 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                 )
             elif parts[1] == "c" and len(parts) == 3:
                 await claim_club(session, actor, expand_id(parts[2]))
-                text, keyboard = club_view(await get_owned_club(session, actor, record=False))
+                card = await get_owned_club(session, actor, record=False)
+                text, keyboard = club_view(card)
             else:
                 raise ValueError("Stale entry callback")
     except (PermissionDenied, ClubUnavailable, ValueError):
@@ -172,7 +180,10 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
             message, tr("Клуб или кнопка больше недоступны. Откройте /start заново.")
         )
         return
-    await edit_response(message, text, keyboard)
+    if card is not None:
+        await show_club(message, database, card, edit=True, view=(text, keyboard))
+    else:
+        await edit_response(message, text, keyboard)
 
 
 @router.message(Command("help"))

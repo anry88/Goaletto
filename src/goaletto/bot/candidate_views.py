@@ -46,7 +46,7 @@ def parse_candidate(data: str) -> tuple[str, UUID | None, UUID | None, int]:
         return p[1], None, None, int(p[2])
     if len(p) == 3 and p[:2] == ["cg", "x"]:
         return "x", expand_id(p[2]), None, 0
-    if len(p) == 5 and p[:2] in (["cg", "q"], ["cg", "b"], ["cg", "f"], ["cg", "d"]):
+    if len(p) == 5 and p[0] == "cg" and p[1] in {"q", "b", "f", "d", "v"}:
         return p[1], expand_id(p[2]), expand_id(p[3]), decode_price(p[4])
     raise ValueError("Invalid candidate action")
 
@@ -72,8 +72,6 @@ def candidate_list(
             f"{ROLES[role]} · {escape(latin_name(name))} · {age} · "
             f"{QUALITY_LABELS[quality_tier(skill)]} · {skill}/20"
             + (" · " + tr("⏳ Последний рабочий сезон") if status == "last_season" else "")
-            + "\n"
-            + staff_contribution(role, skill)
             for role, name, age, skill, status in screen.employed
         )
     if notice:
@@ -84,8 +82,8 @@ def candidate_list(
             rows.append(
                 [
                     button(
-                        tr("Уволить: {name}", name=latin_name(employee[1])),
-                        f"cg:f:{compact_id(employee_id)}:{compact_id(screen.ownership_id)}:0",
+                        latin_name(employee[1]),
+                        f"cg:v:{compact_id(employee_id)}:{compact_id(screen.ownership_id)}:{encode_price(page)}",
                     )
                 ]
             )
@@ -170,11 +168,13 @@ def candidate_list(
                     )
                 ]
             )
+        action = "v" if kind == "staff" else "q"
+        value = page if kind == "staff" else offer.fee
         rows.append(
             [
                 button(
                     latin_name(person.name),
-                    f"cg:q:{compact_id(person.id)}:{compact_id(screen.ownership_id)}:{encode_price(offer.fee)}",
+                    f"cg:{action}:{compact_id(person.id)}:{compact_id(screen.ownership_id)}:{encode_price(value)}",
                 )
             ]
         )
@@ -246,6 +246,10 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
 def staff_change_view(change: StaffChange) -> tuple[str, Keyboard]:
     from goaletto.domain.staff_quality import staff_abilities
 
+    if change.role == "head_coach" and change.incoming_id is None:
+        return tr("Главного тренера можно только заменить через найм другого."), Keyboard(
+            inline_keyboard=[[button(tr("Назад"), "cg:s:0")]]
+        )
     lines = [f"<b>{ROLES[change.role]}</b>"]
     for key, label in (("outgoing", tr("Уходит")), ("incoming", tr("Приходит"))):
         person = change.terms.get(key)
@@ -319,10 +323,6 @@ def staff_change_view(change: StaffChange) -> tuple[str, Keyboard]:
                 "Новый штаб влияет на следующие матчи."
             )
         )
-        if incoming is None:
-            lines.append(
-                tr("Без главного тренера: обычная тактика, 1 инструкция и 1 смена настроя за матч.")
-            )
     return "\n".join(lines), Keyboard(
         inline_keyboard=[
             [button(tr("Подтвердить"), f"cg:x:{compact_id(change.id)}")],

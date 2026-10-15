@@ -15,6 +15,7 @@ from goaletto.bot.club_cards import (
     menu_view,
     stale_view,
 )
+from goaletto.bot.club_kit import show_club
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
 from goaletto.presentation.i18n import tr
@@ -41,10 +42,11 @@ async def club_home(query: CallbackQuery, database: Database) -> None:
         return
     try:
         async with database.transaction() as session:
-            text, keyboard = await build_club_response(
-                session, user.id, query.id, datetime.now(UTC)
+            actor = await actor_for_callback(
+                session, telegram_id=user.id, callback_id=query.id, at=datetime.now(UTC)
             )
-        await edit_response(message, text, keyboard)
+            card = await get_owned_club(session, actor)
+        await show_club(message, database, card, edit=True)
     except PermissionDenied:
         await edit_response(
             message, tr("Нет доступа: клуб больше не принадлежит вам. Откройте /start.")

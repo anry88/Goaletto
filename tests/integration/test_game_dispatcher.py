@@ -6,8 +6,17 @@ from datetime import UTC, datetime
 import pytest
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage, SetMyCommands
-from aiogram.types import CallbackQuery, Chat, Message, Update, User
+from aiogram.methods import (
+    AnswerCallbackQuery,
+    DeleteMessage,
+    EditMessageCaption,
+    EditMessageMedia,
+    EditMessageText,
+    SendMessage,
+    SendPhoto,
+    SetMyCommands,
+)
+from aiogram.types import CallbackQuery, Chat, Message, PhotoSize, Update, User
 from sqlalchemy import select
 
 from goaletto.application.world import initialize_world
@@ -48,15 +57,29 @@ class Telegram(BaseSession):
         # Both answerCallbackQuery and message IO happen outside DB transactions.
         assert self.source.depth == 0
         self.calls.append(method)
-        if isinstance(method, (AnswerCallbackQuery, SetMyCommands)):
+        if isinstance(method, (AnswerCallbackQuery, SetMyCommands, DeleteMessage)):
             return True
-        assert isinstance(method, (SendMessage, EditMessageText))
+        assert isinstance(
+            method, (SendMessage, EditMessageText, SendPhoto, EditMessageMedia, EditMessageCaption)
+        )
+        photo = isinstance(method, (SendPhoto, EditMessageMedia))
+        caption = (
+            method.media.caption
+            if isinstance(method, EditMessageMedia)
+            else getattr(method, "caption", None)
+        )
         self.last_message = Message(
             message_id=77,
             date=datetime.now(UTC),
             chat=Chat(id=1001, type="private"),
             from_user=User(id=bot.id, is_bot=True, first_name="Goaletto"),
-            text=method.text,
+            text=getattr(method, "text", None),
+            caption=caption,
+            photo=[
+                PhotoSize(file_id="test-photo", file_unique_id="test-photo", width=256, height=256)
+            ]
+            if photo
+            else None,
             reply_markup=method.reply_markup,
         )
         return self.last_message
@@ -103,7 +126,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
                 ),
             ),
         )
-        assert isinstance(telegram.calls[-1], SendMessage)
+        assert isinstance(telegram.calls[-1], (SendMessage, SendPhoto))
         return telegram.last_message
 
     async def callback(data):
@@ -124,7 +147,10 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
             ),
         )
         assert isinstance(telegram.calls[previous], AnswerCallbackQuery)
-        assert any(isinstance(call, EditMessageText) for call in telegram.calls[previous:])
+        assert any(
+            isinstance(call, (EditMessageText, EditMessageMedia, SendMessage))
+            for call in telegram.calls[previous:]
+        )
         return telegram.last_message
 
     response = await command("/start")
@@ -132,7 +158,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
     assert "Получить клуб" in str(response.reply_markup)
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
-    assert "Выберите" not in response.text
+    assert "Выберите" not in (response.text or response.caption)
     async with sessions.begin() as session:
         manager = await session.scalar(select(Manager).where(Manager.telegram_id == user.id))
         ownership = await session.scalar(
@@ -166,8 +192,8 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
         assert current.expires_at == ownership.expires_at
     for cmd in ("/squad", "/history", "/table", "/club", "/lineup"):
         response = await command(cmd)
-        assert "недоступ" not in response.text.lower()
-    # Initial seed has no captain; choose one, then change tactics.
+        assert "недоступ" not in (response.text or response.caption).lower()
+    # Choose a captain; the weak starting coach only permits the existing normal tactic.
     panel = next(
         b.callback_data
         for row in response.reply_markup.inline_keyboard
@@ -186,10 +212,10 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
     async with sessions.begin() as session:
         rows = (await session.scalars(select(AcceptedCommand))).all()
-        assert len(rows) == 2
-        assert {r.telegram_update_id for r in rows} == {13, 15}
+        assert len(rows) == 1
+        assert {r.telegram_update_id for r in rows} == {13}
         lineup = await session.get(ClubLineup, ownership.club_id)
-        assert lineup.version == 3
+        assert lineup.version == 2
     await command("/settings")
     response = await callback("lang:en")
     assert "Settings" in response.text
@@ -207,8 +233,9 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     ):
         response = await command(cmd)
         assert not any(
-            "А" <= ch <= "я" or ch in "Ёё" for ch in response.text.replace("Язык", "")
-        ), (cmd, response.text)
+            "А" <= ch <= "я" or ch in "Ёё"
+            for ch in (response.text or response.caption).replace("Язык", "")
+        ), (cmd, response.text or response.caption)
     async with sessions.begin() as session:
         manager = await session.scalar(select(Manager).where(Manager.telegram_id == user.id))
         assert manager.locale == "en"

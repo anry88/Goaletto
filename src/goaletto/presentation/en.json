@@ -644,5 +644,22 @@
   "Ставка: {rate}/4 дня до конца сезона": "Rate: {rate}/4 days until the season ends",
   "Следующий пересмотр: после завершения сезона, не ранее {date} UTC.": "Next renewal: after the season finishes, no earlier than {date} UTC.",
   "🏋️ Тренировка {day} UTC отменена: назначен официальный матч. Выберите свободную дату в /train.": "🏋️ Training on {day} UTC was cancelled because an official match was scheduled. Choose a free date in /train.",
-  "На эту дату тренировка ещё не выбрана.": "No training selected for this date yet."
+  "На эту дату тренировка ещё не выбрана.": "No training selected for this date yet.",
+  "Зарплата: {wage}/4 дня": "Wage: {wage}/4 days",
+  "В штабе клуба": "Employed by your club",
+  "Кандидат на должность": "Staff candidate",
+  "Подписание: {fee}": "Signing: {fee}",
+  "Лояльность клубу: {normal} → {wage}/4 дня (−20%).": "Club loyalty: {normal} → {wage}/4 days (−20%).",
+  "Бывший футболист · {position}": "Former footballer · {position}",
+  "Тактики: {tactics}.": "Tactics: {tactics}.",
+  "Смены за матч: тактика {t}, инструкции {i}, настрой {m}.": "Changes per match: tactic {t}, instructions {i}, mentality {m}.",
+  "Заменить сотрудника": "Replace staff member",
+  "Подписать": "Sign",
+  "Родной клуб: {club}": "Former club: {club}",
+  "Первое предложение до {date} UTC.": "First offer until {date} UTC.",
+  "Уволить": "Dismiss",
+  "Отклонить": "Decline",
+  "🏟 <b>{p0}</b> · Лига {p1}\n💰 Бюджет: {p2}\n🏟 Стадион: {p3:,} · 👥 Болельщики: {p4:,}": "🏟 <b>{p0}</b> · Tier {p1}\n💰 Balance: {p2}\n🏟 Stadium: {p3:,} · 👥 Supporters: {p4:,}",
+  "Главного тренера можно только заменить через найм другого.": "The head coach can only be replaced by hiring another coach.",
+  "Главного тренера можно только заменить через найм другого. Откройте /staff.": "The head coach can only be replaced by hiring another coach. Open /staff."
 }

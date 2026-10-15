@@ -46,6 +46,11 @@ AND-120: [настройки IANA-пояса, местного времени и
 
 ## Кубок: расчёт сетки
 
+Уточнение 2026-10-15: день 3 — свободное резервное окно под добровольные
+тренировки и товарищеские игры. Допустимо оставить его днём отдыха без штрафа.
+AND-128 добавит возможность назначить игру по явной заявке менеджера,
+без автоматического подбора, обязательного матча или создания jobs в пустой день.
+
 Участники кубковой группы — пять текущих лиг уровней 1–5, 50 клубов.
 Сезонная группа не становится обязательной лестницей будущих повышений.
 
@@ -164,7 +169,7 @@ AND-105 пересчитывает бюджет, периодические ст
 | [AND-125](https://linear.app/andrei-brazhnikov/issue/AND-125/provodit-nejtralnyj-final-i-delit-biletnuyu-vyruchku-mezhdu-klubami) | Проводить нейтральный финал и делить билетную выручку между клубами | AND-124 |
 | [AND-126](https://linear.app/andrei-brazhnikov/issue/AND-126/organizovat-kubki-chempionov-otdelno-dlya-kazhdogo-urovnya-s-gruppami) | Организовать кубки чемпионов отдельно для каждого уровня с группами комплектов | AND-118, AND-124 |
 | [AND-127](https://linear.app/andrei-brazhnikov/issue/AND-127/sohranyat-energiyu-mezhdu-matchami-i-nastroit-vosstanovlenie-za-24) | Сохранять энергию между матчами и настроить восстановление за 24 часа | AND-118 |
-| [AND-128](https://linear.app/andrei-brazhnikov/issue/AND-128/naznachat-tovarisheskie-matchi-na-tretij-den-igrovogo-cikla) | Назначать товарищеские матчи на третий день игрового цикла | AND-121, AND-127 |
+| [AND-128](https://linear.app/andrei-brazhnikov/issue/AND-128/dobavit-dobrovolnye-tovarisheskie-matchi-v-svobodnyj-den-cikla) | Добавить добровольные товарищеские матчи в свободный день цикла | AND-121, AND-127 |
 | [AND-129](https://linear.app/andrei-brazhnikov/issue/AND-129/naznachat-trenirovki-v-lyuboj-svobodnyj-ot-matchej-den) | Назначать тренировки в любой свободный от матчей день | AND-118, AND-121 |
 
 AND-129 реализован: [календарь тренировок](training.md) на десять UTC-дней,

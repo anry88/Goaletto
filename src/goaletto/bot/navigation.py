@@ -12,6 +12,7 @@ from goaletto.application.club_view import actor_for_callback, get_owned_club, g
 from goaletto.application.game_actions import Actor, PermissionDenied, actor_for, owned_club
 from goaletto.application.history import get_club_results, get_season_archive
 from goaletto.bot.club_cards import club_view, squad_view
+from goaletto.bot.club_kit import show_club
 from goaletto.bot.history_cards import results_view
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import expand_id, parse_table_callback, table_view
@@ -42,6 +43,7 @@ async def game_command(message: Message, database: Database, event_update: Updat
     if message.from_user is None:
         return
     action = (message.text or "").split()[0].split("@")[0]
+    card = None
     try:
         async with database.transaction() as session:
             actor = await actor_for(
@@ -54,11 +56,15 @@ async def game_command(message: Message, database: Database, event_update: Updat
             elif action == "/table":
                 text, keyboard = await current_table(session, actor)
             else:
-                text, keyboard = club_view(await get_owned_club(session, actor))
+                card = await get_owned_club(session, actor)
+                text, keyboard = club_view(card)
     except (PermissionDenied, ValueError):
         await message.answer(tr("Раздел недоступен. Откройте /start."))
         return
-    await message.answer(text, reply_markup=keyboard)
+    if card is not None:
+        await show_club(message, database, card, edit=False, view=(text, keyboard))
+    else:
+        await message.answer(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data == "nav:table")

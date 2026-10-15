@@ -137,6 +137,7 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
                 InlineKeyboardButton(text=tr("💰 Рынок"), callback_data="mk:open"),
                 InlineKeyboardButton(text=tr("🏟 Стадион"), callback_data="st:open"),
             ],
+            [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
             [InlineKeyboardButton(text=tr("🔔 Напоминания"), callback_data="ntf:open")],
@@ -147,16 +148,12 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
 
 def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
     text = tr(
-        "🏟 <b>{p0}</b> · Лига {p1}\n💰 Бюджет: {p2}\n🏟 Стадион: {p3:,} "
-        "· 👥 Болельщики: {p4:,}\n🎽 Форма: {p5}/{p6} (v{p7})",
+        "🏟 <b>{p0}</b> · Лига {p1}\n💰 Бюджет: {p2}\n🏟 Стадион: {p3:,} · 👥 Болельщики: {p4:,}",
         p0=escape(latin_name(card.name)),
         p1=card.tier,
         p2=format_money(card.budget),
         p3=card.stadium_capacity,
         p4=card.supporters,
-        p5=escape(card.kit_primary),
-        p6=escape(card.kit_secondary),
-        p7=card.kit_version,
     )
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -174,6 +171,7 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
                 InlineKeyboardButton(text=tr("💰 Рынок"), callback_data="mk:open"),
                 InlineKeyboardButton(text=tr("🏟 Стадион"), callback_data="st:open"),
             ],
+            [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
             [InlineKeyboardButton(text=tr("🗂 Сезоны"), callback_data=seasons_callback(1))],

@@ -25,6 +25,10 @@ from goaletto.infrastructure.models import (
 )
 
 
+class HeadCoachRequired(ValueError):
+    """A manager may replace their head coach, but cannot leave the job empty."""
+
+
 async def staff_terms(
     session: AsyncSession,
     person_id: UUID,
@@ -112,6 +116,8 @@ async def quote_change(
         if staff is None or staff.club_id != club.id or staff.role is None:
             raise ValueError("Employee left")
         role = staff.role
+        if role == "head_coach":
+            raise HeadCoachRequired("Replace the head coach instead of dismissing them")
     terms = {}
     if outgoing_id:
         terms["outgoing"] = await staff_terms(session, outgoing_id, role, incoming=False)
@@ -253,6 +259,8 @@ async def execute_change(
         raise PermissionDenied("Stale staff confirmation")
     if row.executed_at is not None:
         return row
+    if row.role == "head_coach" and row.incoming_id is None:
+        raise HeadCoachRequired("Replace the head coach instead of dismissing them")
     if await session.get(CandidateSigning, actor.operation_id) is not None:
         raise ValueError("Signing operation belongs to another confirmation")
     if at < max(actor.at, row.created_at) or await session.scalar(

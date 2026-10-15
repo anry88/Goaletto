@@ -164,6 +164,8 @@ async def test_supply_counts_auctions_and_never_generates_above_twelve(sessions)
 
 
 async def test_staff_uses_retired_player_without_new_person_or_face(sessions):
+    from goaletto.application.staff_career import assign_career
+
     result, _, club_id = await setup_world(sessions)
     async with sessions.begin() as session:
         player = await session.scalar(
@@ -180,12 +182,14 @@ async def test_staff_uses_retired_player_without_new_person_or_face(sessions):
         )
         player.club_id, person.career, person.age = None, "retired", 36
         await session.flush()
+        career = await assign_career(session, person, result.season_id, club_id, NOW)
         assert await replenish_pool(session, "staff", "defence_coach", NOW) == 2
+        assert career.person_id == person.id
         assert (person.id, person.appearance_identity_id, person.appearance_variant_id) == original
         assert person.career == "staff"
         assert (await session.get(Staff, person.id)).club_id is None
         assert (await session.get(Player, person.id)).status == "retired"
-        assert await session.scalar(select(func.count()).select_from(Person)) == 1051
+        assert await session.scalar(select(func.count()).select_from(Person)) == 1052
         assert await replenish_pool(session, "staff", "defence_coach", NOW) == 0
 
 
@@ -320,12 +324,22 @@ async def test_actual_telegram_router_signs_player_and_staff_after_commit(sessio
         screen = await send(text=command)
         if command == "/staff":
             screen = await send(data="cg:s:2")  # Head coaches, including the occupied role.
-        button = next(
+        choices = [
             b.callback_data
             for row in screen.reply_markup.inline_keyboard
             for b in row
-            if (b.callback_data or "").startswith("cg:q:")
-        )
+            if (b.callback_data or "").startswith("cg:q:" if command == "/freeagents" else "cg:v:")
+        ]
+        button = choices[1 if command == "/staff" else 0]
+        if command == "/staff":
+            card = await send(data=button)
+            assert card.photo and "Зарплата:" in card.caption and "Главный тренер" in card.caption
+            button = next(
+                b.callback_data
+                for row in card.reply_markup.inline_keyboard
+                for b in row
+                if (b.callback_data or "").startswith("cg:q:")
+            )
         quote = await send(data=button)
         assert "Разово:" in quote.text and (
             "Зарплата:" in quote.text if command == "/freeagents" else "Приходит:" in quote.text
@@ -353,20 +367,24 @@ async def test_actual_telegram_router_signs_player_and_staff_after_commit(sessio
         )
         assert (await session.get(CandidatePool, ("player", "player"))).generation == 13
     screen = await send(text="/staff")
-    dismiss = next(
+    employee = next(
         b.callback_data
         for row in screen.reply_markup.inline_keyboard
         for b in row
-        if (b.callback_data or "").startswith("cg:f:")
+        if (b.callback_data or "").startswith("cg:v:")
     )
-    confirmation = await send(data=dismiss)
-    assert (
-        "Штрафа за увольнение нет" in confirmation.text
-        and "Без главного тренера" in confirmation.text
+    card = await send(data=employee)
+    assert not any(
+        (b.callback_data or "").startswith("cg:f:")
+        for row in card.reply_markup.inline_keyboard
+        for b in row
     )
-    await send(data=confirmation.reply_markup.inline_keyboard[0][0].callback_data)
+    assert "Главного тренера можно только заменить" in card.caption
+    # An old/forged dismissal button is rejected by the application too.
+    rejected = await send(data=employee.replace("cg:v:", "cg:f:"))
+    assert "Главного тренера можно только заменить" in rejected.text
     async with sessions.begin() as session:
-        assert not await session.scalar(select(Staff.person_id).where(Staff.club_id == club_id))
+        assert await session.scalar(select(Staff.person_id).where(Staff.club_id == club_id))
     await bot.session.close()
 
 
