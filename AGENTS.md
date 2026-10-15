@@ -182,6 +182,8 @@
   is not yet agreed. Shared growth caps/potential still apply. Current league-only
   growth and missing match-form updates are implementation gaps, not design rules.
   Audits must flag these gaps, never approve no-growth cup/friendly balance.
+  Track the complete implementation in AND-130 under AND-64; external pure
+  practice policy alone does not complete its runtime/persistence/UI acceptance.
 - AND-114 assigns retired-staff-v1 once at football retirement, independently of
   candidate deficits. Preserve StaffCareer origin/role/skill and the same face/history.
   First refusal lasts 8 days; decline/timeout/unowned releases to global supply,
