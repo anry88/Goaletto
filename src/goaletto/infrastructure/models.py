@@ -575,7 +575,9 @@ class CandidateOffer(Base):
             ["candidate_pools.kind", "candidate_pools.profile"],
             name="fk_candidate_pool",
         ),
-        CheckConstraint("status IN ('available','signed','retired')", name="ck_candidate_status"),
+        CheckConstraint(
+            "status IN ('available','private','signed','retired')", name="ck_candidate_status"
+        ),
         CheckConstraint("fee > 0 AND weekly_rate > 0", name="ck_candidate_price"),
     )
     person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
@@ -1835,3 +1837,49 @@ class ScoutSigning(Base):
     cycle_rate: Mapped[int] = mapped_column(BigInteger)
     economy_policy: Mapped[str] = mapped_column(String(32))
     signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class MatchDevelopment(Base):
+    __tablename__ = "match_development"
+    __table_args__ = (
+        CheckConstraint(
+            "policy_version = 'match-development-v1'", name="ck_match_development_policy"
+        ),
+        CheckConstraint(
+            "jsonb_typeof(staff_snapshot) = 'object' AND jsonb_typeof(results) = 'array'",
+            name="ck_match_development_documents",
+        ),
+    )
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    policy_version: Mapped[str] = mapped_column(String(32))
+    eligible: Mapped[bool] = mapped_column(Boolean)
+    staff_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    results: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+
+
+class StaffCareer(Base):
+    __tablename__ = "staff_careers"
+    __table_args__ = (
+        CheckConstraint(
+            f"role IN ({STAFF_ROLES_SQL}) AND skill BETWEEN 1 AND 20",
+            name="ck_staff_career_qualification",
+        ),
+        CheckConstraint("policy_version = 'retired-staff-v1'", name="ck_staff_career_policy"),
+        CheckConstraint("status IN ('pending','public','accepted')", name="ck_staff_career_status"),
+        CheckConstraint(
+            "expires_at > created_at AND ((status = 'pending') = (resolved_at IS NULL))",
+            name="ck_staff_career_resolution",
+        ),
+    )
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("staff.person_id"), primary_key=True)
+    origin_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"))
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    role: Mapped[str] = mapped_column(String(32))
+    skill: Mapped[int] = mapped_column(SmallInteger)
+    policy_version: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

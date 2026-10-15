@@ -42,6 +42,8 @@ from goaletto.infrastructure.models import (
     SeasonClub,
     SeasonRolloverReceipt,
     Staff,
+    StaffCareer,
+    StaffQualification,
     Standing,
 )
 from tests.integration.test_agent_wave import NOW
@@ -179,6 +181,20 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
         assert not replay.created and replay.next_season_id == next_season.id
         assert replay.aged + replay.retired == 1000
         assert replay.retired > 0 and replay.replacements > 0 and replay.warned > 0
+        careers = (await session.scalars(select(StaffCareer))).all()
+        assert len(careers) == replay.retired
+        assert any(c.role == "physiotherapist" for c in careers)
+        for career in careers:
+            person = await session.get(Person, career.person_id)
+            assert (
+                person.career == "staff"
+                and (await session.get(Player, person.id)).status == "retired"
+            )
+            assert (
+                await session.get(StaffQualification, (person.id, career.role))
+            ).skill == career.skill
+            assert person.age == ages[person.id]  # No extra year in the career change.
+            assert career.origin_club_id in memberships
         members = (
             await session.scalars(select(SeasonClub).where(SeasonClub.season_id == next_season.id))
         ).all()
@@ -244,7 +260,8 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
         for person_id_, age in ages.items():
             old_player = await session.get(Player, person_id_)
             current = await session.get(Person, person_id_)
-            assert current.age == age + (old_player.status != "retired")
+            profile = old_player if old_player is not None else await session.get(Staff, person_id_)
+            assert current.age == age + (profile.status != "retired")
         notices = (
             await session.scalars(
                 select(OutboxMessage).where(

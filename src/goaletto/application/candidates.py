@@ -52,6 +52,7 @@ from goaletto.infrastructure.models import (
     ScoutDiscovery,
     Season,
     Staff,
+    StaffCareer,
     StaffQualification,
     WorldSeedReceipt,
 )
@@ -66,6 +67,9 @@ class CandidateItem:
     person: Person
     skills: tuple[int, ...]
     alternatives: tuple[str, ...] = ()
+    wage: int | None = None
+    loyal: bool = False
+    private_until: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -182,65 +186,6 @@ def lifecycle_event(
     )
 
 
-async def _former_player(
-    session: AsyncSession, role: str, season: Season, at: datetime, seed_id: UUID
-) -> Person | None:
-    if role == "physiotherapist":
-        return None
-    positions = {
-        "goalkeeping_coach": ("GK",),
-        "defence_coach": ("DL", "DC", "DR", "DM"),
-        "attack_coach": ("FC", "AMC", "AML", "AMR", "ML", "MR"),
-    }
-    query = (
-        select(Person)
-        .join(Player)
-        .where(
-            Player.status == "retired",
-            ~select(ScoutDiscovery.person_id)
-            .where(ScoutDiscovery.person_id == Player.person_id, ScoutDiscovery.signed_at.is_(None))
-            .exists(),
-            Person.career == "retired",
-            Person.age < 60,
-            ~select(Staff.person_id).where(Staff.person_id == Person.id).exists(),
-            ~select(CandidateOffer.person_id)
-            .where(CandidateOffer.person_id == Person.id, CandidateOffer.kind != "player")
-            .exists(),
-        )
-    )
-    if role in positions:
-        query = query.where(Player.position.in_(positions[role]))
-    person = await session.scalar(query.order_by(Person.id).with_for_update(of=Person).limit(1))
-    if person is None:
-        return None
-    # One person and face across both careers; never borrow a different staff face.
-    person.career = "staff"
-    person.home_league_set_id = season.league_set_id
-    if person.age_applied_for_season_id != season.id:
-        person.age += 1
-        person.age_applied_for_season_id = season.id
-        prior = await session.scalar(
-            select(PersonSeasonEvent.id).where(
-                PersonSeasonEvent.person_id == person.id,
-                PersonSeasonEvent.season_id == season.id,
-                PersonSeasonEvent.stage == "age_applied",
-            )
-        )
-        if prior is None:
-            session.add(lifecycle_event(person, season, "age_applied", at, staff=True))
-    session.add(Staff(person_id=person.id, status="active"))
-    await session.flush()
-    _, _, skills, _, _ = candidate_profile(seed_id, "staff", role)
-    session.add(
-        StaffQualification(
-            person_id=person.id, role=role, skill=skills[0], qualified_for_season_id=season.id
-        )
-    )
-    session.add(lifecycle_event(person, season, "staff_last_decision", at, staff=True))
-    session.add(lifecycle_event(person, season, "career_assigned", at, staff=True))
-    return person
-
-
 async def replenish_pool(
     session: AsyncSession, kind: str, profile: str, at: datetime, *, limit: int | None = None
 ) -> int:
@@ -299,69 +244,63 @@ async def replenish_pool(
             else profile
         )
         name, age, skills, fee, wage = candidate_profile(person_id, kind, selected)
-        person = (
-            await _former_player(session, profile, season, at, person_id)
-            if kind == "staff"
-            else None
+        person = await create_person(
+            session,
+            NewPerson(
+                id=person_id,
+                creation_key=f"{POOL_POLICY}:{kind}:{profile}:{pool.generation}",
+                name=name,
+                age=age,
+                career=kind,
+                origin_bank=bank,
+                eligible_variant_ids=eligible,
+                home_league_set_id=season.league_set_id,
+            ),
         )
-        if person is None:
-            person = await create_person(
-                session,
-                NewPerson(
-                    id=person_id,
-                    creation_key=f"{POOL_POLICY}:{kind}:{profile}:{pool.generation}",
-                    name=name,
-                    age=age,
-                    career=kind,
-                    origin_bank=bank,
-                    eligible_variant_ids=eligible,
-                    home_league_set_id=season.league_set_id,
-                ),
-            )
-            person.age_applied_for_season_id = season.id
-            if kind == "player":
-                session.add(
-                    Player(
-                        person_id=person.id,
-                        position=selected,
-                        alternative_positions=list(market_player(person.id, selected).alternatives),
-                        **dict(zip(SKILL_NAMES, skills, strict=True)),
-                        form=6,
-                        experience=0,
-                        morale=50,
-                        status="active",
-                    )
-                )
-                session.add(
-                    PlayerDevelopment(
-                        person_id=person.id,
-                        caps=market_player(person.id, selected).caps,
-                        progress=dict.fromkeys(PROGRESS_KEYS, 0),
-                        policy_version=POLICY_VERSION,
-                    )
-                )
-            else:
-                session.add(Staff(person_id=person.id, status="active"))
-            await session.flush()
-            if kind == "staff":
-                session.add(
-                    StaffQualification(
-                        person_id=person.id,
-                        role=profile,
-                        skill=skills[0],
-                        qualified_for_season_id=season.id,
-                    )
-                )
-            session.add(lifecycle_event(person, season, "age_applied", at, staff=kind == "staff"))
+        person.age_applied_for_season_id = season.id
+        if kind == "player":
             session.add(
-                lifecycle_event(
-                    person,
-                    season,
-                    "player_last_decision" if kind == "player" else "staff_last_decision",
-                    at,
-                    staff=kind == "staff",
+                Player(
+                    person_id=person.id,
+                    position=selected,
+                    alternative_positions=list(market_player(person.id, selected).alternatives),
+                    **dict(zip(SKILL_NAMES, skills, strict=True)),
+                    form=6,
+                    experience=0,
+                    morale=50,
+                    status="active",
                 )
             )
+            session.add(
+                PlayerDevelopment(
+                    person_id=person.id,
+                    caps=market_player(person.id, selected).caps,
+                    progress=dict.fromkeys(PROGRESS_KEYS, 0),
+                    policy_version=POLICY_VERSION,
+                )
+            )
+        else:
+            session.add(Staff(person_id=person.id, status="active"))
+        await session.flush()
+        if kind == "staff":
+            session.add(
+                StaffQualification(
+                    person_id=person.id,
+                    role=profile,
+                    skill=skills[0],
+                    qualified_for_season_id=season.id,
+                )
+            )
+        session.add(lifecycle_event(person, season, "age_applied", at, staff=kind == "staff"))
+        session.add(
+            lifecycle_event(
+                person,
+                season,
+                "player_last_decision" if kind == "player" else "staff_last_decision",
+                at,
+                staff=kind == "staff",
+            )
+        )
         if kind == "staff":
             from goaletto.domain.finances import staff_fee, staff_wage
 
@@ -410,6 +349,9 @@ async def load_candidates(
     refresh_supply: bool = True,
 ) -> CandidateScreen:
     owner, club = await owned_club(session, actor)
+    from goaletto.application.staff_career import expire_offers
+
+    await expire_offers(session, actor.at)
     if kind not in ("player", "staff"):
         raise ValueError("Unknown candidate kind")
     if refresh_supply:
@@ -422,10 +364,20 @@ async def load_candidates(
             .join(Person)
             .where(
                 CandidateOffer.kind == kind,
-                CandidateOffer.status == "available",
+                (CandidateOffer.status == "available")
+                | (
+                    (CandidateOffer.status == "private")
+                    & CandidateOffer.person_id.in_(
+                        select(StaffCareer.person_id).where(
+                            StaffCareer.origin_club_id == club.id, StaffCareer.status == "pending"
+                        )
+                    )
+                ),
                 Person.career == kind,
             )
-            .order_by(CandidateOffer.profile, Person.id)
+            .order_by(
+                (CandidateOffer.status == "private").desc(), CandidateOffer.profile, Person.id
+            )
         )
     ).all()
     items = []
@@ -453,12 +405,23 @@ async def load_candidates(
                 or 0,
             )
         )
+        from goaletto.application.staff_career import quoted_wage
+
+        wage, loyal = (
+            await quoted_wage(session, offer, club.id, actor.at)
+            if kind == "staff"
+            else (offer.weekly_rate, False)
+        )
+        career = await session.get(StaffCareer, person.id) if offer.status == "private" else None
         items.append(
             CandidateItem(
                 offer,
                 person,
                 skill_values,
                 tuple(worker.alternative_positions) if isinstance(worker, Player) else (),
+                wage,
+                loyal,
+                career.expires_at if career else None,
             )
         )
     employed = (
@@ -531,8 +494,20 @@ async def sign_candidate(
         .execution_options(populate_existing=True)
     )
     person = await session.get(Person, person_id, populate_existing=True)
-    if offer is None or person is None or offer.status != "available" or offer.fee != quoted_fee:
+    if (
+        offer is None
+        or person is None
+        or offer.status not in {"available", "private"}
+        or offer.fee != quoted_fee
+    ):
         raise ValueError("Offer unavailable or price changed")
+    from goaletto.application.staff_career import quoted_wage
+
+    wage, _ = (
+        await quoted_wage(session, offer, club.id, at)
+        if offer.kind == "staff"
+        else (offer.weekly_rate, False)
+    )
     worker = await session.scalar(
         select(Player if offer.kind == "player" else Staff)
         .where((Player.person_id if offer.kind == "player" else Staff.person_id) == person.id)
@@ -607,7 +582,7 @@ async def sign_candidate(
             "kind": offer.kind,
             "role": offer.profile,
             "policy": offer.economy_policy,
-            "cycle_rate": offer.weekly_rate,
+            "cycle_rate": wage,
         },
     )
     worker.club_id = club.id
@@ -620,6 +595,9 @@ async def sign_candidate(
     person.home_league_set_id = await league_set_for(session, club)
     # Changing calendars never adds a year at signing; the new club owns subsequent aging.
     person.age_applied_for_season_id = season.id
+    career = await session.get(StaffCareer, person.id) if offer.kind == "staff" else None
+    if career and career.status == "pending":
+        career.status, career.resolved_at = "accepted", at
     offer.status = "signed"
     await session.flush()
     await salary_contract(
@@ -629,7 +607,7 @@ async def sign_candidate(
         "player" if offer.kind == "player" else offer.profile,
         at,
         quoted_player_wage=offer.weekly_rate if offer.kind == "player" else None,
-        quoted_staff_wage=offer.weekly_rate if offer.kind == "staff" else None,
+        quoted_staff_wage=wage if offer.kind == "staff" else None,
         policy_version=offer.economy_policy,
         employment_id=actor.operation_id if offer.kind == "staff" else None,
     )
@@ -641,7 +619,7 @@ async def sign_candidate(
         club_id=club.id,
         ownership_id=owner.id,
         fee=offer.fee,
-        weekly_rate=offer.weekly_rate,
+        weekly_rate=wage,
         economy_policy=offer.economy_policy,
         signed_at=at,
     )

@@ -60,6 +60,7 @@ def money_io(monkeypatch):
 
     monkeypatch.setattr("goaletto.application.game_actions.allocation_lock", AsyncMock())
     monkeypatch.setattr("goaletto.application.finances.match_income", AsyncMock())
+    monkeypatch.setattr("goaletto.application.match_development.apply_development", AsyncMock())
 
 
 class Rows:

@@ -1,4 +1,7 @@
 # ⚽ Goaletto — Game Design Document
+
+Реализованы AND-113/114: [матчевое развитие](docs/match-development.md)
+и [карьера бывших игроков](docs/retired-staff-offers.md).
 > AND-111/112 (2026-10-15): [дневные профильные тренировки и вклад штаба](docs/training.md)
 > реализованы; матрица профессий и [сезонные пределы](docs/staff-training-calibration.md)
 > заменяют старые недельные коэффициенты ниже. Матчевое начисление — AND-113.

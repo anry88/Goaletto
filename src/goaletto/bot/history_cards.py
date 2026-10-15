@@ -235,6 +235,15 @@ def report_view(
                     p6=member.form,
                     p7=energy,
                 )
+                + (
+                    tr(
+                        "\nРазвитие за матч: +{gain}% балла · опыт +{experience}% балла",
+                        gain=f"{member.growth_bps / 100:.2f}",
+                        experience=f"{(member.experience_gain or 0) / 100:.2f}",
+                    )
+                    if member.growth_bps is not None
+                    else ""
+                )
             )
     # Bound whole entries by Telegram's UTF-16 text budget even for long names.
     chunks: list[list[str]] = [[]]

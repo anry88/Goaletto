@@ -26,7 +26,13 @@ from goaletto.infrastructure.models import (
 
 
 async def staff_terms(
-    session: AsyncSession, person_id: UUID, role: str, *, incoming: bool
+    session: AsyncSession,
+    person_id: UUID,
+    role: str,
+    *,
+    incoming: bool,
+    club_id: UUID | None = None,
+    at: datetime | None = None,
 ) -> dict[str, str | int]:
     person = await session.get(Person, person_id, populate_existing=True)
     staff = await session.get(Staff, person_id, populate_existing=True)
@@ -51,14 +57,21 @@ async def staff_terms(
         if (
             staff.club_id is not None
             or offer is None
-            or offer.status != "available"
+            or offer.status not in {"available", "private"}
             or offer.kind != "staff"
             or offer.profile != role
         ):
             raise ValueError("Staff offer unavailable")
+        from goaletto.application.staff_career import quoted_wage
+
+        if club_id is None or at is None:
+            raise ValueError("Incoming staff requires club and date")
+        wage, loyal = await quoted_wage(session, offer, club_id, at)
         terms.update(
             fee=offer.fee,
-            wage=offer.weekly_rate,
+            wage=wage,
+            normal_wage=offer.weekly_rate,
+            loyal=int(loyal),
             policy=offer.economy_policy,
             offer_at=offer.created_at.isoformat(),
         )
@@ -103,7 +116,9 @@ async def quote_change(
     if outgoing_id:
         terms["outgoing"] = await staff_terms(session, outgoing_id, role, incoming=False)
     if incoming_id:
-        terms["incoming"] = await staff_terms(session, incoming_id, role, incoming=True)
+        terms["incoming"] = await staff_terms(
+            session, incoming_id, role, incoming=True, club_id=club.id, at=actor.at
+        )
     quote_id = uuid5(actor.operation_id, "staff-change:v1")
     row = await session.get(StaffChange, quote_id)
     if row is not None:
@@ -253,7 +268,9 @@ async def execute_change(
     if row.outgoing_id:
         terms["outgoing"] = await staff_terms(session, row.outgoing_id, row.role, incoming=False)
     if row.incoming_id:
-        terms["incoming"] = await staff_terms(session, row.incoming_id, row.role, incoming=True)
+        terms["incoming"] = await staff_terms(
+            session, row.incoming_id, row.role, incoming=True, club_id=club.id, at=at
+        )
     if terms != row.terms:
         raise ValueError("Staff terms changed")
     if row.incoming_id:

@@ -89,3 +89,6 @@
 - [Следующие четыре внешних подпакета](handoffs/2026-10-13-wave4/README.md) — feedback, сезонный расчёт, PG races и недельные KPI.
 
 - [Приёмка четвёртой внешней волны](agent-wave4-review.md) — отзывы, старение, PG races и матчевые возможности.
+
+- [Матчевое развитие · AND-113](match-development.md).
+- [Кадровые предложения пенсионерам · AND-114](retired-staff-offers.md).

@@ -60,6 +60,7 @@ def demand_io(monkeypatch):
 
     monkeypatch.setattr("goaletto.application.stadium.crowd_for_fixture", demand)
     monkeypatch.setattr("goaletto.application.stadium.pin_crowd", AsyncMock())
+    monkeypatch.setattr("goaletto.application.match_development.pin_development", AsyncMock())
 
 
 class Rows:

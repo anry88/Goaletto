@@ -1,11 +1,12 @@
-"""Offline 80-day calibration; projected match grants are reserved for AND-113."""
+"""Offline 80-day calibration of actual training and official league appearances."""
 
 import csv
 from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
 
-from goaletto.domain.development import GrowthBudget, grant_growth
+from goaletto.domain.development import GrowthBudget
+from goaletto.domain.match_development import develop_appearance
 from goaletto.domain.recovery import daily_recovery, ready_in, recover
 from goaletto.domain.training import (
     PROGRESS_KEYS,
@@ -13,7 +14,6 @@ from goaletto.domain.training import (
     Focus,
     Intensity,
     TrainingPlayer,
-    age_multiplier,
     train_player,
 )
 
@@ -50,21 +50,18 @@ def simulate(
         )
         if match:
             matches += 1
-            # A conservative projected full appearance, bounded by the shared budget.
-            # This is a calibration reserve, not runtime match development.
-            proposed = 240 * age_multiplier(age) * (5000 + skill * 500) // 10000**2
-            granted = grant_growth(
-                player.skills,
-                player.caps,
-                player.progress,
-                budget,
-                {"playmaking": proposed},
-                source="match",
-            )
-            player, budget = (
-                replace(player, skills=granted.skills, progress=granted.progress),
-                granted.budget,
-            )
+            if phase == 3:
+                appearance = develop_appearance(player, 90, {"attack_coach": skill}, budget)
+                growth = appearance.growth
+                player, budget = (
+                    replace(
+                        player,
+                        skills=growth.skills,
+                        progress=growth.progress,
+                        experience=appearance.experience,
+                    ),
+                    growth.budget,
+                )
             energy = max(0, energy - (3574 if phase in (0, 1) else 2680))
         else:
             days += 1
@@ -108,7 +105,7 @@ def simulate(
         "training_days": days,
         "matches": matches,
         "training_bps": budget.used["training"],
-        "projected_match_bps": budget.used["match"],
+        "match_bps": budget.used["match"],
         "total_bps": budget.used["training"] + budget.used["match"],
         "leadership_bps": budget.used["leadership"],
         "morale": player.morale,
@@ -133,7 +130,7 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
     lines = [
-        "# Калибровка штаба и тренировок · AND-111/112",
+        "# Калибровка штаба и тренировок · AND-111/112/113",
         "",
         "Воспроизведение: `.venv/bin/python scripts/simulate_staff_training.py`.",
         f"{len(rows)} чистых сценария, без DB и сети. "
@@ -146,10 +143,10 @@ def main() -> None:
         "задачами. Игрок начинает с навыками 10, потолками 20, моралью 50 и лидерств"
         "ом 10. Травмы исключены, чтобы оценить верхнюю границу роста.",
         "",
-        "Матчевые прибавки — **резерв калибровки AND-113**, не утверждение о реализо"
-        "ванном начислении за минуты. Пример: 240 bps × возраст × квалификация за по"
-        "лное участие; общий механизм ограничивает любые будущие начисления. Фарм то"
-        "варищеских/операторских матчей этим расчётом не разрешается.",
+        "Матчевые прибавки используют реальную match-development-v1 для 18 официальных игр лиги. "
+        "Кубковые игры пока считаются только нагрузкой: "
+        "их runtime/eligibility подключаются отдельно. "
+        "Товарищеские и операторские матчи не награждаются. Опыт начисляется отдельно от навыка.",
         "",
         "Общие пределы возраста-сезона: 3 балла суммарно по восьми навыкам, из них м"
         "аксимум 2 тренировочных и 1 матчевый; один навык — максимум 1.5. Это потолк"
@@ -166,7 +163,7 @@ def main() -> None:
         "Средняя интенсивность, ранний вылет, физподготовка; весь штаб одной квалифи"
         "кации. Показаны накопленные дробные баллы:",
         "",
-        "| Возраст | Навык штаба | Тренировки | Резерв матчей | Всего | Лидерство | Мораль |",
+        "| Возраст | Навык штаба | Тренировки | Матчи лиги | Всего | Лидерство | Мораль |",
         "|---|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
@@ -178,7 +175,7 @@ def main() -> None:
         ):
             lines.append(
                 f"| {row['age']} | {row['skill']} | {int(row['training_bps']) / 10000:.3f} "
-                f"| {int(row['projected_match_bps']) / 10000:.3f} "
+                f"| {int(row['match_bps']) / 10000:.3f} "
                 f"| {int(row['total_bps']) / 10000:.3f} "
                 f"| {int(row['leadership_bps']) / 10000:.3f} | {row['morale']} |"
             )

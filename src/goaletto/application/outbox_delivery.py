@@ -47,6 +47,7 @@ SUPPORTED_KINDS = frozenset(
         "match_recovery",
         "market_notice",
         "scout_report",
+        "staff_career",
         "player_lifecycle",
         "staff_lifecycle",
     }
@@ -59,6 +60,7 @@ PRIORITY_BY_KIND = {
     "match_result": 100,
     "market_notice": 70,
     "scout_report": 70,
+    "staff_career": 80,
     "player_lifecycle": 80,
     "staff_lifecycle": 80,
     "match_recovery": 90,
@@ -186,6 +188,13 @@ def valid_payload(payload: dict[str, Any]) -> bool:
             and isinstance(payload.get("player_name"), str)
             and 0 < len(payload["player_name"]) <= 120
         )
+    if kind == "staff_career":
+        return (
+            _payload_uuid(payload, "person_id") is not None
+            and _payload_uuid(payload, "club_id") is not None
+            and isinstance(payload.get("player_name"), str)
+            and 0 < len(payload["player_name"]) <= 120
+        )
     if kind == "scout_report":
         return (
             _payload_uuid(payload, "mission_id") is not None
@@ -285,6 +294,13 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "staff_career":
+        return tr(
+            "🤝 {person} готов продолжить карьеру в штабе вашего клуба. "
+            "Лояльность клубу даёт скидку 20% на зарплату. "
+            "Условия и ответ в течение 8 дней — /staff.",
+            person=escape(latin_name(payload["player_name"])),
+        )
     if kind == "scout_report":
         return tr(
             "🔎 Поиск завершён. Найдено игроков: {count}. Итоговый список и цены — /scout.",
@@ -482,6 +498,21 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     if not manager.bot_available:
         return Decision.SKIP_UNAVAILABLE
     kind = payload["kind"]
+    if kind == "staff_career":
+        from goaletto.infrastructure.models import StaffCareer
+
+        career = await session.get(
+            StaffCareer, _payload_uuid(payload, "person_id"), populate_existing=True
+        )
+        return (
+            Decision.DELIVER
+            if career
+            and career.status == "pending"
+            and career.origin_club_id == club.id
+            and now < career.expires_at
+            and _payload_uuid(payload, "club_id") == club.id
+            else Decision.SKIP_STALE
+        )
     if kind == "scout_report":
         from goaletto.infrastructure.models import ScoutMission
 

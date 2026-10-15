@@ -46,7 +46,7 @@ def parse_candidate(data: str) -> tuple[str, UUID | None, UUID | None, int]:
         return p[1], None, None, int(p[2])
     if len(p) == 3 and p[:2] == ["cg", "x"]:
         return "x", expand_id(p[2]), None, 0
-    if len(p) == 5 and p[:2] in (["cg", "q"], ["cg", "b"], ["cg", "f"]):
+    if len(p) == 5 and p[:2] in (["cg", "q"], ["cg", "b"], ["cg", "f"], ["cg", "d"]):
         return p[1], expand_id(p[2]), expand_id(p[3]), decode_price(p[4])
     raise ValueError("Invalid candidate action")
 
@@ -143,10 +143,33 @@ def candidate_list(
                 tr(
                     "Подписание: {fee} · зарплата: {wage}/4 дня",
                     fee=amount(offer.fee),
-                    wage=amount(offer.weekly_rate),
+                    wage=amount(item.wage if item.wage is not None else offer.weekly_rate),
                 ),
             )
         )
+        if item.loyal:
+            lines.append(
+                tr(
+                    "Лояльность клубу: обычная зарплата {normal}, ваша {wage}/4 дня (−20%).",
+                    normal=amount(offer.weekly_rate),
+                    wage=amount(item.wage or offer.weekly_rate),
+                )
+            )
+        if item.private_until:
+            lines.append(
+                tr(
+                    "Первое предложение клубу до {date} UTC.",
+                    date=item.private_until.strftime("%d.%m.%Y %H:%M"),
+                )
+            )
+            rows.append(
+                [
+                    button(
+                        tr("Отказаться: {name}", name=latin_name(person.name)),
+                        f"cg:d:{compact_id(person.id)}:{compact_id(screen.ownership_id)}:0",
+                    )
+                ]
+            )
         rows.append(
             [
                 button(
@@ -194,7 +217,7 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
         name=escape(latin_name(person.name)),
         role=role,
         fee=amount(offer.fee),
-        wage=amount(offer.weekly_rate),
+        wage=amount(item.wage if item.wage is not None else offer.weekly_rate),
     )
     if offer.kind == "player":
         text += "\n" + tr(
@@ -238,6 +261,14 @@ def staff_change_view(change: StaffChange) -> tuple[str, Keyboard]:
                 wage=amount(person["wage"]),
             )
         )
+        if person.get("loyal"):
+            lines.append(
+                tr(
+                    "Лояльность клубу: обычная зарплата {normal}, ваша {wage}/4 дня (−20%).",
+                    normal=amount(person["normal_wage"]),
+                    wage=amount(person["wage"]),
+                )
+            )
         lines.append(staff_contribution(change.role, person["skill"]))
         if person["status"] == "last_season":
             lines.append(tr("⏳ Последний рабочий сезон"))

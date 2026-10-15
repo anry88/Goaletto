@@ -39,6 +39,7 @@ from goaletto.infrastructure.models import (
     Fixture,
     League,
     Match,
+    MatchDevelopment,
     MatchResult,
     MatchStage,
     MatchTick,
@@ -114,6 +115,8 @@ class ReportLineupPlayer:
     injured: bool  # stored terminal condition
     energy_bps: int | None = None  # stored terminal condition, distinct from form
     appeared: bool = False  # includes a player entering immediately before final whistle
+    growth_bps: int | None = None
+    experience_gain: int | None = None
 
 
 @dataclass(frozen=True)
@@ -479,6 +482,13 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
             key = (side, scorer)
             goal_counts[key] = goal_counts.get(key, 0) + 1
 
+    development = await session.get(MatchDevelopment, match.id)
+    growth_rows = (
+        {r["person_id"]: r for r in development.results}
+        if development and development.applied_at
+        else {}
+    )
+
     def _lineup(side: str) -> tuple[ReportLineupPlayer, ...]:
         initial_team = initial.home if side == "home" else initial.away
         final_team = terminal.home if side == "home" else terminal.away
@@ -509,6 +519,8 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                         and _raw_person(raw.get("other_player_id")) == snapshot_player.id
                         for raw in raw_events
                     ),
+                    growth_rows.get(str(snapshot_player.id), {}).get("gain_bps"),
+                    growth_rows.get(str(snapshot_player.id), {}).get("experience_gain"),
                 )
             )
         rows_out.sort(key=lambda r: (not r.started, not r.appeared, r.name, str(r.person_id)))

@@ -74,6 +74,17 @@ async def candidates_callback(
                     "staff",
                     notice=tr("Штаб обновлён. Условия зарплаты сохранены."),
                 )
+            elif action == "d":
+                if owner_id is None or person_id is None:
+                    raise ValueError("Missing career offer")
+                from goaletto.application.staff_career import decline_offer
+
+                await decline_offer(session, actor, person_id, owner_id)
+                text, keyboard = candidate_list(
+                    await load_candidates(session, actor, "staff", record=False),
+                    "staff",
+                    notice=tr("Предложение отклонено. Сотрудник вышел на общий рынок."),
+                )
             elif action == "f":
                 if owner_id is None or person_id is None:
                     raise ValueError("Missing employee")

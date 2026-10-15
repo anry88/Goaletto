@@ -158,7 +158,18 @@
   specialist bonus. Physio owns natural recovery, fitness owns physical drills.
 - Shared development-budget-v1 follows PlayerDevelopment.growth_age, never club/owner.
   Use application.development.growth_budget/save_budget and domain.development.grant_growth
-  for future AND-113 match grants: 30000 total bps, 20000 training, 10000 match,
+  for AND-113 match grants: 30000 total bps, 20000 training, 10000 match,
   15000 per skill per age-season. Preserve fractions/caps on reset; transfers do not reset.
   Leadership has its own fraction and 5000 new bps per age-season. Morale/leadership
   mentoring applies once to attended chosen sessions, not automated bot training.
+
+- AND-113 implements match-development-v1: pin MatchDevelopment at lineup lock;
+  apply actual minutes of both teams atomically with finalization and the shared
+  age-season budget. Staff is frozen outside the immutable match state. Only
+  announced official league plans qualify currently; friendlies, offline/operator
+  fixtures, abandoned and old matches without pinned terms do not grant growth.
+- AND-114 assigns retired-staff-v1 once at football retirement, independently of
+  candidate deficits. Preserve StaffCareer origin/role/skill and the same face/history.
+  First refusal lasts 8 days; decline/timeout/unowned releases to global supply,
+  preserving surplus. Origin club wage is floor(normal * 0.8) on every rehire;
+  fee is unchanged. Use quoted_wage for club-specific offers and salary receipts.

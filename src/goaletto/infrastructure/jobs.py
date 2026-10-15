@@ -83,6 +83,7 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         "season.rollover",
         "scout.complete",
         "scout.expire",
+        "staff.career_expire",
     }:
         try:
             async with session.begin_nested():
@@ -138,6 +139,10 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
                         rescheduled = True
                 elif job.kind in {"scout.complete", "scout.expire"}:
                     await complete_search(session, job, at)
+                elif job.kind == "staff.career_expire":
+                    from goaletto.application.staff_career import expire_job
+
+                    await expire_job(session, job, at)
                 elif job.kind == "finance.cycle":
                     await cycle_finances(session, job, at)
                 elif job.kind == "training.apply":

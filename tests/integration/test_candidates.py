@@ -395,14 +395,23 @@ async def test_free_player_can_enter_staff_pool_with_separate_career_receipts(se
         )
         person.career, person.age = "retired", 36
         await session.flush()
-        assert await replenish_pool(session, "staff", "defence_coach", at, limit=1) == 1
+        from goaletto.application.staff_career import assign_career
+        from goaletto.application.staff_changes import execute_change, quote_change
+
+        career = await assign_career(session, person, season_id, club_id, at)
         offer = await session.get(CandidateOffer, person.id)
-        assert offer.kind == "staff" and offer.profile == "defence_coach"
+        assert offer.kind == "staff" and offer.profile == career.role
         second_action = replace(action(actor), at=at)
-        second = await sign_candidate(
-            session, second_action, screen.ownership_id, person.id, offer.fee, at=at
+        quote = await quote_change(
+            session,
+            action(second_action),
+            screen.ownership_id,
+            incoming_id=person.id,
+            quoted_fee=offer.fee,
         )
-        assert second.kind == "staff" and second.profile == "defence_coach"
+        await execute_change(session, second_action, quote.id, at=at)
+        second = await session.get(CandidateSigning, second_action.operation_id)
+        assert second.kind == "staff" and second.profile == career.role
         assert (person.id, person.appearance_identity_id, person.name) == identity
         assert (await session.get(Player, person.id)).status == "retired"
         assert (await session.get(Staff, person.id)).club_id == club_id
@@ -413,7 +422,7 @@ async def test_free_player_can_enter_staff_pool_with_separate_career_receipts(se
         ).all()
         assert {r.kind: (r.profile, r.fee) for r in history} == {
             "player": ("DC", first.fee),
-            "staff": ("defence_coach", second.fee),
+            "staff": (career.role, second.fee),
         }
         assert (
             await sign_candidate(

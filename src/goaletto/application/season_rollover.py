@@ -51,6 +51,7 @@ from goaletto.infrastructure.models import (
     PersonSeasonEvent,
     Player,
     PlayerDevelopment,
+    ScoutDiscovery,
     Season,
     SeasonClub,
     SeasonRolloverReceipt,
@@ -408,6 +409,7 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     await session.execute(delete(LineupSlot).where(LineupSlot.person_id.in_(retired_ids)))
     await session.flush()
     replacements: dict[UUID, Player] = {}
+    new_careers: list[tuple[Person, UUID | None]] = []
     counts = dict.fromkeys(
         (
             "aged",
@@ -465,6 +467,12 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
             await close_salary(session, person.id, at)
             await _notice(session, person, club_id, season.id, "retired", at)
             await _event(session, "player_retired", person.id, season.id, at)
+            if not await session.scalar(
+                select(ScoutDiscovery.person_id).where(
+                    ScoutDiscovery.person_id == person.id, ScoutDiscovery.signed_at.is_(None)
+                )
+            ):
+                new_careers.append((person, club_id))
             if club_id is not None and club_id not in owned:
                 youth_id = uuid5(person.id, f"{ROLLOVER_POLICY}:{season.id}:youth")
                 name, skills = youth_profile(next_seed, youth_id, player.position)
@@ -538,6 +546,10 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
                 await _notice(session, person, club_id, next_id, "last_season", at)
                 await _event(session, "player_last_season_announced", person.id, next_id, at)
     await _rollover_staff(session, season, next_id, next_seed, by_id, at, counts)
+    from goaletto.application.staff_career import assign_career
+
+    for person, origin_club_id in new_careers:
+        await assign_career(session, person, season.id, origin_club_id, at)
     # Retired candidate offers leave supply, but historical offers/persons remain.
     await session.execute(
         update(CandidateOffer)

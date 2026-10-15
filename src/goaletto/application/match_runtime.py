@@ -657,6 +657,9 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         )
         session.add(match)
         await session.flush()
+        from goaletto.application.match_development import pin_development
+
+        await pin_development(session, fixture, state, at)
         await lock_energy(session, match, state, at)
         await pin_crowd(session, match, demand, at)
         await stage_receipt(session, match, "locked", at, fixture.lineup_lock_at)

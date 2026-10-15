@@ -621,5 +621,11 @@
   "🔒 {focus} — нужен {role}": "🔒 {focus} — requires {role}",
   "👥 Персонал": "👥 Staff",
   "Развитие лидерства: +{gain}% балла": "Leadership development: +{gain}% of a point",
-  "План дня: ": "Daily plan: "
+  "План дня: ": "Daily plan: ",
+  "Лояльность клубу: обычная зарплата {normal}, ваша {wage}/4 дня (−20%).": "Club loyalty: regular wage {normal}, yours {wage}/4 days (−20%).",
+  "Первое предложение клубу до {date} UTC.": "First offer to your club until {date} UTC.",
+  "Отказаться: {name}": "Decline: {name}",
+  "Предложение отклонено. Сотрудник вышел на общий рынок.": "Offer declined. The staff candidate is now on the public market.",
+  "🤝 {person} готов продолжить карьеру в штабе вашего клуба. Лояльность клубу даёт скидку 20% на зарплату. Условия и ответ в течение 8 дней — /staff.": "🤝 {person} is ready to join your staff. Club loyalty gives a 20% wage discount. Terms and your decision within 8 days — /staff.",
+  "\nРазвитие за матч: +{gain}% балла · опыт +{experience}% балла": "\nMatch development: +{gain}% of a point · experience +{experience}% of a point"
 }
