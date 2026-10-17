@@ -22,6 +22,7 @@ COMMANDS = (
     ("train", "Тренировки", "Training"),
     ("calendar", "Расписание ближайших матчей", "Upcoming fixtures"),
     ("match", "Матч и ближайшая встреча", "Live match and next fixture"),
+    ("friendly", "Товарищеские матчи и вызовы", "Friendly matches and challenges"),
     ("table", "Таблица лиги", "League table"),
     ("history", "Результаты и отчёты матчей", "Match results and reports"),
     ("feedback", "Оставить отзыв", "Leave feedback"),

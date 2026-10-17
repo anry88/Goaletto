@@ -736,7 +736,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             from goaletto.application.champions import context_for_champions_fixture
 
             context = await context_for_champions_fixture(session, fixture)
-        elif (fixture.competition or "league") != "league":
+        elif (fixture.competition or "league") not in ("league", "friendly"):
             raise ValueError("Unsupported competition runtime")
         if fixture.neutral:
             from goaletto.application.cup import pin_final_venue

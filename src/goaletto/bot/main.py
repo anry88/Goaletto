@@ -54,6 +54,7 @@ def build_dispatcher(
         entry_router,
         feedback_router,
         finance_router,
+        friendly_router,
         history_router,
         lineup_handlers,
         live_router,
@@ -88,6 +89,7 @@ def build_dispatcher(
         settings_router,
         schedule_router,
         scouting_router,
+        friendly_router,
         history_router,
         club_router,
     ):

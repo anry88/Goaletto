@@ -2206,3 +2206,45 @@ class ChampionsTie(Base):
     extra_time_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     shootout_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class FriendlyInvitation(Base):
+    """Explicit human challenge for a voluntary friendly; no auto pairing."""
+
+    __tablename__ = "friendly_invitations"
+    __table_args__ = (
+        CheckConstraint("home_club_id <> away_club_id", name="ck_friendly_invite_clubs"),
+        CheckConstraint(
+            "status IN ('pending','accepted','declined','cancelled','expired')",
+            name="ck_friendly_invite_status",
+        ),
+        CheckConstraint(
+            "(status = 'accepted') = (plan_id IS NOT NULL)",
+            name="ck_friendly_invite_plan",
+        ),
+        CheckConstraint(
+            "(status = 'pending') = (responded_at IS NULL)",
+            name="ck_friendly_invite_response",
+        ),
+        Index("ix_friendly_invite_day", "season_id", "assigned_day"),
+        Index("ix_friendly_invite_clubs", "home_club_id", "away_club_id", "assigned_day"),
+        Index(
+            "uq_friendly_pending_pair_day",
+            "season_id",
+            "home_club_id",
+            "away_club_id",
+            "assigned_day",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    home_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    away_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    challenger_ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    assigned_day: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(16), server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    plan_id: Mapped[UUID | None] = mapped_column(ForeignKey("fixture_plans.id"), nullable=True)

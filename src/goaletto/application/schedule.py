@@ -59,7 +59,8 @@ async def load_schedule(
     owner, club = await owned_club(session, actor)
     if ownership_id is not None and owner.id != ownership_id:
         raise PermissionDenied("Schedule belongs to an earlier owner")
-    if type(page) is not int or page < 1 or competition not in (None, "cup", "champions"):
+    allowed = (None, "cup", "champions", "friendly")
+    if type(page) is not int or page < 1 or competition not in allowed:
         raise ValueError("Invalid schedule page")
     season = await session.scalar(
         select(Season)

@@ -126,7 +126,7 @@ async def plan_horizon(session: AsyncSession, season_id: UUID, at: datetime) -> 
         if plan.home_club_id is None or plan.away_club_id is None:
             plan.blocked_reason = "awaiting_participants"
             continue
-        if plan.competition not in ("league", "cup", "champions") or (
+        if plan.competition not in ("league", "cup", "champions", "friendly") or (
             plan.competition == "league" and plan.league_id is None
         ):
             plan.blocked_reason = "awaiting_competition_runtime"

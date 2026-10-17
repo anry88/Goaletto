@@ -53,7 +53,7 @@ async def pin_development(
         and state.tick == 0
         and (state.home.snapshot.club_id, state.away.snapshot.club_id)
         == (fixture.home_club_id, fixture.away_club_id)
-        and plan.competition in ("league", "cup", "champions")
+        and plan.competition in ("league", "cup", "champions", "friendly")
         and plan.competition == (fixture.competition or "league")
         and (plan.competition != "cup" or state.knockout is not None)
         and (plan.competition != "champions" or state.knockout is not None)

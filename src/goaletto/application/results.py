@@ -62,9 +62,9 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
         raise ValueError("Final checkpoint projections do not reconcile")
     hash_value = state_hash(state)
     competition = fixture.competition or "league"
-    if competition not in {"league", "cup", "champions"}:
+    if competition not in {"league", "cup", "champions", "friendly"}:
         raise ValueError("Result has no supported competition runtime")
-    if (competition == "league") == (state.knockout is not None):
+    if (competition in {"cup", "champions"}) != (state.knockout is not None):
         raise ValueError("Result has no supported competition runtime")
     receipt = await session.get(MatchResult, match.id)
     if receipt is not None:
