@@ -247,3 +247,13 @@
   member's rollover until all results finish. AND-119 remains open for aligning
   new/delayed sets: current cohorts require equal UTC epoch/end and full completion;
   unfinished/incompatible sets are skipped, not silently synchronized.
+
+- AND-75/76/79 launch measurement is wired; see docs/launch-measurement.md.
+  Direct help/offer confirmations use operation/effect 31001 and a bounded target,
+  only after Telegram accepts IO. Rejections and delivery never renew ownership
+  or sessions. Saved-lineup Update retries are not stale-button errors.
+  Recovery requires claim/manual save within 30 minutes and the same ownership.
+  SQL opportunity reports use full league plans, actual times, mature windows,
+  historical coverage, and reduced second denominator; do not infer churn from
+  calendar waiting. AND-77 technical latency, AND-78 automatic surveys and HDC
+  deployment remain separate; these reports do not launch polling or outreach.

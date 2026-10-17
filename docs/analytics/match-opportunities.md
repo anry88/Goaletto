@@ -1,5 +1,10 @@
 # Матчевые возможности: первое участие и возврат ко второму · AND-77/79/82 (расчёт)
 
+Обновление 2026-10-18: [игровое подключение и PG-приёмка AND-75/76/79](../launch-measurement.md).
+Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
+match-opportunities подключены к операторскому CLI. Технические latency и
+автоматические опросы остаются отдельными задачами.
+
 Статус: чистый типизированный калькулятор в `application/match_opportunities.py`,
 hand-count приёмка в `tests/unit/test_match_opportunities.py`. SQL
 projection/emission/wiring, реальные проекции и подключение к dashboards —

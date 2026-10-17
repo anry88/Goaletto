@@ -7,6 +7,7 @@ from types import MappingProxyType
 from uuid import UUID
 
 CONTRACT_VERSION = 1
+DIRECT_RESPONSE_EFFECT = 31001
 
 
 class Origin(StrEnum):
@@ -88,7 +89,7 @@ EVENT_SPECS = MappingProxyType(
         "manager_started": _user(),
         "start_accepted": _user(),
         "campaign_touched": _user("campaign_id"),
-        "club_offer_delivered": EventSpec(Origin.SYSTEM, ("analytics_manager_id", "outbox_id")),
+        "club_offer_delivered": EventSpec(Origin.SYSTEM, ("analytics_manager_id",)),
         "club_preview_opened": _user("club_id"),
         "club_claimed": _user("club_id", "ownership_id", ownership=True),
         "scout_search_started": _user("club_id", "ownership_id", ownership=True),
@@ -132,7 +133,7 @@ EVENT_SPECS = MappingProxyType(
         "training_plan_saved": _user("club_id", "ownership_id", ownership=True),
         "next_action_opened": _user(),
         "action_rejected": _user(activity=False),
-        "help_delivered": EventSpec(Origin.SYSTEM, ("analytics_manager_id", "outbox_id")),
+        "help_delivered": EventSpec(Origin.SYSTEM, ("analytics_manager_id",)),
         "feedback_prompt_delivered": EventSpec(
             Origin.SYSTEM, ("analytics_manager_id", "outbox_id", "feedback_campaign_id")
         ),
@@ -231,6 +232,12 @@ class JourneyEvent:
         for ref in spec.required_refs:
             if getattr(self, ref) is None:
                 raise ValueError(f"Missing required reference: {ref}")
+        if self.name in {"club_offer_delivered", "help_delivered"} and self.outbox_id is None:
+            if self.effect_number != DIRECT_RESPONSE_EFFECT or self.target not in {
+                Surface.ONBOARDING,
+                Surface.SQUAD,
+            }:
+                raise ValueError("Delivery needs an outbox or a bounded direct response operation")
         if self.reason is not None and not isinstance(self.reason, Reason):
             raise ValueError("Unknown reason")
         if self.reason is not None and self.name not in {

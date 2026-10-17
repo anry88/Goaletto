@@ -158,3 +158,32 @@ def test_session_boundary_is_less_than_thirty_minutes() -> None:
     assert continues_session(START, START + timedelta(minutes=29, seconds=59))
     assert not continues_session(START, START + timedelta(minutes=30))
     assert not continues_session(START, START - timedelta(seconds=1))
+
+
+@pytest.mark.parametrize("name", ["club_offer_delivered", "help_delivered"])
+def test_direct_response_confirmation_preserves_outbox_contract(name: str) -> None:
+    kwargs = dict(
+        event_id=uuid4(),
+        name=name,
+        occurred_at=START,
+        recorded_at=START,
+        origin=Origin.SYSTEM,
+        operation_id=uuid4(),
+        effect_number=31001,
+        surface=Surface.ONBOARDING,
+        analytics_manager_id=uuid4(),
+    )
+    with pytest.raises(ValueError, match="bounded direct response"):
+        JourneyEvent(**kwargs)
+    direct = JourneyEvent(**kwargs, target=Surface.ONBOARDING)
+    assert not direct.counts_as_activity(internal=False)
+    assert not direct.extends_ownership()
+    with pytest.raises(ValueError, match="bounded direct response"):
+        replace(direct, effect_number=0)
+    assert JourneyEvent(**kwargs, outbox_id=uuid4()).target is None
+
+
+def test_optional_delivery_reference_does_not_change_historical_envelopes() -> None:
+    from goaletto.infrastructure.analytics import event_envelope
+
+    assert "delivery_id" not in event_envelope(event("manager_started"))

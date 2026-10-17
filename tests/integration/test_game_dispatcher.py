@@ -1,7 +1,7 @@
 """Real router injection, ownership and commit boundaries; no Telegram network."""
 
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from aiogram import Bot
@@ -96,7 +96,9 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
             WorldOptions(
                 key="dispatcher-wave",
                 seed=0,
-                first_kickoff=datetime(2026, 10, 17, 18, tzinfo=UTC),
+                first_kickoff=(now + timedelta(days=4)).replace(
+                    hour=18, minute=0, second=0, microsecond=0
+                ),
                 initial_budget=50000,
             ),
             initialized_at=now,

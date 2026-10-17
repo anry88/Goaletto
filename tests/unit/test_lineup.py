@@ -586,7 +586,7 @@ async def test_editor_open_change_and_retry_share_business_effect():
         NOW,
         update_id=41,
     )
-    assert "устарел" in text
+    assert "устарел" not in text  # Transport retry reopens the committed result.
     assert len(recorder.added) == added
     assert len([a for a in recorder.added if isinstance(a, AcceptedCommand)]) == 1
 

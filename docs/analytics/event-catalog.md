@@ -1,7 +1,7 @@
 # Каталог событий · контракт v1
 
 Envelope/allowlist закреплены в `application.analytics` и [contract-v1.md](contract-v1.md);
-collector реализован в [storage.md](storage.md); живой сбор ещё не включён. Определения метрик, временные окна
+collector реализован в [storage.md](storage.md); игровой /start включает сбор. Определения метрик, временные окна
 и исключения: [measurement-plan.md](measurement-plan.md).
 Имена и версии фиксировать в коде до инструментирования; изменение смысла — новая версия.
 
@@ -9,7 +9,7 @@ collector реализован в [storage.md](storage.md); живой сбор 
 | --- | --- | --- |
 | manager_started | user | Первый принятый игровой /start; один на manager |
 | campaign_touched | user | Валидное касание /start; update + effect, first-touch отдельно |
-| club_offer_delivered | system | Telegram принял предложение; outbox + stage |
+| club_offer_delivered | system | Telegram принял предложение; outbox + stage или direct operation/effect 31001 |
 | club_preview_opened | user | Явный выбор превью, не автоматический показ |
 | club_claimed | user | Успешный атомарный claim; claim operation |
 | club_opened | user | Явный просмотр своего клуба; текущий ownership + update effect |
@@ -24,7 +24,7 @@ collector реализован в [storage.md](storage.md); живой сбор 
 | match_report_opened | user | Явный выбор отчёта; update + effect |
 | next_action_opened | user | Явный выбор предложенного следующего действия; bounded target |
 | action_rejected | user | Обработанный отказ с конечным reason_code, до rollback отдельная попытка при необходимости |
-| help_delivered | system | Доставлена контекстная подсказка; outbox + stage |
+| help_delivered | system | Доставлена контекстная подсказка; outbox + stage или direct operation/effect 31001 |
 | feedback_prompt_delivered | system | Telegram принял prompt; campaign + manager |
 | feedback_answered | user | Кнопочная причина / отдельный restricted comment; response operation |
 | feedback_skipped | user | Явный skip/opt-out; campaign + manager |

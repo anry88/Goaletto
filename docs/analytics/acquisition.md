@@ -1,5 +1,10 @@
 # Кампании и источник входа · AND-75
 
+Обновление 2026-10-18: [игровое подключение и PG-приёмка AND-75/76/79](../launch-measurement.md).
+Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
+match-opportunities подключены к операторскому CLI. Технические latency и
+автоматические опросы остаются отдельными задачами.
+
 Реализованы opaque start-коды, registry source/placement/publication date,
 транзакционный `accept_start` и immutable first-touch до получения клуба.
 Здесь наблюдается принятый /start; переход по ссылке без /start неизвестен.
@@ -43,8 +48,8 @@ python -m goaletto.application.campaign_cli report --cohort-from 2026-10-12T00:0
 реальные aggregates; здесь он не запускался. Код alias goaletto-campaign после reinstall.
 Миграция0007 не регистрирует кампании и не создаёт пользовательские когорты.
 
-**AND-75 пока In Progress:** backend/CLI/SQL готовы, game /start router ещё не подключён
-к onboarding AND-47; preview не начинает collection. После подключения нужен обычный
-UI path. Unit checks: valid/unknown/case/64 limit, immutable first-touch, retry/cohort,
-internal/retention, report coverage/count guards. SQL-recording и offline DDL без БД;
-PostgreSQL execution и точные SQL n/N на сервере не проверены по указанию пользователя.
+**AND-75 принят 2026-10-18:** настоящий игровой /start, immutable source,
+повтор Update, claim с preview и без него, ручная readiness и SQL source funnel
+проверены на PostgreSQL с fake Telegram. Internal/opt-out, поздние записи,
+границы окон и retention проверяются общей матрицей. Production polling/рассылка
+не запускались. Полный gate доступов/наблюдаемости остаётся AND-82.

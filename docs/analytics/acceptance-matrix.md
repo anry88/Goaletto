@@ -1,5 +1,10 @@
 # Матрица приёмки аналитики · AND-82 (часть)
 
+Обновление 2026-10-18: [игровое подключение и PG-приёмка AND-75/76/79](../launch-measurement.md).
+Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
+match-opportunities подключены к операторскому CLI. Технические latency и
+автоматические опросы остаются отдельными задачами.
+
 Проверка существующей аналитики, а не новая instrumentation и не dashboard.
 Источник ветки: `origin/main` `d3a5185b829c176d45e2a0893c4dd1c61b6a3dd3`;
 рабочая ветка: `codex/analytics-acceptance-fixtures`.
@@ -26,7 +31,8 @@
 ко второму (`match_opportunity`, `second_match_return`), агрегаты
 добровольной обратной связи (`feedback_summary`), восстановление после
 ошибок (`error_recovery`), участие в матче (`match_participation`).
-Unit-тест `g1` фиксирует их отсутствие как `not hasattr`.
+Историческая граница поставки; теперь `g1` проверяет CLI preview трёх новых
+отчётов без подключения, а `test_launch_measurement.py` — их реальные SQL и UI.
 
 ## Матрица named cases
 
@@ -43,7 +49,7 @@ Unit-тест `g1` фиксирует их отсутствие как `not hasa
 | B3 · полуоткрытые границы | D7 = `[18 Oct 12:00, 19 Oct 12:00)`; действия 11:59 и ровно 19 Oct 12:00 | 19 Oct 12:00Z | `retained 0/1`; действие ровно 18 Oct 12:00 → `1/1` | contract-v1 пример D7; верхняя граница исключена |
 | B4 · coverage_start | запрошен 11 Oct, покрытие с 12 Oct 00:00 | 12 Oct 12:00Z | `available_from 12 Oct 00:00`, `coverage_limited`, `starts 0` | reports.md: `available_from = max(requested, coverage, T−retention)`; отсутствие данных — gap, не ноль |
 | B5 · retention cutoff | retention 90д, старты 01 Jul и 11 Oct | 12 Oct 12:00Z | выживает только свежий: `starts 1, eligible 1` | хранение journey 180д по умолчанию; истёкшие окна показывают clipping |
-| B6 · первый матч позже 7 дней | `actual_start` = start+9д, `actual_finish` +33мин | `finish+1h` | окно `[start−24h, finish+24h)` незрелое → **waiting, не пропуск** | measurement-plan: отсутствие действий между матчами не доказывает уход; перенос/пауза — по actual times; матчевый SQL отсутствует — см. G1 |
+| B6 · первый матч позже 7 дней | `actual_start` = start+9д, `actual_finish` +33мин | `finish+1h` | окно `[start−24h, finish+24h)` незрелое → **waiting, не пропуск** | measurement-plan: отсутствие действий между матчами не доказывает уход; перенос/пауза — по actual times; текущая SQL-приёмка в test_launch_measurement.py |
 | B7 · одинаковые даты | 2 менеджера, claim и save в один миг | 12 Oct 12:00Z | `claimed 2/2, ready 2/2` | `saved.occurred_at ≥ claim.occurred_at`; счёт distinct manager, не строк |
 | C1 · не retention | D1-окно: `fixture_finished`, `result_delivered`, `match_command_applied`, `match_tick_committed`, system `lineup_saved`, `action_rejected` | start+2д | `retained 0/1, U 0`; +`club_opened` → `1/1` | event-catalog/contract: доставка, tick, applied и автоматика — не user activity; `action_rejected` (`user_activity=false`) не даёт retention |
 | C2 · явные match/report open | `match_opened`, `match_report_opened`, `match_command_accepted` — `user_activity=true`; `match_command_applied` — system/false | start+2д | accepted в D1 → `1/1` | сверка строго по текущему `EventSpec`; accepted≠applied |

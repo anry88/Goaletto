@@ -12,17 +12,22 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message, Update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from goaletto.application.analytics import Reason, Surface
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import Actor, PermissionDenied, actor_for
 from goaletto.application.lineup import (
     LineupData,
     LineupInput,
+    LineupLocked,
+    LineupStale,
     SaveResult,
     load_lineup,
     open_lineup,
     save_lineup,
 )
+from goaletto.application.onboarding_measurement import rejection
 from goaletto.bot import lineup_views as views
+from goaletto.bot.onboarding_measurement import observe, recovery_keyboard
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import expand_id
 from goaletto.domain.lineup import (
@@ -32,16 +37,22 @@ from goaletto.domain.lineup import (
     reassign_slots,
 )
 from goaletto.infrastructure.database import Database
+from goaletto.infrastructure.models import GameActionReceipt
 from goaletto.presentation.i18n import tr
 
 router = Router(name="lineup")
 
 
 async def build_open_response(
-    session: AsyncSession, telegram_id: int, callback_id: str, at: datetime
+    session: AsyncSession,
+    telegram_id: int,
+    callback_id: str,
+    at: datetime,
+    *,
+    update_id: int | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
     actor = await actor_for_callback(
-        session, telegram_id=telegram_id, callback_id=callback_id, at=at
+        session, telegram_id=telegram_id, callback_id=callback_id, at=at, update_id=update_id
     )
     data = await open_lineup(session, actor)
     return views.render_main(data), views.main_keyboard(data)
@@ -63,10 +74,17 @@ async def build_callback_response(
     data = await load_lineup(session, actor)
     version = args[-1] if args else str(data.version)
     if args and expand_id(args[-2]) != data.ownership_id:
+        await rejection(session, actor, Surface.SQUAD, Reason.STALE_ACTION)
         return views.render_main(
             data, tr("Кнопка от прежнего владения: состав не изменён.")
         ), views.main_keyboard(data)
+    previous = await session.get(GameActionReceipt, (actor.operation_id, 0))
+    if previous is not None and previous.kind == "lineup_saved":
+        # The original update already saved successfully. Its older revision is
+        # expected on redelivery and must not become a new rejected action.
+        return views.render_main(data), views.main_keyboard(data)
     if str(data.version) != version:
+        await rejection(session, actor, Surface.SQUAD, Reason.STALE_ACTION)
         return (
             views.render_main(data, tr("Экран устарел — показана актуальная версия.")),
             views.main_keyboard(data),
@@ -94,11 +112,8 @@ async def lineup_command(message: Message, database: Database, event_update: Upd
                 session, telegram_id=user.id, update_id=event_update.update_id, at=datetime.now(UTC)
             )
             data = await open_lineup(session, actor)
-    except PermissionDenied:
-        await message.answer(tr("Клуб недоступен: нет действующего владения."))
-        return
-    except (LineupInvalid, ValueError):
-        await message.answer(tr("Состав недоступен. Откройте /start или попробуйте /lineup позже."))
+    except (PermissionDenied, LineupInvalid, ValueError) as error:
+        await _help(message, database, user.id, event_update.update_id, error, edit=False)
         return
     await message.answer(views.render_main(data), reply_markup=views.main_keyboard(data))
 
@@ -113,13 +128,10 @@ async def lineup_open(query: CallbackQuery, database: Database, event_update: Up
     try:
         async with database.transaction() as session:
             text, keyboard = await build_open_response(
-                session, user.id, query.id, datetime.now(UTC)
+                session, user.id, query.id, datetime.now(UTC), update_id=event_update.update_id
             )
-    except PermissionDenied:
-        await edit_response(message, tr("Нет действующего владения клубом. Откройте /start."))
-        return
-    except (LineupInvalid, ValueError):
-        await edit_response(message, tr("Состав недоступен. Откройте /lineup заново."))
+    except (PermissionDenied, LineupInvalid, ValueError) as error:
+        await _help(message, database, user.id, event_update.update_id, error, edit=True)
         return
     await edit_response(message, text, keyboard)
 
@@ -141,19 +153,46 @@ async def lineup_callback(query: CallbackQuery, database: Database, event_update
                 datetime.now(UTC),
                 update_id=event_update.update_id,
             )
-    except PermissionDenied:
-        await edit_response(message, tr("Нет действующего владения клубом. Откройте /start."))
-        return
-    except (LineupInvalid, ValueError):
-        await edit_response(
-            message,
-            tr(
-                "Состав не изменён: экран устарел, игрок недоступен или "
-                "состав уже заблокирован. Откройте /lineup заново."
-            ),
-        )
+    except (PermissionDenied, LineupInvalid, ValueError) as error:
+        await _help(message, database, user.id, event_update.update_id, error, edit=True)
         return
     await edit_response(message, text, keyboard)
+    await observe(database, user.id, event_update.update_id, Surface.SQUAD, callback_id=query.id)
+
+
+async def _help(
+    message: Message,
+    database: Database,
+    telegram_id: int,
+    update_id: int,
+    error: Exception,
+    *,
+    edit: bool,
+) -> None:
+    reason = (
+        Reason.PERMISSION_DENIED
+        if isinstance(error, PermissionDenied)
+        else Reason.STALE_ACTION
+        if isinstance(error, (LineupStale, LineupLocked))
+        else Reason.LINEUP_INVALID
+        if isinstance(error, LineupInvalid)
+        else Reason.INVALID_INPUT
+    )
+    await observe(database, telegram_id, update_id, Surface.SQUAD, reason)
+    text = (
+        tr("Нет действующего владения клубом. Откройте /start.")
+        if isinstance(error, PermissionDenied)
+        else tr(
+            "Состав не изменён: экран устарел, игрок недоступен или "
+            "состав уже заблокирован. Откройте /lineup заново."
+        )
+    )
+    keyboard = recovery_keyboard(lineup=not isinstance(error, PermissionDenied))
+    if edit:
+        await edit_response(message, text, keyboard)
+    else:
+        await message.answer(text, reply_markup=keyboard)
+    await observe(database, telegram_id, update_id, Surface.SQUAD)
 
 
 def _panel_keyboard(panel: str, data: LineupData) -> InlineKeyboardMarkup:

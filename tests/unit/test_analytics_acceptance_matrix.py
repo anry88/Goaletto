@@ -12,9 +12,8 @@ literals; they are never computed by the function under test.
 
 Real PostgreSQL execution lives in
 ``tests/integration/test_analytics_acceptance_pg.py`` (run by Codex at the
-agreed time). Unavailable feedback / match-opportunity / error-recovery
-aggregates are explicitly marked NOT IMPLEMENTED; no fake emitters are
-created to force a green test.
+agreed time). Live onboarding and match-opportunity SQL acceptance is in
+``test_launch_measurement.py``; no fabricated production KPIs are used.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -267,8 +266,8 @@ def test_b5_retention_cutoff_clips_beyond_retention_days() -> None:
 def test_b6_first_match_after_seven_days_is_waiting_not_missed() -> None:
     # Contract: weekly league; absence between matches is not churn. A first
     # opportunity 7+ days after start with T before finish+24h is immature.
-    # Match-opportunity SQL is NOT IMPLEMENTED (see section G); here only the
-    # window helper is pinned so a future reader cannot mislabel waiting.
+    # The full SQL path is exercised against real fixtures in PG acceptance;
+    # here the shared UTC window boundary remains pinned.
     actual_start = START + timedelta(days=9)
     actual_finish = actual_start + timedelta(minutes=33)
     window_start, window_end = match_activity_window(actual_start, actual_finish)
@@ -277,8 +276,6 @@ def test_b6_first_match_after_seven_days_is_waiting_not_missed() -> None:
     # T one hour after the match is still inside the +24h window -> immature.
     assert not window_is_mature(window_end, actual_finish + timedelta(hours=1))
     assert window_is_mature(window_end, window_end)
-    assert not hasattr(queries, "match_opportunity")
-    assert not hasattr(queries, "second_match_return")
 
 
 def test_b7_identical_timestamps_count_distinct_managers_once() -> None:
@@ -590,26 +587,32 @@ def test_f3_validators_reject_denominator_substitution() -> None:
         raise AssertionError("retention validator must reject starts swap")
 
 
-# G · explicitly not implemented -------------------------------------------------
+# G · operator entry points ---------------------------------------------------
 
 
-def test_g1_match_opportunity_feedback_and_recovery_have_no_report_api() -> None:
-    # These aggregates are planned (measurement-plan / contract-v1) but have
-    # no report API or SQL reader yet. The matrix must name them instead of
-    # faking emitters to get a green test.
-    for missing in (
-        "match_opportunity",
-        "second_match_return",
-        "feedback_summary",
-        "error_recovery",
-        "match_participation",
-    ):
-        assert not hasattr(queries, missing), missing
-    from goaletto.application import analytics_reports as reports
+def test_g1_launch_cli_preview_is_available_without_database() -> None:
+    import json
+    import subprocess
+    import sys
 
-    for missing in (
-        "evaluate_match_opportunity",
-        "evaluate_feedback",
-        "evaluate_error_recovery",
-    ):
-        assert not hasattr(reports, missing), missing
+    for command in ("last-steps", "recovery", "match-opportunities"):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "goaletto.application.analytics_reports_cli",
+                command,
+                "--cohort-from",
+                "2026-10-18T00:00:00Z",
+                "--at",
+                "2026-10-19T00:00:00Z",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert json.loads(result.stdout) == {
+            "command": command,
+            "database_connected": False,
+            "apply_required": True,
+        }

@@ -1,5 +1,8 @@
 # Документация Goaletto
 
+[Вход первых игроков и отчёты](launch-measurement.md) — AND-75/76/79:
+источники, помощь после ошибок, последние действия и реальные матчевые возможности.
+
 [Приёмка четырёх агентских работ 17–18 октября](agent-wave8-review.md).
 [Академия](academy-runtime.md), [товарищеские](friendly-runtime.md),
 [Кубки чемпионов](champions-runtime.md), [совместный rollover](cross-set-rollover.md).

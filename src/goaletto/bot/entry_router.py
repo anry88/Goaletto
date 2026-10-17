@@ -8,6 +8,7 @@ from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from sqlalchemy import select
 
+from goaletto.application.analytics import Reason, Surface
 from goaletto.application.club_view import actor_for_callback, get_owned_club
 from goaletto.application.game_actions import PermissionDenied
 from goaletto.application.onboarding import (
@@ -20,6 +21,7 @@ from goaletto.application.onboarding import (
 )
 from goaletto.bot.club_cards import club_view, format_money
 from goaletto.bot.club_kit import show_club
+from goaletto.bot.onboarding_measurement import observe, recovery_keyboard
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
@@ -50,12 +52,7 @@ def offer_view(items: tuple[ClubOffer, ...], page: int = 1) -> tuple[str, Inline
             ]
         )
     if not items:
-        lines.append(
-            tr(
-                "Сейчас доступных клубов нет. Для нового комплекта нужен "
-                "запас уникальных внешностей."
-            )
-        )
+        lines.append(tr("Свободные клубы временно недоступны. Обновите список позже."))
     nav = []
     if page > 1:
         nav.append(InlineKeyboardButton(text=tr("← Назад"), callback_data=f"en:o:{page - 1}"))
@@ -96,6 +93,14 @@ async def game_start(
         await show_club(message, database, card, edit=False, view=(text, keyboard))
     else:
         await message.answer(text, reply_markup=keyboard)
+        if entry.offers:
+            await observe(
+                database,
+                message.from_user.id,
+                event_update.update_id,
+                Surface.ONBOARDING,
+                offer=True,
+            )
 
 
 @router.callback_query(F.data.startswith("en:"))
@@ -105,6 +110,7 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
     if not isinstance(message, Message) or message.chat.type != "private":
         return
     card = None
+    shown_offers: tuple[ClubOffer, ...] = ()
     try:
         parts = (query.data or "").split(":")
         if len(parts) not in {3, 4}:
@@ -121,7 +127,8 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                 if not parts[2].isascii() or not parts[2].isdigit():
                     raise ValueError("Invalid page")
                 page = int(parts[2])
-                text, keyboard = offer_view(await offers(session, page), page)
+                shown_offers = await offers(session, page)
+                text, keyboard = offer_view(shown_offers, page)
             elif parts[1] == "p" and len(parts) == 4:
                 club_id = expand_id(parts[2])
                 if (
@@ -175,15 +182,32 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                 text, keyboard = club_view(card)
             else:
                 raise ValueError("Stale entry callback")
-    except (PermissionDenied, ClubUnavailable, ValueError):
-        await edit_response(
-            message, tr("Клуб или кнопка больше недоступны. Откройте /start заново.")
+    except (PermissionDenied, ClubUnavailable, ValueError) as error:
+        reason = (
+            Reason.PERMISSION_DENIED
+            if isinstance(error, PermissionDenied)
+            else Reason.CLUB_UNAVAILABLE
+            if isinstance(error, ClubUnavailable)
+            else Reason.INVALID_INPUT
         )
+        await observe(
+            database, query.from_user.id, event_update.update_id, Surface.ONBOARDING, reason
+        )
+        await edit_response(
+            message,
+            tr("Клуб или кнопка больше недоступны. Откройте /start заново."),
+            recovery_keyboard(),
+        )
+        await observe(database, query.from_user.id, event_update.update_id, Surface.ONBOARDING)
         return
     if card is not None:
         await show_club(message, database, card, edit=True, view=(text, keyboard))
     else:
         await edit_response(message, text, keyboard)
+        if shown_offers:
+            await observe(
+                database, query.from_user.id, event_update.update_id, Surface.ONBOARDING, offer=True
+            )
 
 
 @router.message(Command("help"))

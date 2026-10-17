@@ -1,5 +1,12 @@
 # Контракт событий v1 · AND-73
 
+Дополнение 2026-10-18: подтверждения direct Telegram responses для
+club_offer_delivered/help_delivered используют существующие operation_id,
+effect_number=31001 и ограниченный target onboarding/squad вместо outbox_id.
+Они фиксируются после принятия Telegram, не являются user activity.
+Исторические outbox envelopes и смысл delivered сохраняются; новых полей нет.
+[Приёмка и ограничения](../launch-measurement.md).
+
 Статус: контракт реализации закреплён в `application/analytics.py`, envelope/allowlist
 и временные границы проверяются без БД. Транзакционный collector, sessions,
 dedupe/exclusions и retention helper реализованы: [storage.md](storage.md).

@@ -1,5 +1,10 @@
 # Операторские отчёты аналитики · AND-79
 
+Обновление 2026-10-18: [игровое подключение и PG-приёмка AND-75/76/79](../launch-measurement.md).
+Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
+match-opportunities подключены к операторскому CLI. Технические latency и
+автоматические опросы остаются отдельными задачами.
+
 Статус: Python report API/CLI и bounded PostgreSQL-запросы реализованы в
 отдельном checkout `codex/analytics-reports` от `origin/main` `ba16344a`.
 Общие `models`/Alembic/collector не изменены. Публичный API, Grafana

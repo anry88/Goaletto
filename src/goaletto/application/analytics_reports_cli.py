@@ -17,6 +17,7 @@ from goaletto.application.analytics import require_utc
 from goaletto.config import Settings
 from goaletto.infrastructure.analytics_reports_queries import delivery, entry_funnel, retention
 from goaletto.infrastructure.database import Database
+from goaletto.infrastructure.onboarding_queries import launch_report
 
 
 def _utc(value: str) -> datetime:
@@ -29,6 +30,8 @@ async def _apply(args: argparse.Namespace) -> dict[str, Any]:
     database = Database(Settings())
     try:
         async with database.read_transaction() as session:
+            if args.command in {"last-steps", "recovery", "match-opportunities"}:
+                return await launch_report(session, args.cohort_from, args.at, report=args.command)
             if args.command == "entry-funnel":
                 report = await entry_funnel(session, args.cohort_from, args.at)
                 result: dict[str, Any] = report.as_dict()
@@ -59,6 +62,11 @@ def main() -> None:
     sent.add_argument("--window-from", type=_utc, required=True)
     sent.add_argument("--at", type=_utc, required=True)
     sent.add_argument("--apply", action="store_true", help="Read configured game DB")
+    for command in ("last-steps", "recovery", "match-opportunities"):
+        launch = sub.add_parser(command, help="Observed launch journey aggregates")
+        launch.add_argument("--cohort-from", type=_utc, required=True)
+        launch.add_argument("--at", type=_utc, required=True)
+        launch.add_argument("--apply", action="store_true", help="Read configured game DB")
     args = parser.parse_args()
     data: dict[str, Any]
     if args.apply:
