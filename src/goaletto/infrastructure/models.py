@@ -2079,3 +2079,25 @@ class NeutralFinalBooking(Base):
     assigned_day: Mapped[date] = mapped_column(Date)
     locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     basis: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+class SeasonAllocationReceipt(Base):
+    """Frozen cross-set promotion/relegation draw for one rollover cohort."""
+
+    __tablename__ = "season_allocation_receipts"
+    __table_args__ = (
+        UniqueConstraint("cohort_key", name="uq_allocation_cohort"),
+        CheckConstraint("policy_version = 'league-allocation-v1'", name="ck_allocation_policy"),
+        CheckConstraint("seed >= 0", name="ck_allocation_seed"),
+        CheckConstraint("jsonb_typeof(season_ids) = 'array'", name="ck_allocation_seasons"),
+        CheckConstraint("jsonb_typeof(assignments) = 'array'", name="ck_allocation_assignments"),
+        CheckConstraint("jsonb_typeof(draws) = 'array'", name="ck_allocation_draws"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    cohort_key: Mapped[str] = mapped_column(String(128))
+    seed: Mapped[int] = mapped_column(BigInteger)
+    policy_version: Mapped[str] = mapped_column(String(40))
+    season_ids: Mapped[list[str]] = mapped_column(JSONB)
+    assignments: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    draws: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

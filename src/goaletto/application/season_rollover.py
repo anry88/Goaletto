@@ -9,6 +9,7 @@ from uuid import UUID, uuid5
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from goaletto.application.allocation import allocate_cohort, allocation_for_season, ready_peers
 from goaletto.application.analytics import JourneyEvent, Origin, Surface, require_utc
 from goaletto.application.finances import close_salary, salary_contract
 from goaletto.application.game_actions import allocation_lock
@@ -16,14 +17,12 @@ from goaletto.application.market import cancel_auction, prohibit_player_trades
 from goaletto.application.match_runtime import NotReady
 from goaletto.application.persons import AppearanceExhausted, NewPerson, create_person
 from goaletto.application.recovery import recover_player
-from goaletto.application.results import league_table
 from goaletto.application.world_portraits import age_band
 from goaletto.domain.calendar import (
     ScheduledFixture,
     league_calendar,
 )
 from goaletto.domain.game_cycle import next_first_league, season_end, season_epoch
-from goaletto.domain.leagues import plan_season_movements
 from goaletto.domain.player_season_plan import PlayerSeasonEntry, plan_player_season
 from goaletto.domain.retirement import RetirementDecision, player_last_season, staff_last_season
 from goaletto.domain.season_rollover import ROLLOVER_POLICY, youth_profile
@@ -38,13 +37,9 @@ from goaletto.infrastructure.models import (
     CandidatePool,
     Club,
     ClubLineup,
-    Fixture,
-    FixturePlan,
     Job,
-    League,
     LineupSlot,
     Manager,
-    MatchResult,
     OutboxMessage,
     OwnershipPeriod,
     Person,
@@ -213,153 +208,46 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         raise NotReady("Season calendar has not ended")
     if await session.get(Season, next_id) is not None:
         raise ValueError("Next season exists without a rollover receipt")
-    from goaletto.infrastructure.models import CupBracket, CupTie
+    # Joint cohort rollover: this season plus every other set's completed
+    # season move simultaneously. Clubs may land in any cohort league of the
+    # adjacent tier; stayers keep their exact league. The persisted draw makes
+    # every retry reproduce the same destinations.
+    from goaletto.application.allocation import load_ready_season, origin_seasons
 
-    if await session.get(CupBracket, season.id) is not None:
-        cup_ties = (
-            await session.scalars(
-                select(CupTie).where(CupTie.season_id == season.id).with_for_update()
-            )
-        ).all()
-        if len(cup_ties) != 49 or any(t.status != "decided" for t in cup_ties):
-            raise NotReady("Cup has unfinished ties")
-        cup_plans = (
-            await session.scalars(
-                select(FixturePlan.id).where(
-                    FixturePlan.season_id == season.id, FixturePlan.competition == "cup"
-                )
-            )
-        ).all()
-        completed_cup = (
-            await session.scalars(
-                select(MatchResult.fixture_id).where(
-                    MatchResult.season_id == season.id, MatchResult.competition == "cup"
-                )
-            )
-        ).all()
-        if len(cup_plans) != 97 or set(cup_plans) != set(completed_cup):
-            raise NotReady("Cup has missing result receipts")
-    unannounced = await session.scalar(
-        select(FixturePlan.id)
-        .where(
-            FixturePlan.season_id == season.id,
-            FixturePlan.competition == "league",
-            FixturePlan.announced_at.is_(None),
-        )
-        .limit(1)
-    )
-    if unannounced is not None:
-        raise NotReady("Season has unresolved mandatory tournament plans")
-    # Lock every league fixture so the completion proof and transition share one snapshot.
-    # Cup fixtures are excluded: the cup bracket check is separate.
-    fixtures = list(
-        (
-            await session.scalars(
-                select(Fixture)
-                .where(
-                    Fixture.season_id == season.id,
-                    Fixture.competition == "league",
-                )
-                .order_by(Fixture.id)
-                .with_for_update()
-            )
-        ).all()
-    )
-    results = list(
-        (
-            await session.scalars(
-                select(MatchResult).where(
-                    MatchResult.season_id == season.id,
-                    MatchResult.competition == "league",
-                )
-            )
-        ).all()
-    )
-    result_by_fixture = {r.fixture_id: r for r in results}
-    if (
-        len(fixtures) != 450
-        or len(results) != 450
-        or any(
-            f.status not in {"finished", "abandoned"}
-            or f.actual_finish_at is None
-            or f.actual_finish_at > at
-            or f.id not in result_by_fixture
-            for f in fixtures
-        )
-    ):
-        raise NotReady("Season still has unfinished or unfinalized fixtures")
-    for f in fixtures:
-        r = result_by_fixture[f.id]
-        if (r.home_club_id, r.away_club_id, r.league_id, r.actual_start_at, r.actual_finish_at) != (
-            f.home_club_id,
-            f.away_club_id,
-            f.league_id,
-            f.actual_start_at,
-            f.actual_finish_at,
-        ):
-            raise ValueError("Result differs from frozen fixture")
-    last_finish = max(cast(datetime, f.actual_finish_at) for f in fixtures)
-    kickoff = next_first_league(season.starts_at, last_finish, at)
-    leagues = list(
-        (
-            await session.scalars(
-                select(League)
-                .where(League.league_set_id == season.league_set_id)
-                .order_by(League.tier)
-            )
-        ).all()
-    )
+    own = await load_ready_season(session, season, at)
+    stored = await allocation_for_season(session, season_id)
+    if stored is None:
+        peers = await ready_peers(session, season, at)
+        allocation = await allocate_cohort(session, [own, *peers], at)
+        season_ids = [own.season.id, *(item.season.id for item in peers)]
+    else:
+        allocation, season_ids = stored
+    leagues = own.leagues
+    kickoff = next_first_league(season.starts_at, own.last_finish, at)
+    dest = {a.club_id: a.destination_league_id for a in allocation.assignments}
+    places = {a.club_id: a.source_place for a in allocation.assignments}
+    origins = await origin_seasons(session, allocation, season_ids)
+    for assignment in allocation.assignments:
+        origins.setdefault(assignment.club_id, season_id)
     memberships = list(
         (await session.scalars(select(SeasonClub).where(SeasonClub.season_id == season.id))).all()
     )
-    if len(leagues) != 5 or len(memberships) != 50:
+    if len(memberships) != 50:
         raise ValueError("Invalid five-tier season membership")
     by_id = {m.club_id: m for m in memberships}
+    own_league_ids = {league.id for league in leagues}
+    member_ids = [club_id for club_id, league_id in dest.items() if league_id in own_league_ids]
+    if len(member_ids) != 50:
+        raise ValueError("Allocation must fill every league exactly")
     clubs = list(
         (
             await session.scalars(
-                select(Club).where(Club.id.in_(by_id)).order_by(Club.id).with_for_update()
+                select(Club).where(Club.id.in_(member_ids)).order_by(Club.id).with_for_update()
             )
         ).all()
     )
-    if len(clubs) != 50 or any(c.league_id != by_id[c.id].league_id for c in clubs):
-        raise ValueError("Current clubs disagree with season membership")
-    tables = {league.tier: await league_table(session, season.id, league.id) for league in leagues}
-    if any(row.played != 18 for table in tables.values() for row in table):
-        raise NotReady("Season standings are incomplete")
-    # The table must reconcile against every immutable receipt, not just its played counter.
-    expected = {c.id: [0] * 7 for c in clubs}
-    for result in results:
-        for club_id, goals, against in (
-            (result.home_club_id, result.home_goals, result.away_goals),
-            (result.away_club_id, result.away_goals, result.home_goals),
-        ):
-            if club_id not in expected or by_id[club_id].league_id != result.league_id:
-                raise ValueError("Result is outside historical membership")
-            values = expected[club_id]
-            values[0] += 1
-            values[1] += goals > against
-            values[2] += goals == against
-            values[3] += goals < against
-            values[4] += goals
-            values[5] += against
-            values[6] += 3 if goals > against else int(goals == against)
-    stored = list(
-        (
-            await session.scalars(
-                select(Standing).where(Standing.season_id == season.id).with_for_update()
-            )
-        ).all()
-    )
-    if len(stored) != 50 or any(
-        expected[r.club_id]
-        != [r.played, r.won, r.drawn, r.lost, r.goals_for, r.goals_against, r.points]
-        for r in stored
-    ):
-        raise ValueError("Season standings do not reconcile with results")
-    movement = plan_season_movements(
-        {tier: [str(r.club_id) for r in table] for tier, table in tables.items()}
-    )
+    if len(clubs) != 50:
+        raise ValueError("Allocated clubs are missing")
     rows = list(
         (
             await session.execute(
@@ -442,7 +330,7 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         (
             await session.scalars(
                 select(LineupSlot)
-                .where(LineupSlot.club_id.in_(by_id))
+                .where(LineupSlot.club_id.in_([c.id for c in clubs]))
                 .order_by(LineupSlot.club_id, LineupSlot.slot)
             )
         ).all()
@@ -624,7 +512,9 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     await _install_lineups(session, clubs, saved_slots, retired_ids, replacements)
     calendars: list[ScheduledFixture] = []
     for league in leagues:
-        league_clubs = [club for club in clubs if movement[str(club.id)] == league.tier]
+        league_clubs = [club for club in clubs if dest[club.id] == league.id]
+        if len(league_clubs) != 10:
+            raise ValueError("Allocation must fill every league exactly")
         draw_order = sorted(league_clubs, key=lambda c: stable_seed(next_seed, f"tie:{c.id}"))
         for order, club in enumerate(draw_order, 1):
             club.league_id = league.id
@@ -650,9 +540,6 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     session.add_all([Standing(season_id=next_id, club_id=c.id) for c in clubs])
     from goaletto.application.sponsorship import sign_sponsor
 
-    final_places = {
-        row.club_id: place for table in tables.values() for place, row in enumerate(table, 1)
-    }
     tiers_by_league = {league.id: league.tier for league in leagues}
     for club in clubs:
         await sign_sponsor(
@@ -662,8 +549,8 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
             at,
             season_end(kickoff),
             tier=tiers_by_league[club.league_id],
-            place=final_places[club.id],
-            source_season_id=season.id,
+            place=places[club.id],
+            source_season_id=origins[club.id],
         )
     from goaletto.application.calendar_planning import (
         add_plan,
