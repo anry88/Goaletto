@@ -62,12 +62,14 @@ class Club(Base):
     kit_version: Mapped[int] = mapped_column(Integer, server_default="1")
     stadium_capacity: Mapped[int] = mapped_column(Integer, server_default="5000")
     supporters: Mapped[int] = mapped_column(Integer, server_default="2500")
+    academy_level: Mapped[int] = mapped_column(SmallInteger, server_default="1")
     __table_args__ = (
         CheckConstraint("budget >= 0", name="ck_club_budget"),
         CheckConstraint("kit_primary ~ '^#[0-9A-Fa-f]{6}$'", name="ck_club_primary_color"),
         CheckConstraint("kit_secondary ~ '^#[0-9A-Fa-f]{6}$'", name="ck_club_secondary_color"),
         CheckConstraint("kit_version > 0", name="ck_club_kit_version"),
         CheckConstraint("stadium_capacity >= 0 AND supporters >= 0", name="ck_club_crowd"),
+        CheckConstraint("academy_level BETWEEN 1 AND 5", name="ck_club_academy_level"),
     )
 
 
@@ -1064,6 +1066,9 @@ class JourneySession(Base):
 
 
 JOURNEY_NAMES = (
+    "academy_candidate_signed",
+    "academy_opened",
+    "academy_upgraded",
     "action_rejected",
     "bot_unavailable",
     "bot_youth_replacement_created",
@@ -1341,7 +1346,8 @@ class GameActionReceipt(Base):
             "'next_fixture_opened','notification_preferences',"
             "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered','market_opened',"
             "'market_listing_created','market_bid_accepted','market_listing_cancelled','candidate_signed',"
-            "'scout_search_started','scout_search_cancelled')",
+            "'scout_search_started','scout_search_cancelled','academy_opened','academy_upgraded',"
+            "'academy_candidate_signed')",
             name="ck_action_kind",
         ),
     )
@@ -1404,6 +1410,47 @@ class PlayerDevelopment(Base):
     caps: Mapped[dict[str, int]] = mapped_column(JSONB)
     progress: Mapped[dict[str, int]] = mapped_column(JSONB)
     policy_version: Mapped[str] = mapped_column(String(32))
+
+
+class AcademyCandidate(Base):
+    """Durable, season-scoped academy shortlist; person rows appear only on signing."""
+
+    __tablename__ = "academy_candidates"
+    __table_args__ = (
+        UniqueConstraint("club_id", "season_id", "slot", name="uq_academy_club_season_slot"),
+        CheckConstraint("policy_version = 'academy-v1'", name="ck_academy_policy"),
+        CheckConstraint("slot >= 1", name="ck_academy_slot"),
+        CheckConstraint("age BETWEEN 17 AND 18", name="ck_academy_age"),
+        CheckConstraint(f"position IN ({POSITIONS_SQL})", name="ck_academy_position"),
+        CheckConstraint(
+            f"cardinality(alternative_positions) <= 2 AND "
+            f"alternative_positions <@ ARRAY[{POSITIONS_SQL}]::varchar[] AND "
+            "NOT position = ANY(alternative_positions) AND "
+            "array_position(alternative_positions, NULL) IS NULL AND "
+            "(cardinality(alternative_positions) < 2 OR "
+            "alternative_positions[1] <> alternative_positions[2])",
+            name="ck_academy_alternatives",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(skills) = 'object' AND jsonb_typeof(caps) = 'object'",
+            name="ck_academy_profiles",
+        ),
+        CheckConstraint("status IN ('available','signed','expired')", name="ck_academy_status"),
+        CheckConstraint("(status = 'signed') = (signed_at IS NOT NULL)", name="ck_academy_signed"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    slot: Mapped[int] = mapped_column(SmallInteger)
+    policy_version: Mapped[str] = mapped_column(String(32), server_default="academy-v1")
+    name: Mapped[str] = mapped_column(String(120))
+    age: Mapped[int] = mapped_column(SmallInteger)
+    position: Mapped[str] = mapped_column(String(3))
+    alternative_positions: Mapped[list[str]] = mapped_column(ARRAY(String(3)), default=list)
+    skills: Mapped[dict[str, int]] = mapped_column(JSONB)
+    caps: Mapped[dict[str, int]] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String(16), default="available")
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class TrainingPlan(Base):
@@ -1489,7 +1536,8 @@ class LedgerEntry(Base):
         CheckConstraint(
             "kind IN ('opening','grant','tickets','sponsor','merchandise',"
             "'player_salary','staff_salary','stadium_upkeep','prize','reserve','release',"
-            "'transfer_in','transfer_out','arrears_paid','stadium_upgrade','signing_fee','scout_search')",
+            "'transfer_in','transfer_out','arrears_paid','stadium_upgrade','signing_fee',"
+            "'scout_search','academy_upkeep','academy_upgrade')",
             name="ck_ledger_kind",
         ),
         Index("ix_ledger_club_page", "club_id", "sequence"),

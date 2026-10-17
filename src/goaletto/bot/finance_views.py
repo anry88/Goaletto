@@ -31,6 +31,8 @@ KINDS = LabelMap(
         "scout_search": "Скаутский поиск",
         "signing_fee": "Подписание",
         "stadium_upgrade": "Расширение стадиона",
+        "academy_upkeep": "Содержание академии",
+        "academy_upgrade": "Развитие академии",
     }
 )
 

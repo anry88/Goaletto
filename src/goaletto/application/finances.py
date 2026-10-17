@@ -14,6 +14,7 @@ from goaletto.application.finance_seed import cycle_job
 from goaletto.application.game_actions import Actor, allocation_lock, owned_club, user_effect
 from goaletto.application.match_runtime import NotReady
 from goaletto.application.money import credit_locked, debit_locked, locked_accounts
+from goaletto.domain.academy import academy_upkeep
 from goaletto.domain.finances import (
     POLICY_VERSION,
     SALARY_POLICIES,
@@ -323,6 +324,7 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
             ),
             **wages,
             "stadium_upkeep": upkeep,
+            "academy_upkeep": academy_upkeep(account.club.academy_level),
         }
         key = "cycle:" + week.isoformat()
         details = {
@@ -336,7 +338,7 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
                 await credit_locked(
                     session, account, key + ":" + kind, kind, amounts[kind], at, details
                 )
-        for kind in ("player_salary", "staff_salary", "stadium_upkeep"):
+        for kind in ("player_salary", "staff_salary", "stadium_upkeep", "academy_upkeep"):
             if amounts[kind]:
                 await debit_locked(
                     session,

@@ -179,6 +179,8 @@ async def debit_locked(
         "stadium_upgrade",
         "signing_fee",
         "scout_search",
+        "academy_upkeep",
+        "academy_upgrade",
     }:
         raise ValueError("Unsupported debit kind")
     body = request(kind, amount, {**(details or {}), "mandatory": mandatory})

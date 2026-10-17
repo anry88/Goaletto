@@ -49,6 +49,7 @@ def build_dispatcher(
     if database is None:
         raise ValueError("Game dispatcher requires a database")
     from goaletto.bot import (
+        academy_router,
         candidate_router,
         club_router,
         entry_router,
@@ -84,6 +85,7 @@ def build_dispatcher(
         market_router,
         squad_router,
         stadium_router,
+        academy_router,
         training_router,
         player_router,
         settings_router,
