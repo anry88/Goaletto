@@ -106,6 +106,14 @@ async def record_event(session: AsyncSession, event: JourneyEvent) -> bool:
     if coverage is None:
         raise CoverageNotStarted("Collection needs explicit coverage activation")
     if event.occurred_at < coverage.started_at:
+        if (
+            event.origin == Origin.SYSTEM
+            and event.analytics_manager_id is None
+            and getattr(session, "info", {}).get("world_replay_recorded_at") is not None
+        ):
+            # Newly calculated bot history does not retroactively establish
+            # analytics coverage before collection actually started.
+            return False
         raise ValueError("Event precedes declared collection coverage")
     if event.analytics_manager_id is not None:
         mapping = await session.scalar(

@@ -19,7 +19,6 @@ from goaletto.application.onboarding import (
     ensure_entry_capacity,
     next_initial_kickoff,
 )
-from goaletto.application.persons import AppearanceExhausted
 from goaletto.domain.ownership import ownership_deadline
 from goaletto.infrastructure.models import (
     AnalyticsManager,
@@ -131,7 +130,7 @@ async def test_claim_keeps_budget_and_one_ownership_on_retry():
     assert await claim_club(cast(AsyncSession, recorder), recorder.actor, recorder.club.id) is owner
     assert len(recorder.added) == count[0]
     inserts = [s for s in recorder.statements if getattr(s, "is_insert", False)]
-    assert len(inserts) == 4 and all(s.table.name == "jobs" for s in inserts)
+    assert len(inserts) == 5 and all(s.table.name == "jobs" for s in inserts)
     assert all(
         "attempts =" not in str(s.compile(dialect=postgresql.dialect())).split("DO UPDATE SET")[1]
         for s in inserts
@@ -248,22 +247,24 @@ async def test_opted_out_manager_schedules_expiry_without_new_reminders():
     recorder.manager.reminders_enabled = False
     await claim_club(cast(AsyncSession, recorder), recorder.actor, recorder.club.id)
     inserts = [s for s in recorder.statements if getattr(s, "is_insert", False)]
-    assert len(inserts) == 1 and inserts[0].compile().params["kind"] == "ownership.expire"
+    assert {s.compile().params["kind"] for s in inserts} == {"ownership.expire", "world.reserve"}
 
 
-async def test_exhausted_faces_leave_expansion_unavailable_without_activation(monkeypatch):
+async def test_empty_capacity_only_queues_background_work(monkeypatch):
     recorder = Recorder()
 
-    async def exhausted(*args, **kwargs):
-        raise AppearanceExhausted("No unused portraits")
+    async def empty(*args, **kwargs):
+        return 0
 
     async def forbidden(*args, **kwargs):
-        raise AssertionError("An incomplete world must never activate")
+        raise AssertionError("User entry must never generate a world")
 
-    monkeypatch.setattr("goaletto.application.onboarding.initialize_world", exhausted)
-    monkeypatch.setattr("goaletto.application.onboarding.activate_season", forbidden)
+    monkeypatch.setattr("goaletto.application.onboarding.available_clubs", empty)
+    monkeypatch.setattr("goaletto.application.world_capacity.initialize_world", forbidden)
     assert not await ensure_entry_capacity(cast(AsyncSession, recorder), NOW)
-    assert recorder.nested == 1 and recorder.added == []
+    assert recorder.nested == 0 and recorder.added == []
+    inserts = [s for s in recorder.statements if getattr(s, "is_insert", False)]
+    assert len(inserts) == 1 and inserts[0].compile().params["kind"] == "world.reserve"
 
 
 def test_expansion_preparation_window_and_invalid_actor_identity():

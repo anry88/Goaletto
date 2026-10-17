@@ -1,9 +1,10 @@
 """Cross-set promotion/relegation cohorts and persisted allocation draws.
 
-Only fully completed latest seasons with the same UTC epoch and end join the
+All latest seasons with the same UTC epoch and end must finish before joining the
 requested season. One shared draw and every destination season commit together;
-peer job retries read their own rollover receipts. Incompatible or unfinished
-sets do not participate. Stayers keep their league; movers use the seeded draw
+peer job retries read their own rollover receipts. Incompatible sets stay separate;
+unfinished compatible sets defer the whole cohort. Stayers keep their league;
+movers use the seeded draw
 among all destination leagues at their new tier.
 """
 
@@ -46,6 +47,7 @@ from goaletto.infrastructure.models import (
     SeasonAllocationReceipt,
     SeasonClub,
     Standing,
+    WorldAdmission,
 )
 
 RECEIPT_NAMESPACE = UUID("9e8b6a5c-4d3e-4f2a-8b1c-6d5e4f3a2b1c")
@@ -62,6 +64,9 @@ class ReadySeason:
 async def load_ready_season(session: AsyncSession, season: Season, at: datetime) -> ReadySeason:
     """Run every completion gate and load the frozen final tables."""
     require_utc(at)
+    admission = await session.get(WorldAdmission, season.id)
+    if admission is not None and admission.ready_at is None:
+        raise NotReady("Compatible set is still preparing its bot history")
     if season.status == "scheduled":
         raise NotReady("Season opening has not committed")
     if season.status not in {"active", "finished"}:
@@ -289,7 +294,7 @@ async def load_ready_season(session: AsyncSession, season: Season, at: datetime)
 
 
 async def ready_peers(session: AsyncSession, season: Season, at: datetime) -> list[ReadySeason]:
-    """Collect every other set's completed latest season; unfinished sets wait out."""
+    """Wait for every compatible latest season, independent of worker job order."""
     await allocation_lock(session)
     ready: list[ReadySeason] = []
     set_ids = [
@@ -305,17 +310,9 @@ async def ready_peers(session: AsyncSession, season: Season, at: datetime) -> li
             .limit(1)
             .with_for_update()
         )
-        if (
-            peer is None
-            or peer.status not in {"active", "finished"}
-            or peer.cycle_epoch != season.cycle_epoch
-            or peer.ends_at != season.ends_at
-        ):
+        if peer is None or peer.cycle_epoch != season.cycle_epoch or peer.ends_at != season.ends_at:
             continue
-        try:
-            ready.append(await load_ready_season(session, peer, at))
-        except NotReady:
-            continue
+        ready.append(await load_ready_season(session, peer, at))
     ready.sort(key=lambda item: item.season.league_set_id.hex)
     return ready
 

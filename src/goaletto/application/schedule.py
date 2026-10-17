@@ -66,7 +66,7 @@ async def load_schedule(
         select(Season)
         .join(SeasonClub, SeasonClub.season_id == Season.id)
         .where(SeasonClub.club_id == club.id, Season.status.in_(("scheduled", "active")))
-        .order_by(Season.number.desc())
+        .order_by(Season.starts_at.desc(), Season.id)
         .limit(1)
     )
     if season is None or season.cycle_epoch is None:

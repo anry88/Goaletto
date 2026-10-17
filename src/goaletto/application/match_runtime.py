@@ -360,7 +360,7 @@ async def lifecycle_event(
             event_id=uuid5(operation, "event"),
             name=name,
             occurred_at=at,
-            recorded_at=at,
+            recorded_at=max(at, getattr(session, "info", {}).get("world_replay_recorded_at", at)),
             origin=Origin.SYSTEM,
             operation_id=operation,
             effect_number=0,

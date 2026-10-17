@@ -134,7 +134,7 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
             away_goals=match.away_goals,
             actual_start_at=fixture.actual_start_at,
             actual_finish_at=fixture.actual_finish_at,
-            recorded_at=at,
+            recorded_at=max(at, getattr(session, "info", {}).get("world_replay_recorded_at", at)),
             state_hash=hash_value,
         )
     )

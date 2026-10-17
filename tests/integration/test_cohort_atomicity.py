@@ -248,3 +248,62 @@ async def test_persisted_multi_set_grouping_and_membership(
             await session.scalar(select(func.count()).select_from(SeasonRolloverReceipt)) == count
         )
         assert not (await runtime.rollover_season(session, ids[-1], at)).created
+
+
+async def test_cross_set_readers_use_dates_when_new_set_season_number_is_lower(
+    sessions, monkeypatch
+):
+    """An established year-7 manager promotes into a new set's year 2."""
+    from dataclasses import replace
+    from uuid import uuid4
+
+    import goaletto.application.allocation as allocation
+    import goaletto.application.season_rollover as runtime
+    from goaletto.application.academy import current_season
+    from goaletto.application.friendly import _active_season
+    from goaletto.application.market import calendar_for
+    from goaletto.application.onboarding import begin_game, claim_club
+    from goaletto.application.schedule import load_schedule
+    from goaletto.bot.navigation import current_table
+    from goaletto.bot.result_views import compact_id
+
+    first, second = await two_aligned_sets(sessions)
+
+    async def ready(session, season, at):
+        leagues = list(
+            (
+                await session.scalars(
+                    select(League)
+                    .where(League.league_set_id == season.league_set_id)
+                    .order_by(League.tier)
+                )
+            ).all()
+        )
+        tables = {
+            league.tier: await league_table(session, season.id, league.id) for league in leagues
+        }
+        return ReadySeason(season, leagues, tables, season.ends_at)
+
+    monkeypatch.setattr(runtime, "load_ready_season", ready)
+    monkeypatch.setattr(allocation, "load_ready_season", ready)
+    async with sessions.begin() as session:
+        old = await session.get(Season, first)
+        old.number, old.status = 7, "active"
+        (await session.get(Season, second)).status = "active"
+        at = old.ends_at + timedelta(hours=1)
+        # This fixed cohort's tier-5 winners promote across sets. Claim is still
+        # tier-5-only; the manager retains that club through the real allocation.
+        club_id = (await ready(session, old, at)).tables[5][0].club_id
+        entrant = await begin_game(session, telegram_id=1010, update_id=700, payload=None, at=at)
+        actor = replace(entrant.actor, operation_id=uuid4(), update_id=701)
+        ownership = await claim_club(session, actor, club_id)
+        await runtime.rollover_season(session, first, at)
+        chosen = await current_season(session, club_id)
+        assert chosen.number == 2 and chosen.league_set_id != old.league_set_id
+        assert (await _active_season(session, club_id)).id == chosen.id
+        assert (await calendar_for(session, club_id, at))[0].id == chosen.id
+        screen = await load_schedule(session, replace(actor, operation_id=uuid4()))
+        assert screen.ownership_id == ownership.id
+        text, keyboard = await current_table(session, replace(actor, operation_id=uuid4()))
+        assert compact_id(chosen.id) in str(keyboard)
+        assert ownership.club_id == club_id and text

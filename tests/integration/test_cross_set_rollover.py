@@ -10,7 +10,6 @@ from goaletto.application.season_rollover import rollover_season
 from goaletto.domain.league_allocation import LeagueSnapshot, allocate
 from goaletto.infrastructure.models import (
     Club,
-    FixturePlan,
     League,
     Season,
     SeasonAllocationReceipt,
@@ -242,28 +241,19 @@ async def test_joint_rollover_moves_clubs_across_sets(sessions, monkeypatch):
         assert await session.scalar(select(func.count()).select_from(SeasonAllocationReceipt)) == 2
 
 
-async def test_lone_ready_season_rolls_within_its_own_set(sessions):
+async def test_ready_season_waits_for_compatible_peer_without_partial_rollover(sessions):
+    from goaletto.application.match_runtime import NotReady
+
     season_a, season_b = await two_aligned_sets(sessions)
     latest_a, _ = await complete_season(sessions, season_a)
-    next_a = await rollover_next(sessions, season_a, latest_a + timedelta(hours=1))
+    with pytest.raises(NotReady):
+        async with sessions.begin() as session:
+            await rollover_season(session, season_a, latest_a + timedelta(hours=1))
     async with sessions.begin() as session:
         assert (await session.get(Season, season_b)).status != "rolled_over"
-        receipts = (await session.scalars(select(SeasonAllocationReceipt))).all()
-        assert len(receipts) == 1 and receipts[0].season_ids == [str(season_a)]
-        leagues = {row.id: row for row in (await session.scalars(select(League))).all()}
-        for a in receipts[0].assignments:
-            assert (
-                leagues[UUID(a["source_league_id"])].league_set_id
-                == leagues[UUID(a["destination_league_id"])].league_set_id
-            )
-        assert (
-            await session.scalar(
-                select(func.count())
-                .select_from(FixturePlan)
-                .where(FixturePlan.season_id == next_a, FixturePlan.competition == "league")
-            )
-            == 450
-        )
+        assert (await session.get(Season, season_a)).status != "rolled_over"
+        assert await session.scalar(select(func.count()).select_from(SeasonAllocationReceipt)) == 0
+        assert await session.scalar(select(func.count()).select_from(Season)) == 2
 
 
 async def test_incompatible_seasons_never_share_allocation(sessions):

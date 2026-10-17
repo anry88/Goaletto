@@ -44,7 +44,7 @@ async def _active_season(session: AsyncSession, club_id: UUID) -> Season:
             SeasonClub.club_id == club_id,
             Season.status.in_(("scheduled", "active")),
         )
-        .order_by(Season.number.desc())
+        .order_by(Season.starts_at.desc(), Season.id)
         .limit(1)
     )
     if season is None or season.cycle_epoch is None:

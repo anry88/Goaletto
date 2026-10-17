@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
-from uuid import uuid5
+from uuid import UUID, uuid5
 
-from sqlalchemy import String, cast, select
+from sqlalchemy import String, cast, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +21,7 @@ from goaletto.application.scouting import complete_search
 from goaletto.application.season_rollover import rollover_season
 from goaletto.application.stadium import complete_expansion
 from goaletto.application.training import apply_training
-from goaletto.infrastructure.models import Fixture, Job, OperationAttempt
+from goaletto.infrastructure.models import Fixture, Job, OperationAttempt, WorldAdmission
 
 
 async def enqueue_ping(session: AsyncSession, dedupe_key: str) -> None:
@@ -40,7 +40,12 @@ async def enqueue_ping(session: AsyncSession, dedupe_key: str) -> None:
     await session.execute(statement)
 
 
-async def process_one_job(session: AsyncSession, *, at: datetime | None = None) -> bool:
+async def process_one_job(
+    session: AsyncSession,
+    *,
+    at: datetime | None = None,
+    replay_season_id: UUID | None = None,
+) -> bool:
     """Short database-only handler in the caller's transaction; no external delivery."""
     at = at or datetime.now(UTC)
     require_utc(at)
@@ -51,9 +56,29 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         )
         .exists()
     )
+    from goaletto.application.world_capacity import replay_job_predicate
+
+    preparing = select(WorldAdmission.season_id).where(WorldAdmission.ready_at.is_(None))
+    if replay_season_id is None:
+        admission_scope = or_(Job.kind == "world.catch_up", ~replay_job_predicate(preparing))
+    else:
+        if not await allocation_lock(session, try_lock=True):
+            raise NotReady("Historical admission is busy")
+        admission_scope = replay_job_predicate([replay_season_id]) & Job.kind.not_in(
+            ("world.reserve", "world.catch_up", "season.rollover")
+        )
+        if (
+            await session.scalar(
+                select(WorldAdmission.season_id).where(
+                    WorldAdmission.season_id == replay_season_id, WorldAdmission.ready_at.is_(None)
+                )
+            )
+            is None
+        ):
+            raise ValueError("Historical execution requires an unopened admission")
     statement = (
         select(Job)
-        .where(Job.status == "pending", Job.due_at <= at, ~paused)
+        .where(Job.status == "pending", Job.due_at <= at, ~paused, admission_scope)
         .order_by(Job.due_at, Job.id)
         .with_for_update(skip_locked=True)
         .limit(1)
@@ -61,6 +86,9 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
     job = await session.scalar(statement)
     if job is None:
         return False
+    processed_at = at
+    if replay_season_id is not None:
+        at = job.due_at
     original_due = job.due_at
     rescheduled = False
     job.attempts += 1
@@ -84,10 +112,21 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         "scout.complete",
         "scout.expire",
         "staff.career_expire",
+        "world.reserve",
+        "world.catch_up",
     }:
         try:
             async with session.begin_nested():
-                if job.kind in RUNTIME_KINDS:
+                if job.kind == "world.reserve":
+                    from goaletto.application.world_capacity import reserve_step
+
+                    await reserve_step(session, job, at)
+                    rescheduled = True
+                elif job.kind == "world.catch_up":
+                    from goaletto.application.world_capacity import catch_up_step
+
+                    rescheduled = await catch_up_step(session, job, at)
+                elif job.kind in RUNTIME_KINDS:
                     rescheduled = await handle_calendar_job(session, job, at) == "rescheduled"
                     _, fixture_id, _ = job_refs(job)
                 elif job.kind == "season.rollover":
@@ -168,8 +207,9 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
         except (NotReady, AppearanceExhausted):
             outcome, failure = "deferred", "not_ready"
             job.last_error = "not_ready"
-            if job.kind == "season.rollover":
-                job.due_at = at + timedelta(seconds=60)
+            if job.kind in {"season.rollover", "world.reserve", "world.catch_up"}:
+                delay = 1 if job.kind == "world.catch_up" else 60
+                job.due_at = at + timedelta(seconds=delay)
         except (ValueError, TypeError, KeyError):
             outcome, failure = "failed", "invalid_state"
             job.status = "failed"
@@ -185,9 +225,9 @@ async def process_one_job(session: AsyncSession, *, at: datetime | None = None) 
             operation_id=operation_id,
             fixture_id=fixture_id,
             retry_number=job.attempts,
-            stage=job.kind,
-            started_at=at,
-            finished_at=max(at, datetime.now(UTC)),
+            stage=f"world.catch_up:{job.kind}" if replay_season_id else job.kind,
+            started_at=processed_at,
+            finished_at=max(processed_at, datetime.now(UTC)),
             due_at=original_due,
             outcome=outcome,
             failure_class=failure,

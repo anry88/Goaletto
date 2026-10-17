@@ -68,7 +68,7 @@ async def calendar_for(
         .where(
             SeasonClub.club_id == club_id, Season.status.in_(("scheduled", "active", "finished"))
         )
-        .order_by(Season.number.desc())
+        .order_by(Season.starts_at.desc(), Season.id)
         .limit(1)
     )
     if season is None:

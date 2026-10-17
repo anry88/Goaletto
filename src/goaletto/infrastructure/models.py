@@ -718,6 +718,23 @@ class LineupSlot(Base):
     position: Mapped[str] = mapped_column(String(3))
 
 
+class WorldAdmission(Base):
+    """New unowned set stays private until its chronological bot replay catches up."""
+
+    __tablename__ = "world_admissions"
+    __table_args__ = (
+        UniqueConstraint("league_set_id", name="uq_admission_set"),
+        CheckConstraint("replay_from <= requested_at", name="ck_admission_replay"),
+        CheckConstraint("ready_at IS NULL OR ready_at >= requested_at", name="ck_admission_ready"),
+    )
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
+    league_set_id: Mapped[UUID] = mapped_column(ForeignKey("league_sets.id"))
+    reference_season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
+    replay_from: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Fixture(Base):
     __tablename__ = "fixtures"
     __table_args__ = (
@@ -1351,7 +1368,8 @@ class GameActionReceipt(Base):
             "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered','market_opened',"
             "'market_listing_created','market_bid_accepted','market_listing_cancelled','candidate_signed',"
             "'scout_search_started','scout_search_cancelled','academy_opened','academy_upgraded',"
-            "'academy_candidate_signed','friendly_opened','friendly_scheduled','friendly_invited','friendly_responded')",
+            "'academy_candidate_signed','friendly_opened','friendly_scheduled','friendly_invited',"
+            "'friendly_responded','entry_opened')",
             name="ck_action_kind",
         ),
     )

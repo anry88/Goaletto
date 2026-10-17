@@ -239,14 +239,24 @@
   ownership periods on invitations; expiry is 00:00 UTC of the assigned match day.
   Friendlies use 50% skill/experience as a prototype coefficient, normal form,
   injury/recovery and home ticket rules. Preserve immutable history and league FK.
-- Cross-set rollover now atomically transitions every ready compatible season;
+- Cross-set rollover now atomically transitions every compatible season;
   one allocation receipt, destination person calendars, sponsorship and tournament
   qualification commit together. Champions eligibility uses past tier/season;
   guest SeasonContestant rows do not replace true SeasonClub membership.
   Shared tournament hosts are visible to guest calendars and block every cohort
-  member's rollover until all results finish. AND-119 remains open for aligning
-  new/delayed sets: current cohorts require equal UTC epoch/end and full completion;
-  unfinished/incompatible sets are skipped, not silently synchronized.
+  member's rollover until all results finish. AND-119 now waits for every latest
+  compatible season (equal UTC epoch/end), including delayed and preparing sets;
+  only incompatible operator/dev calendars stay separate.
+
+- AND-47/119 align new sets with the current common calendar and season number.
+  Before admission, durable world.catch_up batches execute actual past bot jobs;
+  PostgreSQL forbids ownership of a pending set and replay of a previously owned set.
+  Never replay an existing human world or invent previous seasons/results.
+  User update 2026-10-18: keep a ready tier-5 reserve, refill at <=10 to up to 20
+  through world.reserve; startup queues it when the game is enabled. Entry/claim
+  only enqueue preparation, never generate/simulate synchronously. Finish reserve
+  preparation before traffic; see docs/world-reserve.md. Use chronological season
+  reads after cross-set moves. entry_opened receipts dedupe /start independently of analytics.
 
 - AND-75/76/79 launch measurement is wired; see docs/launch-measurement.md.
   Direct help/offer confirmations use operation/effect 31001 and a bounded target,

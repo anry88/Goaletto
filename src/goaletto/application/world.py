@@ -17,7 +17,7 @@ from goaletto.domain.calendar import (
     league_calendar,
     next_season_kickoff,
 )
-from goaletto.domain.game_cycle import CYCLE_CALENDAR, season_end, season_epoch
+from goaletto.domain.game_cycle import CYCLE_CALENDAR, midnight, season_end, season_epoch
 from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS, SKILLS, initial_caps
 from goaletto.domain.world import SKILL_NAMES, WORLD_POLICY, WorldOptions, WorldPlan, build_world
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
@@ -117,15 +117,23 @@ async def initialize_world(
     *,
     initialized_at: datetime,
     root: Path | None = None,
+    replay_from: datetime | None = None,
+    season_number: int | None = None,
 ) -> SeedResult:
     """Caller owns the transaction; receipt is committed with all 1000 reservations."""
     if not session.in_transaction():
         raise ValueError("World initialization requires a caller-owned transaction")
+    if season_number is not None and (type(season_number) is not int or season_number < 1):
+        raise ValueError("Initial season number must be positive")
     await session.execute(
         text("SELECT pg_advisory_xact_lock(:key)"), {"key": APPEARANCE_ALLOCATION_LOCK}
     )
     receipt = await session.get(WorldSeedReceipt, options.key)
     if receipt is not None:
+        if season_number is not None:
+            saved = await session.get(Season, receipt.season_id)
+            if saved is None or saved.number != season_number:
+                raise ValueError("World key has another frozen season number")
         expected = (
             options
             if "naming_policy" in receipt.config
@@ -139,7 +147,16 @@ async def initialize_world(
         return SeedResult(receipt.league_set_id, receipt.season_id, False)
     if initialized_at.tzinfo is None or initialized_at.utcoffset() != timedelta(0):
         raise ValueError("Initialization timestamp must be timezone-aware UTC")
-    if initialized_at >= options.first_kickoff - timedelta(minutes=5, seconds=1):
+    simulation_start = replay_from or initialized_at
+    if replay_from is not None:
+        from goaletto.application.analytics import require_utc
+
+        require_utc(replay_from)
+        if replay_from > initialized_at or replay_from > midnight(
+            season_epoch(options.first_kickoff)
+        ):
+            raise ValueError("Historical bot replay must start before the season")
+    if simulation_start >= options.first_kickoff - timedelta(minutes=5, seconds=1):
         raise ValueError("Choose a future kickoff with the preparation window still open")
     plan_id = build_world(options).league_set_id
     if await session.get(LeagueSet, plan_id) is not None:
@@ -186,7 +203,7 @@ async def initialize_world(
             {
                 "id": plan.season_id,
                 "league_set_id": plan.league_set_id,
-                "number": 1,
+                "number": season_number or 1,
                 "status": "scheduled",
                 "seed": options.seed,
                 "starts_at": options.first_kickoff,
@@ -337,14 +354,14 @@ async def initialize_world(
     from goaletto.application.calendar_planning import add_plan, ensure_planner_job, job_row
 
     for fixture in prepared.fixtures:
-        await add_plan(session, fixture, initialized_at)
+        await add_plan(session, fixture, simulation_start)
     for work in prepared.work:
         await session.execute(insert(Job).values(**job_row(plan.season_id, work, "held")))
-    await ensure_planner_job(session, plan.season_id, initialized_at, held=True)
+    await ensure_planner_job(session, plan.season_id, simulation_start, held=True)
     from goaletto.application.cup import initialize_season_cup
 
-    await initialize_season_cup(session, plan.season_id, initialized_at)
-    account_rows, ledger_rows, salary_rows, finance_jobs = opening_rows(plan, initialized_at)
+    await initialize_season_cup(session, plan.season_id, simulation_start)
+    account_rows, ledger_rows, salary_rows, finance_jobs = opening_rows(plan, simulation_start)
     await write(FinanceAccount, account_rows)
     await write(LedgerEntry, ledger_rows)
     await write(SalaryContract, salary_rows)
@@ -364,6 +381,7 @@ async def initialize_world(
                     "initial_budget": options.initial_budget,
                     "naming_policy": options.naming_policy,
                     "calendar_policy": CYCLE_CALENDAR,
+                    "season_number": season_number or 1,
                 },
                 "created_at": initialized_at,
             }
@@ -372,7 +390,7 @@ async def initialize_world(
     from goaletto.application.coaches import ensure_starting_coaches
 
     await session.flush()
-    await ensure_starting_coaches(session, initialized_at, league_set_id=plan.league_set_id)
+    await ensure_starting_coaches(session, simulation_start, league_set_id=plan.league_set_id)
     from goaletto.application.sponsorship import sign_sponsor
 
     for league in plan.leagues:
@@ -384,7 +402,7 @@ async def initialize_world(
                 session,
                 club_row,
                 plan.season_id,
-                initialized_at,
+                simulation_start,
                 season_end(plan.options.first_kickoff),
                 tier=league.tier,
             )

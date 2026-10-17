@@ -198,3 +198,24 @@ async def test_cleanup_uses_configured_recording_age_and_does_not_remove_live_se
     recorder = Recorder()
     await start_coverage(cast(AsyncSession, recorder), NOW)
     assert "ON CONFLICT (version) DO NOTHING" in recorder.sql()[0]
+
+
+async def test_historical_bot_replay_does_not_invent_earlier_analytics_coverage():
+    _, _, coverage, original = setup()
+    event = replace(
+        original,
+        name="fixture_finished",
+        origin=Origin.SYSTEM,
+        analytics_manager_id=None,
+        session_id=None,
+        fixture_id=uuid4(),
+        occurred_at=NOW - timedelta(days=1),
+        recorded_at=NOW,
+    )
+    recorder = Recorder(coverage)
+    with pytest.raises(ValueError, match="precedes declared"):
+        await record_event(cast(AsyncSession, recorder), event)
+    recorder = Recorder(coverage)
+    recorder.info = {"world_replay_recorded_at": NOW}
+    assert not await record_event(cast(AsyncSession, recorder), event)
+    assert not recorder.added

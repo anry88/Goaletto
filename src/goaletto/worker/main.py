@@ -59,7 +59,12 @@ async def run() -> None:
                 at=datetime.now(UTC),
                 retention_days=settings.feedback_comment_retention_days,
             )
-    logger.info("Worker started; match calendar activation remains explicit")
+    if settings.game_enabled:
+        from goaletto.application.world_capacity import request_reserve
+
+        async with database.transaction() as session:
+            await request_reserve(session, datetime.now(UTC))
+    logger.info("Worker started; existing match calendar activation remains explicit")
     logger.info("Outbox sender %s", "enabled" if bot else "disabled")
     try:
         async with asyncio.TaskGroup() as tasks:

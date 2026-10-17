@@ -29,7 +29,7 @@ async def current_table(session: AsyncSession, actor: Actor) -> tuple[str, Inlin
         select(SeasonClub)
         .join(Season, Season.id == SeasonClub.season_id)
         .where(SeasonClub.club_id == club.id)
-        .order_by(Season.number.desc())
+        .order_by(Season.starts_at.desc(), Season.id)
         .limit(1)
     )
     if membership is None:

@@ -4,29 +4,31 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID, uuid5
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from goaletto.application.acquisition import accept_start
+from goaletto.application.acquisition import accept_start, telegram_operation
 from goaletto.application.analytics import Surface, require_utc
 from goaletto.application.game_actions import (
     DEFAULT_LEASE_POLICY,
     Actor,
     LeasePolicy,
     PermissionDenied,
+    actor_for,
     allocation_lock,
     end_expired,
     owned_club,
     user_effect,
 )
-from goaletto.application.match_runtime import activate_season
-from goaletto.application.persons import AppearanceExhausted
-from goaletto.application.world import initialize_world
-from goaletto.domain.finances import INITIAL_CAPITAL
+from goaletto.application.world_capacity import (
+    LOW_WATER,
+    available_clubs,
+    ready_set_predicate,
+    request_reserve,
+)
 from goaletto.domain.ownership import ownership_deadline
-from goaletto.domain.world import WorldOptions, stable_seed
 from goaletto.infrastructure.analytics import start_coverage
-from goaletto.infrastructure.models import Club, League, LeagueSet, Manager, OwnershipPeriod
+from goaletto.infrastructure.models import Club, GameActionReceipt, League, Manager, OwnershipPeriod
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,7 @@ async def offers(session: AsyncSession, page: int = 1) -> tuple[ClubOffer, ...]:
                 League.tier == 5,
                 Club.owner_telegram_id.is_(None),
                 ~active,
+                ready_set_predicate(),
             )
             .order_by(Club.id)
             .offset((page - 1) * 5)
@@ -83,27 +86,12 @@ async def offers(session: AsyncSession, page: int = 1) -> tuple[ClubOffer, ...]:
 
 
 async def ensure_entry_capacity(session: AsyncSession, at: datetime) -> bool:
-    """Under the shared allocation lock. Failed catalog preflight creates no partial set."""
+    """Only inspect ready stock and enqueue replenishment; no generation in entry."""
     await allocation_lock(session)
-    if await offers(session):
-        return True
-    count = await session.scalar(select(func.count()).select_from(LeagueSet))
-    if count is None:
-        raise ValueError("Could not count league sets")
-    key = "initial" if count == 0 else f"auto-{count + 1:04d}"
-    options = WorldOptions(
-        key=key,
-        seed=0 if count == 0 else stable_seed(0, key),
-        first_kickoff=next_initial_kickoff(at),
-        initial_budget=INITIAL_CAPITAL,
-    )
-    try:
-        async with session.begin_nested():
-            result = await initialize_world(session, options, initialized_at=at)
-            await activate_season(session, result.season_id, at)
-    except AppearanceExhausted:
-        return False
-    return bool(await offers(session))
+    count = await available_clubs(session)
+    if count <= LOW_WATER:
+        await request_reserve(session, at)
+    return count > 0
 
 
 async def begin_game(
@@ -119,23 +107,52 @@ async def begin_game(
     # This lock precedes Manager, season, club and ownership locks in every entry mutation.
     await allocation_lock(session)
     await start_coverage(session, at)  # Explicit game-enabled entry, never the preview router.
-    start = await accept_start(
-        session,
-        telegram_id=telegram_id,
-        update_id=update_id,
-        payload=payload,
-        at=at,
-        internal=internal,
-    )
-    actor = Actor(
-        start.manager_id, telegram_id, start.analytics_manager_id, start.operation_id, at, update_id
-    )
+    previous = await session.get(GameActionReceipt, (telegram_operation(update_id), 4))
+    if previous is not None:
+        actor = await actor_for(session, telegram_id, update_id, at)
+        if previous.manager_id != actor.manager_id or previous.kind != "entry_opened":
+            raise PermissionDenied("Entry operation belongs to another manager")
+    else:
+        start = await accept_start(
+            session,
+            telegram_id=telegram_id,
+            update_id=update_id,
+            payload=payload,
+            at=at,
+            internal=internal,
+        )
+        actor = Actor(
+            start.manager_id,
+            telegram_id,
+            start.analytics_manager_id,
+            start.operation_id,
+            at,
+            update_id,
+        )
     manager = await session.get(Manager, actor.manager_id)
     if manager is None:
         raise ValueError("Manager disappeared")
-    manager.bot_available = True
-    if manager.bot_confirmed_at is None or manager.bot_confirmed_at < at:
-        manager.bot_confirmed_at = at
+    if internal:
+        manager.is_internal = True
+    # Operational dedupe must survive analytics opt-out/retention and a claim
+    # made after an earlier /start. Retrying an old update never renews a lease.
+    new_entry = previous is None
+    if new_entry:
+        session.add(
+            GameActionReceipt(
+                operation_id=actor.operation_id,
+                effect_number=4,
+                manager_id=actor.manager_id,
+                ownership_id=None,
+                club_id=None,
+                kind="entry_opened",
+                occurred_at=at,
+            )
+        )
+        manager.bot_available = True
+        if manager.bot_confirmed_at is None or manager.bot_confirmed_at < at:
+            manager.bot_confirmed_at = at
+        await session.flush()
     ownership = await session.scalar(
         select(OwnershipPeriod)
         .where(OwnershipPeriod.manager_id == actor.manager_id, OwnershipPeriod.ended_at.is_(None))
@@ -147,16 +164,17 @@ async def begin_game(
         ownership = None
     if ownership is not None:
         ownership, club = await owned_club(session, actor)
-        await user_effect(
-            session,
-            actor,
-            "club_opened",
-            Surface.CLUB,
-            effect=3,
-            ownership=ownership,
-            club_id=club.id,
-            policy=policy,
-        )
+        if new_entry:
+            await user_effect(
+                session,
+                actor,
+                "club_opened",
+                Surface.CLUB,
+                effect=3,
+                ownership=ownership,
+                club_id=club.id,
+                policy=policy,
+            )
         return Entry(actor, ownership.id, club.id, ())
     available = await ensure_entry_capacity(session, at)
     return Entry(actor, None, None, await offers(session) if available else (), not available)
@@ -177,6 +195,7 @@ async def preview_club(session: AsyncSession, actor: Actor, club_id: UUID) -> Cl
             League.tier == 5,
             Club.owner_telegram_id.is_(None),
             ~active,
+            ready_set_predicate(),
         )
     )
     if club is None:
@@ -237,6 +256,7 @@ async def claim_club(
             League.tier == 5,
             Club.owner_telegram_id.is_(None),
             ~active,
+            ready_set_predicate(),
         )
         .with_for_update(of=Club)
         .execution_options(populate_existing=True)
@@ -266,4 +286,6 @@ async def claim_club(
         club_id=club.id,
         policy=policy,
     )
+    if await available_clubs(session) <= LOW_WATER:
+        await request_reserve(session, actor.at)
     return ownership
