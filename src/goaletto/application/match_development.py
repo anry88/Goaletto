@@ -79,6 +79,10 @@ async def pin_development(
 
         if await context_for_champions_fixture(session, fixture) != state.knockout:
             raise ValueError("Practice context differs from the authenticated champions plan")
+    if eligible and plan is not None and plan.competition == "friendly":
+        from goaletto.application.friendly import authenticate_fixture
+
+        await authenticate_fixture(session, fixture)
     session.add(
         MatchDevelopment(
             match_id=state.match_id,

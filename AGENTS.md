@@ -228,3 +228,22 @@
   no home advantage or arena-owner income. League and cup practice use actual
   0..120 minutes once; penalties add no minutes/goals. Champions/friendly runtime
   and completion of AND-130 remain separate work.
+
+- Agent intake 2026-10-17 accepts AND-62/128 and champions runtime AND-126;
+  see docs/agent-wave8-review.md, docs/academy-runtime.md, docs/friendly-runtime.md
+  and docs/champions-runtime.md. Academy intakes/signing are offseason-only;
+  freeze level/limit once per club+season, hide numeric caps, graduates sign free.
+  Unsigned academy graduates enter public supply once at season.open. Upkeep is
+  prorated using historical upgrade ledger timestamps. Bot retirement youth stays separate.
+  Friendlies require an explicit accepted booking; no automatic creation. Pin both
+  ownership periods on invitations; expiry is 00:00 UTC of the assigned match day.
+  Friendlies use 50% skill/experience as a prototype coefficient, normal form,
+  injury/recovery and home ticket rules. Preserve immutable history and league FK.
+- Cross-set rollover now atomically transitions every ready compatible season;
+  one allocation receipt, destination person calendars, sponsorship and tournament
+  qualification commit together. Champions eligibility uses past tier/season;
+  guest SeasonContestant rows do not replace true SeasonClub membership.
+  Shared tournament hosts are visible to guest calendars and block every cohort
+  member's rollover until all results finish. AND-119 remains open for aligning
+  new/delayed sets: current cohorts require equal UTC epoch/end and full completion;
+  unfinished/incompatible sets are skipped, not silently synchronized.

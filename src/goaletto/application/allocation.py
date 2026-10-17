@@ -1,11 +1,10 @@
 """Cross-set promotion/relegation cohorts and persisted allocation draws.
 
-Cohort rule (explicit orchestration choice): the requested season plus every
-other set's latest season that is fully complete joins one joint rollover.
-Sets without a completed season are skipped silently — nobody waits for an
-unfinished season. With a single set the cohort holds one season and the
-allocation matches the tier ladder (stayers keep their league, movers take
-the single league of their destination tier).
+Only fully completed latest seasons with the same UTC epoch and end join the
+requested season. One shared draw and every destination season commit together;
+peer job retries read their own rollover receipts. Incompatible or unfinished
+sets do not participate. Stayers keep their league; movers use the seeded draw
+among all destination leagues at their new tier.
 """
 
 import hashlib
@@ -33,6 +32,9 @@ from goaletto.domain.season_rollover import ROLLOVER_POLICY
 from goaletto.domain.standings import LeagueStanding
 from goaletto.domain.world import stable_seed
 from goaletto.infrastructure.models import (
+    ChampionsDraw,
+    ChampionsTie,
+    ChampionsTournament,
     CupBracket,
     CupTie,
     Fixture,
@@ -92,6 +94,71 @@ async def load_ready_season(session: AsyncSession, season: Season, at: datetime)
         ).all()
         if len(cup_plans) != 97 or set(cup_plans) != set(completed_cup):
             raise NotReady("Cup has missing result receipts")
+    draw = await session.scalar(select(ChampionsDraw).where(ChampionsDraw.season_id == season.id))
+    if draw is not None:
+        tournaments = (
+            await session.scalars(
+                select(ChampionsTournament).where(
+                    ChampionsTournament.cohort_key == draw.cohort_key,
+                )
+            )
+        ).all()
+        from goaletto.application.champions import frozen_groups
+
+        groups = await frozen_groups(session, draw)
+        if sorted((t.tier, t.group_index, t.participant_count) for t in tournaments) != sorted(
+            (g.tier, g.group_index, g.participant_count) for g in groups.groups
+        ):
+            raise ValueError("Champions tournaments differ from the frozen groups")
+        ids = [t.id for t in tournaments]
+        ties = (
+            await session.scalars(
+                select(ChampionsTie)
+                .where(
+                    ChampionsTie.tournament_id.in_(ids),
+                )
+                .with_for_update()
+            )
+        ).all()
+        if len(ties) != sum(t.participant_count - 1 for t in tournaments) or any(
+            t.status != "decided" for t in ties
+        ):
+            raise NotReady("Champions cups have unfinished ties")
+        planned = set(
+            (
+                await session.scalars(
+                    select(FixturePlan.id).where(
+                        FixturePlan.season_id.in_({t.season_id for t in tournaments}),
+                        FixturePlan.competition == "champions",
+                    )
+                )
+            ).all()
+        )
+        finished = set(
+            (
+                await session.scalars(
+                    select(MatchResult.fixture_id).where(
+                        MatchResult.fixture_id.in_(planned),
+                        MatchResult.competition == "champions",
+                    )
+                )
+            ).all()
+        )
+        if (
+            len(planned) != sum(2 * t.participant_count - 3 for t in tournaments)
+            or planned != finished
+        ):
+            raise NotReady("Champions cups have missing result receipts")
+    unfinished = await session.scalar(
+        select(Fixture.id)
+        .where(
+            Fixture.season_id == season.id,
+            Fixture.status.not_in(("finished", "cancelled")),
+        )
+        .limit(1)
+    )
+    if unfinished is not None:
+        raise NotReady("Season still has unfinished fixtures")
     unannounced = await session.scalar(
         select(FixturePlan.id)
         .where(
@@ -149,7 +216,28 @@ async def load_ready_season(session: AsyncSession, season: Season, at: datetime)
             f.actual_finish_at,
         ):
             raise ValueError("Result differs from frozen fixture")
-    last_finish = max(cast(datetime, f.actual_finish_at) for f in fixtures)
+    all_finishes = list(
+        (
+            await session.scalars(
+                select(Fixture.actual_finish_at).where(
+                    Fixture.season_id == season.id,
+                    Fixture.actual_finish_at.is_not(None),
+                )
+            )
+        ).all()
+    )
+    if draw is not None:
+        all_finishes.extend(
+            (
+                await session.scalars(
+                    select(Fixture.actual_finish_at).where(
+                        Fixture.id.in_(planned),
+                        Fixture.actual_finish_at.is_not(None),
+                    )
+                )
+            ).all()
+        )
+    last_finish = max(cast(datetime, finish) for finish in all_finishes)
     leagues = list(
         (
             await session.scalars(
@@ -217,7 +305,12 @@ async def ready_peers(session: AsyncSession, season: Season, at: datetime) -> li
             .limit(1)
             .with_for_update()
         )
-        if peer is None or peer.status not in {"active", "finished"}:
+        if (
+            peer is None
+            or peer.status not in {"active", "finished"}
+            or peer.cycle_epoch != season.cycle_epoch
+            or peer.ends_at != season.ends_at
+        ):
             continue
         try:
             ready.append(await load_ready_season(session, peer, at))
@@ -225,34 +318,6 @@ async def ready_peers(session: AsyncSession, season: Season, at: datetime) -> li
             continue
     ready.sort(key=lambda item: item.season.league_set_id.hex)
     return ready
-
-
-async def allocation_for_season(
-    session: AsyncSession, season_id: UUID
-) -> tuple[AllocationResult, list[UUID]] | None:
-    """Reload the joint draw when a cohort peer already persisted it.
-
-    The first ready job of a cohort writes one receipt; later peer jobs must
-    reuse its destinations instead of redrawing alone.
-    """
-    stored = await session.scalar(
-        select(SeasonAllocationReceipt)
-        .where(SeasonAllocationReceipt.season_ids.contains([str(season_id)]))
-        .order_by(SeasonAllocationReceipt.created_at.desc())
-        .limit(1)
-    )
-    if stored is None:
-        return None
-    return (
-        AllocationResult(
-            policy_version=stored.policy_version,
-            cohort_key=stored.cohort_key,
-            seed=stored.seed,
-            assignments=tuple(_assignment_from_json(a) for a in stored.assignments),
-            draws=tuple(_draw_from_json(d) for d in stored.draws),
-        ),
-        [UUID(value) for value in stored.season_ids],
-    )
 
 
 async def origin_seasons(

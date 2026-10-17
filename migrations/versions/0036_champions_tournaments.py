@@ -1,11 +1,11 @@
-"""Durable champions-cup draws, tournaments and ties (single set, AND-126)."""
+"""Durable champions-cup draws, tournaments and ties (AND-126)."""
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0035_champions_tournaments"
-down_revision = "0034_real_knockout"
+revision = "0036_champions_tournaments"
+down_revision = "0035_allocation_receipts"
 branch_labels = None
 depends_on = None
 
@@ -28,7 +28,8 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("seed >= 0", name="ck_champions_draw_seed"),
         sa.CheckConstraint(
-            "jsonb_typeof(snapshots) = 'array' AND jsonb_array_length(snapshots) = 5",
+            "jsonb_typeof(snapshots) = 'array' AND jsonb_array_length(snapshots) >= 5 "
+            "AND mod(jsonb_array_length(snapshots),5) = 0",
             name="ck_champions_draw_snapshots",
         ),
     )
@@ -114,8 +115,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("""DO $$ BEGIN
-      IF EXISTS (SELECT 1 FROM champions_ties WHERE status = 'decided') THEN
-        RAISE EXCEPTION 'Decided champions ties prevent downgrade'; END IF;
+      IF EXISTS (SELECT 1 FROM champions_draws) THEN
+        RAISE EXCEPTION 'Frozen champions draws prevent downgrade'; END IF;
     END $$""")
     op.drop_index("ix_champions_ties_tournament", table_name="champions_ties")
     op.drop_index("ix_champions_ties_season", table_name="champions_ties")

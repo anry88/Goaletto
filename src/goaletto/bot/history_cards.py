@@ -64,8 +64,14 @@ def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
     for entry in page.entries:
         marker = OUTCOME_MARKERS.get(entry.outcome, "")
         date = entry.scheduled_start_at.strftime("%d.%m")
-        if entry.competition == "cup":
-            lines.append(tr("Кубок · {date}", date=date))
+        if entry.competition in {"cup", "champions", "friendly"}:
+            lines.append(
+                tr("Кубок чемпионов · {date}", date=date)
+                if entry.competition == "champions"
+                else tr("Товарищеский · {date}", date=date)
+                if entry.competition == "friendly"
+                else tr("Кубок · {date}", date=date)
+            )
             lines.append(
                 f"{marker} <b>{escape(latin_name(entry.home_name))} "
                 f"{entry.home_goals}:{entry.away_goals} "
@@ -203,8 +209,14 @@ def report_view(
     lines = [
         f"⚽ <b>{escape(latin_name(report.home_name))} {report.home_goals}:{report.away_goals} "
         f"{escape(latin_name(report.away_name))}</b>",
-        tr("Кубок · {date}", date=date)
-        if report.competition == "cup"
+        (
+            tr("Кубок чемпионов · {date}", date=date)
+            if report.competition == "champions"
+            else tr("Товарищеский · {date}", date=date)
+            if report.competition == "friendly"
+            else tr("Кубок · {date}", date=date)
+        )
+        if report.competition in {"cup", "champions", "friendly"}
         else tr("Тур {p0} · {p1}", p0=report.round_number, p1=date),
         "",
         tr(
@@ -400,22 +412,25 @@ def player_history_view(page: PlayerHistoryPage) -> tuple[str, InlineKeyboardMar
             extra += " · 🟥"
         elif entry.yellows:
             extra += " · 🟨"
+        if entry.competition == "league":
+            heading = tr("Тур {p0} · {p1}", p0=entry.round_number, p1=date)
+        elif entry.competition == "cup":
+            heading = tr("Кубок · {date}", date=date)
+        elif entry.competition == "champions":
+            heading = tr("Кубок чемпионов · {date}", date=date)
+        else:
+            heading = tr("Товарищеский · {date}", date=date)
         lines.append(
-            tr(
-                "Тур {p0} · {p1}\n<b>{p2} {p3}:{p4} {p5}</b>{p6}",
-                p0=entry.round_number,
-                p1=date,
-                p2=escape(latin_name(entry.home_name)),
-                p3=entry.home_goals,
-                p4=entry.away_goals,
-                p5=escape(latin_name(entry.away_name)),
-                p6=extra,
-            )
+            f"{heading}\n<b>{escape(latin_name(entry.home_name))} "
+            f"{entry.home_goals}:{entry.away_goals} "
+            f"{escape(latin_name(entry.away_name))}</b>{extra}"
         )
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=tr("Тур {p0}: отчёт", p0=entry.round_number)[:60],
+                    text=tr("Тур {p0}: отчёт", p0=entry.round_number)[:60]
+                    if entry.competition == "league"
+                    else tr("📋 Отчёт о матче"),
                     callback_data=match_callback(entry.fixture_id, 1),
                 )
             ]

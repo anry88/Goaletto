@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,12 +45,23 @@ from goaletto.infrastructure.models import (
 async def crowd_for_fixture(
     session: AsyncSession, fixture: Fixture, home: Club, at: datetime
 ) -> Attendance:
-    _, tier, place = await ranking_at(session, home.id, at, season_id=fixture.season_id)
+    from goaletto.application.champions import host_seasons_for, league_season_for
+
+    league_season = (
+        await league_season_for(session, fixture.season_id, home.id)
+        if fixture.competition == "champions"
+        else fixture.season_id
+    )
+    _, tier, place = await ranking_at(session, home.id, at, season_id=league_season)
     results = (
         await session.scalars(
             select(MatchResult)
             .where(
-                MatchResult.season_id == fixture.season_id,
+                or_(
+                    MatchResult.season_id == league_season,
+                    (MatchResult.competition == "champions")
+                    & MatchResult.season_id.in_(host_seasons_for(league_season)),
+                ),
                 MatchResult.actual_finish_at < at,
                 (MatchResult.home_club_id == home.id) | (MatchResult.away_club_id == home.id),
             )

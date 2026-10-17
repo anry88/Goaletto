@@ -17,20 +17,16 @@ from goaletto.presentation.i18n import tr
 _LABELS = {name: label for name, label in SKILL_LABELS}
 
 
-def parse_academy(data: str) -> tuple[str, UUID, int | None]:
+def parse_academy(data: str) -> tuple[str, UUID, int | None, UUID | None]:
     parts = data.split(":")
-    if len(data.encode()) > 64 or parts[0] != "ac" or len(parts) not in (3, 4):
+    if len(data.encode()) > 64 or parts[0] != "ac":
         raise ValueError("Invalid academy callback")
-    if parts[1] in ("o", "u") and len(parts) == 3:
-        return parts[1], expand_id(parts[2]), None
-    if (
-        parts[1] == "g"
-        and len(parts) == 4
-        and parts[3].isascii()
-        and parts[3].isdigit()
-        and len(parts[3]) <= 2
-    ):
-        return "g", expand_id(parts[2]), int(parts[3])
+    if len(parts) == 3 and parts[1] == "o":
+        return "o", expand_id(parts[2]), None, None
+    if len(parts) == 4 and parts[1] == "u" and parts[3] in {"1", "2", "3", "4"}:
+        return "u", expand_id(parts[2]), int(parts[3]), None
+    if len(parts) == 5 and parts[1] == "g" and parts[4] in {"1", "2", "3", "4", "5"}:
+        return "g", expand_id(parts[2]), int(parts[4]), expand_id(parts[3])
     raise ValueError("Invalid academy callback")
 
 
@@ -55,11 +51,11 @@ def _candidate_lines(view: CandidateView) -> list[str]:
     )
     if view.status == "signed":
         header = f"{header} · {tr('✓ подписан')}"
-    low, high = min(view.caps.values()), max(view.caps.values())
+    hint = tr("Высокий потенциал") if max(view.caps.values()) >= 12 else tr("Есть запас для роста")
     return [
         header,
         tr("   Ключевые: {skills}", skills=_top_skills(view.skills)),
-        tr("   Потенциал: {low}–{high} (потолок навыков)", low=low, high=high),
+        hint,
     ]
 
 
@@ -68,7 +64,7 @@ def academy_view(screen: AcademyScreen, notice: str | None = None) -> tuple[str,
         tr("⚽ <b>Академия · {club}</b>", club=escape(latin_name(screen.club_name))),
         "",
         tr(
-            "Уровень: {level}/5 · содержание: {upkeep}/период клуба",
+            "Уровень: {level}/5 · содержание: {upkeep} за 4 дня",
             level=screen.level,
             upkeep=amount(academy_upkeep(screen.level)),
         ),
@@ -85,6 +81,8 @@ def academy_view(screen: AcademyScreen, notice: str | None = None) -> tuple[str,
             cap=screen.sign_limit,
         ),
     ]
+    if not screen.intake_open:
+        lines.append(tr("Выпуск академии доступен в межсезонье."))
     if notice:
         lines.extend(("", notice))
     if screen.next_upgrade_cost is not None:
@@ -109,12 +107,17 @@ def academy_view(screen: AcademyScreen, notice: str | None = None) -> tuple[str,
     )
     rows = []
     for view in screen.candidates:
-        if view.status == "available":
+        if (
+            view.status == "available"
+            and screen.intake_open
+            and screen.signed < screen.sign_limit
+            and screen.roster_size < ROSTER_LIMIT
+        ):
             rows.append(
                 [
                     Button(
                         text=tr("Подписать: {name}", name=latin_name(view.name)),
-                        callback_data=f"ac:g:{compact_id(screen.ownership_id)}:{view.slot}",
+                        callback_data=f"ac:g:{compact_id(screen.ownership_id)}:{compact_id(screen.season_id)}:{view.slot}",
                     )
                 ]
             )
@@ -128,7 +131,7 @@ def academy_view(screen: AcademyScreen, notice: str | None = None) -> tuple[str,
                             level=screen.level + 1,
                             cost=amount(screen.next_upgrade_cost),
                         ),
-                        callback_data=f"ac:u:{compact_id(screen.ownership_id)}",
+                        callback_data=f"ac:u:{compact_id(screen.ownership_id)}:{screen.level}",
                     )
                 ]
             )

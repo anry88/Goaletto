@@ -40,6 +40,7 @@ from goaletto.infrastructure.models import (
     NeutralFinalBooking,
     Season,
     SeasonClub,
+    SeasonContestant,
 )
 from goaletto.infrastructure.models import CupBracket as CupBracketModel
 from goaletto.infrastructure.models import CupTie as CupTieModel
@@ -489,9 +490,9 @@ async def pin_final_venue(
     )
     venue = await session.scalar(
         select(Club)
-        .join(SeasonClub, SeasonClub.club_id == Club.id)
+        .join(SeasonContestant, SeasonContestant.club_id == Club.id)
         .where(
-            SeasonClub.season_id == fixture.season_id,
+            SeasonContestant.season_id == fixture.season_id,
             Club.id.not_in((home.id, away.id)),
             Club.id.not_in(occupied),
             Club.id.not_in(booked),

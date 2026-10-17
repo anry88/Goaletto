@@ -9,7 +9,13 @@ from uuid import UUID, uuid5
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from goaletto.application.allocation import allocate_cohort, allocation_for_season, ready_peers
+from goaletto.application.allocation import (
+    ReadySeason,
+    allocate_cohort,
+    load_ready_season,
+    origin_seasons,
+    ready_peers,
+)
 from goaletto.application.analytics import JourneyEvent, Origin, Surface, require_utc
 from goaletto.application.finances import close_salary, salary_contract
 from goaletto.application.game_actions import allocation_lock
@@ -23,6 +29,7 @@ from goaletto.domain.calendar import (
     league_calendar,
 )
 from goaletto.domain.game_cycle import next_first_league, season_end, season_epoch
+from goaletto.domain.league_allocation import AllocationResult
 from goaletto.domain.player_season_plan import PlayerSeasonEntry, plan_player_season
 from goaletto.domain.retirement import RetirementDecision, player_last_season, staff_last_season
 from goaletto.domain.season_rollover import ROLLOVER_POLICY, youth_profile
@@ -206,29 +213,110 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         raise ValueError("Season is not ready for rollover")
     if at < season.ends_at:
         raise NotReady("Season calendar has not ended")
-    if await session.get(Season, next_id) is not None:
-        raise ValueError("Next season exists without a rollover receipt")
-    # Joint cohort rollover: this season plus every other set's completed
-    # season move simultaneously. Clubs may land in any cohort league of the
-    # adjacent tier; stayers keep their exact league. The persisted draw makes
-    # every retry reproduce the same destinations.
-    from goaletto.application.allocation import load_ready_season, origin_seasons
-
     own = await load_ready_season(session, season, at)
-    stored = await allocation_for_season(session, season_id)
-    if stored is None:
-        peers = await ready_peers(session, season, at)
-        allocation = await allocate_cohort(session, [own, *peers], at)
-        season_ids = [own.season.id, *(item.season.id for item in peers)]
-    else:
-        allocation, season_ids = stored
+    ready = [own, *await ready_peers(session, season, at)]
+    ready.sort(key=lambda item: str(item.season.id))
+    allocation = await allocate_cohort(session, ready, at)
+    season_ids = [item.season.id for item in ready]
+    kickoff = max(next_first_league(item.season.starts_at, item.last_finish, at) for item in ready)
+    future = {
+        item.season.league_set_id: uuid5(item.season.id, f"{ROLLOVER_POLICY}:next")
+        for item in ready
+    }
+    for item in ready:
+        old = item.season
+        upcoming = future[old.league_set_id]
+        session.add(
+            Season(
+                id=upcoming,
+                league_set_id=old.league_set_id,
+                number=old.number + 1,
+                status="scheduled",
+                seed=stable_seed(old.seed, f"{ROLLOVER_POLICY}:{upcoming}"),
+                starts_at=kickoff,
+                ends_at=season_end(kickoff),
+                calendar_policy=old.calendar_policy,
+                calendar_enabled=True,
+                cycle_epoch=season_epoch(kickoff),
+            )
+        )
+    await session.flush()
+    league_sets = {
+        league.id: item.season.league_set_id for item in ready for league in item.leagues
+    }
+    player_seasons = {
+        a.club_id: future[league_sets[a.destination_league_id]] for a in allocation.assignments
+    }
+    outcomes = {}
+    new_careers: list[tuple[Person, UUID, UUID | None]] = []
+    for item in ready:
+        outcome, retirees = await _rollover_one(
+            session,
+            item,
+            allocation,
+            season_ids,
+            player_seasons,
+            kickoff,
+            at,
+        )
+        outcomes[item.season.id] = outcome
+        new_careers.extend((person, item.season.id, origin) for person, origin in retirees)
+    # Create global newcomers only after every source calendar has finished aging.
+    # Otherwise an unprocessed set can see next-season people in its free pool.
+    from goaletto.application.staff_career import assign_career
+
+    for person, source_season, origin_club in new_careers:
+        await assign_career(session, person, source_season, origin_club, at)
+    # Staff created on football retirement also adopts the destination calendar.
+    for club_id, upcoming in player_seasons.items():
+        people = (
+            select(Player.person_id)
+            .where(Player.club_id == club_id)
+            .union(select(Staff.person_id).where(Staff.club_id == club_id))
+        )
+        await session.execute(
+            update(Person)
+            .where(Person.id.in_(people))
+            .values(
+                age_applied_for_season_id=upcoming,
+                home_league_set_id=league_sets[
+                    next(
+                        a.destination_league_id
+                        for a in allocation.assignments
+                        if a.club_id == club_id
+                    )
+                ],
+            )
+        )
+    from goaletto.application.champions import initialize_cohort_champions
+
+    await initialize_cohort_champions(session, ready, future, at)
+    from goaletto.application.calendar_planning import plan_horizon
+
+    for upcoming in future.values():
+        await plan_horizon(session, upcoming, at)
+    from goaletto.application.candidates import replenish_pool
+
+    for pool in (await session.scalars(select(CandidatePool))).all():
+        await replenish_pool(session, pool.kind, pool.profile, at)
+    return outcomes[season_id]
+
+
+async def _rollover_one(
+    session: AsyncSession,
+    own: ReadySeason,
+    allocation: AllocationResult,
+    season_ids: list[UUID],
+    player_seasons: dict[UUID, UUID],
+    kickoff: datetime,
+    at: datetime,
+) -> tuple[RolloverResult, list[tuple[Person, UUID | None]]]:
+    season = own.season
+    next_id = uuid5(season.id, f"{ROLLOVER_POLICY}:next")
     leagues = own.leagues
-    kickoff = next_first_league(season.starts_at, own.last_finish, at)
     dest = {a.club_id: a.destination_league_id for a in allocation.assignments}
     places = {a.club_id: a.source_place for a in allocation.assignments}
     origins = await origin_seasons(session, allocation, season_ids)
-    for assignment in allocation.assignments:
-        origins.setdefault(assignment.club_id, season_id)
     memberships = list(
         (await session.scalars(select(SeasonClub).where(SeasonClub.season_id == season.id))).all()
     )
@@ -239,15 +327,22 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     member_ids = [club_id for club_id, league_id in dest.items() if league_id in own_league_ids]
     if len(member_ids) != 50:
         raise ValueError("Allocation must fill every league exactly")
-    clubs = list(
+    destination_clubs = list(
         (
             await session.scalars(
                 select(Club).where(Club.id.in_(member_ids)).order_by(Club.id).with_for_update()
             )
         ).all()
     )
-    if len(clubs) != 50:
+    if len(destination_clubs) != 50:
         raise ValueError("Allocated clubs are missing")
+    clubs = list(
+        (
+            await session.scalars(
+                select(Club).where(Club.id.in_(by_id)).order_by(Club.id).with_for_update()
+            )
+        ).all()
+    )
     rows = list(
         (
             await session.execute(
@@ -309,21 +404,6 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         raise AppearanceExhausted("No approved youth portrait in reusable catalog")
     # Everything from here commits or rolls back as one unit.
     next_seed = stable_seed(season.seed, f"{ROLLOVER_POLICY}:{next_id}")
-    session.add(
-        Season(
-            id=next_id,
-            league_set_id=season.league_set_id,
-            number=season.number + 1,
-            status="scheduled",
-            seed=next_seed,
-            starts_at=kickoff,
-            ends_at=season_end(kickoff),
-            calendar_policy=season.calendar_policy,
-            calendar_enabled=True,
-            cycle_epoch=season_epoch(kickoff),
-        )
-    )
-    await session.flush()
     # Remove references before retired players leave the roster (composite FK).
     retired_ids = {p.person_id for p, _ in retiring}
     saved_slots = list(
@@ -363,12 +443,13 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         if person.career != "player":
             raise ValueError("Player profile and person career disagree")
         draw = Random(stable_seed(next_seed, f"decision:{person.id}")).randrange(10000)
+        person_next = player_seasons.get(player.club_id, next_id)
         plan = plan_player_season(
             PlayerSeasonEntry(
                 person_id=person.id,
                 appearance_identity_id=person.appearance_identity_id,
                 completed_season_id=season.id,
-                next_season_id=next_id,
+                next_season_id=person_next,
                 current_age=person.age,
                 current_age_applied_for_season_id=person.age_applied_for_season_id,
                 current_status=cast(Literal["active", "last_season", "retired"], player.status),
@@ -418,7 +499,7 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
                         home_league_set_id=season.league_set_id,
                     ),
                 )
-                youth.age_applied_for_season_id = next_id
+                youth.age_applied_for_season_id = person_next
                 replacement = Player(
                     person_id=youth.id,
                     club_id=club_id,
@@ -439,11 +520,11 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
                         policy_version=POLICY_VERSION,
                     )
                 )
-                session.add(_person_event(youth, next_id, "age_applied", at))
+                session.add(_person_event(youth, person_next, "age_applied", at))
                 session.add(
                     _person_event(
                         youth,
-                        next_id,
+                        person_next,
                         "player_last_decision",
                         at,
                         decision=player_last_season(18, 0),
@@ -464,21 +545,19 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
             variant = variant_by_band.get((person.appearance_identity_id, age_band(person.age)))
             if variant is not None:
                 person.appearance_variant_id = variant
-            session.add(_person_event(person, next_id, "age_applied", at))
+            session.add(_person_event(person, person_next, "age_applied", at))
             session.add(
-                _person_event(person, next_id, "player_last_decision", at, decision=plan.decision)
+                _person_event(
+                    person, person_next, "player_last_decision", at, decision=plan.decision
+                )
             )
             await session.flush()
             if plan.outcome == "continue_last_season":
                 counts["warned"] += 1
                 await prohibit_player_trades(session, person.id, at)
-                await _notice(session, person, club_id, next_id, "last_season", at)
-                await _event(session, "player_last_season_announced", person.id, next_id, at)
-    await _rollover_staff(session, season, next_id, next_seed, by_id, at, counts)
-    from goaletto.application.staff_career import assign_career
-
-    for person, origin_club_id in new_careers:
-        await assign_career(session, person, season.id, origin_club_id, at)
+                await _notice(session, person, club_id, person_next, "last_season", at)
+                await _event(session, "player_last_season_announced", person.id, person_next, at)
+    await _rollover_staff(session, season, next_id, next_seed, by_id, at, counts, player_seasons)
     # Retired candidate offers leave supply, but historical offers/persons remain.
     await session.execute(
         update(CandidateOffer)
@@ -510,6 +589,7 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     await session.flush()
     # Retired IDs cannot be inserted through the composite FK; feed old picks to repair directly.
     await _install_lineups(session, clubs, saved_slots, retired_ids, replacements)
+    clubs = destination_clubs
     calendars: list[ScheduledFixture] = []
     for league in leagues:
         league_clubs = [club for club in clubs if dest[club.id] == league.id]
@@ -568,17 +648,7 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     from goaletto.application.cup import initialize_season_cup
 
     await initialize_season_cup(session, next_id, at)
-    from goaletto.application.champions import initialize_season_champions
-
-    await initialize_season_champions(session, next_id, season.id, tables, leagues, at)
     await plan_horizon(session, next_id, at)
-    # Replenish only pools that were opened already; rollover does not create an
-    # unused staff market. The first set owns free-candidate aging, not availability.
-    from goaletto.application.candidates import replenish_pool
-
-    pools = list((await session.scalars(select(CandidatePool))).all())
-    for pool in pools:
-        await replenish_pool(session, pool.kind, pool.profile, at)
     # Terminal old work cannot start again; finance jobs are club-period work and continue.
     await session.execute(
         update(Job)
@@ -596,11 +666,11 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
             policy_version=ROLLOVER_POLICY,
             completed_at=at,
             counts=counts,
-            movements={str(c.id): str(c.league_id) for c in clubs},
+            movements={str(club_id): str(dest[club_id]) for club_id in by_id},
         )
     )
     await session.flush()
-    return RolloverResult(season.id, next_id, True, **counts)
+    return RolloverResult(season.id, next_id, True, **counts), new_careers
 
 
 async def _install_lineups(
@@ -682,6 +752,7 @@ async def _rollover_staff(
     memberships: dict[UUID, SeasonClub],
     at: datetime,
     counts: dict[str, int],
+    player_seasons: dict[UUID, UUID],
 ) -> None:
     rows = (
         await session.execute(
@@ -708,6 +779,7 @@ async def _rollover_staff(
     for worker, person in rows:
         if person.career != "staff" or person.age_applied_for_season_id != season.id:
             raise ValueError("Staff calendar does not match the completed season")
+        person_next = player_seasons.get(worker.club_id, next_id)
         club_id = worker.club_id
         former_role = worker.role
         if worker.status == "last_season":
@@ -731,14 +803,14 @@ async def _rollover_staff(
             counts["staff_retired"] += 1
         else:
             person.age += 1
-            person.age_applied_for_season_id = next_id
+            person.age_applied_for_season_id = person_next
             decision = staff_last_season(
                 person.age,
                 Random(stable_seed(seed, f"staff-decision:{person.id}")).randrange(10000),
             )
-            session.add(_person_event(person, next_id, "age_applied", at))
+            session.add(_person_event(person, person_next, "age_applied", at))
             session.add(
-                _person_event(person, next_id, "staff_last_decision", at, decision=decision)
+                _person_event(person, person_next, "staff_last_decision", at, decision=decision)
             )
             stage = (
                 "staff-early"
@@ -752,7 +824,7 @@ async def _rollover_staff(
                 person.appearance_variant_id = variant
             counts["staff_aged"] += 1
             if decision.is_last_season:
-                worker.status, worker.last_season_id = "last_season", next_id
-                await _notice(session, person, club_id, next_id, "last_season", at, staff=True)
+                worker.status, worker.last_season_id = "last_season", person_next
+                await _notice(session, person, club_id, person_next, "last_season", at, staff=True)
                 counts["staff_warned"] += 1
     await session.flush()

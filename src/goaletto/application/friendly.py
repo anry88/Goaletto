@@ -13,13 +13,22 @@ from uuid import UUID, uuid4, uuid5
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from goaletto.application.analytics import require_utc
-from goaletto.application.game_actions import Actor, PermissionDenied, owned_club
+from goaletto.application.analytics import Surface, require_utc
+from goaletto.application.game_actions import (
+    Actor,
+    PermissionDenied,
+    allocation_lock,
+    owned_club,
+    user_effect,
+)
 from goaletto.domain.game_cycle import HORIZON_DAYS, Phase, cycle_on, midnight
 from goaletto.infrastructure.models import (
     Club,
+    Fixture,
     FixturePlan,
     FriendlyInvitation,
+    Manager,
+    OutboxMessage,
     OwnershipPeriod,
     Season,
     SeasonClub,
@@ -55,7 +64,6 @@ def _require_future_free_day(today: date, day: date, epoch: date) -> None:
 
 async def _clash_plan(
     session: AsyncSession,
-    season_id: UUID,
     clubs: tuple[UUID, UUID],
     day: date,
     *,
@@ -63,7 +71,6 @@ async def _clash_plan(
 ) -> UUID | None:
     home_id, away_id = clubs
     filters = [
-        FixturePlan.season_id == season_id,
         FixturePlan.assigned_day == day,
         or_(
             FixturePlan.home_club_id.in_(clubs),
@@ -104,7 +111,7 @@ async def _create_plan(
         ):
             raise ValueError("Conflicting friendly plan")
         return existing
-    if await _clash_plan(session, season.id, clubs, day, exclude=plan_id) is not None:
+    if await _clash_plan(session, clubs, day, exclude=plan_id) is not None:
         raise ValueError("A club already has a match that day")
     await reserve_match_day(session, clubs, day, at, competition="friendly")
     epoch = season.cycle_epoch
@@ -128,6 +135,11 @@ async def _create_plan(
     )
     session.add(plan)
     await session.flush()
+    from goaletto.application.calendar_planning import plan_horizon
+
+    await plan_horizon(session, season.id, at)
+    if plan.blocked_reason is not None:
+        raise ValueError("Friendly kickoff is blocked: " + plan.blocked_reason)
     return plan
 
 
@@ -155,7 +167,7 @@ async def schedule_friendly(
     require_utc(actor.at)
     if not session.in_transaction():
         raise ValueError("Friendly scheduling needs a transaction")
-    _, home = await owned_club(session, actor)
+    ownership, home = await owned_club(session, actor)
     away = await session.get(Club, away_club_id)
     if away is None or away.id == home.id:
         raise ValueError("Friendly needs a different opponent club")
@@ -177,7 +189,30 @@ async def schedule_friendly(
     )
     if active_owner is not None:
         raise ValueError("Owned clubs play friendlies only by invitation")
-    return await _create_plan(session, season, home.id, away.id, day, actor.at)
+    plan = await _create_plan(session, season, home.id, away.id, day, actor.at)
+    existing = await session.scalar(
+        select(FriendlyInvitation).where(FriendlyInvitation.plan_id == plan.id)
+    )
+    if existing is None:
+        session.add(
+            FriendlyInvitation(
+                id=uuid5(plan.id, "friendly-booking"),
+                season_id=season.id,
+                home_club_id=home.id,
+                away_club_id=away.id,
+                challenger_ownership_id=ownership.id,
+                challenged_ownership_id=None,
+                assigned_day=day,
+                status="accepted",
+                created_at=actor.at,
+                responded_at=actor.at,
+                plan_id=plan.id,
+            )
+        )
+    await user_effect(
+        session, actor, "friendly_scheduled", Surface.CALENDAR, ownership=ownership, club_id=home.id
+    )
+    return plan
 
 
 async def _pending_invite(
@@ -210,7 +245,7 @@ async def _pending_invite(
 
 def _settle_expiry(row: FriendlyInvitation, at: datetime) -> bool:
     """Lazily expire a pending invitation past its UTC date. Returns True if open."""
-    if row.status == "pending" and at.date() > row.assigned_day:
+    if row.status == "pending" and at.date() >= row.assigned_day:
         row.status, row.responded_at = "expired", at
         return False
     return row.status == "pending"
@@ -224,8 +259,8 @@ async def invite_friendly(
     The invitation stays pending until the challenged owner accepts or
     declines, or the challenger cancels. Accepting creates the FixturePlan;
     until then no plan, kickoff or jobs exist and neither club's training is
-    touched. The invitation is valid through its UTC date; afterwards it
-    expires and acceptance is refused.
+    touched. The invitation expires at the start of its assigned UTC date, before any
+    kickoff can occur.
     """
 
     require_utc(actor.at)
@@ -253,14 +288,21 @@ async def invite_friendly(
     )
     if bot_check is None:
         raise ValueError("Bot clubs need no invitation; schedule the friendly directly")
-    if await _clash_plan(session, season.id, (home.id, away.id), day) is not None:
+    if await _clash_plan(session, (home.id, away.id), day) is not None:
         raise ValueError("A club already has a match that day")
     duplicate = await _pending_invite(session, season.id, home.id, away.id, day)
     if duplicate is not None:
-        if not _settle_expiry(duplicate, actor.at):
-            await session.flush()
-        else:
+        same_owners = (
+            duplicate.challenger_ownership_id == ownership.id
+            and duplicate.challenged_ownership_id == bot_check
+            if duplicate.home_club_id == home.id
+            else duplicate.challenger_ownership_id == bot_check
+            and duplicate.challenged_ownership_id == ownership.id
+        )
+        if same_owners and _settle_expiry(duplicate, actor.at):
             return duplicate
+        duplicate.status, duplicate.responded_at = "expired", actor.at
+        await session.flush()
     from goaletto.application.training import reserve_match_day
 
     await reserve_match_day(session, (home.id, away.id), day, actor.at, competition="friendly")
@@ -270,6 +312,7 @@ async def invite_friendly(
         home_club_id=home.id,
         away_club_id=away.id,
         challenger_ownership_id=ownership.id,
+        challenged_ownership_id=bot_check,
         assigned_day=day,
         status="pending",
         created_at=actor.at,
@@ -278,6 +321,33 @@ async def invite_friendly(
     # Duplicate pending rows are already excluded above under the shared
     # allocation lock; the partial unique index is a durable backstop.
     await session.flush()
+    target = await session.get(OwnershipPeriod, bot_check)
+    assert target is not None
+    manager = await session.get(Manager, target.manager_id)
+    assert manager is not None
+    session.add(
+        OutboxMessage(
+            id=uuid5(row.id, "invite-notice"),
+            dedupe_key=f"friendly:invite:{row.id}",
+            priority=70,
+            chat_id=manager.telegram_id,
+            due_at=actor.at,
+            status="pending",
+            attempts=0,
+            payload={
+                "version": 1,
+                "kind": "friendly_invitation",
+                "ownership_id": str(target.id),
+                "club_id": str(away.id),
+                "invitation_id": str(row.id),
+                "home": home.name,
+                "day": day.isoformat(),
+            },
+        )
+    )
+    await user_effect(
+        session, actor, "friendly_invited", Surface.CALENDAR, ownership=ownership, club_id=home.id
+    )
     return row
 
 
@@ -296,15 +366,23 @@ async def respond_friendly(
     require_utc(actor.at)
     if not session.in_transaction():
         raise ValueError("Friendly responses need a transaction")
+    await allocation_lock(session)
+    ownership, club = await owned_club(session, actor)
     row = await session.get(FriendlyInvitation, invitation_id, with_for_update=True)
     if row is None:
         raise ValueError("Unknown friendly invitation")
+    if club.id not in (row.home_club_id, row.away_club_id):
+        raise PermissionDenied("Invitation belongs to another pair of clubs")
+    expected_owner = (
+        row.challenger_ownership_id if club.id == row.home_club_id else row.challenged_ownership_id
+    )
+    if ownership.id != expected_owner:
+        raise PermissionDenied("Invitation belongs to a previous owner")
     if row.status != "pending":
         return row
     if not _settle_expiry(row, actor.at):
         await session.flush()
-        raise ValueError("Friendly invitation has expired")
-    ownership, club = await owned_club(session, actor)
+        return row
     if accept:
         if club.id != row.away_club_id:
             raise PermissionDenied("Only the challenged club accepts the invitation")
@@ -317,9 +395,13 @@ async def respond_friendly(
         ):
             row.status, row.responded_at = "expired", actor.at
             await session.flush()
-            raise ValueError("Challenger no longer owns the home club")
+            return row
         season = await session.get(Season, row.season_id)
-        if season is None or season.cycle_epoch is None:
+        if (
+            season is None
+            or season.cycle_epoch is None
+            or season.status not in {"scheduled", "active"}
+        ):
             raise ValueError("Missing club calendar")
         for club_id in (row.home_club_id, row.away_club_id):
             membership = await session.scalar(
@@ -353,7 +435,14 @@ async def respond_friendly(
             .values(status="cancelled", responded_at=actor.at)
         )
         await session.flush()
-        _ = ownership
+        await user_effect(
+            session,
+            actor,
+            "friendly_responded",
+            Surface.CALENDAR,
+            ownership=ownership,
+            club_id=club.id,
+        )
         return row
     if club.id == row.away_club_id:
         row.status = "declined"
@@ -364,6 +453,9 @@ async def respond_friendly(
     else:
         raise PermissionDenied("Invitation belongs to another pair of clubs")
     row.responded_at = actor.at
+    await user_effect(
+        session, actor, "friendly_responded", Surface.CALENDAR, ownership=ownership, club_id=club.id
+    )
     await session.flush()
     return row
 
@@ -401,7 +493,9 @@ def _card(row: FriendlyInvitation, names: dict[UUID, str]) -> FriendlyInviteCard
     )
 
 
-async def load_friendly_screen(session: AsyncSession, actor: Actor) -> FriendlyScreen:
+async def load_friendly_screen(
+    session: AsyncSession, actor: Actor, *, record: bool = True
+) -> FriendlyScreen:
     """Pending incoming/outgoing challenges plus the latest settled ones."""
     ownership, club = await owned_club(session, actor)
     rows = (
@@ -409,11 +503,15 @@ async def load_friendly_screen(session: AsyncSession, actor: Actor) -> FriendlyS
             select(FriendlyInvitation)
             .where(
                 or_(
-                    FriendlyInvitation.home_club_id == club.id,
-                    FriendlyInvitation.away_club_id == club.id,
+                    FriendlyInvitation.challenger_ownership_id == ownership.id,
+                    FriendlyInvitation.challenged_ownership_id == ownership.id,
                 )
             )
-            .order_by(FriendlyInvitation.assigned_day, FriendlyInvitation.created_at)
+            .order_by(
+                (FriendlyInvitation.status == "pending").desc(),
+                FriendlyInvitation.created_at.desc(),
+            )
+            .limit(20)
         )
     ).all()
     touched = False
@@ -434,7 +532,16 @@ async def load_friendly_screen(session: AsyncSession, actor: Actor) -> FriendlyS
     outgoing = tuple(
         _card(r, names) for r in rows if r.status == "pending" and r.home_club_id == club.id
     )
-    recent = tuple(_card(r, names) for r in rows if r.status != "pending")[-5:]
+    recent = tuple(_card(r, names) for r in rows if r.status != "pending")[:5]
+    if record:
+        await user_effect(
+            session,
+            actor,
+            "friendly_opened",
+            Surface.CALENDAR,
+            ownership=ownership,
+            club_id=club.id,
+        )
     return FriendlyScreen(
         ownership.id, club.id, names.get(club.id, "?"), incoming, outgoing, recent
     )
@@ -471,7 +578,6 @@ async def challenge_days(session: AsyncSession, actor: Actor) -> tuple[date, ...
         for plan in (
             await session.scalars(
                 select(FixturePlan).where(
-                    FixturePlan.season_id == season.id,
                     FixturePlan.assigned_day.in_(free),
                     or_(
                         FixturePlan.home_club_id == club.id,
@@ -532,7 +638,6 @@ async def challenge_opponents(
     plans = (
         await session.scalars(
             select(FixturePlan).where(
-                FixturePlan.season_id == season.id,
                 FixturePlan.assigned_day == day,
                 or_(
                     FixturePlan.home_club_id.in_(ids),
@@ -557,7 +662,50 @@ async def challenge_opponents(
                 continue
             if parsed in ids:
                 busy.add(parsed)
+    busy.update(
+        (
+            await session.scalars(
+                select(TrainingPlan.club_id).where(
+                    TrainingPlan.club_id.in_(ids),
+                    TrainingPlan.week_start == midnight(day),
+                    TrainingPlan.status.in_(("scheduled", "applied")),
+                )
+            )
+        ).all()
+    )
     return tuple(
         FriendlyOpponent(cid, names.get(cid, "?"), cid in owned_ids, cid in busy)
         for cid in sorted(ids, key=str)
     )
+
+
+async def authenticate_fixture(session: AsyncSession, fixture: "Fixture") -> None:
+    from goaletto.infrastructure.models import FixturePlan
+
+    plan = await session.get(FixturePlan, fixture.id)
+    booking = await session.scalar(
+        select(FriendlyInvitation).where(
+            FriendlyInvitation.plan_id == fixture.id,
+            FriendlyInvitation.status == "accepted",
+        )
+    )
+    if (
+        plan is None
+        or booking is None
+        or plan.competition != "friendly"
+        or fixture.competition != "friendly"
+        or fixture.neutral
+        or fixture.leg is not None
+        or plan.id
+        != _plan_id(
+            plan.season_id, booking.home_club_id, booking.away_club_id, booking.assigned_day
+        )
+        or (plan.home_club_id, plan.away_club_id) != (booking.home_club_id, booking.away_club_id)
+        or (fixture.home_club_id, fixture.away_club_id)
+        != (booking.home_club_id, booking.away_club_id)
+        or plan.season_id != fixture.season_id
+        or plan.announced_at is None
+        or plan.assigned_day != booking.assigned_day
+        or plan.assigned_day != fixture.scheduled_start_at.date()
+    ):
+        raise ValueError("Friendly fixture has no genuine accepted request")

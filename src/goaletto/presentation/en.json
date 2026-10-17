@@ -688,7 +688,6 @@
   "👤 ": "👤 ",
   "🤖 ": "🤖 ",
   "Все клубы заняты в этот день. Выберите другую дату.": "Every club is busy that day. Pick another date.",
-  "{home} — {day} UTC. Ответьте до конца дня.": "{home} — {day} UTC. Reply before the day ends.",
   "{away} — {day} UTC. Ожидает ответа.": "{away} — {day} UTC. Awaiting a reply.",
   "{home} — {away} · {day} UTC: {state}": "{home} — {away} · {day} UTC: {state}",
   "⛔ {name} — занят в этот день.": "⛔ {name} — busy that day.",
@@ -711,7 +710,6 @@
   "🚫 Отозвано": "🚫 Withdrawn",
   "⌛ Истекло": "⌛ Expired",
   "⚽ <b>Академия · {club}</b>": "⚽ <b>Academy · {club}</b>",
-  "Уровень: {level}/5 · содержание: {upkeep}/период клуба": "Level: {level}/5 · upkeep: {upkeep}/club pay period",
   "Состав: {roster}/{limit} · подписано в этом сезоне: {signed}/{cap}": "Squad: {roster}/{limit} · signed this season: {signed}/{cap}",
   "Следующий уровень: {level} · стоимость: {cost}": "Next level: {level} · cost: {cost}",
   "Достигнут максимальный уровень академии.": "The academy is already at its maximum level.",
@@ -728,5 +726,13 @@
   "Академия недоступна. Откройте /start.": "The academy is unavailable. Open /start.",
   "Академия улучшена.": "Academy upgraded.",
   "Юноша подписан.": "Youth player signed.",
-  "Действие не выполнено: кнопка устарела, нет свободных денег, лимит подписаний или состав заполнен. Откройте /academy.": "Action not completed: the button is outdated, funds are unavailable, the signing limit is reached or the squad is full. Open /academy."
+  "Действие не выполнено: кнопка устарела, нет свободных денег, лимит подписаний или состав заполнен. Откройте /academy.": "Action not completed: the button is outdated, funds are unavailable, the signing limit is reached or the squad is full. Open /academy.",
+  "Высокий потенциал": "High potential",
+  "Есть запас для роста": "Room to develop",
+  "Выпуск академии доступен в межсезонье.": "Academy intake is available during the offseason.",
+  "Кубок чемпионов · {date}": "Champions Cup · {date}",
+  "⚽ {club} приглашает на товарищеский матч {day} UTC. Ответьте в /friendly.": "⚽ {club} invites you to a friendly on {day} UTC. Respond in /friendly.",
+  "{home} — {day} UTC. Ответьте до начала этого дня (00:00 UTC).": "{home} — {day} UTC. Reply before that day begins (00:00 UTC).",
+  "Товарищеский · {date}": "Friendly · {date}",
+  "Уровень: {level}/5 · содержание: {upkeep} за 4 дня": "Level: {level}/5 · upkeep: {upkeep} per 4 days"
 }

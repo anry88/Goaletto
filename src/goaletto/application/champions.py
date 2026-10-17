@@ -2,10 +2,11 @@
 
 from dataclasses import asdict
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
@@ -42,11 +43,69 @@ from goaletto.infrastructure.models import (
     League,
     Match,
     Season,
+    SeasonClub,
+    SeasonContestant,
 )
 from goaletto.infrastructure.models import (
     ChampionsTie as ChampionsTieModel,
 )
 from goaletto.infrastructure.models import MatchResult as ResultReceipt
+
+if TYPE_CHECKING:
+    from goaletto.application.allocation import ReadySeason
+
+
+async def initialize_cohort_champions(
+    session: AsyncSession,
+    ready: list["ReadySeason"],
+    future: dict[UUID, UUID],
+    at: datetime,
+) -> list[ChampionsTournament]:
+    cohort = sorted(ready, key=lambda item: str(item.season.id))
+    host = cohort[0]
+    key = "champions:" + str(uuid5(host.season.id, ":".join(str(r.season.id) for r in cohort)))
+    snapshots = tuple(
+        LeagueSnapshot(
+            cohort_key=key,
+            season_id=item.season.id,
+            league_id=league.id,
+            league_set_id=item.season.league_set_id,
+            tier=league.tier,
+            order=tuple(row.club_id for row in item.tables[league.tier]),
+        )
+        for item in cohort
+        for league in item.leagues
+    )
+    host_next = future[host.season.league_set_id]
+    tournaments = await initialize_season_champions(
+        session,
+        host_next,
+        host.season.id,
+        host.tables,
+        host.leagues,
+        at,
+        snapshots_override=snapshots,
+    )
+    draw = await session.scalar(select(ChampionsDraw).where(ChampionsDraw.season_id == host_next))
+    assert draw is not None
+    for item in cohort[1:]:
+        upcoming = future[item.season.league_set_id]
+        session.add(
+            ChampionsDraw(
+                id=uuid5(upcoming, f"champions-draw:{key}"),
+                season_id=upcoming,
+                qualifying_season_id=item.season.id,
+                league_set_id=item.season.league_set_id,
+                cohort_key=draw.cohort_key,
+                seed=draw.seed,
+                policy_version=draw.policy_version,
+                snapshots=draw.snapshots,
+                created_at=at,
+            )
+        )
+    await session.flush()
+    return tournaments
+
 
 COMPETITION = "champions"
 
@@ -135,7 +194,11 @@ async def frozen_bracket(
         ),
         None,
     )
-    if group is None:
+    if (
+        group is None
+        or tournament.participant_count != group.participant_count
+        or tournament.seed != draw.seed
+    ):
         raise ValueError("Tournament group left the frozen draw")
     bracket = build_champions_bracket(
         group=group, tournament_id=tournament.id, seed=tournament.bracket_seed
@@ -153,14 +216,17 @@ async def initialize_season_champions(
     tables: dict[int, tuple[StandingRow, ...]],
     leagues: list[League],
     at: datetime,
+    *,
+    snapshots_override: tuple[LeagueSnapshot, ...] | None = None,
 ) -> list[ChampionsTournament]:
-    """Durable qualification, brackets, ties and fixture plans for one set.
+    """Persist qualification, brackets, ties and plans under one host season.
 
     Qualification comes from the frozen final tables of the completed
     qualifying season (top eight per league). The first season has no past
     table, so world initialization never calls this: no qualification means
-    no champions cups, never invented clubs. Multi-set cohorts wait for the
-    cross-set orchestration of AND-119; this builds the single-set cohort.
+    no champions cups, never invented clubs. Joint rollover supplies frozen
+    snapshots across all compatible sets; guest eligibility does not change
+    their actual destination league membership.
     """
     require_utc(at)
     await allocation_lock(session)
@@ -183,7 +249,7 @@ async def initialize_season_champions(
         raise ValueError("Season cycle epoch required for champions planning")
     set_ids = {league.league_set_id for league in leagues}
     if len(set_ids) != 1:
-        raise ValueError("Champions cohort needs exactly one league set for now")
+        raise ValueError("Champions host needs exactly one league set")
     league_set_id = next(iter(set_ids))
     by_tier = {league.tier: league for league in leagues}
     if sorted(by_tier) != [1, 2, 3, 4, 5]:
@@ -200,6 +266,9 @@ async def initialize_season_champions(
         )
         for tier in range(1, 6)
     )
+    if snapshots_override is not None:
+        snapshots = snapshots_override
+        cohort_key = snapshots[0].cohort_key
     seed = stable_seed(season.seed, f"champions:{cohort_key}")
     groups = build_champions_groups(snapshots, seed=seed)
     draw = ChampionsDraw(
@@ -214,6 +283,16 @@ async def initialize_season_champions(
         created_at=at,
     )
     session.add(draw)
+    for snapshot in snapshots:
+        for club_id in snapshot.order[:8]:
+            await session.execute(
+                insert(SeasonContestant)
+                .values(
+                    season_id=next_season_id,
+                    club_id=club_id,
+                )
+                .on_conflict_do_nothing()
+            )
     await session.flush()
     from goaletto.application.training import reserve_match_day
 
@@ -555,3 +634,27 @@ async def pin_champions_venue(
     from goaletto.application.cup import pin_final_venue
 
     return await pin_final_venue(session, fixture, home, away, seed, at, competition=COMPETITION)
+
+
+def host_seasons_for(season_id: UUID) -> Select[tuple[UUID]]:
+    """Shared tournament hosts for one club's actual playing season."""
+    cohort = select(ChampionsDraw.cohort_key).where(ChampionsDraw.season_id == season_id)
+    return select(ChampionsTournament.season_id).where(ChampionsTournament.cohort_key.in_(cohort))
+
+
+async def league_season_for(session: AsyncSession, host_season_id: UUID, club_id: UUID) -> UUID:
+    """Resolve a champions guest's actual league calendar within its frozen cohort."""
+    cohort = (
+        select(ChampionsDraw.cohort_key)
+        .where(ChampionsDraw.season_id == host_season_id)
+        .scalar_subquery()
+    )
+    rows = await session.scalars(
+        select(SeasonClub.season_id)
+        .join(ChampionsDraw, ChampionsDraw.season_id == SeasonClub.season_id)
+        .where(SeasonClub.club_id == club_id, ChampionsDraw.cohort_key == cohort)
+    )
+    season_id = rows.one_or_none()
+    if season_id is None:
+        raise ValueError("Champions participant has no cohort league membership")
+    return season_id

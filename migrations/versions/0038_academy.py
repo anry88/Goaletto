@@ -4,8 +4,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0035_academy"
-down_revision = "0034_real_knockout"
+revision = "0038_academy"
+down_revision = "0037_friendly_invitations"
 branch_labels = None
 depends_on = None
 
@@ -27,7 +27,8 @@ ACTION_KINDS_OLD = (
     "'scout_search_started','scout_search_cancelled'"
 )
 ACTION_KINDS_NEW = (
-    ACTION_KINDS_OLD + ",'academy_opened','academy_upgraded','academy_candidate_signed'"
+    ACTION_KINDS_OLD + ",'academy_opened','academy_upgraded','academy_candidate_signed',"
+    "'friendly_opened','friendly_scheduled','friendly_invited','friendly_responded'"
 )
 
 JOURNEY_NAMES_OLD = (
@@ -45,6 +46,7 @@ JOURNEY_NAMES_OLD = (
     "'scout_search_cancelled'"
 )
 JOURNEY_NAMES_NEW = (
+    "'friendly_opened','friendly_scheduled','friendly_invited','friendly_responded',"
     "'academy_candidate_signed','academy_opened','academy_upgraded'," + JOURNEY_NAMES_OLD
 )
 
@@ -107,7 +109,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(
-        "DO $$ BEGIN IF EXISTS (SELECT 1 FROM academy_candidates) THEN "
+        "DO $$ BEGIN IF EXISTS (SELECT 1 FROM academy_candidates) OR "
+        "EXISTS (SELECT 1 FROM ledger_entries WHERE kind IN ('academy_upkeep','academy_upgrade')) "
+        "OR EXISTS (SELECT 1 FROM game_action_receipts WHERE kind LIKE 'academy_%' "
+        "OR kind LIKE 'friendly_%') THEN "
         "RAISE EXCEPTION 'Academy history prevents downgrade'; END IF; END $$"
     )
     op.drop_constraint("ck_journey_name", "journey_events", type_="check")

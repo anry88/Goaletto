@@ -121,7 +121,7 @@ async def test_friendly_schedule_materialize_play_and_reduced_growth(sessions):
         before_played = await session.scalar(select(func.sum(Standing.played))) or 0
     async with sessions.begin() as session:
         made = await plan_horizon(session, season_id, NOW)
-        assert made >= 1
+        assert made == 0  # the explicit request already announced the fixture
         fixture = await session.get(Fixture, plan.id)
         assert fixture is not None and fixture.competition == "friendly"
         assert fixture.scheduled_start_at.date() == day
@@ -269,7 +269,7 @@ async def test_human_challenge_accept_and_full_match(sessions):
         assert plan is not None and plan.assigned_day == day
     async with sessions.begin() as session:
         made = await plan_horizon(session, season_id, NOW)
-        assert made >= 1
+        assert made == 0  # the explicit request already announced the fixture
         assert (await session.get(Fixture, accepted.plan_id)) is not None
     await _play(sessions, accepted.plan_id)
     async with sessions.begin() as session:
@@ -321,9 +321,8 @@ async def test_human_invite_expiry_and_training_conflict(sessions):
     async with sessions.begin() as session:
         invite = await invite_friendly(session, action(actor_a), home_b, day)
         late = replace(action(actor_b), at=midnight_day + timedelta(days=1))
-        with pytest.raises(ValueError, match="expired"):
-            await respond_friendly(session, late, invite.id, accept=True)
-        # The caught error commits: the stale row is durably expired.
+        assert (await respond_friendly(session, late, invite.id, accept=True)).status == "expired"
+        # The router commits this outcome, rather than rolling it back on an exception.
         assert (await session.get(FriendlyInvitation, invite.id)).status == "expired"
     async with sessions.begin() as session:
         retry = await invite_friendly(session, action(actor_a), home_b, day)
@@ -346,3 +345,190 @@ async def test_human_invite_expiry_and_training_conflict(sessions):
         with pytest.raises(ValueError, match="Training already occupies"):
             await respond_friendly(session, action(actor_b), retry.id, accept=True)
         assert (await session.get(FriendlyInvitation, retry.id)).status == "pending"
+
+
+async def test_invitation_notification_expiry_commits_and_forged_admission_fails(sessions):
+    from goaletto.application.friendly import authenticate_fixture
+    from goaletto.application.outbox_delivery import Decision, check_recipient, valid_payload
+    from goaletto.infrastructure.models import OutboxMessage
+
+    actor_a, _home_a, actor_b, home_b, _sid, day = await _two_owners(sessions)
+    async with sessions.begin() as session:
+        invite = await invite_friendly(session, action(actor_a), home_b, day)
+        notice = await session.scalar(
+            select(OutboxMessage).where(OutboxMessage.dedupe_key == f"friendly:invite:{invite.id}")
+        )
+        assert notice is not None and valid_payload(notice.payload)
+        assert await check_recipient(session, notice, NOW) == Decision.DELIVER
+        source_owner = await session.get(OwnershipPeriod, invite.challenger_ownership_id)
+        source_owner.ended_at, source_owner.end_reason = NOW, "voluntary"
+        await session.flush()
+        assert (
+            await check_recipient(session, notice, NOW + timedelta(minutes=2))
+            == Decision.SKIP_STALE
+        )
+        source_owner.ended_at, source_owner.end_reason = None, None
+        await session.flush()
+        late = replace(action(actor_b), at=datetime.combine(day, datetime.min.time(), tzinfo=UTC))
+        assert (await respond_friendly(session, late, invite.id, accept=True)).status == "expired"
+    async with sessions.begin() as session:
+        assert (await session.get(FriendlyInvitation, invite.id)).status == "expired"
+        assert await session.get(FixturePlan, uuid4()) is None
+        notice = await session.get(OutboxMessage, notice.id)
+        assert await check_recipient(session, notice, late.at) == Decision.SKIP_STALE
+        # A copied league fixture label is not a genuine friendly booking.
+        fixture = await session.scalar(select(Fixture).limit(1))
+        fixture.competition = "friendly"
+        with session.no_autoflush:
+            with pytest.raises(ValueError, match="genuine accepted request"):
+                await authenticate_fixture(session, fixture)
+        session.expunge(fixture)
+
+
+async def test_previous_owner_invitation_does_not_block_new_owner(sessions):
+    from goaletto.infrastructure.models import Club
+
+    actor_a, _home_a, actor_b, home_b, _sid, day = await _two_owners(sessions)
+    async with sessions.begin() as session:
+        old = await invite_friendly(session, action(actor_a), home_b, day)
+        owner = await session.get(OwnershipPeriod, old.challenged_ownership_id)
+        owner.ended_at, owner.end_reason = NOW, "inactive"
+        (await session.get(Club, home_b)).owner_telegram_id = None
+        await session.flush()
+        entry = await begin_game(session, telegram_id=2004, update_id=7010, payload=None, at=NOW)
+        successor = replace(entry.actor, operation_id=uuid4(), update_id=7011)
+        await claim_club(session, successor, home_b)
+        fresh = await invite_friendly(session, action(actor_a), home_b, day)
+        assert fresh.id != old.id and old.status == "expired"
+        assert fresh.challenged_ownership_id != old.challenged_ownership_id
+    with pytest.raises(PermissionDenied):
+        async with sessions.begin() as session:
+            await respond_friendly(session, action(successor), old.id, accept=True)
+    with pytest.raises(PermissionDenied):
+        async with sessions.begin() as session:
+            await respond_friendly(session, action(actor_b), fresh.id, accept=True)
+    async with sessions.begin() as session:
+        assert (
+            await respond_friendly(session, action(successor), fresh.id, accept=True)
+        ).status == "accepted"
+
+
+async def test_telegram_friendly_request_is_explicit_and_replay_safe(sessions, monkeypatch):
+    from aiogram import Bot
+    from aiogram.types import CallbackQuery, Chat, Message, Update, User
+
+    import goaletto.bot.friendly_router as module
+    from goaletto.bot.main import build_dispatcher
+    from tests.integration.test_game_dispatcher import Source, Telegram
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW
+
+    monkeypatch.setattr(module, "datetime", Clock)
+    _result, _actor, _club = await funded(sessions)
+    source = Source(sessions)
+    transport = Telegram(source)
+    bot = Bot("123456:FAKE_LOCAL_TEST_TOKEN", session=transport)
+    dispatcher = build_dispatcher(source, game_enabled=True)
+    user = User(id=1001, is_bot=False, first_name="Manager")
+    sequence = 900
+
+    async def send(data=None):
+        nonlocal sequence
+        sequence += 1
+        if data is None:
+            update = Update(
+                update_id=sequence,
+                message=Message(
+                    message_id=sequence,
+                    date=NOW,
+                    chat=Chat(id=1001, type="private"),
+                    from_user=user,
+                    text="/friendly",
+                ),
+            )
+        else:
+            update = Update(
+                update_id=sequence,
+                callback_query=CallbackQuery(
+                    id=f"friendly-ui-{sequence}",
+                    from_user=user,
+                    chat_instance="test",
+                    message=transport.last_message,
+                    data=data,
+                ),
+            )
+        await dispatcher.feed_update(bot, update)
+        return transport.last_message
+
+    def button(message, prefix):
+        return next(
+            b.callback_data
+            for row in message.reply_markup.inline_keyboard
+            for b in row
+            if (b.callback_data or "").startswith(prefix)
+        )
+
+    message = await send()
+    async with sessions.begin() as session:
+        assert await session.scalar(select(func.count()).select_from(FriendlyInvitation)) == 0
+    message = await send(button(message, "fr:c"))
+    message = await send(button(message, "fr:d:"))
+    request = button(message, "fr:o:")
+    message = await send(request)
+    assert "Матч с бот-клубом назначен" in message.text
+    await send(request)
+    async with sessions.begin() as session:
+        assert await session.scalar(select(func.count()).select_from(FriendlyInvitation)) == 1
+        assert (
+            await session.scalar(
+                select(func.count()).select_from(Fixture).where(Fixture.competition == "friendly")
+            )
+            == 1
+        )
+    await bot.session.close()
+
+
+async def test_adjacent_utc_day_overlap_rejects_request_atomically(sessions):
+    from goaletto.application.kickoff_preferences import set_kickoff_preference
+
+    result, actor, home_id = await funded(sessions)
+    _sid, away_id, day = await _free_day_and_opponent(sessions, home_id)
+    start = datetime.combine(day, datetime.min.time(), tzinfo=UTC) - timedelta(minutes=30)
+    async with sessions.begin() as session:
+        await set_kickoff_preference(session, action(actor), zone="UTC", minute=0)
+        # An already scheduled operator fixture can cross into the next UTC day.
+        membership = await session.scalar(
+            select(SeasonClub).where(
+                SeasonClub.season_id == result.season_id, SeasonClub.club_id == home_id
+            )
+        )
+        session.add(
+            Fixture(
+                id=uuid4(),
+                season_id=result.season_id,
+                league_id=membership.league_id,
+                competition="league",
+                round_number=1,
+                home_club_id=home_id,
+                away_club_id=away_id,
+                scheduled_start_at=start,
+                lineup_lock_at=start - timedelta(minutes=5),
+                status="scheduled",
+            )
+        )
+    with pytest.raises(ValueError, match="fixture_overlap"):
+        async with sessions.begin() as session:
+            await schedule_friendly(session, action(actor), away_id, day)
+    async with sessions.begin() as session:
+        assert await session.scalar(select(func.count()).select_from(FriendlyInvitation)) == 0
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(FixturePlan)
+                .where(FixturePlan.competition == "friendly")
+            )
+            == 0
+        )

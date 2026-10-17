@@ -167,6 +167,7 @@ class PlayerMatchEntry:
     goals: int
     yellows: int
     sent_off: bool
+    competition: str = "league"
 
 
 @dataclass(frozen=True)
@@ -260,7 +261,15 @@ def _fixture_filters(club_id: UUID, season_id: UUID | None = None) -> list[Any]:
         Fixture.status == "finished",
     ]
     if season_id is not None:
-        filters.append(Fixture.season_id == season_id)
+        from goaletto.application.champions import host_seasons_for
+
+        filters.append(
+            or_(
+                Fixture.season_id == season_id,
+                (Fixture.competition == "champions")
+                & Fixture.season_id.in_(host_seasons_for(season_id)),
+            )
+        )
     return filters
 
 
@@ -758,6 +767,7 @@ async def get_player_matches(
                 goals,
                 condition.yellows if condition else 0,
                 condition.dismissed if condition else False,
+                fixture.competition or "league",
             )
         )
     if not entries and not person_name and live is None:
@@ -805,7 +815,10 @@ async def get_club_seasons(session: AsyncSession, actor: Actor) -> tuple[SeasonS
         if season is None or league is None:
             raise ValueError("Season membership is missing its season or league")
         summaries.append(SeasonSummary(season.id, season.number, league.tier))
-    summaries.sort(key=lambda s: s.number, reverse=True)
+    summaries.sort(
+        key=lambda summary: (seasons_by_id[summary.season_id].starts_at, summary.season_id),
+        reverse=True,
+    )
     await user_effect(
         session, actor, "club_opened", Surface.CLUB, ownership=ownership, club_id=club.id
     )
@@ -834,7 +847,7 @@ async def get_club_seasons_page(
             .join(Season, Season.id == SeasonClub.season_id)
             .join(League, League.id == SeasonClub.league_id)
             .where(SeasonClub.club_id == club.id)
-            .order_by(Season.number.desc(), Season.id)
+            .order_by(Season.starts_at.desc(), Season.id)
             .limit(HISTORY_PAGE_SIZE)
             .offset((page - 1) * HISTORY_PAGE_SIZE)
         )

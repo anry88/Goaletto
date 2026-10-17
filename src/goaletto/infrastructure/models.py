@@ -733,12 +733,12 @@ class Fixture(Base):
         ),
         ForeignKeyConstraint(
             ["season_id", "home_club_id"],
-            ["season_clubs.season_id", "season_clubs.club_id"],
+            ["season_contestants.season_id", "season_contestants.club_id"],
             name="fk_fixture_home_season_club",
         ),
         ForeignKeyConstraint(
             ["season_id", "away_club_id"],
-            ["season_clubs.season_id", "season_clubs.club_id"],
+            ["season_contestants.season_id", "season_contestants.club_id"],
             name="fk_fixture_away_season_club",
         ),
         CheckConstraint("home_club_id <> away_club_id", name="ck_fixture_distinct_clubs"),
@@ -1066,6 +1066,10 @@ class JourneySession(Base):
 
 
 JOURNEY_NAMES = (
+    "friendly_opened",
+    "friendly_scheduled",
+    "friendly_invited",
+    "friendly_responded",
     "academy_candidate_signed",
     "academy_opened",
     "academy_upgraded",
@@ -1232,12 +1236,12 @@ class MatchResult(Base):
         ),
         ForeignKeyConstraint(
             ["season_id", "home_club_id"],
-            ["season_clubs.season_id", "season_clubs.club_id"],
+            ["season_contestants.season_id", "season_contestants.club_id"],
             name="fk_result_home_season_club",
         ),
         ForeignKeyConstraint(
             ["season_id", "away_club_id"],
-            ["season_clubs.season_id", "season_clubs.club_id"],
+            ["season_contestants.season_id", "season_contestants.club_id"],
             name="fk_result_away_season_club",
         ),
         CheckConstraint(
@@ -1347,7 +1351,7 @@ class GameActionReceipt(Base):
             "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered','market_opened',"
             "'market_listing_created','market_bid_accepted','market_listing_cancelled','candidate_signed',"
             "'scout_search_started','scout_search_cancelled','academy_opened','academy_upgraded',"
-            "'academy_candidate_signed')",
+            "'academy_candidate_signed','friendly_opened','friendly_scheduled','friendly_invited','friendly_responded')",
             name="ck_action_kind",
         ),
     )
@@ -2149,6 +2153,8 @@ class SeasonAllocationReceipt(Base):
     assignments: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     draws: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ChampionsDraw(Base):
     """Frozen qualifying cohort for one playing season (single set, AND-126)."""
 
@@ -2158,7 +2164,8 @@ class ChampionsDraw(Base):
         CheckConstraint("policy_version = 'champions-groups-v1'", name="ck_champions_draw_policy"),
         CheckConstraint("seed >= 0", name="ck_champions_draw_seed"),
         CheckConstraint(
-            "jsonb_typeof(snapshots) = 'array' AND jsonb_array_length(snapshots) = 5",
+            "jsonb_typeof(snapshots) = 'array' AND jsonb_array_length(snapshots) >= 5 "
+            "AND mod(jsonb_array_length(snapshots),5) = 0",
             name="ck_champions_draw_snapshots",
         ),
     )
@@ -2261,6 +2268,7 @@ class FriendlyInvitation(Base):
 
     __tablename__ = "friendly_invitations"
     __table_args__ = (
+        UniqueConstraint("plan_id", name="uq_friendly_invite_plan"),
         CheckConstraint("home_club_id <> away_club_id", name="ck_friendly_invite_clubs"),
         CheckConstraint(
             "status IN ('pending','accepted','declined','cancelled','expired')",
@@ -2291,8 +2299,27 @@ class FriendlyInvitation(Base):
     home_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
     away_club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
     challenger_ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    challenged_ownership_id: Mapped[UUID | None] = mapped_column(ForeignKey("ownership_periods.id"))
     assigned_day: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(16), server_default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     plan_id: Mapped[UUID | None] = mapped_column(ForeignKey("fixture_plans.id"), nullable=True)
+
+
+class SeasonContestant(Base):
+    """Fixture eligibility: local league members and frozen champions guests."""
+
+    __tablename__ = "season_contestants"
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+
+
+class AcademyIntake(Base):
+    """Frozen academy terms, unaffected by later upgrades or owner changes."""
+
+    __tablename__ = "academy_intakes"
+    __table_args__ = (CheckConstraint("level BETWEEN 1 AND 5", name="ck_academy_intake_level"),)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
+    level: Mapped[int] = mapped_column(SmallInteger)

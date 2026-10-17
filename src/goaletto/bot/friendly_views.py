@@ -34,7 +34,7 @@ def friendly_view(screen: FriendlyScreen, notice: str | None = None) -> tuple[st
         for card in screen.incoming:
             lines.append(
                 tr(
-                    "{home} — {day} UTC. Ответьте до конца дня.",
+                    "{home} — {day} UTC. Ответьте до начала этого дня (00:00 UTC).",
                     home=escape(latin_name(card.home_name)),
                     day=card.day.strftime("%d.%m"),
                 )

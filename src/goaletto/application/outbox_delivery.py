@@ -48,6 +48,7 @@ SUPPORTED_KINDS = frozenset(
         "market_notice",
         "scout_report",
         "staff_career",
+        "friendly_invitation",
         "training_cancelled",
         "player_lifecycle",
         "staff_lifecycle",
@@ -59,6 +60,7 @@ BACKOFF_BASE_SECONDS = 5.0
 BACKOFF_CAP_SECONDS = 600.0
 PRIORITY_BY_KIND = {
     "match_result": 100,
+    "friendly_invitation": 70,
     "market_notice": 70,
     "scout_report": 70,
     "staff_career": 80,
@@ -202,6 +204,17 @@ def valid_payload(payload: dict[str, Any]) -> bool:
             and isinstance(payload.get("player_name"), str)
             and 0 < len(payload["player_name"]) <= 120
         )
+    if kind == "friendly_invitation":
+        try:
+            day = date.fromisoformat(str(payload.get("day", "")))
+        except ValueError:
+            return False
+        return (
+            day.isoformat() == payload.get("day")
+            and all(_payload_uuid(payload, k) is not None for k in ("invitation_id", "club_id"))
+            and isinstance(payload.get("home"), str)
+            and 0 < len(payload["home"]) <= 80
+        )
     if kind == "training_cancelled":
         try:
             day = date.fromisoformat(str(payload.get("day", "")))
@@ -321,6 +334,12 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "friendly_invitation":
+        return tr(
+            "⚽ {club} приглашает на товарищеский матч {day} UTC. Ответьте в /friendly.",
+            club=escape(latin_name(payload["home"])),
+            day=payload["day"],
+        )
     if kind == "training_cancelled":
         return tr(
             "🏋️ Тренировка {day} UTC отменена: назначен официальный матч. "
@@ -553,6 +572,33 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     if not manager.bot_available:
         return Decision.SKIP_UNAVAILABLE
     kind = payload["kind"]
+    if kind == "friendly_invitation":
+        from goaletto.infrastructure.models import FriendlyInvitation
+
+        row = await session.get(
+            FriendlyInvitation, _payload_uuid(payload, "invitation_id"), populate_existing=True
+        )
+        if (
+            row is None
+            or row.status != "pending"
+            or row.challenged_ownership_id != ownership.id
+            or row.away_club_id != club.id
+            or _payload_uuid(payload, "club_id") != club.id
+            or row.assigned_day.isoformat() != payload["day"]
+            or row.assigned_day <= now.date()
+        ):
+            return Decision.SKIP_STALE
+        challenger = await session.get(
+            OwnershipPeriod, row.challenger_ownership_id, populate_existing=True
+        )
+        if (
+            challenger is None
+            or challenger.ended_at is not None
+            or challenger.expires_at <= now
+            or challenger.club_id != row.home_club_id
+        ):
+            return Decision.SKIP_STALE
+        return Decision.DELIVER
     if kind == "training_cancelled":
         from goaletto.infrastructure.models import TrainingPlan
 

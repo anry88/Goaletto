@@ -657,6 +657,9 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         )
         if season is None or season.status not in {"scheduled", "active"}:
             raise ValueError("Invalid season opening")
+        from goaletto.application.academy import release_intakes
+
+        await release_intakes(session, season.id, at)
         season.status = "active"
         return None
     # The same short ownership gate used by admission/expiry/settings, acquired
@@ -736,7 +739,11 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             from goaletto.application.champions import context_for_champions_fixture
 
             context = await context_for_champions_fixture(session, fixture)
-        elif (fixture.competition or "league") not in ("league", "friendly"):
+        elif fixture.competition == "friendly":
+            from goaletto.application.friendly import authenticate_fixture
+
+            await authenticate_fixture(session, fixture)
+        elif (fixture.competition or "league") != "league":
             raise ValueError("Unsupported competition runtime")
         if fixture.neutral:
             from goaletto.application.cup import pin_final_venue

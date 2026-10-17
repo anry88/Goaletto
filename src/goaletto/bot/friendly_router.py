@@ -52,7 +52,7 @@ async def _challenge(
     else:
         await invite_friendly(session, actor, club_id, day)
         notice = tr("Вызов отправлен. Ответ появится здесь же.")
-    return friendly_view(await load_friendly_screen(session, actor), notice=notice)
+    return friendly_view(await load_friendly_screen(session, actor, record=False), notice=notice)
 
 
 @router.message(Command("friendly"))
@@ -105,16 +105,22 @@ async def friendly_callback(query: CallbackQuery, database: Database, event_upda
                     if row.status == "accepted"
                     else tr("Вызов уже разобран. Откройте /friendly.")
                 )
-                text, keyboard = friendly_view(await load_friendly_screen(session, actor), notice)
-            elif data.startswith("fr:r:"):
-                await respond_friendly(session, actor, parse_invite(data, "r"), accept=False)
                 text, keyboard = friendly_view(
-                    await load_friendly_screen(session, actor), tr("Вызов отклонён.")
+                    await load_friendly_screen(session, actor, record=False), notice
                 )
-            elif data.startswith("fr:x:"):
-                await respond_friendly(session, actor, parse_invite(data, "x"), accept=False)
+            elif data.startswith(("fr:r:", "fr:x:")):
+                row = await respond_friendly(
+                    session, actor, parse_invite(data, data.split(":")[1]), accept=False
+                )
+                notice = (
+                    tr("Вызов отклонён.")
+                    if row.status == "declined"
+                    else tr("Вызов отозван.")
+                    if row.status == "cancelled"
+                    else tr("Вызов уже разобран. Откройте /friendly.")
+                )
                 text, keyboard = friendly_view(
-                    await load_friendly_screen(session, actor), tr("Вызов отозван.")
+                    await load_friendly_screen(session, actor, record=False), notice
                 )
             else:
                 raise ValueError("Invalid friendly callback")

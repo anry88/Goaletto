@@ -10,7 +10,7 @@ from goaletto.application.academy import load_academy, sign_candidate, upgrade_a
 from goaletto.application.finances import cycle_finances
 from goaletto.application.game_actions import PermissionDenied
 from goaletto.application.money import InsufficientFunds, debit_locked, locked_accounts
-from goaletto.domain.academy import academy_upkeep, candidate_count, sign_limit, skill_band
+from goaletto.domain.academy import candidate_count, sign_limit, skill_band
 from goaletto.infrastructure.models import (
     AcademyCandidate,
     Job,
@@ -120,7 +120,9 @@ async def test_upgrade_charges_once_and_cycle_raises_upkeep(sessions):
         upkeep = await session.scalar(
             select(LedgerEntry).where(LedgerEntry.kind == "academy_upkeep")
         )
-        assert upkeep is not None and upkeep.request["amount"] == academy_upkeep(2) == 12_000
+        assert (
+            upkeep is not None and upkeep.request["amount"] == 4_500
+        )  # first partial cycle: 36 of 96 hours
     with pytest.raises(PermissionDenied):
         async with sessions.begin() as session:
             await upgrade_academy(session, action(actor), uuid4())
@@ -179,7 +181,17 @@ async def test_candidate_rows_and_club_level_are_constrained(sessions):
             )
 
 
-async def test_telegram_router_opens_signs_and_upgrades(sessions):
+async def test_telegram_router_opens_signs_and_upgrades(sessions, monkeypatch):
+    from datetime import datetime as real_datetime
+
+    import goaletto.bot.academy_router as module
+
+    class Clock(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW
+
+    monkeypatch.setattr(module, "datetime", Clock)
     from datetime import UTC, datetime
 
     from aiogram import Bot
@@ -250,3 +262,107 @@ async def test_telegram_router_opens_signs_and_upgrades(sessions):
     message = await send(data=button(message, "ac:o:"))
     assert "Уровень: 2/5" in message.text
     await bot.session.close()
+
+
+async def test_frozen_intake_free_signing_and_stale_upgrade_quotes(sessions):
+    from goaletto.infrastructure.models import AcademyIntake
+
+    _, actor, club_id = await funded(sessions)
+    async with sessions.begin() as session:
+        screen = await load_academy(session, action(actor))
+        before = (await locked_accounts(session, club_id))[club_id].available
+        person_id = await sign_candidate(
+            session, action(actor), screen.ownership_id, 1, season_id=screen.season_id
+        )
+        assert (await locked_accounts(session, club_id))[club_id].available == before
+        person = await session.get(Person, person_id)
+        assert person.age == 17 and person.age_applied_for_season_id == screen.season_id
+        assert (
+            await upgrade_academy(session, action(actor), screen.ownership_id, expected_level=1)
+            == 2
+        )
+        frozen = await session.get(AcademyIntake, (club_id, screen.season_id))
+        assert frozen.level == 1
+        refreshed = await load_academy(session, action(actor))
+        assert refreshed.level == 2 and refreshed.sign_limit == 1
+        assert len(refreshed.candidates) == 3
+    with pytest.raises(ValueError, match="price changed"):
+        async with sessions.begin() as session:
+            await upgrade_academy(session, action(actor), screen.ownership_id, expected_level=1)
+    with pytest.raises(ValueError, match="another season"):
+        async with sessions.begin() as session:
+            await sign_candidate(session, action(actor), screen.ownership_id, 2, season_id=uuid4())
+    with pytest.raises(ValueError, match="limit"):
+        async with sessions.begin() as session:
+            await sign_candidate(session, action(actor), screen.ownership_id, 2)
+
+
+async def test_season_open_releases_unsigned_graduates_once(sessions):
+    from dataclasses import replace
+
+    from goaletto.infrastructure.models import AcademyIntake, Season
+    from tests.integration.test_agent_wave import job
+
+    result, actor, _club_id = await funded(sessions)
+    async with sessions.begin() as session:
+        screen = await load_academy(session, action(actor))
+        rows = (await session.scalars(select(AcademyCandidate))).all()
+        ids = {r.id for r in rows}
+        signed = await sign_candidate(session, action(actor), screen.ownership_id, rows[0].slot)
+        season = await session.get(Season, result.season_id)
+        late = replace(action(actor), at=season.starts_at)
+    await job(sessions, "season.open")
+    async with sessions.begin() as session:
+        screen = await load_academy(session, late)
+        assert not screen.intake_open
+        assert await session.scalar(select(func.count()).select_from(AcademyIntake)) == 1
+        rows = (await session.scalars(select(AcademyCandidate))).all()
+        assert {r.id for r in rows} == ids
+        assert sorted(r.status for r in rows) == ["expired", "expired", "signed"]
+        released = (
+            await session.scalars(select(Player).where(Player.person_id.in_(ids - {signed})))
+        ).all()
+        assert len(released) == 2 and all(p.club_id is None for p in released)
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(SalaryContract)
+                .where(SalaryContract.person_id.in_(ids - {signed}))
+            )
+            == 0
+        )
+        from goaletto.application.academy import release_intakes
+
+        await release_intakes(session, result.season_id, late.at)
+        assert (
+            await session.scalar(select(func.count()).select_from(Person).where(Person.id.in_(ids)))
+            == 3
+        )
+    with pytest.raises(ValueError, match="offseason"):
+        async with sessions.begin() as session:
+            await sign_candidate(session, late, screen.ownership_id, rows[1].slot)
+
+
+async def test_delayed_upkeep_uses_historical_levels(sessions):
+    from dataclasses import replace
+    from datetime import timedelta
+
+    from goaletto.application.academy import upkeep_for_period
+
+    _, actor, club_id = await funded(sessions)
+    async with sessions.begin() as session:
+        screen = await load_academy(session, action(actor))
+        await upgrade_academy(
+            session, replace(action(actor), at=NOW + timedelta(days=2)), screen.ownership_id
+        )
+        await upgrade_academy(
+            session, replace(action(actor), at=NOW + timedelta(days=6)), screen.ownership_id
+        )
+        # Reading the first bill after the second upgrade must not apply level 3 retroactively.
+        assert await upkeep_for_period(session, club_id, NOW, NOW + timedelta(days=4)) == 9_000
+        assert (
+            await upkeep_for_period(
+                session, club_id, NOW + timedelta(days=4), NOW + timedelta(days=8)
+            )
+            == 16_000
+        )

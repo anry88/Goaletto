@@ -49,13 +49,13 @@ async def academy_callback(query: CallbackQuery, database: Database, event_updat
             )
             notice = None
             if query.data != "ac:open":
-                action, owner, slot = parse_academy(query.data or "")
+                action, owner, slot, season_id = parse_academy(query.data or "")
                 if action == "u":
-                    await upgrade_academy(session, actor, owner)
+                    await upgrade_academy(session, actor, owner, expected_level=slot)
                     notice = tr("Академия улучшена.")
                     screen = await load_academy(session, actor, record=False)
                 elif action == "g" and slot is not None:
-                    await sign_candidate(session, actor, owner, slot)
+                    await sign_candidate(session, actor, owner, slot, season_id=season_id)
                     notice = tr("Юноша подписан.")
                     screen = await load_academy(session, actor, record=False)
                 else:

@@ -73,7 +73,15 @@ async def load_schedule(
         raise ValueError("Missing club calendar")
     manager = await session.get(Manager, actor.manager_id)
     until = actor.at + timedelta(days=10)
-    query = select(FixturePlan).where(FixturePlan.season_id == season.id)
+    from goaletto.application.champions import host_seasons_for
+
+    hosts = host_seasons_for(season.id)
+    query = select(FixturePlan).where(
+        or_(
+            FixturePlan.season_id == season.id,
+            (FixturePlan.competition == "champions") & FixturePlan.season_id.in_(hosts),
+        )
+    )
     if competition is None:
         query = query.where(
             FixturePlan.assigned_day >= actor.at.date(),

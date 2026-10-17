@@ -219,12 +219,13 @@ async def test_season_list_uses_batched_queries_without_n_plus_one() -> None:
 
     second_season_id = uuid4()
     second_league_id = uuid4()
+    second_set_id = uuid4()
     recorder.memberships.append(
         SeasonClub(
             season_id=second_season_id,
             club_id=recorder.club.id,
             league_id=second_league_id,
-            league_set_id=recorder.league.league_set_id,
+            league_set_id=second_set_id,
             tie_break_order=1,
         )
     )
@@ -232,25 +233,26 @@ async def test_season_list_uses_batched_queries_without_n_plus_one() -> None:
         recorder.season,
         Season(
             id=second_season_id,
-            league_set_id=recorder.league.league_set_id,
+            league_set_id=second_set_id,
             number=3,
-            status="active",
+            status="rolled_over",
             seed=9,
             starts_at=NOW - timedelta(weeks=20),
             ends_at=NOW - timedelta(weeks=10),
-            rollover_completed_at=None,
+            rollover_completed_at=NOW - timedelta(weeks=10),
         ),
     ]
     recorder.leagues_list = [  # type: ignore[attr-defined]
         recorder.league,
-        League(id=second_league_id, league_set_id=recorder.league.league_set_id, tier=4),
+        League(id=second_league_id, league_set_id=second_set_id, tier=4),
     ]
     before = len(recorder.statements)
     summaries = await get_club_seasons(
         session(recorder), Actor(recorder.manager.id, 123, None, uuid4(), NOW)
     )
     assert len(summaries) == 2
-    assert [s.number for s in summaries] == [3, 2]
+    # After a cross-set move, container numbers need not be chronological.
+    assert [s.number for s in summaries] == [2, 3]
     # Memberships (1) + seasons IN (1) + leagues IN (1) + auth/receipt, no per-season gets.
     added = len(recorder.statements) - before
     assert added < 15
