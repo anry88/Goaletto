@@ -1,6 +1,6 @@
 # Документация Goaletto
 
-[Приёмка четырёх агентских работ 17 октября](agent-wave8-review.md).
+[Приёмка четырёх агентских работ 17–18 октября](agent-wave8-review.md).
 [Академия](academy-runtime.md), [товарищеские](friendly-runtime.md),
 [Кубки чемпионов](champions-runtime.md), [совместный rollover](cross-set-rollover.md).
 

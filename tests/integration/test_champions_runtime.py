@@ -284,6 +284,7 @@ async def test_champions_gate_blocks_rollover_until_decided(sessions):
     season1 = result.season_id
     latest = await play_season(sessions, season1)
     season2 = await rollover_next(sessions, season1, latest + timedelta(hours=1))
+    await open_season(sessions, season2)
     # Remove the independent ordinary-cup gate from this focused gate check;
     # the full chronological scenario above covers actual completion of both.
     from goaletto.application.allocation import load_ready_season
