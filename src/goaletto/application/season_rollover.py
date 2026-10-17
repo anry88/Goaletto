@@ -568,6 +568,9 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
     from goaletto.application.cup import initialize_season_cup
 
     await initialize_season_cup(session, next_id, at)
+    from goaletto.application.champions import initialize_season_champions
+
+    await initialize_season_champions(session, next_id, season.id, tables, leagues, at)
     await plan_horizon(session, next_id, at)
     # Replenish only pools that were opened already; rollover does not create an
     # unused staff market. The first set owns free-candidate aging, not availability.

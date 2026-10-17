@@ -14,8 +14,9 @@ Definitions mirror ``docs/analytics/measurement-plan.md`` and
   ``>= window_end``). Lost ownership is a separate ``interrupted`` group, never
   a continuation by a new owner.
 * Only ``league`` fixtures with ``finished`` status are supported opportunities.
-  ``cancelled`` and non-league (``cup``/``friendly``) fixtures are excluded
-  (skipped, separate route). ``abandoned`` and unknown statuses/types are
+  ``cancelled`` and non-league (``cup``/``champions``/``friendly``) fixtures
+  are excluded (skipped, separate route). ``abandoned`` and unknown
+  statuses/types are
   ``unsupported``/``unavailable`` until a central mapping proves an official
   result; they never produce a false KPI.
 * Earlier unfinished candidates block later mature ones: the first candidate in
@@ -59,7 +60,7 @@ ELIGIBLE_USER_ACTIONS: frozenset[str] = frozenset(
 ``result_delivered``, automation/system and passive board updates are excluded."""
 
 SUPPORTED_FIXTURE_TYPE = "league"
-NON_LEAGUE_TYPES: frozenset[str] = frozenset({"cup", "friendly"})
+NON_LEAGUE_TYPES: frozenset[str] = frozenset({"cup", "champions", "friendly"})
 CANCELLED_STATUS = "cancelled"
 SUPPORTED_FINAL_STATUS = "finished"
 PENDING_STATUSES: frozenset[str] = frozenset({"scheduled", "live", "paused"})
@@ -157,8 +158,9 @@ class FixtureProjection:
     """One fixture from the calendar perspective of the owning club.
 
     Fields for future SQL: ``fixture_id``, ``club_id`` (the owned club taking
-    part), ``fixture_type`` (only ``league`` is supported; ``cup``/``friendly``
-    are a separate route and are skipped), ``status``, calendar
+    part), ``fixture_type`` (only ``league`` is supported;
+    ``cup``/``champions``/``friendly`` are a separate route and are skipped),
+    ``status``, calendar
     ``scheduled_start``, ``lineup_lock``, and actual ``actual_start`` /
     ``actual_finish`` (postponements/pauses shift the window via actual times).
     ``has_official_result`` records whether an official result was proven; it

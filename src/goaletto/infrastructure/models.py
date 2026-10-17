@@ -2101,3 +2101,108 @@ class SeasonAllocationReceipt(Base):
     assignments: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     draws: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+class ChampionsDraw(Base):
+    """Frozen qualifying cohort for one playing season (single set, AND-126)."""
+
+    __tablename__ = "champions_draws"
+    __table_args__ = (
+        UniqueConstraint("season_id", name="uq_champions_draw_season"),
+        CheckConstraint("policy_version = 'champions-groups-v1'", name="ck_champions_draw_policy"),
+        CheckConstraint("seed >= 0", name="ck_champions_draw_seed"),
+        CheckConstraint(
+            "jsonb_typeof(snapshots) = 'array' AND jsonb_array_length(snapshots) = 5",
+            name="ck_champions_draw_snapshots",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    qualifying_season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    league_set_id: Mapped[UUID] = mapped_column(ForeignKey("league_sets.id"))
+    cohort_key: Mapped[str] = mapped_column(String(128))
+    seed: Mapped[int] = mapped_column(BigInteger)
+    policy_version: Mapped[str] = mapped_column(String(40))
+    snapshots: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ChampionsTournament(Base):
+    """One per-tier champions cup of a playing season (AND-126)."""
+
+    __tablename__ = "champions_tournaments"
+    __table_args__ = (
+        UniqueConstraint("season_id", "tier", "group_index", name="uq_champions_tournament"),
+        CheckConstraint("tier BETWEEN 1 AND 5", name="ck_champions_tournament_tier"),
+        CheckConstraint("group_index >= 0", name="ck_champions_tournament_group"),
+        CheckConstraint(
+            "participant_count IN (8,16,32,64,128,256,512)",
+            name="ck_champions_tournament_size",
+        ),
+        CheckConstraint(
+            "policy_version = 'champions-bracket-v1'", name="ck_champions_tournament_policy"
+        ),
+        CheckConstraint("seed >= 0 AND bracket_seed >= 0", name="ck_champions_tournament_seed"),
+        Index("ix_champions_tournaments_season", "season_id"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    qualifying_season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    tier: Mapped[int] = mapped_column(Integer)
+    group_index: Mapped[int] = mapped_column(Integer)
+    participant_count: Mapped[int] = mapped_column(Integer)
+    cohort_key: Mapped[str] = mapped_column(String(128))
+    seed: Mapped[int] = mapped_column(BigInteger)
+    bracket_seed: Mapped[int] = mapped_column(BigInteger)
+    policy_version: Mapped[str] = mapped_column(String(40))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ChampionsTie(Base):
+    """One knockout tie of a champions tournament (AND-126)."""
+
+    __tablename__ = "champions_ties"
+    __table_args__ = (
+        CheckConstraint(
+            "(home_kind = 'club' AND home_club_id IS NOT NULL AND home_tie_id IS NULL) "
+            "OR (home_kind = 'winner' AND home_tie_id IS NOT NULL)",
+            name="ck_champions_tie_home_slot",
+        ),
+        CheckConstraint(
+            "(away_kind = 'club' AND away_club_id IS NOT NULL AND away_tie_id IS NULL) "
+            "OR (away_kind = 'winner' AND away_tie_id IS NOT NULL)",
+            name="ck_champions_tie_away_slot",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'in_progress', 'decided')",
+            name="ck_champions_tie_status",
+        ),
+        CheckConstraint(
+            "(status = 'decided') = (winner_club_id IS NOT NULL) AND "
+            "(status = 'decided') = (decided_at IS NOT NULL) AND "
+            "(winner_club_id IS NULL OR (home_club_id IS NOT NULL AND away_club_id IS NOT NULL "
+            "AND winner_club_id IN (home_club_id,away_club_id)))",
+            name="ck_champions_tie_winner",
+        ),
+        Index("ix_champions_ties_season", "season_id"),
+        Index("ix_champions_ties_tournament", "tournament_id"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    tournament_id: Mapped[UUID] = mapped_column(ForeignKey("champions_tournaments.id"))
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    round_number: Mapped[int] = mapped_column(SmallInteger)
+    tie_index: Mapped[int] = mapped_column(SmallInteger)
+    round_label: Mapped[str] = mapped_column(String(40))
+    home_kind: Mapped[str] = mapped_column(String(16))
+    home_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), nullable=True)
+    home_tie_id: Mapped[UUID | None] = mapped_column(ForeignKey("champions_ties.id"), nullable=True)
+    away_kind: Mapped[str] = mapped_column(String(16))
+    away_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), nullable=True)
+    away_tie_id: Mapped[UUID | None] = mapped_column(ForeignKey("champions_ties.id"), nullable=True)
+    champions_cycles: Mapped[list[int]] = mapped_column(JSONB)
+    neutral: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    status: Mapped[str] = mapped_column(String(20), server_default="pending")
+    winner_club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), nullable=True)
+    first_match_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    second_match_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    extra_time_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    shootout_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

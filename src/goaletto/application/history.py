@@ -388,7 +388,7 @@ async def get_club_results(
         conceded = receipt.away_goals if mine_home else receipt.home_goals
         outcome = "win" if scored > conceded else "draw" if scored == conceded else "loss"
         penalties = None
-        if (fixture.competition or "league") == "cup":
+        if (fixture.competition or "league") in ("cup", "champions"):
             terminal = restore_state(match.state)
             if terminal.knockout and terminal.knockout.shootout:
                 from goaletto.domain.knockout import decide_shootout

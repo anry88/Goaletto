@@ -732,12 +732,18 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             from goaletto.application.cup import context_for_fixture
 
             context = await context_for_fixture(session, fixture)
+        elif fixture.competition == "champions":
+            from goaletto.application.champions import context_for_champions_fixture
+
+            context = await context_for_champions_fixture(session, fixture)
         elif (fixture.competition or "league") != "league":
             raise ValueError("Unsupported competition runtime")
         if fixture.neutral:
             from goaletto.application.cup import pin_final_venue
 
-            demand = await pin_final_venue(session, fixture, home, away, seed, at)
+            demand = await pin_final_venue(
+                session, fixture, home, away, seed, at, competition=fixture.competition or "league"
+            )
         from goaletto.application.recovery import lock_energy, recover_player
 
         home_snapshot = await team_snapshot(session, home, fixture.scheduled_start_at)

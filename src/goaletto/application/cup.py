@@ -460,11 +460,22 @@ async def advance_bracket_progression(
 
 
 async def pin_final_venue(
-    session: AsyncSession, fixture: Fixture, home: Club, away: Club, seed: int, at: datetime
+    session: AsyncSession,
+    fixture: Fixture,
+    home: Club,
+    away: Club,
+    seed: int,
+    at: datetime,
+    *,
+    competition: str = "cup",
 ) -> Attendance:
     """Book a real third club's free stadium and freeze every financial input."""
-    if not fixture.neutral or fixture.competition != "cup":
-        raise ValueError("Neutral venue requires a cup final")
+    if (
+        not fixture.neutral
+        or fixture.competition != competition
+        or competition not in ("cup", "champions")
+    ):
+        raise ValueError("Neutral venue requires a knockout final")
     day = fixture.scheduled_start_at.date()
     occupied = select(Fixture.home_club_id).where(
         Fixture.scheduled_start_at >= datetime.combine(day, datetime.min.time(), tzinfo=at.tzinfo),
@@ -526,7 +537,11 @@ async def pin_final_venue(
     )
 
 
-async def settle_final_revenue(session: AsyncSession, fixture: Fixture, at: datetime) -> None:
+async def settle_final_revenue(
+    session: AsyncSession, fixture: Fixture, at: datetime, *, competition: str = "cup"
+) -> None:
+    if competition not in ("cup", "champions"):
+        raise ValueError("Unknown knockout competition")
     booking = await session.get(NeutralFinalBooking, fixture.id)
     if booking is None:
         raise ValueError("Final has no pinned neutral venue")
@@ -558,7 +573,7 @@ async def settle_final_revenue(session: AsyncSession, fixture: Fixture, at: date
         await credit_locked(
             session,
             accounts[club_id],
-            key=f"cup:final:tickets:{fixture.id}:{club_id}",
+            key=f"{competition}:final:tickets:{fixture.id}:{club_id}",
             kind="tickets",
             amount=amount,
             at=at,
