@@ -313,3 +313,14 @@
   latency from deferred attempt percentiles, and fake Telegram time from real IO.
   Use the single real player-free application DB, serially; reset/recreate freely.
   Local timings do not establish HDC capacity or full-season balance.
+
+- AND-80/82 operator dashboards use migration 0044 aggregate-only
+  goaletto_operator.report and deploy/grafana provisioning. Frozen report SQL
+  changes require a new migration and parity checks against CLI. Never grant
+  the datasource raw tables/comments or the game login. Use a separate private
+  Grafana organization: folder ACL alone does not isolate an OSS datasource.
+  Journey filters precede aggregation; tier/set refer to first-claim historical
+  membership and exclude unclaimed managers. Operational panels are unfiltered;
+  absent coverage/observations never become successful zeroes. See
+  docs/analytics/grafana.md. Local real-login/Grafana acceptance does not certify
+  HDC organization membership, actual production grants or external outreach.

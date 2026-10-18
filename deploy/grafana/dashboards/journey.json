@@ -1,0 +1,434 @@
+{
+  "uid": "goaletto-launch",
+  "title": "Goaletto · вход и участие",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": [
+    "goaletto",
+    "private-operator"
+  ],
+  "editable": false,
+  "timezone": "utc",
+  "refresh": "1m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "source",
+        "type": "custom",
+        "query": "all,direct,known,unknown",
+        "current": {
+          "text": "all",
+          "value": "all"
+        },
+        "multi": false,
+        "includeAll": false,
+        "options": []
+      },
+      {
+        "name": "locale",
+        "label": "locale",
+        "type": "custom",
+        "query": "all,ru,en",
+        "current": {
+          "text": "all",
+          "value": "all"
+        },
+        "multi": false,
+        "includeAll": false,
+        "options": []
+      },
+      {
+        "name": "variant",
+        "label": "variant",
+        "type": "custom",
+        "query": "all,control,a,b",
+        "current": {
+          "text": "all",
+          "value": "all"
+        },
+        "multi": false,
+        "includeAll": false,
+        "options": []
+      },
+      {
+        "name": "tier",
+        "label": "tier",
+        "type": "custom",
+        "query": "all,1,2,3,4,5",
+        "current": {
+          "text": "all",
+          "value": "all"
+        },
+        "multi": false,
+        "includeAll": false,
+        "options": []
+      },
+      {
+        "name": "set",
+        "label": "set",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "goaletto-operator-pg"
+        },
+        "refresh": 1,
+        "query": "SELECT 'all' AS __text, 'all' AS __value UNION ALL SELECT name,name FROM jsonb_to_recordset(goaletto_operator.report('sets',now()-interval '1 hour',now(),'{}'::jsonb)->'rows') AS r(name text)",
+        "current": {
+          "text": "all",
+          "value": "all"
+        },
+        "multi": false,
+        "includeAll": false,
+        "options": []
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Период, знаменатели и фильтры",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 5
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "UTC: выбранный диапазон задаёт когорту стартов и момент наблюдения (конец диапазона). eligible — только зрелые менеджеры; waiting и unknown_late видны отдельно. При N=0 процент не вычисляется. Source = direct/known/unknown; locale — язык на момент отчёта, не исторический язык входа. Variant — наблюдавшаяся exposure; без событий нет контрольной группы. Tier/set — первая полученная команда и её историческая сезонная лига: этот фильтр исключает не получивших клуб и меняет знаменатель. Для полной воронки оставьте tier/set=all. Диапазон ≤366 дней. Отзывы и технические очереди — на отдельном экране, без этих фильтров. Нет данных ≠ ноль; комментарии и личные идентификаторы недоступны."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Покрытие и доступность",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Проверьте перед интерпретацией остальных панелей.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT r->>'state' AS state, r->>'coverage_started_at' AS coverage_started_at, r->>'available_from' AS available_from, r->>'requested_from' AS requested_from, r->>'report_at' AS report_at, r->>'coverage_limited' AS coverage_limited FROM (SELECT goaletto_operator.report('entry',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,jsonb_build_object('source',${source:sqlstring},'locale',${locale:sqlstring},'variant',${variant:sqlstring},'tier',${tier:sqlstring},'set',${set:sqlstring})) AS r) s",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Вход за 24 часа · n/N",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 8
+      },
+      "description": "claimed/eligible и ready/eligible; нет автоматического состава в ready.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('entry',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,jsonb_build_object('source',${source:sqlstring},'locale',${locale:sqlstring},'variant',${variant:sqlstring},'tier',${tier:sqlstring},'set',${set:sqlstring}))->'rows') AS r(starts bigint, eligible bigint, waiting bigint, claimed bigint, ready bigint, unknown_claimed_late bigint, unknown_ready_late bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Источники · n/N",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Кампании без персональных ссылок. Только зрелые старты входят в eligible.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('sources',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,jsonb_build_object('source',${source:sqlstring},'locale',${locale:sqlstring},'variant',${variant:sqlstring},'tier',${tier:sqlstring},'set',${set:sqlstring}))->'rows') AS r(kind text, campaign_id text, source text, placement text, published_on date, starts bigint, eligible bigint, waiting bigint, claimed bigint, ready bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "D1 / D3 / D7 / D30 · n/N",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 8
+      },
+      "description": "retained/eligible; автоматические матчи и пассивная доставка не считаются действием.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('retention',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,jsonb_build_object('source',${source:sqlstring},'locale',${locale:sqlstring},'variant',${variant:sqlstring},'tier',${tier:sqlstring},'set',${set:sqlstring}))->'rows') AS r(day integer, starts bigint, eligible bigint, waiting bigint, retained bigint, unknown_late bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Первая и вторая матчевая возможность",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 24,
+        "h": 8
+      },
+      "description": "N = managers только строки state=mature. Для second — только участвовавшие в зрелой первой возможности. Остальные состояния не равны уходу.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('opportunities',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,jsonb_build_object('source',${source:sqlstring},'locale',${locale:sqlstring},'variant',${variant:sqlstring},'tier',${tier:sqlstring},'set',${set:sqlstring}))->'rows') AS r(stage text, state text, managers bigint, participated_n bigint, unknown_late bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Последние наблюдавшиеся действия",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Нет вывода причин молчания. Cohort_week позволяет сравнивать недели.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('last_steps',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,jsonb_build_object('source',${source:sqlstring},'locale',${locale:sqlstring},'variant',${variant:sqlstring},'tier',${tier:sqlstring},'set',${set:sqlstring}))->'rows') AS r(source_kind text, campaign_id text, locale text, cohort_week date, entry_path text, last_step text, surface text, managers bigint, offers_accepted bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Ошибки, помощь и восстановление за 30 минут",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 8
+      },
+      "description": "recovered_n/eligible_N; не подтверждённая помощь не превращается в доставленную.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('recovery',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,jsonb_build_object('source',${source:sqlstring},'locale',${locale:sqlstring},'variant',${variant:sqlstring},'tier',${tier:sqlstring},'set',${set:sqlstring}))->'rows') AS r(reason text, surface text, target text, errors bigint, managers bigint, \"eligible_N\" bigint, waiting bigint, help_accepted bigint, help_unconfirmed bigint, recovered_n bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "links": []
+}

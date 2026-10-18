@@ -1,5 +1,9 @@
 # ⚽ Goaletto · Голетто
 
+[Операторский Grafana](docs/analytics/grafana.md): два dashboard с ограниченным
+SQL-интерфейсом, проверенными правами отдельного логина и совпадением с CLI.
+Локальный Grafana smoke пройден; подключение существующего HDC остаётся отдельным этапом.
+
 [Работоспособность worker](docs/worker-health.md) и [нагрузка перед запуском](docs/launch-load.md):
 отдельные jobs/sender heartbeat, Docker healthcheck и измеренные live-профили 50/75 матчей.
 

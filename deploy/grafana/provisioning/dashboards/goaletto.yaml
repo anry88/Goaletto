@@ -1,0 +1,12 @@
+apiVersion: 1
+providers:
+  - name: Goaletto private operator
+    orgId: $GOALETTO_GRAFANA_ORG_ID
+    folder: Goaletto operator
+    folderUid: goaletto-operator
+    type: file
+    disableDeletion: true
+    editable: false
+    updateIntervalSeconds: 60
+    options:
+      path: /var/lib/grafana/dashboards/goaletto

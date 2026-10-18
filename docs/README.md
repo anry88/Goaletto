@@ -1,5 +1,8 @@
 # Документация Goaletto
 
+[Операторский Grafana и SQL-доступ](analytics/grafana.md) — AND-80/82:
+provisioning, агрегаты, фильтры и настоящая проверка restricted LOGIN.
+
 [Технические задержки и безопасный reconciliation](runtime-observation.md) — AND-69/77.
 
 [Фоновый запас клубов и общий календарь](world-reserve.md) — AND-47/119:

@@ -1,0 +1,348 @@
+{
+  "uid": "goaletto-operations",
+  "title": "Goaletto · доставка и worker",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": [
+    "goaletto",
+    "private-operator"
+  ],
+  "editable": false,
+  "timezone": "utc",
+  "refresh": "1m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Очереди сейчас",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Текущий снимок, не историческое значение по выбранному диапазону. due_items включает разные статусы: просрочку очереди смотреть в pending.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('queues',now()-interval '1 hour',now(),'{}'::jsonb)->'rows') AS r(queue text, status text, items bigint, due_items bigint, oldest_due_seconds double precision)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Последний экземпляр worker сейчас",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Нет строк — нет наблюдений; это не healthy. Строка sender отсутствует и при отключённом sender. Проверка конкретного контейнера — health_cli.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('worker',now()-interval '1 hour',now(),'{}'::jsonb)->'rows') AS r(component text, outcome text, state text, started_at timestamptz, observed_at timestamptz, succeeded_at timestamptz, observation_age_seconds double precision, success_age_seconds double precision)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Технические задержки · p50/p95",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Включая internal. command_wait_for_tick — игровое ожидание. worker_* включают deferred attempts; это не latency только committed ticks.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('latency',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,'{}'::jsonb)->'rows') AS r(metric text, observations bigint, measured bigint, unknown bigint, p50_seconds double precision, p95_seconds double precision)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Исходы сообщений · N",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Telegram accepted означает доставку API, не прочтение. Unknown не прибавляется к delivered.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('delivery',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,'{}'::jsonb)->'rows') AS r(kind text, total bigint, delivered bigint, failed_known bigint, failed_unknown bigint, pending bigint, unknown_messages bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Попытки доставки",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Попытки отдельно от количества уникальных сообщений.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('delivery_attempts',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,'{}'::jsonb)->'rows') AS r(outcome text, count bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Добровольные отзывы · n/N",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 8
+      },
+      "description": "N — созданные предложения, включая неподтверждённую доставку. Internal выделены отдельными строками. Комментарии недоступны.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('feedback',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,'{}'::jsonb)->'rows') AS r(campaign text, internal boolean, \"offered_N\" bigint, delivery_confirmed bigint, delivery_unconfirmed bigint, answered_n bigint, skipped_n bigint, opted_out_n bigint, redacted_unknown bigint, expired_unanswered bigint, waiting bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Выбранные причины ответивших",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "goaletto-operator-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 24,
+        "h": 8
+      },
+      "description": "Только явные выбранные причины; не переносить на молчащих. Без текста комментариев.",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM jsonb_to_recordset(goaletto_operator.report('feedback_reasons',$__timeFrom()::timestamptz,$__timeTo()::timestamptz,'{}'::jsonb)->'rows') AS r(campaign text, internal boolean, reason text, answers bigint)",
+          "editorMode": "code",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "goaletto-operator-pg"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "links": []
+}
