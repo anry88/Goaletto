@@ -737,5 +737,9 @@
   "⚽ {club} приглашает на товарищеский матч {day} UTC. Ответьте в /friendly.": "⚽ {club} invites you to a friendly on {day} UTC. Respond in /friendly.",
   "{home} — {day} UTC. Ответьте до начала этого дня (00:00 UTC).": "{home} — {day} UTC. Reply before that day begins (00:00 UTC).",
   "Товарищеский · {date}": "Friendly · {date}",
-  "Уровень: {level}/5 · содержание: {upkeep} за 4 дня": "Level: {level}/5 · upkeep: {upkeep} per 4 days"
+  "Уровень: {level}/5 · содержание: {upkeep} за 4 дня": "Level: {level}/5 · upkeep: {upkeep} per 4 days",
+  "/start — продолжить выбор клуба.": "/start — continue choosing a club.",
+  "/lineup — подготовить состав к следующему матчу.": "/lineup — prepare your lineup for the next match.",
+  "/calendar — посмотреть ближайшие игры.": "/calendar — see upcoming matches.",
+  "Если хотите, расскажите, что было неудобно: /feedback. Это добровольно и ни на что не влияет.": "If you like, tell us what was inconvenient: /feedback. This is optional and has no effect on your game."
 }

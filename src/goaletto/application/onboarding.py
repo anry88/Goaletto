@@ -138,6 +138,19 @@ async def begin_game(
     # made after an earlier /start. Retrying an old update never renews a lease.
     new_entry = previous is None
     if new_entry:
+        # Operational coverage is also needed for internal/opted-out people,
+        # who deliberately have no public analytics identity or start event.
+        if manager.first_game_start_at is None:
+            earlier_entry = await session.scalar(
+                select(GameActionReceipt.operation_id)
+                .where(
+                    GameActionReceipt.manager_id == manager.id,
+                    GameActionReceipt.kind == "entry_opened",
+                )
+                .limit(1)
+            )
+            if earlier_entry is None:
+                manager.first_game_start_at = at
         session.add(
             GameActionReceipt(
                 operation_id=actor.operation_id,

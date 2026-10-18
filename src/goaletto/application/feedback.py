@@ -1,4 +1,4 @@
-"""Voluntary manual feedback. Internal/test cohort only; no automatic campaigns.
+"""Voluntary feedback. Internal/test cohort only, shared cooldown and privacy.
 
 Manual entry never promises delivery: the prompt is stored durably first,
 Telegram send happens outside the transaction, and prompt_delivered is recorded
@@ -327,6 +327,12 @@ async def answer_with_reason(
     manager = await _locked_manager(session, actor)
     await _check_eligibility(session, manager)
     response = await _locked_response(session, actor, response_id)
+    if (
+        response.status == "prompted"
+        and response.expires_at is not None
+        and at >= response.expires_at
+    ):
+        raise PermissionDenied("Feedback prompt has expired")
     if response.status in {"skipped", "opted_out"}:
         return AnswerOutcome(applied=False, duplicate=True, status=response.status, reason=None)
     if response.status == "answered":
@@ -618,3 +624,24 @@ async def schedule_comment_cleanup(
             },
         )
     )
+
+
+async def resume_automatic_prompt(
+    session: AsyncSession, actor: Actor, at: datetime, *, settings: FeedbackSettings
+) -> PromptOutcome | None:
+    _require_collection(settings)
+    manager = await _locked_manager(session, actor)
+    await _check_eligibility(session, manager)
+    row = await session.scalar(
+        select(FeedbackResponse)
+        .where(
+            FeedbackResponse.manager_id == manager.id,
+            FeedbackResponse.trigger_kind.is_not(None),
+            FeedbackResponse.status == "prompted",
+            FeedbackResponse.expires_at > at,
+        )
+        .order_by(FeedbackResponse.prompted_at.desc())
+        .limit(1)
+        .with_for_update()
+    )
+    return PromptOutcome(row.id, row.campaign_id, False, True, row.status) if row else None

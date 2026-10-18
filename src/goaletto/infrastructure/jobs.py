@@ -108,6 +108,7 @@ async def process_one_job(
         "market.close",
         "market.cancel_player",
         "feedback.cleanup",
+        "feedback.scan",
         "season.rollover",
         "scout.complete",
         "scout.expire",
@@ -118,7 +119,12 @@ async def process_one_job(
     }:
         try:
             async with session.begin_nested():
-                if job.kind == "runtime.reconcile":
+                if job.kind == "feedback.scan":
+                    from goaletto.application.feedback_automation import scan
+
+                    await scan(session, job, at)
+                    rescheduled = True
+                elif job.kind == "runtime.reconcile":
                     from goaletto.application.runtime_reconciliation import reconcile
 
                     await reconcile(session, job, at)
@@ -218,6 +224,7 @@ async def process_one_job(
                 "world.reserve",
                 "world.catch_up",
                 "runtime.reconcile",
+                "feedback.scan",
             }:
                 delay = 1 if job.kind == "world.catch_up" else 60
                 job.due_at = at + timedelta(seconds=delay)

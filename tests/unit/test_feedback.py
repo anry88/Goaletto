@@ -255,6 +255,11 @@ async def test_feedback_command_commits_before_telegram_io(
         return ("prompt-text", None)
 
     monkeypatch.setattr(feedback_router, "_render_for_status", fake_render)
+
+    async def no_automatic(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(feedback_router, "resume_automatic_prompt", no_automatic)
     await feedback_router.feedback_command(
         cast(object, message),
         cast(object, db),

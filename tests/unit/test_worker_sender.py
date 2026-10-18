@@ -1,6 +1,7 @@
 """Worker wiring with fake tasks, database and Bot; no polling/network/DB."""
 
 import asyncio
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -18,6 +19,10 @@ async def test_worker_runs_sender_independently_and_closes_resources(monkeypatch
     class DatabaseStub:
         def __init__(self, settings):
             pass
+
+        @asynccontextmanager
+        async def transaction(self):
+            yield None
 
         async def close(self):
             stopped.append("database")
@@ -38,6 +43,10 @@ async def test_worker_runs_sender_independently_and_closes_resources(monkeypatch
         started_sender.set()
         await asyncio.Event().wait()
 
+    async def configure(*args):
+        pass
+
+    monkeypatch.setattr(worker, "configure_feedback", configure)
     monkeypatch.setattr(worker, "Settings", lambda: settings)
     monkeypatch.setattr(worker, "Database", DatabaseStub)
     monkeypatch.setattr(worker, "Bot", BotStub)

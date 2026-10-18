@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 
 from aiogram import Bot
 
-from goaletto.application.feedback import schedule_comment_cleanup
+from goaletto.application.feedback import FeedbackSettings, schedule_comment_cleanup
+from goaletto.application.feedback_automation import configure as configure_feedback
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.jobs import process_one_job
@@ -59,6 +60,17 @@ async def run() -> None:
                 at=datetime.now(UTC),
                 retention_days=settings.feedback_comment_retention_days,
             )
+    async with database.transaction() as session:
+        await configure_feedback(
+            session,
+            datetime.now(UTC),
+            FeedbackSettings(
+                settings.feedback_enabled and settings.feedback_comment_retention_days is not None,
+                settings.feedback_comment_retention_days,
+                settings.feedback_cooldown_days,
+            ),
+            settings.game_enabled and settings.feedback_automatic_enabled,
+        )
     if settings.game_enabled:
         from goaletto.application.runtime_reconciliation import request_reconciliation
         from goaletto.application.world_capacity import request_reserve

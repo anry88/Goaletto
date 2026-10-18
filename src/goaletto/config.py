@@ -24,5 +24,6 @@ class Settings(BaseSettings):
     # Voluntary feedback (AND-78, manual/internal cohort only). Collection stays
     # disabled until an explicit comment retention is configured.
     feedback_enabled: bool = False
+    feedback_automatic_enabled: bool = False
     feedback_comment_retention_days: int | None = Field(default=None, gt=0, le=730)
     feedback_cooldown_days: int = Field(default=7, ge=7, le=730)

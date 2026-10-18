@@ -312,6 +312,7 @@ async def user_effect(
             previous.manager_id != actor.manager_id
             or previous.kind != name
             or previous.club_id != club_id
+            or previous.fixture_id != fixture_id
             or previous.ownership_id != (ownership.id if ownership is not None else None)
         ):
             raise PermissionDenied("Action identity was reused with a different scope")
@@ -325,6 +326,7 @@ async def user_effect(
             club_id=club_id,
             kind=name,
             occurred_at=actor.at,
+            fixture_id=fixture_id,
         )
     )
     await session.flush()

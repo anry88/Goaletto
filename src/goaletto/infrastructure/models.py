@@ -1399,6 +1399,7 @@ class GameActionReceipt(Base):
 
     __tablename__ = "game_action_receipts"
     __table_args__ = (
+        Index("ix_action_manager_time", "manager_id", "occurred_at"),
         ForeignKeyConstraint(
             ["ownership_id", "manager_id", "club_id"],
             ["ownership_periods.id", "ownership_periods.manager_id", "ownership_periods.club_id"],
@@ -1425,6 +1426,10 @@ class GameActionReceipt(Base):
     club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"))
     kind: Mapped[str] = mapped_column(String(80))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    fixture_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("fixtures.id", name="fk_action_fixture")
+    )
 
 
 class TelegramPortraitFile(Base):
@@ -1858,6 +1863,13 @@ class FeedbackResponse(Base):
 
     __tablename__ = "feedback_responses"
     __table_args__ = (
+        CheckConstraint(
+            "trigger_kind IS NULL OR (trigger_kind IN ('entry_help','missed_match') "
+            "AND expires_at IS NOT NULL AND expires_at > prompted_at AND "
+            "(trigger_kind <> 'missed_match' OR (ownership_id IS NOT NULL "
+            "AND fixture_id IS NOT NULL)))",
+            name="ck_feedback_trigger",
+        ),
         UniqueConstraint("manager_id", "campaign_id", name="uq_feedback_manager_campaign"),
         UniqueConstraint("operation_id", name="uq_feedback_operation"),
         CheckConstraint(
@@ -1898,6 +1910,15 @@ class FeedbackResponse(Base):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     comment_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    trigger_kind: Mapped[str | None] = mapped_column(String(24))
+    ownership_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("ownership_periods.id", name="fk_feedback_ownership")
+    )
+    fixture_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("fixtures.id", name="fk_feedback_fixture")
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class FeedbackComment(Base):

@@ -55,8 +55,11 @@ USAGE schema и SELECT journey_export; не grant tables/all schemas или writ
 `cleanup_events` использует persisted retention_days (по умолчанию 180), удаляет rows
 с recorded_at раньше границы, пустые истёкшие sessions, acquisition touches
 и истёкший first-touch; first_game_start_at не позволяет повтор launch cohort. Ровно на границе данные
-сохраняются. Вызывать в отдельной короткой maintenance transaction; автоматическое
-расписание/операторский CLI — AND-82. Комментарии/опросы и их сроки — AND-78.
+сохраняются. Вызывать в отдельной короткой maintenance transaction через
+`python -m goaletto.application.analytics_cleanup_cli --at <UTC ISO> --apply`.
+Без `--apply` подключения нет; используется сохранённый retention.
+Расписание на HDC остаётся частью развёртывания. [Gate/runbook](launch-gate.md).
+Комментарии/опросы и их сроки — AND-78.
 Внешний экспорт запускается отдельно и не блокирует игровую транзакцию.
 
 ## Проверка и границы

@@ -108,9 +108,7 @@ FROM outcomes GROUP BY reason, surface, target ORDER BY reason, surface, target
 
 # Plans cover the full season, including dates outside the ten-day announcement
 # horizon. Their UTC date only orders candidates; it never invents a kickoff.
-OPPORTUNITIES_SQL = (
-    COHORT
-    + """
+_OPPORTUNITY_BODY = """
 , calendar AS (
  SELECT p.id, p.season_id, p.league_id, p.home_club_id, p.away_club_id,
         p.assigned_day, f.status, f.scheduled_start_at, f.lineup_lock_at,
@@ -171,8 +169,17 @@ OPPORTUNITIES_SQL = (
    AND e.occurred_at >= GREATEST(p.claimed_at, p.actual_start_at - INTERVAL '24 hours')
    AND e.occurred_at < p.actual_finish_at + INTERVAL '24 hours'
    AND e.recorded_at > :report_at) AS late
- FROM candidates p WHERE ordinal <= 2
-), per_manager AS (
+ FROM candidates p
+"""
+
+OPPORTUNITY_DETAILS_SQL = _OPPORTUNITY_BODY + " WHERE ordinal <= 2\n)\n"
+ALL_OPPORTUNITY_DETAILS_SQL = _OPPORTUNITY_BODY + "\n)\n"
+
+OPPORTUNITIES_SQL = (
+    COHORT
+    + OPPORTUNITY_DETAILS_SQL
+    + """
+, per_manager AS (
  SELECT c.analytics_manager_id, COALESCE(f.state, 'no_calendar') AS first_state,
         COALESCE(f.participated, false) AS first_participated,
         COALESCE(f.late, false) AS first_late,

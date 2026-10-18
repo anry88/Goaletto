@@ -3,7 +3,9 @@
 Обновление 2026-10-18: [игровое подключение и PG-приёмка AND-75/76/79](../launch-measurement.md).
 Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
 match-opportunities подключены к операторскому CLI. Технические latency и
-автоматические опросы остаются отдельными задачами.
+автоматические опросы теперь подключены отдельно: [отзывы](../feedback.md).
+[Локальный gate и оставшаяся проверка HDC](launch-gate.md) дополняют эту матрицу
+реальными cleanup/export/ACL и внутренними опросами.
 
 Проверка существующей аналитики, а не новая instrumentation и не dashboard.
 Источник ветки: `origin/main` `d3a5185b829c176d45e2a0893c4dd1c61b6a3dd3`;
@@ -26,7 +28,8 @@ match-opportunities подключены к операторскому CLI. Те
 Поддержаны: воронка входа `start → claim → ручной lineup_saved` (24ч),
 `D1/D3/D7/D30` по явным действиям, delivery по `outbox_messages` +
 `outbox_delivery_attempts`, attribution `direct/unknown/known`
-(`source_funnel`). Явно **не реализованы** (не создавать фиктивные
+(`source_funnel`). На дату исходной внешней поставки **не были реализованы**
+(не создавать фиктивные
 эмиттеры ради зелёного теста): участие в первом доступном матче и возврат
 ко второму (`match_opportunity`, `second_match_return`), агрегаты
 добровольной обратной связи (`feedback_summary`), восстановление после
@@ -96,7 +99,7 @@ GOALETTO_ALLOW_DEVELOPMENT_RESET=1 python -m pytest -q -m integration \
 сообщений, исключений с секретами и текстов комментариев — только
 синтетические UUID/время/kind/outcome.
 
-## Оставшиеся ограничения
+## Ограничения исходной внешней поставки
 
 - Матчевые когорты (первая/вторая возможность, `actual_start/finish`,
   `lineup_lock`, смена владения, переносы) не считаются: нужен AND-76/77.
@@ -104,5 +107,5 @@ GOALETTO_ALLOW_DEVELOPMENT_RESET=1 python -m pytest -q -m integration \
   намеренно не имитируются.
 - Delivery — текущий snapshot; исторической реконструкции outcome на `--at`
   нет (`historical_outcomes_available=false`).
-- AND-82 целиком не закрывать: dashboard/access/feedback зависят от
-  следующих частей.
+- Текущие матчевые отчёты и feedback приняты отдельно; AND-82 целиком
+  не закрывать до dashboard/access HDC. См. [актуальный gate](launch-gate.md).

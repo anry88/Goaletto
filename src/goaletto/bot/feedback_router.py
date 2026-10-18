@@ -28,6 +28,7 @@ from goaletto.application.feedback import (
     opt_out,
     prompt_outbox_id,
     record_prompt_delivered,
+    resume_automatic_prompt,
     save_comment,
     skip_comment,
 )
@@ -54,7 +55,9 @@ router = Router(name="voluntary-feedback")
 def feedback_settings_from_config(config: Settings | None = None) -> FeedbackSettings:
     config = config or Settings()
     return FeedbackSettings(
-        enabled=bool(config.feedback_enabled),
+        enabled=bool(
+            config.feedback_enabled and config.feedback_comment_retention_days is not None
+        ),
         comment_retention_days=config.feedback_comment_retention_days,
         cooldown_days=int(config.feedback_cooldown_days),
     )
@@ -110,9 +113,9 @@ async def feedback_command(message: Message, database: Database, event_update: U
     try:
         async with database.transaction() as session:
             actor = await actor_for(session, message.from_user.id, event_update.update_id, at)
-            outcome = await _open(
-                session, actor, slug=MANUAL_CAMPAIGN_SLUG, settings=settings, at=at
-            )
+            outcome = await resume_automatic_prompt(
+                session, actor, at, settings=settings
+            ) or await _open(session, actor, slug=MANUAL_CAMPAIGN_SLUG, settings=settings, at=at)
         text, keyboard = await _render_for_status(
             database, outcome.response_id, outcome.status, at, actor.manager_id
         )
@@ -165,7 +168,9 @@ async def feedback_callback(query: CallbackQuery, database: Database) -> None:
                 actor = await actor_for_callback(
                     session, telegram_id=user.id, callback_id=query.id, at=at
                 )
-                outcome = await _open(
+                outcome = await resume_automatic_prompt(
+                    session, actor, at, settings=settings
+                ) or await _open(
                     session, actor, slug=MANUAL_CAMPAIGN_SLUG, settings=settings, at=at
                 )
             text, keyboard = await _render_for_status(

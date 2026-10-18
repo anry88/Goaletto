@@ -2,8 +2,9 @@
 
 Обновление 2026-10-18: [игровое подключение и PG-приёмка AND-75/76/79](../launch-measurement.md).
 Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
-match-opportunities подключены к операторскому CLI. Технические latency и
-автоматические опросы остаются отдельными задачами.
+match-opportunities подключены к операторскому CLI. Добавлены
+[технические latency](../runtime-observation.md), [внутренние опросы и сводка feedback](../feedback.md).
+Полный [gate HDC](launch-gate.md) ещё требует dashboard/access.
 
 Статус: Python report API/CLI и bounded PostgreSQL-запросы реализованы в
 отдельном checkout `codex/analytics-reports` от `origin/main` `ba16344a`.
@@ -155,7 +156,7 @@ python -m goaletto.application.analytics_reports_cli delivery \
   и добровольная обратная связь (AND-78) здесь не агрегируются; отзывы не
   имитировались.
 
-## Недостающая instrumentation для Codex (AND-76/77)
+## Исторические пробелы внешней поставки (до приёмки AND-76/77)
 
 Поиск `user_effect`/`record_event` показывает, что collector готов, но
 продуктовые эмиссии неполны:

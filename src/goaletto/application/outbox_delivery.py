@@ -52,6 +52,7 @@ SUPPORTED_KINDS = frozenset(
         "training_cancelled",
         "player_lifecycle",
         "staff_lifecycle",
+        "feedback_prompt",
     }
 )
 LEASE_SECONDS = 120.0
@@ -187,6 +188,16 @@ def board_revision(payload: dict[str, Any]) -> int:
 
 def valid_payload(payload: dict[str, Any]) -> bool:
     kind = payload.get("kind")
+    if kind == "feedback_prompt":
+        return (
+            set(payload) == {"version", "kind", "response_id", "manager_id", "trigger", "target"}
+            and type(payload.get("version")) is int
+            and payload["version"] == SUPPORTED_VERSION
+            and _payload_uuid(payload, "response_id") is not None
+            and _payload_uuid(payload, "manager_id") is not None
+            and payload.get("trigger") in {"entry_help", "missed_match"}
+            and payload.get("target") in {"claim", "lineup", "calendar"}
+        )
     if (
         type(payload.get("version")) is not int
         or payload["version"] != SUPPORTED_VERSION
@@ -334,6 +345,22 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "feedback_prompt":
+        next_step = (
+            tr("/start — продолжить выбор клуба.")
+            if payload["target"] == "claim"
+            else tr("/lineup — подготовить состав к следующему матчу.")
+            if payload["target"] == "lineup"
+            else tr("/calendar — посмотреть ближайшие игры.")
+        )
+        return (
+            next_step
+            + "\n\n"
+            + tr(
+                "Если хотите, расскажите, что было неудобно: /feedback. "
+                "Это добровольно и ни на что не влияет."
+            )
+        )
     if kind == "friendly_invitation":
         return tr(
             "⚽ {club} приглашает на товарищеский матч {day} UTC. Ответьте в /friendly.",
@@ -553,6 +580,35 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     payload = message.payload
     if not isinstance(payload, dict) or not valid_payload(payload):
         return Decision.SKIP_STALE
+    if payload["kind"] == "feedback_prompt":
+        from goaletto.application.feedback_automation import deliverable
+        from goaletto.infrastructure.models import FeedbackResponse
+
+        response = await session.get(
+            FeedbackResponse, _payload_uuid(payload, "response_id"), populate_existing=True
+        )
+        manager = await session.get(
+            Manager, _payload_uuid(payload, "manager_id"), populate_existing=True
+        )
+        if (
+            response is None
+            or manager is None
+            or response.manager_id != manager.id
+            or manager.telegram_id != message.chat_id
+        ):
+            return Decision.SKIP_STALE
+        if not manager.bot_available:
+            return Decision.SKIP_UNAVAILABLE
+        expected_target = (
+            "calendar" if response.fixture_id else "lineup" if response.ownership_id else "claim"
+        )
+        if payload["trigger"] != response.trigger_kind or payload["target"] != expected_target:
+            return Decision.SKIP_STALE
+        return (
+            Decision.DELIVER
+            if await deliverable(session, response, manager, now)
+            else Decision.SKIP_STALE
+        )
     ownership = await session.scalar(
         select(OwnershipPeriod)
         .where(OwnershipPeriod.id == _payload_uuid(payload, "ownership_id"))
@@ -841,6 +897,17 @@ async def claim_outbox(
         if row.leased_until is not None and row.leased_until <= now:
             await _expire_attempts(session, now, row.id)
             row.last_error = "unknown_outcome"
+        if row.payload.get("kind") == "feedback_prompt" and await session.scalar(
+            select(OutboxDeliveryAttempt.outbox_id)
+            .where(
+                OutboxDeliveryAttempt.outbox_id == row.id,
+                OutboxDeliveryAttempt.outcome == "unknown",
+            )
+            .limit(1)
+        ):
+            row.status, row.last_error = "failed", "unknown_outcome"
+            _clear_lease(row)
+            continue
         if row.attempts >= MAX_ATTEMPTS:
             row.status = "failed"
             row.last_error = row.last_error or "unknown_outcome"
@@ -991,6 +1058,19 @@ async def _attempt(session: AsyncSession, row: OutboxMessage) -> OutboxDeliveryA
 async def _record_delivery_event(
     session: AsyncSession, message: OutboxMessage, now: datetime, outcome: Outcome
 ) -> None:
+    if message.payload["kind"] == "feedback_prompt" and outcome in {
+        Outcome.SENT,
+        Outcome.EDITED,
+        Outcome.DUPLICATE,
+    }:
+        from goaletto.application.feedback import record_prompt_delivered
+
+        response_id = _payload_uuid(message.payload, "response_id")
+        assert response_id is not None
+        await record_prompt_delivered(
+            session, response_id=response_id, outbox_id=message.id, at=now
+        )
+        return
     if outcome in {Outcome.BLOCKED, Outcome.CHAT_UNAVAILABLE}:
         name = "bot_unavailable"
         reason = Reason.BLOCKED if outcome == Outcome.BLOCKED else Reason.CHAT_UNAVAILABLE
@@ -1062,7 +1142,10 @@ async def finish_delivery(
         deadline = now + timedelta(seconds=compute_backoff(row.attempts, retry_after))
         if board is not None:
             board.retry_at = deadline
-        if row.attempts >= MAX_ATTEMPTS:
+        if row.attempts >= MAX_ATTEMPTS or (
+            row.payload.get("kind") == "feedback_prompt"
+            and outcome in {Outcome.UNKNOWN, Outcome.TRANSIENT}
+        ):
             row.status, row.last_error = "failed", error
         else:
             row.due_at = deadline

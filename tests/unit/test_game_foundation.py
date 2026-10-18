@@ -26,6 +26,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     sql = normalized(output.getvalue())
     old = {"league_sets", "leagues", "clubs", "jobs", "outbox_messages"}
     altered = {
+        "feedback_responses",
         "outbox_delivery_attempts",
         "fixtures",
         "match_results",

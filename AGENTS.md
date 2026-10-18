@@ -265,8 +265,21 @@
   Recovery requires claim/manual save within 30 minutes and the same ownership.
   SQL opportunity reports use full league plans, actual times, mature windows,
   historical coverage, and reduced second denominator; do not infer churn from
-  calendar waiting. AND-78 automatic surveys and HDC deployment remain separate;
+  calendar waiting. HDC deployment remains separate;
   these reports do not launch polling or outreach.
+
+- AND-78 automatic feedback is internal-only and off by default. Durable
+  feedback.scan pins coverage, checks incomplete entry at 24h and mature missed
+  league opportunities, and enqueues secondary offers below game-message priority.
+  Recheck before send, suppress stale/expired/opted-out/unavailable cases, never
+  resend an unknown automatic send. /feedback resumes its existing response.
+  Internal first-entry time and action fixture scopes are operational facts,
+  not public analytics events. Preserve manager/campaign dedupe and >=7d cooldown.
+  See docs/feedback.md; migration 0042 forbids dropping used trigger/scope history.
+- AND-82 local cleanup/export/feedback gate is documented in docs/analytics/launch-gate.md.
+  analytics_cleanup_cli is preview-only unless --apply and uses persisted retention.
+  Grafana parity and actual HDC role permissions remain open; a local READ ONLY
+  transaction or PUBLIC ACL check does not certify deployment or external outreach.
 
 - AND-77 records operational RuntimeRequest attempts for match/live/history,
   with actual observed commit, render and Telegram intent/outcome. Retry gets a
