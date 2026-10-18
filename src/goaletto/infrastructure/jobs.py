@@ -114,10 +114,16 @@ async def process_one_job(
         "staff.career_expire",
         "world.reserve",
         "world.catch_up",
+        "runtime.reconcile",
     }:
         try:
             async with session.begin_nested():
-                if job.kind == "world.reserve":
+                if job.kind == "runtime.reconcile":
+                    from goaletto.application.runtime_reconciliation import reconcile
+
+                    await reconcile(session, job, at)
+                    rescheduled = True
+                elif job.kind == "world.reserve":
                     from goaletto.application.world_capacity import reserve_step
 
                     await reserve_step(session, job, at)
@@ -207,7 +213,12 @@ async def process_one_job(
         except (NotReady, AppearanceExhausted):
             outcome, failure = "deferred", "not_ready"
             job.last_error = "not_ready"
-            if job.kind in {"season.rollover", "world.reserve", "world.catch_up"}:
+            if job.kind in {
+                "season.rollover",
+                "world.reserve",
+                "world.catch_up",
+                "runtime.reconcile",
+            }:
                 delay = 1 if job.kind == "world.catch_up" else 60
                 job.due_at = at + timedelta(seconds=delay)
         except (ValueError, TypeError, KeyError):

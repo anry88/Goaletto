@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- AND-77: отдельные durable попытки `/match`/live/history, настоящий commit,
+  render и Telegram accepted/rejected/unknown, read-only p50/p95. Queue timestamps
+  не используют календарное ожидание; исторический bot replay исключён из live lateness.
+- AND-69: фоновый bounded reconciliation восстанавливает только потерянный ближайший
+  live job по подтверждённому checkpoint; обычный recovery сохраняет окно решений.
+  Повреждения и failed/done/held конфликты требуют разбора. HDC drill остаётся открытым.
+- Миграция 0041 сохраняет технические наблюдения без backfill старых времён;
+  подготовка текста match/history и sender выполняется вне игровой DB-транзакции.
+
 - AND-47: фоновый запас 10–20 готовых клубов tier 5. Регистрация только
   выдаёт готовые клубы и ставит заявку на пополнение, без генерации/симуляции
   в запросе человека. [Подготовка мира](docs/world-reserve.md).

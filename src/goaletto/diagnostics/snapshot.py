@@ -47,6 +47,7 @@ WORKER_JOB_KINDS = frozenset(
         "staff.career_expire",
         "world.reserve",
         "world.catch_up",
+        "runtime.reconcile",
         "stadium.complete",
         "market.close",
         "market.cancel_player",

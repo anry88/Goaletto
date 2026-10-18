@@ -265,5 +265,19 @@
   Recovery requires claim/manual save within 30 minutes and the same ownership.
   SQL opportunity reports use full league plans, actual times, mature windows,
   historical coverage, and reduced second denominator; do not infer churn from
-  calendar waiting. AND-77 technical latency, AND-78 automatic surveys and HDC
-  deployment remain separate; these reports do not launch polling or outreach.
+  calendar waiting. AND-78 automatic surveys and HDC deployment remain separate;
+  these reports do not launch polling or outreach.
+
+- AND-77 records operational RuntimeRequest attempts for match/live/history,
+  with actual observed commit, render and Telegram intent/outcome. Retry gets a
+  new attempt of the same operation/command. Unknown sends/commits stay unknown;
+  observation failure is bounded and never cancels gameplay. Outbox enqueue and
+  per-attempt availability/render timestamps have no historical backfill.
+  Read-only runtime_observation_cli reports p50/p95; tick waiting and historical
+  world.catch_up are excluded from technical live latency. See docs/runtime-observation.md.
+- AND-69 adds periodic runtime.reconcile (50 live fixtures per 30-second batch).
+  Only restore a missing immediate continuation proven by immutable tick/stage
+  hash and matching projections/clock. Normal processing restores a late decision
+  window before any tick. Never reset failed/done/held jobs, replay an admitted
+  human world, mutate a checkpoint, or infer money/results. Skip paused/inactive/
+  preparing worlds. HDC reboot/DB-disconnect drill remains open under AND-69/72.

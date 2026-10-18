@@ -1,13 +1,15 @@
 """History router. Handles hx: results/report/player/seasons/archive screens."""
 
+from collections.abc import Callable
 from datetime import UTC, datetime
-from uuid import UUID
+from functools import partial
+from uuid import UUID, uuid5
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from goaletto.application.club_view import actor_for_callback
+from goaletto.application.club_view import CALLBACK_NAMESPACE, actor_for_callback
 from goaletto.application.game_actions import PermissionDenied
 from goaletto.application.history import (
     get_club_results,
@@ -27,6 +29,7 @@ from goaletto.bot.history_cards import (
 )
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
+from goaletto.infrastructure.request_timing import observe_request
 from goaletto.presentation.i18n import tr
 
 router = Router(name="history-view")
@@ -39,16 +42,25 @@ async def history_screen(query: CallbackQuery, database: Database) -> None:
     user = query.from_user
     if not isinstance(message, Message) or user is None:
         return
-    try:
-        kind, identity, page = parse_history_callback(query.data or "")
-        async with database.transaction() as session:
-            text, keyboard = await _render(session, user.id, query.id, kind, identity, page)
-        await edit_response(message, text, keyboard)
-    except PermissionDenied:
-        await edit_response(message, tr("Нет доступа: история недоступна. Откройте /start."))
-    except ValueError:
-        text, keyboard = stale_view()
-        await edit_response(message, text, keyboard)
+    operation = uuid5(CALLBACK_NAMESPACE, f"goaletto:callback:v1:{query.id}")
+    async with observe_request(database, operation, "history") as timing:
+        try:
+            kind, identity, page = parse_history_callback(query.data or "")
+            async with timing.transaction() as session:
+                render = await _load(session, user.id, query.id, kind, identity, page)
+                if kind == "match" and identity is not None:
+                    timing.bind(identity)
+        except PermissionDenied:
+            await timing.send(
+                lambda: edit_response(
+                    message, tr("Нет доступа: история недоступна. Откройте /start.")
+                )
+            )
+            return
+        except ValueError:
+            render = stale_view
+        text, keyboard = timing.render(render)
+        await timing.send(lambda: edit_response(message, text, keyboard))
 
 
 async def _render(
@@ -59,23 +71,36 @@ async def _render(
     identity: UUID | None,
     page: int,
 ) -> tuple[str, InlineKeyboardMarkup]:
+    return (await _load(session, user_id, callback_id, kind, identity, page))()
+
+
+async def _load(
+    session: AsyncSession,
+    user_id: int,
+    callback_id: str,
+    kind: str,
+    identity: UUID | None,
+    page: int,
+) -> Callable[[], tuple[str, InlineKeyboardMarkup]]:
     actor = await actor_for_callback(
         session, telegram_id=user_id, callback_id=callback_id, at=datetime.now(UTC)
     )
     if kind == "results":
-        return results_view(await get_club_results(session, actor, page))
+        return partial(results_view, await get_club_results(session, actor, page))
     if kind == "match":
         assert identity is not None
-        return report_view(await get_match_report(session, actor, identity), page)
+        return partial(report_view, await get_match_report(session, actor, identity), page)
     if kind == "player":
         assert identity is not None
-        return player_history_view(await get_player_matches(session, actor, identity, page))
+        return partial(
+            player_history_view, await get_player_matches(session, actor, identity, page)
+        )
     if kind == "seasons":
         data = await get_club_seasons_page(session, actor, page)
-        return seasons_view(data.entries, page=data.page, total_pages=data.total_pages)
+        return partial(seasons_view, data.entries, page=data.page, total_pages=data.total_pages)
     if kind == "archive":
         assert identity is not None
-        return archive_view(await get_season_archive(session, actor, identity))
+        return partial(archive_view, await get_season_archive(session, actor, identity))
     raise ValueError("Unknown history screen")
 
 
@@ -87,17 +112,28 @@ async def report_page(query: CallbackQuery, database: Database) -> None:
     await query.answer()
     if not isinstance(query.message, Message):
         return
-    try:
-        fixture_id, section, page, return_page = parse_report_callback(query.data or "")
-        async with database.transaction() as session:
-            actor = await actor_for_callback(
-                session, telegram_id=query.from_user.id, callback_id=query.id, at=datetime.now(UTC)
+    message = query.message
+    operation = uuid5(CALLBACK_NAMESPACE, f"goaletto:callback:v1:{query.id}")
+    async with observe_request(database, operation, "history") as timing:
+        try:
+            fixture_id, section, page, return_page = parse_report_callback(query.data or "")
+            async with timing.transaction() as session:
+                actor = await actor_for_callback(
+                    session,
+                    telegram_id=query.from_user.id,
+                    callback_id=query.id,
+                    at=datetime.now(UTC),
+                )
+                report = await get_match_report(session, actor, fixture_id)
+                timing.bind(fixture_id)
+            text, keyboard = timing.render(
+                report_view, report, return_page, section=section, page=page
             )
-            report = await get_match_report(session, actor, fixture_id)
-            text, keyboard = report_view(report, return_page, section=section, page=page)
-    except (PermissionDenied, ValueError):
-        await edit_response(
-            query.message, tr("Отчёт недоступен или кнопка устарела. Откройте /history.")
-        )
-        return
-    await edit_response(query.message, text, keyboard)
+        except (PermissionDenied, ValueError):
+            await timing.send(
+                lambda: edit_response(
+                    message, tr("Отчёт недоступен или кнопка устарела. Откройте /history.")
+                )
+            )
+            return
+        await timing.send(lambda: edit_response(message, text, keyboard))

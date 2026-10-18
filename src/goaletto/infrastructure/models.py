@@ -120,6 +120,9 @@ class OutboxMessage(Base):
     live_board_key: Mapped[str | None] = mapped_column(String(200))
     priority: Mapped[int] = mapped_column(SmallInteger, server_default="0")
     last_error: Mapped[str | None] = mapped_column(String(80))
+    enqueued_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp()
+    )
 
 
 class OutboxBoard(Base):
@@ -151,6 +154,7 @@ class OutboxDeliveryAttempt(Base):
 
     __tablename__ = "outbox_delivery_attempts"
     __table_args__ = (
+        Index("ix_delivery_attempt_started", "started_at"),
         CheckConstraint("attempt > 0", name="ck_delivery_attempt_number"),
         CheckConstraint(
             "outcome IN ('claimed','sending','sent','edited','duplicate','rate_limited',"
@@ -174,9 +178,48 @@ class OutboxDeliveryAttempt(Base):
     attempt: Mapped[int] = mapped_column(Integer, primary_key=True)
     lease_owner: Mapped[str] = mapped_column(String(64))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    available_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    render_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rendered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     network_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     outcome: Mapped[str] = mapped_column(String(24))
+
+
+class RuntimeRequest(Base):
+    """One operational attempt, no Telegram IDs, payloads or journey identity."""
+
+    __tablename__ = "runtime_requests"
+    __table_args__ = (
+        Index("ix_runtime_request_time", "received_at"),
+        Index("ix_runtime_request_operation", "operation_id"),
+        CheckConstraint(
+            "route IN ('match_open','match_callback','history')", name="ck_request_route"
+        ),
+        CheckConstraint(
+            "business_outcome IN ('unknown','committed','rejected')", name="ck_request_business"
+        ),
+        CheckConstraint(
+            "delivery_outcome IN ('not_started','sending','accepted','rejected','unknown')",
+            name="ck_request_delivery",
+        ),
+        CheckConstraint(
+            "finished_at IS NULL OR finished_at >= received_at", name="ck_request_time"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    operation_id: Mapped[UUID] = mapped_column(Uuid)
+    route: Mapped[str] = mapped_column(String(24))
+    fixture_id: Mapped[UUID | None] = mapped_column(ForeignKey("fixtures.id"))
+    command_id: Mapped[UUID | None] = mapped_column(ForeignKey("accepted_commands.id"))
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    committed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    render_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rendered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    network_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    business_outcome: Mapped[str] = mapped_column(String(16))
+    delivery_outcome: Mapped[str] = mapped_column(String(16))
 
 
 class Manager(Base):
@@ -949,6 +992,7 @@ class MatchTick(Base):
 class AcceptedCommand(Base):
     __tablename__ = "accepted_commands"
     __table_args__ = (
+        Index("ix_accepted_command_time", "accepted_at"),
         UniqueConstraint("telegram_update_id", "effect_number", name="uq_command_update_effect"),
         ForeignKeyConstraint(
             ["match_id", "applied_tick_number"],
@@ -1210,6 +1254,7 @@ class MatchStage(Base):
 class OperationAttempt(Base):
     __tablename__ = "operation_attempts"
     __table_args__ = (
+        Index("ix_operation_attempt_started", "started_at"),
         UniqueConstraint("job_id", "retry_number", name="uq_attempt_job_retry"),
         CheckConstraint("retry_number > 0 AND finished_at >= started_at", name="ck_attempt_time"),
         CheckConstraint("outcome IN ('committed','deferred','failed')", name="ck_attempt_outcome"),

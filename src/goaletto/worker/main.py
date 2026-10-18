@@ -60,10 +60,12 @@ async def run() -> None:
                 retention_days=settings.feedback_comment_retention_days,
             )
     if settings.game_enabled:
+        from goaletto.application.runtime_reconciliation import request_reconciliation
         from goaletto.application.world_capacity import request_reserve
 
         async with database.transaction() as session:
             await request_reserve(session, datetime.now(UTC))
+            await request_reconciliation(session, datetime.now(UTC))
     logger.info("Worker started; existing match calendar activation remains explicit")
     logger.info("Outbox sender %s", "enabled" if bot else "disabled")
     try:

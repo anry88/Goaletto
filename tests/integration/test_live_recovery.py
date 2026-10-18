@@ -94,7 +94,8 @@ async def test_lag_restores_window_and_commands_then_replay_finishes_once(sessio
         actor,
         refreshed,
         "tactics",
-        {"tactic": "pressing"},
+        # The fixture's Q4 coach knows counter, not elite-only pressing.
+        {"tactic": "counter"},
         update=101,
         at=discovery + timedelta(seconds=15),
     )

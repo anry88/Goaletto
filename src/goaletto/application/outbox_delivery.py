@@ -889,6 +889,7 @@ async def claim_outbox(
                 attempt=row.attempts,
                 lease_owner=lease_owner,
                 started_at=now,
+                available_at=row.due_at,
                 outcome="claimed",
             )
         )
@@ -1114,7 +1115,13 @@ async def skip_stale(
 
 
 async def preflight_delivery(
-    session: AsyncSession, message_id: UUID, now: datetime, *, lease_owner: str, attempt: int
+    session: AsyncSession,
+    message_id: UUID,
+    now: datetime,
+    *,
+    lease_owner: str,
+    attempt: int,
+    start_network: bool = True,
 ) -> tuple[OutboxMessage, int | None] | None:
     """Commit these fresh guards directly before network; skip stale work atomically."""
     row = await _leased_row(session, message_id, now, lease_owner, attempt)
@@ -1128,8 +1135,9 @@ async def preflight_delivery(
         )
         return None
     delivery_attempt = await _attempt(session, row)
-    delivery_attempt.network_started_at = now
-    delivery_attempt.outcome = "sending"
+    if start_network:
+        delivery_attempt.network_started_at = now
+        delivery_attempt.outcome = "sending"
     return row, board.telegram_message_id if board else None
 
 
@@ -1140,11 +1148,16 @@ async def deliver_claimed(
     *,
     existing_board_message_id: int | None = None,
     timezone_name: str = "UTC",
+    prepared_text: str | None = None,
 ) -> tuple[Outcome, int | None, float | None]:
     """Call after preflight commit, without an open database transaction."""
     require_utc(now)
     try:
-        text = render_text(message.payload, timezone_name=timezone_name)
+        text = (
+            prepared_text
+            if prepared_text is not None
+            else render_text(message.payload, timezone_name=timezone_name)
+        )
         if message.payload["kind"] == "match_board" and existing_board_message_id is not None:
             try:
                 await transport.edit_text(message.chat_id, existing_board_message_id, text)

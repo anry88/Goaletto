@@ -320,7 +320,7 @@ async def test_runner_commits_before_network_and_records_one_system_effect(store
     previous = store.ownership.last_game_action_at, store.ownership.expires_at
     transport = Transport(store)
     step = await process_one_delivery(store, transport, clock=lambda: store.now)
-    assert step.processed and store.commits == 3
+    assert step.processed and store.commits == 4
     assert row.status == "sent" and row.telegram_message_id == 777
     assert len(transport.calls) == 1
     assert len(store.events) == 1
@@ -639,9 +639,21 @@ def test_frozen_migration_and_downgrade_match_board_ddl(monkeypatch):
     assert normalized(
         str(CreateTable(OutboxBoard.__table__).compile(dialect=postgresql.dialect()))
     ) in normalized(sql)
-    assert normalized(
-        str(CreateTable(OutboxDeliveryAttempt.__table__).compile(dialect=postgresql.dialect()))
-    ) in normalized(sql)
+    # The original delivery table remains frozen; 0041 adds observation clocks.
+    from sqlalchemy.schema import CreateColumn
+
+    for column in OutboxDeliveryAttempt.__table__.columns:
+        if column.name in {"available_at", "render_started_at", "rendered_at"}:
+            assert f"ALTER TABLE outbox_delivery_attempts ADD COLUMN {column.name}" in sql
+        else:
+            assert normalized(
+                str(CreateColumn(column).compile(dialect=postgresql.dialect()))
+            ) in normalized(sql)
+    for constraint in OutboxDeliveryAttempt.__table__.constraints:
+        if constraint.name:
+            assert normalized(
+                f"CONSTRAINT {constraint.name} CHECK ({constraint.sqltext})"
+            ) in normalized(sql)
     assert "ADD COLUMN leased_until" in sql and "ck_outbox_lease" in sql
     assert "UPDATE outbox_messages SET priority" in sql
     down = io.StringIO()
@@ -753,3 +765,23 @@ def test_knockout_result_keeps_match_goals_separate_from_aggregate_and_penalties
     pending = {**row.payload, "kind": "match_board", "phase": "penalties", "penalty_kicks": 11}
     assert sender.board_revision(row.payload) > sender.board_revision(pending)
     assert sender.valid_payload(pending)
+
+
+async def test_runner_render_failure_never_calls_telegram_or_leaves_sending_intent(
+    store, monkeypatch
+):
+    from goaletto.infrastructure import outbox_runner
+
+    row = store.message()
+
+    def broken(*args, **kwargs):
+        assert store.active == 0
+        raise ValueError("broken render")
+
+    monkeypatch.setattr(outbox_runner, "render_text", broken)
+    transport = Transport(store)
+    await process_one_delivery(store, transport, clock=lambda: store.now)
+    attempt = store.attempts[row.id, 1]
+    assert attempt.outcome == "invalid_request"
+    assert attempt.network_started_at is None
+    assert row.status == "failed"

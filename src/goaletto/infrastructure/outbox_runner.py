@@ -19,8 +19,9 @@ from goaletto.application.outbox_delivery import (
     deliver_claimed,
     finish_delivery,
     preflight_delivery,
+    render_text,
 )
-from goaletto.infrastructure.models import Manager
+from goaletto.infrastructure.models import Manager, OutboxDeliveryAttempt
 from goaletto.presentation.i18n import using_locale
 
 
@@ -54,7 +55,12 @@ async def process_one_delivery(
     try:
         async with database.transaction() as session:
             ready = await preflight_delivery(
-                session, message_id, clock(), lease_owner=token, attempt=attempt
+                session,
+                message_id,
+                clock(),
+                lease_owner=token,
+                attempt=attempt,
+                start_network=False,
             )
             manager = await session.scalar(
                 select(Manager).where(Manager.telegram_id == row.chat_id)
@@ -66,6 +72,20 @@ async def process_one_delivery(
         row, board_id = ready
         try:
             with using_locale(chosen if chosen in {"ru", "en"} else "ru"):
+                render_started = clock()
+                text = render_text(row.payload, timezone_name=timezone_name)
+                rendered = clock()
+                # A fresh guard after render; no transaction spans Telegram I/O.
+                async with database.transaction() as session:
+                    ready = await preflight_delivery(
+                        session, message_id, clock(), lease_owner=token, attempt=attempt
+                    )
+                    if ready is None:
+                        return DeliveryStep(True)
+                    row, board_id = ready
+                    observed = await session.get(OutboxDeliveryAttempt, (message_id, attempt))
+                    assert observed is not None
+                    observed.render_started_at, observed.rendered_at = render_started, rendered
                 async with asyncio.timeout(30):
                     outcome, telegram_id, retry_after = await deliver_claimed(
                         row,
@@ -73,7 +93,12 @@ async def process_one_delivery(
                         clock(),
                         existing_board_message_id=board_id,
                         timezone_name=timezone_name,
+                        prepared_text=text,
                     )
+        except LeaseLost:
+            raise
+        except ValueError:
+            outcome, telegram_id, retry_after = Outcome.INVALID, None, None
         except TimeoutError:
             outcome, telegram_id, retry_after = Outcome.UNKNOWN, None, None
         async with database.transaction() as session:
