@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from goaletto.application.game_actions import Actor, allocation_lock
 from goaletto.application.market import (
+    calendar_for,
     close_auction,
     list_player,
     place_bid,
@@ -73,22 +74,24 @@ def fresh_action(actor: Actor, at: datetime = NOW) -> Actor:
 
 async def market_race_world(
     sessions: async_sessionmaker[AsyncSession],
+    *,
+    at: datetime = NOW,
 ) -> tuple[list[tuple[Actor, UUID, UUID]], UUID, UUID, UUID]:
     """Three funded clubs and one open seller auction; caller owns no transaction."""
-    _, seller_actor, seller_club = await setup_world(sessions)
+    _, seller_actor, seller_club = await setup_world(sessions, at=at)
     pairs: list[tuple[Actor, UUID]] = [(seller_actor, seller_club)]
     async with sessions.begin() as session:
         for telegram_id in (1002, 1003):
             entry = await begin_game(
-                session, telegram_id=telegram_id, update_id=telegram_id, payload=None, at=NOW
+                session, telegram_id=telegram_id, update_id=telegram_id, payload=None, at=at
             )
-            actor = fresh_action(entry.actor)
+            actor = fresh_action(entry.actor, at)
             owner = await claim_club(session, actor, entry.offers[0].id)
             pairs.append((actor, owner.club_id))
         funded: list[tuple[Actor, UUID, UUID]] = []
         for actor, club_id in pairs:
             account = (await locked_accounts(session, club_id))[club_id]
-            await credit_locked(session, account, f"test-race:{club_id}", "grant", 1000000, NOW)
+            await credit_locked(session, account, f"test-race:{club_id}", "grant", 1000000, at)
             owner_id = await session.scalar(
                 select(OwnershipPeriod.id).where(
                     OwnershipPeriod.club_id == club_id, OwnershipPeriod.ended_at.is_(None)
@@ -110,11 +113,11 @@ async def market_race_world(
         assert player is not None
         auction = await list_player(
             session,
-            fresh_action(seller_actor),
+            fresh_action(seller_actor, at),
             funded[0][2],
             player.person_id,
             100000,
-            clock=lambda: NOW,
+            clock=lambda: at,
         )
         auction_id: UUID = auction.id
         person_id: UUID = player.person_id
@@ -444,15 +447,20 @@ async def test_late_bid_extension_vs_taken_close_job_defers_with_single_reserve(
     sessions: async_sessionmaker[AsyncSession],
 ) -> None:
     """Late bid extends while the close job waits; no early transfer, future job kept."""
-    people, auction_id, _, _ = await market_race_world(sessions)
+    # Keep listing + 48h + extension inside the current four-day calendar's
+    # offseason window; crossing its close tests rejection, not this race.
+    listed_at = NOW - timedelta(days=1)
+    people, auction_id, _, _ = await market_race_world(sessions, at=listed_at)
     buyer_actor, buyer_club, buyer_owner = people[1]
     seller_club = people[0][1]
-    late_at = NOW + timedelta(hours=47)
+    late_at = listed_at + timedelta(hours=47)
     async with sessions.begin() as session:
         auction_row = await session.get(Auction, auction_id)
         assert auction_row is not None
         old_ends = auction_row.ends_at
-    assert old_ends == NOW + timedelta(hours=48)
+        _, window = await calendar_for(session, buyer_club, late_at)
+        assert window.contains(late_at)
+    assert old_ends == listed_at + timedelta(hours=48)
     new_ends = old_ends + timedelta(minutes=30)
 
     bid_acquired = asyncio.Event()

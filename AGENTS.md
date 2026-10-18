@@ -110,6 +110,11 @@
   During development, while Goaletto has no real players, use the single
   Goaletto application database for checks (create the main database if absent);
   its development data may be reset.
+  User reiterated 2026-10-18: during development, freely reset/recreate the real
+  Goaletto application DB when useful. Backing up/restoring disposable test data
+  is optional, never a prerequisite or an approval gate. Do not add compatibility
+  code just to preserve this world. Older agent/check docs requiring a saved world
+  describe an obsolete workflow; this instruction takes precedence.
   Verify the exact Goaletto target before any reset. Never reset another project.
   Once real players/data exist, this development reset authorization no longer
   applies. Never print tokens or credential-bearing database URLs.
@@ -294,3 +299,17 @@
   window before any tick. Never reset failed/done/held jobs, replay an admitted
   human world, mutate a checkpoint, or infer money/results. Skip paused/inactive/
   preparing worlds. HDC reboot/DB-disconnect drill remains open under AND-69/72.
+
+- AND-70 worker health uses migration 0043 and per-boot worker_heartbeats for
+  jobs/sender separately. Pulse only after committed iterations or intentional
+  sender backoff waits; never maintain health with an independent timer while
+  processing is stuck. Health CLI reads this process's private boot file and DB,
+  never another replica's success. Monitoring writes are bounded and do not undo
+  game commits. See docs/worker-health.md. Docker unhealthy alone does not restart
+  a live container; HDC alerts/backup/reboot acceptance remain separate.
+- AND-71 bounded load profile is tests/integration/test_launch_load.py;
+  docs/launch-load.md records 50/75-match real-clock first-tick measurements.
+  Synthetic past jobs are held, not invented as results. Separate committed-tick
+  latency from deferred attempt percentiles, and fake Telegram time from real IO.
+  Use the single real player-free application DB, serially; reset/recreate freely.
+  Local timings do not establish HDC capacity or full-season balance.

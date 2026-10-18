@@ -9,7 +9,13 @@ HDC: Windows host + Docker с Linux-контейнерами, SSH alias hdc.
 Предлагаемый путь: D:\HomeDataCenter\services\goaletto.
 Отдельный Compose project goaletto, volumes и host-only secrets. PostgreSQL без
 публичного порта; bot/worker используют исходящий long polling, без Cloudflare Tunnel.
-Соединение с сервером и production-деплой Goaletto ещё не выполнялись.
+Production-деплой Goaletto ещё не выполнялся.
+
+Обновление 2026-10-18: read-only SSH/inventory проверены, HDC отвечает;
+Docker Linux/x86_64, 8 CPU, около 7,71 GiB RAM, Compose 5.1.4. Goaletto ещё не
+развёрнут, соседние сервисы не менялись. В release добавлен
+[worker healthcheck](worker-health.md); локальная [нагрузочная проверка](launch-load.md)
+не заменяет измерение на HDC и проверку бюджета памяти существующих сервисов.
 
 ## Подготовка
 

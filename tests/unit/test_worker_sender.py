@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -46,7 +47,11 @@ async def test_worker_runs_sender_independently_and_closes_resources(monkeypatch
     async def configure(*args):
         pass
 
+    async def initialize(*args):
+        return uuid4()
+
     monkeypatch.setattr(worker, "configure_feedback", configure)
+    monkeypatch.setattr(worker, "initialize_health", initialize)
     monkeypatch.setattr(worker, "Settings", lambda: settings)
     monkeypatch.setattr(worker, "Database", DatabaseStub)
     monkeypatch.setattr(worker, "Bot", BotStub)
@@ -72,3 +77,33 @@ async def test_sender_enabled_without_token_fails_before_opening_database(monkey
     monkeypatch.setattr(worker, "Database", lambda _: pytest.fail("Database must not open"))
     with pytest.raises(SystemExit, match="GOALETTO_BOT_TOKEN"):
         await worker.run()
+
+
+async def test_startup_failure_closes_bot_and_database(monkeypatch):
+    settings = Settings(_env_file=None, outbox_enabled=True, bot_token="stub")
+    stopped = []
+
+    class DatabaseStub:
+        def __init__(self, settings):
+            pass
+
+        async def close(self):
+            stopped.append("database")
+
+    class BotStub:
+        def __init__(self, token):
+            self.session = SimpleNamespace(close=self.close)
+
+        async def close(self):
+            stopped.append("bot")
+
+    async def fail(*args):
+        raise ConnectionError("startup failed")
+
+    monkeypatch.setattr(worker, "Settings", lambda: settings)
+    monkeypatch.setattr(worker, "Database", DatabaseStub)
+    monkeypatch.setattr(worker, "Bot", BotStub)
+    monkeypatch.setattr(worker, "prepare_worker", fail)
+    with pytest.raises(ConnectionError):
+        await worker.run()
+    assert stopped == ["bot", "database"]

@@ -1394,6 +1394,27 @@ class AcquisitionTouch(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class WorkerHeartbeat(Base):
+    """Operational loop progress; never user activity or game state."""
+
+    __tablename__ = "worker_heartbeats"
+    __table_args__ = (
+        CheckConstraint("component IN ('jobs','sender')", name="ck_heartbeat_component"),
+        CheckConstraint("outcome IN ('starting','ok','error')", name="ck_heartbeat_outcome"),
+        CheckConstraint("observed_at >= started_at", name="ck_heartbeat_time"),
+        CheckConstraint(
+            "succeeded_at IS NULL OR succeeded_at <= observed_at", name="ck_heartbeat_success"
+        ),
+        Index("ix_heartbeat_observed", "observed_at"),
+    )
+    instance_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    component: Mapped[str] = mapped_column(String(8), primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    succeeded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome: Mapped[str] = mapped_column(String(8))
+
+
 class GameActionReceipt(Base):
     """Operational dedupe independent of optional/expiring analytics."""
 

@@ -1,3 +1,5 @@
+from pathlib import Path
+from tempfile import gettempdir
 from typing import Annotated
 
 from pydantic import Field, SecretStr
@@ -16,6 +18,7 @@ class Settings(BaseSettings):
     )
     log_level: str = "INFO"
     worker_poll_seconds: float = Field(default=1, ge=0.1, le=60)
+    worker_health_file: Path = Path(gettempdir()) / "goaletto-worker-instance"
     outbox_enabled: bool = False
     game_enabled: bool = False
     # JSON array in the host-only environment; empty preserves unrestricted access.
