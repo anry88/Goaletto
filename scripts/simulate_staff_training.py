@@ -1,4 +1,4 @@
-"""Offline 80-day calibration of actual training and official league appearances."""
+"""Offline upper-bound seasons using current training and all match practice rules."""
 
 import csv
 from dataclasses import replace
@@ -6,7 +6,11 @@ from pathlib import Path
 from uuid import UUID
 
 from goaletto.domain.development import GrowthBudget
-from goaletto.domain.match_development import develop_appearance
+from goaletto.domain.match_practice import (
+    CURRENT_POLICY,
+    Competition,
+    develop_match_practice,
+)
 from goaletto.domain.recovery import daily_recovery, ready_in, recover
 from goaletto.domain.training import (
     PROGRESS_KEYS,
@@ -19,7 +23,12 @@ from goaletto.domain.training import (
 
 
 def simulate(
-    age: int, skill: int, focus: Focus, intensity: Intensity, late: bool = False
+    age: int,
+    skill: int,
+    focus: Focus,
+    intensity: Intensity,
+    late: bool = False,
+    friendlies: bool = False,
 ) -> dict[str, int | str]:
     player = TrainingPlayer(
         UUID(int=1),
@@ -32,37 +41,55 @@ def simulate(
         0,
     )
     budget, days, matches = GrowthBudget(age), 0, 0
+    appearances = dict.fromkeys(Competition, 0)
+    minutes_played = 0
     energy, remainder, minimum = 10000, 0, 10000
     for day in range(80):
         # Eight offseason dates + eighteen four-day cycles in one age-season.
         phase = (day - 8) % 4
         cycle = (day - 8) // 4
-        match = day >= 8 and (
-            phase == 3
-            or phase == 0
-            and cycle < (17 if late else 2)
-            or phase == 1
-            and late
-            and cycle < 17
-        )
+        competition = None
+        if day >= 8:
+            if phase == 3:
+                competition = Competition.LEAGUE
+            elif phase == 0 and cycle < (17 if late else 2):
+                competition = Competition.CUP
+            elif phase == 1 and late and cycle < 17:
+                competition = Competition.CHAMPIONS
+            elif phase == 2 and friendlies:
+                competition = Competition.FRIENDLY
         energy, remainder = recover(
             energy, remainder, 86400, daily_recovery(player.skills["stamina"], age, skill)
         )
-        if match:
+        if competition is not None:
             matches += 1
-            if phase == 3:
-                appearance = develop_appearance(player, 90, {"attack_coach": skill}, budget)
-                growth = appearance.growth
-                player, budget = (
-                    replace(
-                        player,
-                        skills=growth.skills,
-                        progress=growth.progress,
-                        experience=appearance.experience,
-                    ),
-                    growth.budget,
-                )
-            energy = max(0, energy - (3574 if phase in (0, 1) else 2680))
+            appearances[competition] += 1
+            # Stress second legs/finals with actual 120 minutes; first legs stay 90.
+            extra_time = competition in {Competition.CUP, Competition.CHAMPIONS} and (
+                cycle % 2 == 1 or cycle == 16
+            )
+            minutes = 120 if extra_time else 90
+            minutes_played += minutes
+            appearance = develop_match_practice(
+                player,
+                competition,
+                minutes,
+                {"attack_coach": skill},
+                budget,
+                match_seed=f"calibration:{competition}:{day}",
+                policy=CURRENT_POLICY,
+            )
+            player, budget = (
+                replace(
+                    player,
+                    skills=appearance.skills,
+                    progress=appearance.progress,
+                    experience=appearance.experience,
+                    form=appearance.form,
+                ),
+                appearance.growth.budget,
+            )
+            energy = max(0, energy - (3574 if extra_time else 2680))
         else:
             days += 1
             result = train_player(
@@ -101,9 +128,13 @@ def simulate(
         "skill": skill,
         "focus": focus.value,
         "intensity": intensity.value,
-        "calendar": "two-finals" if late else "early-exit",
+        "calendar": ("two-finals" if late else "early-exit")
+        + ("+friendlies" if friendlies else ""),
         "training_days": days,
         "matches": matches,
+        **{f"{competition.value}_matches": count for competition, count in appearances.items()},
+        "minutes_played": minutes_played,
+        "experience_bps": player.experience * 10000 + player.progress["experience"],
         "training_bps": budget.used["training"],
         "match_bps": budget.used["match"],
         "total_bps": budget.used["training"] + budget.used["match"],
@@ -116,12 +147,13 @@ def simulate(
 
 def main() -> None:
     rows = [
-        simulate(age, skill, focus, intensity, late)
+        simulate(age, skill, focus, intensity, late, friendlies)
         for age in (18, 21, 26, 30)
         for skill in (1, 2, 5, 6, 9, 10, 13, 14, 17, 18, 20)
         for focus in (Focus.TEAM, Focus.PHYSICAL)
         for intensity in Intensity
         for late in (False, True)
+        for friendlies in (False, True)
     ]
     output = Path("work/staff-training-calibration.csv")
     output.parent.mkdir(exist_ok=True)
@@ -136,17 +168,22 @@ def main() -> None:
         f"{len(rows)} чистых сценария, без DB и сети. "
         "Все фокусы и группы отдельно покрыты unit/PG-проверками.",
         "",
-        "80 дней одного возраста: 8 межсезонья и 72 сезона. Ранний вылет: 18 игр лиг"
-        "и + 2 кубковые, 60 тренировочных дней; два финала: 52 игры и 28 тренировочн"
-        "ых дней.",
-        "Кубковые нагрузки здесь — проектный стресс, их runtime остаётся отдельными "
-        "задачами. Игрок начинает с навыками 10, потолками 20, моралью 50 и лидерств"
-        "ом 10. Травмы исключены, чтобы оценить верхнюю границу роста.",
+        "80 дней одного возраста: 8 межсезонья и 72 сезона. Ранний вылет: 18 игр лиги "
+        "+ 2 кубковые; плотный календарь: 18 лиговых + 17 кубковых + 17 чемпионских. "
+        "Это верхняя нагрузка для дошедшего до двух финалов клуба нижней лиги при "
+        "максимальной чемпионской группе, а не симуляция реальной сетки/сезона в БД.",
+        "Отдельные сценарии добавляют 18 явно выбранных товарищеских в день 3. "
+        "Они добровольны: в игре нет автоматического назначения или штрафа за отдых. "
+        "Все оставшиеся даты здесь выбраны под тренировки только для оценки верхней границы.",
+        "Игрок начинает с навыками 10, потолками 20, моралью 50 и лидерством 10. "
+        "Травмы исключены; штрафы усталости к минутам/участию не моделируются. "
+        "Энергия — иллюстрация 24-часового recovery-v1 с типовой нагрузкой 2680/3574 bps; "
+        "это не прогноз травм или матчевых результатов.",
         "",
-        "Матчевые прибавки используют реальную match-development-v1 для 18 официальных игр лиги. "
-        "Кубковые игры пока считаются только нагрузкой: "
-        "их runtime/eligibility подключаются отдельно. "
-        "Товарищеские и операторские матчи не награждаются. Опыт начисляется отдельно от навыка.",
+        "Все матчи используют текущую match-practice-v2: официальные — полный прогресс, "
+        "товарищеские — рабочие 50% навыков/опыта, с обычной динамикой формы. "
+        "Для вторых кубковых/чемпионских встреч и финала взяты 120 минут, остальных — 90; "
+        "пенальти минут не добавляют. Опыт начисляется отдельно от навыков.",
         "",
         "Общие пределы возраста-сезона: 3 балла суммарно по восьми навыкам, из них м"
         "аксимум 2 тренировочных и 1 матчевый; один навык — максимум 1.5. Это потолк"
@@ -163,7 +200,7 @@ def main() -> None:
         "Средняя интенсивность, ранний вылет, физподготовка; весь штаб одной квалифи"
         "кации. Показаны накопленные дробные баллы:",
         "",
-        "| Возраст | Навык штаба | Тренировки | Матчи лиги | Всего | Лидерство | Мораль |",
+        "| Возраст | Навык штаба | Тренировки | Все матчи | Всего | Лидерство | Мораль |",
         "|---|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
@@ -178,6 +215,30 @@ def main() -> None:
                 f"| {int(row['match_bps']) / 10000:.3f} "
                 f"| {int(row['total_bps']) / 10000:.3f} "
                 f"| {int(row['leadership_bps']) / 10000:.3f} | {row['morale']} |"
+            )
+    lines.extend(
+        (
+            "",
+            "Возраст 18, штаб 10, средняя физподготовка: сравнение плотности календаря.",
+            "Числа — один детерминированный сценарий, не статистика игроков.",
+            "",
+            "| Календарь | Тренировки | Лига/кубок/чемпионы/товарищеские | Минуты | Рост | Опыт |",
+            "|---|---:|---|---:|---:|---:|",
+        )
+    )
+    for row in rows:
+        if (
+            row["age"] == 18
+            and row["skill"] == 10
+            and row["focus"] == "physical"
+            and row["intensity"] == "medium"
+        ):
+            lines.append(
+                f"| {row['calendar']} | {row['training_days']} | "
+                f"{row['league_matches']}/{row['cup_matches']}/"
+                f"{row['champions_matches']}/{row['friendly_matches']} | "
+                f"{row['minutes_played']} | {int(row['total_bps']) / 10000:.3f} | "
+                f"{int(row['experience_bps']) / 10000:.3f} |"
             )
     maximum = max(int(r["total_bps"]) for r in rows)
     lines.extend(

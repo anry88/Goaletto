@@ -324,3 +324,11 @@
   absent coverage/observations never become successful zeroes. See
   docs/analytics/grafana.md. Local real-login/Grafana acceptance does not certify
   HDC organization membership, actual production grants or external outreach.
+
+- AND-61/83/64 functional acceptance is consolidated in
+  docs/staff-development-acceptance.md. Their child runtime flows are implemented:
+  paid final scouting reports, staff replacement/cards/effects, persisted retirement
+  careers and loyalty rehires, all-competition practice, shared growth and aging.
+  simulate_staff_training now uses current V2 for every match, including optional
+  friendlies and knockout ET; its 1056 scenarios are an upper-bound calibration,
+  never fabricated DB results. Balance/HDC/portrait-production tasks stay separate.

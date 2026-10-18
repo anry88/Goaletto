@@ -3,7 +3,7 @@
 Pure forecast with the real domain functions only (no DB, engine copy or
 network). Compares friendly 25/50/75% proposals and two 80-day calendars
 with training on free UTC dates only. Results are implementation
-proposals, not approved game balance and not an already-connected game.
+prototype coefficients, not approved balance or measurements of live players.
 
 Reproduce: ``.venv/bin/python scripts/calibrate_match_practice.py --seed 7``
 """
@@ -19,7 +19,7 @@ from goaletto.domain.match_practice import (
     CURRENT_POLICY,
     Competition,
     develop_match_practice,
-    form_up_chance,
+    form_chances,
     practice_form,
 )
 from goaletto.domain.training import (
@@ -53,13 +53,20 @@ def official_parity() -> list[str]:
     for age in (18, 22, 30):
         old = develop_appearance(player(age), 90, STAFF, GrowthBudget(age))
         new = develop_match_practice(
-            player(age), "league", 90, STAFF, GrowthBudget(age), match_seed="parity"
+            player(age),
+            "league",
+            90,
+            STAFF,
+            GrowthBudget(age),
+            match_seed="parity",
+            policy=CURRENT_POLICY,
         )
         parity = (
             new.growth == old.growth
             and new.experience == old.experience
             and new.experience_gain == old.experience_gain
         )
+        assert parity, "Official practice changed its legacy 90-minute skill/experience scale"
         lines.append(
             f"age {age}: v1 granted={sum(old.growth.granted.values())} "
             f"practice granted={sum(new.granted.values())} "
@@ -74,7 +81,13 @@ def factor_table() -> list[str]:
     lines.append("age | official skill | 25% | 50% | 75% | official exp | 25% | 50% | 75%")
     for age in (18, 21, 26, 30, 34):
         official = develop_match_practice(
-            player(age), "league", 90, STAFF, GrowthBudget(age), match_seed="factor"
+            player(age),
+            "league",
+            90,
+            STAFF,
+            GrowthBudget(age),
+            match_seed="factor",
+            policy=CURRENT_POLICY,
         )
         row = [f"{age} | {sum(official.granted.values())} |"]
         exps = [f"{official.experience_gain} |"]
@@ -88,6 +101,7 @@ def factor_table() -> list[str]:
                 match_seed="factor",
                 friendly_skill_factor=factor,
                 friendly_experience_factor=factor,
+                policy=CURRENT_POLICY,
             )
             row.append(f" {sum(friendly.granted.values())} |")
             exps.append(f" {friendly.experience_gain} |")
@@ -105,7 +119,13 @@ def extra_time_table() -> list[str]:
     lines = ["== extra time is total minutes, no double counting (age 22) =="]
     for minutes in (90, 105, 120):
         result = develop_match_practice(
-            player(22), "cup", minutes, STAFF, GrowthBudget(22), match_seed="et"
+            player(22),
+            "cup",
+            minutes,
+            STAFF,
+            GrowthBudget(22),
+            match_seed="et",
+            policy=CURRENT_POLICY,
         )
         lines.append(
             f"{minutes} min: skill={sum(result.granted.values())} exp={result.experience_gain}"
@@ -114,28 +134,29 @@ def extra_time_table() -> list[str]:
 
 
 def form_table(seed: int) -> list[str]:
-    lines = [f"== form distribution over 2000 person seeds (base seed {seed}) =="]
-    lines.append("minutes/form -> chance bps | observed +1/2000")
+    lines = [f"== {CURRENT_POLICY} form distribution over 2000 person seeds (seed {seed}) =="]
+    lines.append("minutes/form -> up/down chance bps | observed +1/0/-1 of 2000")
     for minutes in (30, 90, 120):
         for form in (4, 6, 7):
-            chance = form_up_chance(minutes, form)
-            ups = sum(
+            up, down = form_chances(minutes, form)
+            changes = Counter(
                 practice_form(
                     form,
                     minutes,
                     person_id=UUID(int=1000000 + seed * 10000 + i),
                     match_seed=f"form-cal:{seed}",
+                    policy=CURRENT_POLICY,
                 ).form
-                == form + 1
+                - form
                 for i in range(2000)
             )
+            assert sum(changes.values()) == 2000 and set(changes) <= {-1, 0, 1}
             lines.append(
-                f"{minutes} min/form {form}: chance {chance} -> {ups}/2000 ({ups / 20:.1f}%)"
+                f"{minutes} min/form {form}: {up}/{down} -> {changes[1]}/{changes[0]}/{changes[-1]}"
             )
     lines.append(
-        "Reading: 90 min at form 6 gives ~8% per match, so ~12 such matches "
-        "per +1 on average; form 7 is ~3%. No guaranteed +1, no fast "
-        "saturation to 8 across a season."
+        "Reading: current V2 permits both rises and falls; more actual minutes "
+        "scale exposure, not the size of the step. This is a seeded sample, not live data."
     )
     return lines
 

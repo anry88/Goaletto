@@ -36,7 +36,10 @@ async def test_real_final_energy_survives_next_read_and_no_recovery_during_outag
     async with sessions.begin() as session:
         fixture = await session.scalar(
             select(Fixture)
-            .where((Fixture.home_club_id == club) | (Fixture.away_club_id == club))
+            .where(
+                Fixture.competition == "league",
+                (Fixture.home_club_id == club) | (Fixture.away_club_id == club),
+            )
             .order_by(Fixture.scheduled_start_at)
             .limit(1)
         )

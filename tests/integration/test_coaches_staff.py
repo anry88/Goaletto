@@ -429,7 +429,16 @@ async def test_coach_retirement_closes_salary_and_restores_basic_future_tactic(s
             ).all()
         }
         counts = {key: 0 for key in ("staff_aged", "staff_warned", "staff_retired")}
-        await _rollover_staff(session, season, successor.id, 0, members, season.ends_at, counts)
+        await _rollover_staff(
+            session,
+            season,
+            successor.id,
+            0,
+            members,
+            season.ends_at,
+            counts,
+            {member: successor.id for member in members},
+        )
         assert staff.status == "retired" and counts["staff_retired"] == 1
         assert (await coach_snapshot(session, club_id)).person_id is None
         assert lineup.tactics["tactic"] == "normal"

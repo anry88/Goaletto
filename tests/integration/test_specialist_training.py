@@ -297,8 +297,19 @@ async def test_training_after_real_match_does_not_rewrite_snapshot_and_mentoring
         for player in players:
             player.morale = 40
             (await session.get(PlayerDevelopment, player.person_id)).leadership_progress = 9990
-        actor = replace(action(actor), at=week_start(at) + timedelta(days=1, hours=1))
-        plan = await choose(session, actor, Focus.TEAM)
+        actor = replace(action(actor), at=at + timedelta(hours=1))
+        screen = await load_training(session, actor, record=False)
+        # The day after a league game can now be reserved for a cup tie.
+        free = next(day for day in screen.dates if day.reason is None)
+        plan = await select_training(
+            session,
+            actor,
+            ownership_id=screen.ownership_id,
+            week=free.day,
+            focus=Focus.TEAM,
+            intensity=Intensity.MEDIUM,
+            clock=lambda: actor.at,
+        )
         await apply_training(session, await training_job(session, plan), plan.due_at)
         assert plan.status == "applied"
         assert any(r["morale_after"] > r["morale_before"] for r in plan.results)

@@ -1,5 +1,7 @@
 # Документация Goaletto
 
+[Приёмка штаба, второй карьеры и развития](staff-development-acceptance.md) — AND-61/83/64.
+
 [Операторский Grafana и SQL-доступ](analytics/grafana.md) — AND-80/82:
 provisioning, агрегаты, фильтры и настоящая проверка restricted LOGIN.
 
