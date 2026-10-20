@@ -92,17 +92,34 @@ python -m goaletto.application.analytics_cleanup_cli --at <UTC ISO> --apply
 24-часовой срок предложения, возврат пользователя и `bot_available`.
 Не чинить цифры вставкой событий или сбросом failed jobs.
 
-## Оставшийся gate HDC
+## Приёмка HDC · 2026-10-20
 
-- Сверить Grafana с теми же SQL, UTC-интервалами, фильтрами, n/N и coverage.
-  Пока dashboard не подключён, соответствие не подтверждено.
-- Проверить от имени фактической аналитической роли: разрешён только выбранный
-  export/агрегаты, запрещены Telegram mapping, feedback_comments и запись.
-  READ ONLY транзакция игрового DB-пользователя не заменяет проверку GRANT.
-- Подтвердить maintenance/retention и restricted доступ к выгрузкам на хосте.
-  Локальная проверка PUBLIC ACL не доказывает правильность ролей HDC.
-- Зафиксировать результаты перед AND-72 и первым внешним привлечением.
-  Внешние опросы по-прежнему не включены; текущий фильтр пропускает только internal.
+- В существующем Grafana 12.1.0 подключены оба dashboard, все 14 SQL запросов
+  выполнены фактическим ограниченным login. Шесть journey-отчётов сверены с CLI
+  на одном UTC-интервале. UI показывает coverage_start `2026-10-20T07:52:25.860710Z`,
+  ограничение покрытия и 0 внешних starts, не смешивая внутренний smoke с людьми.
+- Пользователь выбрал общую Main Org. (1) и папку Goaletto operator. Агрегаты
+  доступны её существующим Admin/Viewer; участников и их роли не меняли.
+  Отдельная организация не создавалась. Anonymous API =401.
+- Настоящий `goaletto_grafana` получает только aggregate function, без raw tables,
+  `journey_export`, mapping, comments или записи. Запреты проверены в READ WRITE,
+  не только через режим транзакции. Шесть безопасных атрибутов/connection limit,
+  минимальная membership и отсутствие прав на public relations подтверждены.
+- Реальная БД хранит retention 180 дней. В четырёх таблицах 0 истёкших кандидатов.
+  `cleanup_events` применён дважды с guard под блокировкой: при любом кандидате
+  проверка отказала бы до DELETE. Это проверка текущего no-op; точные границы и
+  удаление старых synthetic rows доказаны локальной hand-count PG матрицей.
+  Ownership, receipts и свежие analytics counts не изменились.
+- Проверены девять разрешённых колонок `journey_export`, security_barrier,
+  0 PUBLIC ACL entries и 0 внешних строк. Header-only CSV сохранён в закрытом
+  HDC `goaletto/operator-exports`, доступ — административный SSH/host-only ACL.
+  Grafana этот export не читает. Регулярную ручную maintenance выполнять
+  указанным выше CLI; автоматическое расписание journey cleanup не устанавливалось.
+
+[Полная HDC-приёмка](../hdc-acceptance-2026-10-20.md). Аналитический gate AND-82
+проверен. Это не включает внешнее привлечение, feedback-рассылки или admission:
+allowlist остаётся внутренним, automatic feedback выключен, host reboot/alerts
+и эксплуатационная приёмка AND-72 остаются отдельными задачами.
 
 ## Локальная приёмка 2026-10-18
 

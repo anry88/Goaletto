@@ -1,6 +1,6 @@
 apiVersion: 1
 providers:
-  - name: Goaletto private operator
+  - name: Goaletto operator
     orgId: $GOALETTO_GRAFANA_ORG_ID
     folder: Goaletto operator
     folderUid: goaletto-operator

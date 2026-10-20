@@ -82,14 +82,17 @@ ALTER ROLE goaletto_grafana IN DATABASE goaletto SET default_transaction_read_on
 
 ## Приватность в существующем Grafana
 
-Создать **отдельную операторскую организацию** существующего Grafana, доступную
-только операторам. Не добавлять datasource в общую организацию: в Grafana OSS
-права папки сами по себе не ограничивают запросы к datasource из Explore.
-Не включать anonymous/публичные dashboard snapshots и не приглашать игроков.
+Уточнение пользователя 2026-10-20: HDC использует существующую общую
+организацию **Main Org. (orgId=1)** и папку **Goaletto operator** рядом с остальными
+дашбордами. Отдельная организация не требуется. Агрегаты доступны участникам
+общей организации, включая запросы через Explore; folder ACL не изолирует
+PostgreSQL datasource. Отдельный ограниченный DB login остаётся обязательным.
+Не включать anonymous/публичные snapshots и не приглашать игроков автоматически.
+Для будущей установки с иным кругом участников можно выбрать отдельную организацию.
 
 Настройки provisioning находятся в `deploy/grafana/provisioning`. Host-only env:
 
-- `GOALETTO_GRAFANA_ORG_ID` — ID отдельной операторской организации;
+- `GOALETTO_GRAFANA_ORG_ID` — ID выбранной организации (HDC: 1);
 - `GOALETTO_GRAFANA_PG_HOST` — приватный Goaletto PostgreSQL host:port;
 - `GOALETTO_GRAFANA_PG_USER` / `GOALETTO_GRAFANA_PG_PASSWORD` — отдельный login;
 - `GOALETTO_GRAFANA_PG_SSLMODE` — фактическая настройка приватного транспорта;
@@ -101,14 +104,11 @@ ALTER ROLE goaletto_grafana IN DATABASE goaletto SET default_transaction_read_on
 Не заменять чужие файлы provisioning. UID datasource `goaletto-operator-pg`,
 UID dashboard `goaletto-launch`/`goaletto-operations`, folder `goaletto-operator`.
 Pool ограничен двумя соединениями, refresh раз в минуту, datasource не default.
-Файлы dashboard/provisioning не являются ACL: после загрузки применить
-`deploy/grafana/folder-permissions.json` через
-`POST /api/folders/goaletto-operator/permissions` в операторской организации
-и прочитать permissions обратно. Заголовок `X-Grafana-Org-Id` должен указывать
-её ID; авторизация только host-only credential, без вывода/коммита секрета.
-Проверить отсутствие Viewer/Editor и лишних участников организации. При добавлении
-операторов права выдаются явно. Комментарии доступны отдельным restricted
-операторским процессом, не через этот datasource.
+Файлы dashboard/provisioning не являются ACL. `folder-permissions.json` —
+дополнительный admin-only вариант для приватной установки, а не требование HDC
+после уточнения пользователя. Проверять реальный состав организации и права
+папки; общая папка не скрывает агрегаты от остальных её участников. Комментарии
+доступны отдельным restricted операторским процессом, не через этот datasource.
 
 ## Приёмка 2026-10-18
 
@@ -128,10 +128,9 @@ PostgreSQL-прогон — 27 сценариев; окончательные ш
 0044 и `alembic check` прошли. Тестовая БД не создавалась: использована одна
 настоящая application DB Goaletto, её мир разработки можно свободно пересоздавать.
 
-Это не установка на HDC (там при инвентаризации Grafana 12.1.0). AND-80/82
-остаются открыты до реального подключения HDC, проверки организации/участников,
-GRANT фактического production LOGIN и сверки панелей на той же выборке. Локальная
-приёмка не разрешает внешние опросы, рекламу или admission игроков автоматически.
+Эта локальная приёмка не разрешает внешние опросы, рекламу или admission игроков
+автоматически. HDC-проверка 2026-10-20 описана отдельно в
+[эксплуатационной приёмке](../hdc-acceptance-2026-10-20.md).
 
 Источники: [Grafana PostgreSQL datasource](https://grafana.com/docs/grafana/latest/datasources/postgres/configure/),
 [provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/),

@@ -6,22 +6,20 @@
 проверки; доступ к HDC и автоматический деплой через CI не требуются.
 
 HDC: Windows host + Docker с Linux-контейнерами, SSH alias hdc.
-Предлагаемый путь: D:\HomeDataCenter\services\goaletto.
+Каталог сервиса: D:\HomeDataCenter\services\goaletto.
 Отдельный Compose project goaletto, volumes и host-only secrets. PostgreSQL без
 публичного порта; bot/worker используют исходящий long polling, без Cloudflare Tunnel.
 2026-10-20: выполнен закрытый HDC-запуск для двух внутренних аккаунтов.
 [Релиз, backup на Mac и приёмка](hdc-acceptance-2026-10-20.md).
 Внешняя launch-приёмка остаётся за AND-72/82.
 
-Обновление 2026-10-18: read-only SSH/inventory проверены, HDC отвечает;
-Docker Linux/x86_64, 8 CPU, около 7,71 GiB RAM, Compose 5.1.4. Goaletto ещё не
-развёрнут, соседние сервисы не менялись. В release добавлен
-[worker healthcheck](worker-health.md); локальная [нагрузочная проверка](launch-load.md)
-не заменяет измерение на HDC и проверку бюджета памяти существующих сервисов.
-
-2026-10-20: SSH и `docker ps` повторно проверены, контейнеров Goaletto ещё нет.
-Пользователь разрешил проверки на HDC; deployment/gameplay/recovery drill
-по-прежнему требуют развёртывания самого Goaletto. Эта проверка не меняла сервисы.
+HDC: Docker Linux/x86_64, 8 CPU, около 7,71 GiB RAM, Compose 5.1.4.
+Закрытый стек, миграции 0044, резерв свободных клубов, off-host backup/restore,
+worker recovery и механика rollback проверены 2026-10-20. Операторские панели
+подключены к существующему Grafana в общей папке Goaletto по решению пользователя.
+Перезапускался только согласованный Grafana; другие игры и БД не менялись.
+[Worker healthcheck](worker-health.md) и локальная [нагрузочная проверка](launch-load.md)
+не заменяют проверку HDC capacity, alerts и полного Windows reboot.
 
 ## Подготовка
 

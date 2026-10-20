@@ -91,12 +91,89 @@ launchctl print gui/501/local.goaletto.hdc-backup
 а не просто свежести старого heartbeat в пределах 120 секунд. Наблюдаемые
 success_age после проверки: jobs 2,10 с, sender 2,53 с. Другие БД не затронуты.
 
+## Живой матч, recovery и rollback
+
+В Telegram выполнены `/start` → выбор/claim Sakura → `/lineup` → ручное сохранение
+капитана → `/match`. Единственная ownership внутренняя; внешних менеджеров нет.
+Первый настоящий league fixture `685e96e7-f34a-57c1-bc43-49f67e1a5c9a`
+(Teranga — Sakura) оператором перенесён в пределах назначенной UTC-даты на
+2026-10-20 08:05:17 UTC. Обычные 60-секундные тики не ускорялись.
+
+Настрой «атака» принят через Telegram и применён ровно в tick 5. После остановки
+только worker checkpoint tick 5, счёт 0:0 и hash
+`e67250604e2a3abbd64067b0412dc699caaf5932d254edbf183e4c2cc65e662e`
+не изменились. Worker остановлен около 08:10:22 и возобновлён около 08:11:48.
+Recovery receipt в 08:11:54.373873 сохранил этот hash; следующий тик назначен на
+08:12:55.159370 — более 60 секунд на решение. Не было залпового catch-up или
+повторного применения команды. Telegram доставил уведомление о восстановлении.
+
+Второй immutable image `goaletto:b4df7333-hdc` собран из
+`b4df7333bcdaf0d518a604f2cfcc77b2fb71d165`: 75 900 928 bytes, SHA-256
+`cf88230583c129ea5e9b2c4a24b89f6939753d5d87eadde094511f0d5d98c638`,
+config digest `sha256:0a6320c0aeb4cb9f6c35394b7ce3833c6db44a02f88dc1377794952372737b04`.
+Проверены загрузка, переход bot/worker на второй image и возврат к `5b82d89e`.
+Матч продолжился, health jobs/sender успешен, failed_jobs=0. Это проверка
+механики двух релизов с одинаковыми application-кодом/схемой, не обещание
+совместимости произвольных schema downgrade. Оба образа сохранены на HDC.
+
+## Grafana на HDC
+
+По явному уточнению пользователя используется **Main Org. (1)** и папка
+**Goaletto operator** в существующем Grafana 12.1.0. Новая организация не создавалась.
+Агрегаты доступны участникам общей организации; ограничения папки не скрывают
+источник от Explore. Это осознанная настройка владельца, заменяющая прежнее
+требование отдельной приватной организации. Anonymous API получает 401. В Main Org. при проверке один Admin и один Viewer;
+участников/роли не меняли, общей организации предоставлены только агрегаты.
+
+Создан отдельный `goaletto_grafana`, только `goaletto_operator_reader`,
+NOSUPERUSER/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS, pool/connection limit 2.
+Роль не имеет прав ни на одну public table/view. Реальный login проверен в
+READ WRITE: запрещены managers, feedback_comments, journey_events, UPDATE clubs,
+CREATE public table и SET ROLE goaletto. Все 14 SQL панелей выполнились; шесть
+journey-отчётов совпали с application CLI на интервале
+2026-10-19 08:18:48.945479 — 2026-10-20 08:18:48.945479 UTC. Внешних starts=0:
+внутренний smoke не добавляет людей в публичную воронку.
+
+Источник и provider добавлены отдельными `goaletto.yaml` в существующий
+`D:/Utilities/grafana-enterprise-12.1.0.windows-amd64/grafana-v12.1.0/conf/provisioning`.
+Пароль сгенерирован на HDC и хранится только в datasource YAML с приватным ACL;
+в репозиторий/argv/вывод не попадает. Dashboard JSON — в `data/goaletto-dashboards`,
+provider path `/var/lib/grafana/goaletto-dashboards`. PostgreSQL TLS disable относится
+только к приватной Docker-сети одного хоста, не к внешнему подключению.
+
+В existing `D:/HomeDataCenter/compose/docker-compose.observability.prod.yml`
+изменён только граф сетей Grafana: добавлена external `goaletto_default`.
+Существующие сети/volumes/настройки сохранены. Пользователь явно согласовал
+создание login, сохранение секрета, приватное подключение и перезапуск Grafana.
+Пересоздан только `hdc-grafana`; остальные игры/БД не перезапускались.
+Перед правкой исходный Compose сохранён в Goaletto `grafana/observability-before.yaml`.
+При пересоздании observability network Goaletto должна уже существовать;
+запускать Compose выборочно, без общего `down`.
+
+Панели: [вход и участие](https://grafana.tg-games.com/d/goaletto-launch),
+[доставка и worker](https://grafana.tg-games.com/d/goaletto-operations).
+
+## Retention и export на HDC
+
+`analytics_coverage` хранит начало 2026-10-20 07:52:25.860710 UTC и retention
+180 дней. Read-only проверка дала 0 истёкших кандидатов во всех четырёх таблицах.
+Очистка выполнена дважды с защитой под блокировкой: при любом кандидате на удаление
+проверка отказала бы до очистки. Ownership, игровые receipts и свежие analytics
+counts совпали до/после. Реальное удаление и точные временные границы остаются
+доказанными локальной hand-count PG матрицей; на HDC проверен только текущий no-op.
+
+`journey_export` имеет ровно девять согласованных колонок и security_barrier,
+PUBLIC grants на чувствительные analytics relations отсутствуют. Внешних строк 0.
+Проверена header-only выгрузка `operator-exports/journey-export-20261020T0828.csv`
+с приватным Windows ACL. Datasource login не имеет доступа даже к этому view.
+Maintenance — явный операторский CLI из [launch gate](analytics/launch-gate.md);
+автоматическое расписание journey cleanup в этой работе не добавлялось.
+
 ## Границы приёмки
 
 Это закрытый запуск для внутренних аккаунтов. Полный Windows reboot, проверка
-автозапуска Docker после login/reboot, отдельная предыдущая версия для настоящего
-application rollback и подключение HDC alerts остаются отдельной приёмкой.
-Не перезагружать общий HDC ради этой проверки без окна для соседних сервисов.
+автозапуска Docker после login/reboot и подключение HDC alerts остаются отдельной
+приёмкой. Не перезагружать общий HDC ради проверки без окна для соседних сервисов.
 AND-69/70/72 не закрываются одним наличием контейнеров, backup или heartbeat.
-AND-80/82 требуют фактической приватной Grafana организации/логина и сверки отчётов;
-локальные SQL проверки не заменяют эту HDC-приёмку и допуск внешних игроков.
+Внешние опросы, реклама и admission людей не включены. Аналитические панели/права, текущий retention и restricted export HDC проверены;
+это не выдаёт разрешение на внешние рассылки.

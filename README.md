@@ -155,7 +155,9 @@ goaletto-worker
 Исходящие уведомления worker включаются отдельно через `GOALETTO_OUTBOX_ENABLED=true`
 с тем же токеном, после миграций и подготовки игрового потока. Sender не запускает
 polling и не удерживает DB-транзакцию во время Telegram-вызова. Он проверен
-на PostgreSQL с fake Telegram; реальные отправки и polling не запускались.
+на PostgreSQL с fake Telegram; 2026-10-20 закрытый HDC smoke также использовал
+настоящие polling и Telegram IO для внутренних аккаунтов.
+[Эксплуатационная приёмка](docs/hdc-acceptance-2026-10-20.md).
 Локальная БД использует постоянный volume и порт 5433; 5432 занят другим проектом.
 Для игры включите `GOALETTO_GAME_ENABLED=true`; календарь активируется отдельно.
 Для закрытого теста задайте host-only списки `GOALETTO_ALLOWED_TELEGRAM_IDS` и

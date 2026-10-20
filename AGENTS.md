@@ -317,8 +317,9 @@
 - AND-80/82 operator dashboards use migration 0044 aggregate-only
   goaletto_operator.report and deploy/grafana provisioning. Frozen report SQL
   changes require a new migration and parity checks against CLI. Never grant
-  the datasource raw tables/comments or the game login. Use a separate private
-  Grafana organization: folder ACL alone does not isolate an OSS datasource.
+  the datasource raw tables/comments or the game login. User update 2026-10-20:
+  use the existing shared Grafana organization and a Goaletto dashboard folder. Aggregate reports are available to its members; folder
+  ACL alone does not isolate an OSS datasource. Keep the separate restricted DB login.
   Journey filters precede aggregation; tier/set refer to first-claim historical
   membership and exclude unclaimed managers. Operational panels are unfiltered;
   absent coverage/observations never become successful zeroes. See

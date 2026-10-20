@@ -14,9 +14,9 @@ restore-drill нужен проверенный архив, из которог�
 
 Инструмент: `python scripts/backup_goaletto.py`. Даёт проверяемый `pg_dump`
 одной явно согласованной базы `goaletto` в custom-формате плюс SHA256-манифест.
-Настоящие dump/restore проверяются Codex на единственной development Goaletto DB
-с сохранением текущего мира. Расписание, off-host копия и HDC требуют отдельной
-операторской настройки.
+Настоящие dump/restore проверяются Codex на единственной development Goaletto DB.
+Для HDC используйте `scripts/backup_hdc.py`: off-host копия и LaunchAgent на Mac
+настроены и проверены 2026-10-20; ниже остаются переносимые команды общего CLI.
 
 Связь: часть AND-70. Не дублирует read-only diagnostics CLI
 (`goaletto-diagnostics`, см. [runtime-diagnostics-runbook.md](runtime-diagnostics-runbook.md)):
@@ -147,17 +147,18 @@ scp "work/backups/goaletto-<UTC>.dump" "work/backups/goaletto-<UTC>.manifest.jso
 
 На HDC PostgreSQL без публичного порта: запускать dump изнутри Compose-сети
 (например, one-off контейнером в проекте `goaletto` или `docker compose exec`),
-точную команду фиксирует Codex при drill. Windows Task Scheduler — аналогично
-руками оператора, не инструментом.
+реальная процедура зафиксирована в [HDC-приёмке](hdc-acceptance-2026-10-20.md).
+HDC-backup запускает пользовательский LaunchAgent на Mac через SSH, без Windows
+Task Scheduler и открытия PostgreSQL наружу.
 
-## Восстановление (drill Codex, согласованное окно)
+## Восстановление (операторский drill)
 
 Запрет пользователя: новых локальных/CI тестовых БД не создавать. Restore
-проверяется на единственной development Goaletto DB; перед drill — backup
-текущего мира этим же инструментом.
+проверяется на единственной development Goaletto DB. Пока нет реальных игроков,
+текущий мир disposable: сохранять его перед drill необязательно.
 
-1. **Backup текущего мира.** Выполнить dump по процедуре выше и проверить хеш.
-   Без проверенного backup мира дальше не идти.
+1. **Выбрать проверенный архив.** Сверить его размер и SHA-256 с manifest.
+   Сохранение текущего disposable dev-мира — необязательный отдельный шаг.
 2. **Совместимость миграций.** Сверить `alembic current` в БД и `alembic history`
    кода: архив должен соответствовать ревизии, на которой работает (или будет
    работать) код. Миграции автоматически не откатывать; несовместимость —
@@ -175,8 +176,9 @@ scp "work/backups/goaletto-<UTC>.dump" "work/backups/goaletto-<UTC>.manifest.jso
 6. **Проверка после restore.** Read-only `goaletto-diagnostics --format json`,
    сверка таблиц/лиг (ожидаемое число клубов комплекта 5×10), smoke `/start`,
    отсутствие чужих данных. Любое расхождение — откат.
-7. **Rollback.** Повторный restore backup мира из шага 1 той же процедурой,
-   затем шаги 5–6. Откат приложения отдельно: предыдущий `GOALETTO_IMAGE`
+7. **Rollback.** Если мир сохраняли, повторить restore его архива и шаги 5–6.
+   Disposable dev-мир также можно свободно пересоздать. Откат приложения отдельно:
+   предыдущий `GOALETTO_IMAGE`
    и совместимая конфигурация (см. [deployment-hdc.md](deployment-hdc.md)).
 
 ## Приёмка Codex
@@ -197,17 +199,22 @@ Unit-покрытие (`tests/unit/test_backup_tooling.py`, всё на fake run
 - отсутствие секретов: маркер пароля не встречается в captured
   stdout/stderr/argv/манифесте.
 
-Реальный drill (Codex, после сохранения мира): dump единственной development
-Goaletto DB, off-host копия, проверка хеша, restore в согласованном окне,
+Реальный drill: dump единственной development Goaletto DB, off-host копия,
+проверка хеша, restore в эту же БД,
 rollback-готовность. При приёмке 2026-10-13 локальный dump и restore drill выполнены на единственной
 Goaletto development DB; исходный мир восстановлен. См. [отчёт приёмки](agent-wave3-review.md).
-Off-host копия, расписание backup и HDC ещё не настроены.
+2026-10-20 проверены off-host копия HDC → Mac, реальный restore именно
+возвращённого с Mac архива (85 таблиц совпали) и фоновый SSH-запуск LaunchAgent.
 
 ## Оставшиеся ограничения
 
-- Совместимость версий `pg_dump`/сервера и точная HDC-команда dump внутри
-  Compose-сети подтверждаются при drill.
-- Планировщик (cron/Task Scheduler) и off-host хранилище ставит оператор
-  вручную; автоматической установки нет.
-- Destructive restore остаётся ручной процедурой Codex; флага restore
-  у инструмента нет сознательно.
+- На HDC dump/list/restore использовали PostgreSQL tools его же контейнера.
+  Для общего CLI совместимость внешних `pg_dump`/сервера проверять отдельно.
+- LaunchAgent требует включённый Mac, пользовательскую сессию и доступ к HDC.
+  После сна/недоступности повторяет попытку; удаление старых копий не настроено.
+- Custom dump содержит одну БД, не host-only secrets и не cluster-global LOGIN.
+  На новом кластере сначала создать роль владельца Goaletto; отдельный Grafana
+  login/минимальные GRANT восстановить через provisioning/access workflow.
+- Destructive restore остаётся явной операторской процедурой; флага restore
+  у backup CLI нет. Разрешение свободно пересоздавать dev-мир перестаёт действовать
+  с появлением реальных игроков/данных.
