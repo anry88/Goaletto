@@ -1,6 +1,6 @@
 """Global bounded candidate supply. No commits, image generation or network calls."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import cast
 from uuid import UUID, uuid5
@@ -45,6 +45,7 @@ from goaletto.infrastructure.models import (
     CandidateOffer,
     CandidatePool,
     CandidateSigning,
+    Club,
     Fixture,
     Person,
     PersonSeasonEvent,
@@ -341,6 +342,57 @@ async def replenish_pool(
     return missing
 
 
+async def _club_staff_screen(
+    session: AsyncSession, ownership_id: UUID, club: Club
+) -> CandidateScreen:
+    account = (await locked_accounts(session, club.id))[club.id]
+    employed = (
+        await session.execute(
+            select(
+                Staff.role,
+                Person.name,
+                Person.age,
+                StaffQualification.skill,
+                Staff.status,
+                Staff.person_id,
+                Person.country_code,
+            )
+            .join(Person)
+            .join(
+                StaffQualification,
+                (StaffQualification.person_id == Staff.person_id)
+                & (StaffQualification.role == Staff.role),
+            )
+            .where(Staff.club_id == club.id, Staff.status.in_(("active", "last_season")))
+            .order_by(Staff.role)
+        )
+    ).all()
+    return CandidateScreen(
+        ownership_id,
+        club.name,
+        account.available,
+        (),
+        tuple(
+            (cast(str, role), flag_name(name, country), age, skill, status)
+            for role, name, age, skill, status, _, country in employed
+        ),
+        tuple(row[5] for row in employed),
+    )
+
+
+async def load_club_staff(
+    session: AsyncSession, actor: Actor, *, record: bool = True
+) -> CandidateScreen:
+    """Current employees only; opening the club never loads or replenishes offers."""
+    owner, club = await owned_club(session, actor)
+    screen = await _club_staff_screen(session, owner.id, club)
+    if record:
+        await user_effect(
+            session, actor, "club_opened", Surface.CLUB, ownership=owner, club_id=club.id
+        )
+    return screen
+
+
 async def load_candidates(
     session: AsyncSession,
     actor: Actor,
@@ -358,7 +410,6 @@ async def load_candidates(
     if refresh_supply:
         for profile in ("player",) if kind == "player" else STAFF_ROLES:
             await replenish_pool(session, kind, profile, actor.at)
-    account = (await locked_accounts(session, club.id))[club.id]
     rows = (
         await session.execute(
             select(CandidateOffer, Person)
@@ -425,42 +476,12 @@ async def load_candidates(
                 career.expires_at if career else None,
             )
         )
-    employed = (
-        await session.execute(
-            select(
-                Staff.role,
-                Person.name,
-                Person.age,
-                StaffQualification.skill,
-                Staff.status,
-                Staff.person_id,
-                Person.country_code,
-            )
-            .join(Person)
-            .join(
-                StaffQualification,
-                (StaffQualification.person_id == Staff.person_id)
-                & (StaffQualification.role == Staff.role),
-            )
-            .where(Staff.club_id == club.id, Staff.status.in_(("active", "last_season")))
-            .order_by(Staff.role)
-        )
-    ).all()
+    screen = await _club_staff_screen(session, owner.id, club)
     if record:
         await user_effect(
             session, actor, "market_opened", Surface.CLUB, ownership=owner, club_id=club.id
         )
-    return CandidateScreen(
-        owner.id,
-        club.name,
-        account.available,
-        tuple(items),
-        tuple(
-            (cast(str, role), flag_name(name, country), age, skill, status)
-            for role, name, age, skill, status, _, country in employed
-        ),
-        tuple(row[5] for row in employed),
-    )
+    return replace(screen, items=tuple(items))
 
 
 async def sign_candidate(

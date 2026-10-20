@@ -80,7 +80,7 @@ def test_maximal_former_player_card_fits_caption_in_ru_and_en_and_quotes_before_
             callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
             assert any(c.startswith("cg:q:") for c in callbacks)
             assert not any(c.startswith(("cg:x:", "cg:b:")) for c in callbacks)
-            assert "cg:s:2" in callbacks and all(len(c.encode()) <= 64 for c in callbacks)
+            assert "cg:h:2" in callbacks and all(len(c.encode()) <= 64 for c in callbacks)
 
 
 def test_head_coach_card_has_no_dismissal_but_specialist_card_does():

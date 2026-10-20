@@ -155,6 +155,16 @@ async def test_portrait_and_kit_reuse_file_ids_recover_invalid_cache_and_keep_si
     await send(command="/club")
     assert isinstance(transport.calls[-1].photo, BufferedInputFile)
     staff = await send(command="/staff")
+    assert "Персонал клуба" in staff.text and "Подписание:" not in staff.text
+    assert buttons(staff, "cg:h:") == ["cg:h:0"]
+    own_cards = set(buttons(staff, "cg:v:"))
+    market = await send(data="cg:h:0")
+    assert "Рынок персонала" in market.text and "Кандидаты для найма" in market.text
+    assert own_cards.isdisjoint(buttons(market, "cg:v:"))
+    market_card = await send(data=buttons(market, "cg:v:")[0])
+    assert buttons(market_card, "cg:h:") == ["cg:h:0"]
+    staff = await send(data="cg:s:0")
+    assert set(buttons(staff, "cg:v:")) == own_cards
     employee = buttons(staff, "cg:v:")[0]
     first = await send(data=employee)
     assert first.photo and "Зарплата:" in first.caption
@@ -167,14 +177,14 @@ async def test_portrait_and_kit_reuse_file_ids_recover_invalid_cache_and_keep_si
     assert second.photo and transport.calls[-1].media.media == "test-photo"
     assert not any(isinstance(c, (SendMessage, SendPhoto)) for c in transport.calls[before:])
     async with sessions.begin() as session:
+        person = await session.get(Person, screen_person_id(employee))
         cache = await session.scalar(
             select(TelegramPortraitFile).where(
-                ~TelegramPortraitFile.identity_id.startswith("club:")
+                TelegramPortraitFile.identity_id == person.appearance_identity_id
             )
         )
         cache.file_id = "expired-file"
         identity = cache.identity_id
-        person = await session.get(Person, screen_person_id(employee))
         assert person.appearance_identity_id == identity
     await send(data=employee)
     assert isinstance(transport.calls[-1].media.media, BufferedInputFile)

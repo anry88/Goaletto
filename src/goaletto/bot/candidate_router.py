@@ -6,7 +6,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message, Update
 
-from goaletto.application.candidates import load_candidates, sign_candidate
+from goaletto.application.candidates import load_candidates, load_club_staff, sign_candidate
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied, actor_for
 from goaletto.application.staff_cards import load_staff_card
@@ -14,6 +14,7 @@ from goaletto.application.staff_changes import HeadCoachRequired, execute_change
 from goaletto.bot.candidate_views import (
     candidate_list,
     candidate_quote,
+    club_staff_list,
     parse_candidate,
     staff_change_view,
 )
@@ -37,7 +38,11 @@ async def candidates_command(message: Message, database: Database, event_update:
             actor = await actor_for(
                 session, message.from_user.id, event_update.update_id, datetime.now(UTC)
             )
-            text, keyboard = candidate_list(await load_candidates(session, actor, kind), kind)
+            text, keyboard = (
+                club_staff_list(await load_club_staff(session, actor))
+                if kind == "staff"
+                else candidate_list(await load_candidates(session, actor, kind), kind)
+            )
     except (PermissionDenied, ValueError):
         await message.answer(tr("Раздел недоступен. Откройте /start."))
         return
@@ -76,7 +81,9 @@ async def candidates_callback(
                     card.kit_secondary,
                     card.kit_version,
                 )
-            elif action in {"p", "s"}:
+            elif action == "s":
+                text, keyboard = club_staff_list(await load_club_staff(session, actor))
+            elif action in {"p", "h"}:
                 kind = "player" if action == "p" else "staff"
                 text, keyboard = candidate_list(
                     await load_candidates(session, actor, kind), kind, value
@@ -85,11 +92,8 @@ async def candidates_callback(
                 if person_id is None:
                     raise ValueError("Missing confirmation")
                 await execute_change(session, actor, person_id, at=datetime.now(UTC))
-                text, keyboard = candidate_list(
-                    await load_candidates(
-                        session, actor, "staff", record=False, refresh_supply=False
-                    ),
-                    "staff",
+                text, keyboard = club_staff_list(
+                    await load_club_staff(session, actor, record=False),
                     notice=tr("Штаб обновлён. Условия зарплаты сохранены."),
                 )
             elif action == "d":

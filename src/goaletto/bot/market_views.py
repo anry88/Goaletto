@@ -125,7 +125,9 @@ def market_view(screen: MarketScreen, notice: str | None = None) -> tuple[str, K
                 )
             ]
         )
-    rows.append([button(tr("Свободные футболисты"), "cg:p:0"), button(tr("Персонал"), "cg:s:0")])
+    rows.append(
+        [button(tr("Свободные футболисты"), "cg:p:0"), button(tr("🔎 Поиск персонала"), "cg:h:0")]
+    )
     if opened:
         rows.append([button(tr("Продать игрока"), "mk:sell:0")])
     nav = []

@@ -78,5 +78,8 @@ def staff_card_view(card: StaffCard, page: int = 0) -> tuple[str, Keyboard]:
         rows.append([button(label, f"cg:q:{suffix}:{encode_price(int(terms['fee']))}")])
         if card.career and card.career.status == "pending":
             rows.append([button(tr("Отклонить"), f"cg:d:{suffix}:0")])
-    rows.append([button(tr("Назад"), f"cg:s:{page}"), button(tr("🏠 Клуб"), "vc:c")])
+    back = "cg:s:0" if card.employed else f"cg:h:{page}"
+    if card.employed and card.role == "head_coach":
+        rows.append([button(tr("🔎 Поиск персонала"), "cg:h:0")])
+    rows.append([button(tr("Назад"), back), button(tr("🏠 Клуб"), "vc:c")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)

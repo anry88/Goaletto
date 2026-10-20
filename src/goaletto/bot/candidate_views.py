@@ -39,7 +39,7 @@ def parse_candidate(data: str) -> tuple[str, UUID | None, UUID | None, int]:
     if (
         len(p) == 3
         and p[0] == "cg"
-        and p[1] in {"p", "s"}
+        and p[1] in {"p", "s", "h"}
         and p[2].isascii()
         and p[2].isdigit()
         and len(p[2]) <= 3
@@ -52,46 +52,67 @@ def parse_candidate(data: str) -> tuple[str, UUID | None, UUID | None, int]:
     raise ValueError("Invalid candidate action")
 
 
+def club_staff_list(screen: CandidateScreen, notice: str | None = None) -> tuple[str, Keyboard]:
+    lines = [f"<b>{tr('Персонал клуба')} · {escape(latin_name(screen.club_name))}</b>"]
+    rows = []
+    for employee_id, (role, name, age, skill, status) in zip(
+        screen.employee_ids, screen.employed, strict=True
+    ):
+        lines.extend(
+            (
+                "",
+                f"{ROLES[role]} · {escape(latin_name(name))} · {age}",
+                f"{QUALITY_LABELS[quality_tier(skill)]} · {skill}/20",
+            )
+        )
+        if status == "last_season":
+            lines.append(tr("⏳ Последний рабочий сезон"))
+        rows.append(
+            [
+                button(
+                    latin_name(name),
+                    f"cg:v:{compact_id(employee_id)}:{compact_id(screen.ownership_id)}:0",
+                )
+            ]
+        )
+    if not screen.employed:
+        lines.extend(("", tr("В клубе пока нет сотрудников.")))
+    if not any(row[0] == "head_coach" for row in screen.employed):
+        lines.append(
+            tr("Без главного тренера: обычная тактика, 1 инструкция и 1 смена настроя за матч.")
+        )
+    if notice:
+        lines.extend(("", notice))
+    rows.extend(
+        (
+            [button(tr("🔎 Поиск персонала"), "cg:h:0")],
+            [button(tr("🔎 Скаутские задания"), "ss:open")],
+            [button(tr("↻ Обновить"), "cg:s:0")],
+            [button(tr("🏠 Клуб"), "vc:c")],
+        )
+    )
+    return "\n".join(lines), Keyboard(inline_keyboard=rows)
+
+
 def candidate_list(
     screen: CandidateScreen, kind: str, page: int = 0, notice: str | None = None
 ) -> tuple[str, Keyboard]:
     if kind not in ("player", "staff") or type(page) is not int or page < 0:
         raise ValueError("Invalid candidate page")
-    prefix = "p" if kind == "player" else "s"
-    busy_roles = {row[0] for row in screen.employed}
+    prefix = "p" if kind == "player" else "h"
     available = screen.items
     pages = max(1, (len(available) + PAGE_SIZE - 1) // PAGE_SIZE)
     page = min(page, pages - 1)
-    title = tr("Свободные футболисты") if kind == "player" else tr("Персонал")
+    title = tr("Свободные футболисты") if kind == "player" else tr("Рынок персонала")
     lines = [
         f"<b>{title} · {escape(latin_name(screen.club_name))}</b>",
         tr("Доступно: {amount}", amount=amount(screen.available_money)),
     ]
-    if kind == "staff" and screen.employed:
-        lines.append(tr("В клубе:"))
-        lines.extend(
-            f"{ROLES[role]} · {escape(latin_name(name))} · {age} · "
-            f"{QUALITY_LABELS[quality_tier(skill)]} · {skill}/20"
-            + (" · " + tr("⏳ Последний рабочий сезон") if status == "last_season" else "")
-            for role, name, age, skill, status in screen.employed
-        )
+    if kind == "staff":
+        lines.append(tr("Кандидаты для найма в клуб."))
     if notice:
         lines.extend(("", notice))
     rows = []
-    if kind == "staff":
-        for employee_id, employee in zip(screen.employee_ids, screen.employed, strict=True):
-            rows.append(
-                [
-                    button(
-                        latin_name(employee[1]),
-                        f"cg:v:{compact_id(employee_id)}:{compact_id(screen.ownership_id)}:{encode_price(page)}",
-                    )
-                ]
-            )
-        if "head_coach" not in busy_roles:
-            lines.append(
-                tr("Без главного тренера: обычная тактика, 1 инструкция и 1 смена настроя за матч.")
-            )
     for item in available[page * PAGE_SIZE : (page + 1) * PAGE_SIZE]:
         offer, person = item.offer, item.person
         role = (
@@ -184,9 +205,7 @@ def candidate_list(
         )
     if not available:
         message = (
-            tr("Все профессии в клубе заняты.")
-            if kind == "staff" and len(busy_roles) == 7
-            else tr("Свободных сотрудников на доступные профессии сейчас нет.")
+            tr("Кандидатов на рынке персонала сейчас нет.")
             if kind == "staff"
             else tr("Свободных кандидатов сейчас нет. Посмотрите аукционы в /market.")
         )
@@ -199,7 +218,7 @@ def candidate_list(
     if nav:
         rows.append(nav)
     if kind == "staff":
-        rows.append([button(tr("🔎 Скаутские задания"), "ss:open")])
+        rows.append([button(tr("👥 Персонал клуба"), "cg:s:0")])
     rows.extend(
         (
             [button(tr("↻ Обновить"), f"cg:{prefix}:{page}")],
@@ -233,7 +252,7 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
             quality=QUALITY_LABELS[quality_tier(item.skills[0])],
             skill=item.skills[0],
         )
-    prefix = "p" if offer.kind == "player" else "s"
+    prefix = "p" if offer.kind == "player" else "h"
     return text, Keyboard(
         inline_keyboard=[
             [
@@ -330,7 +349,7 @@ def staff_change_view(change: StaffChange) -> tuple[str, Keyboard]:
     return "\n".join(lines), Keyboard(
         inline_keyboard=[
             [button(tr("Подтвердить"), f"cg:x:{compact_id(change.id)}")],
-            [button(tr("Назад"), "cg:s:0")],
+            [button(tr("Назад"), "cg:h:0" if change.incoming_id else "cg:s:0")],
         ]
     )
 
