@@ -10,8 +10,9 @@ from goaletto.presentation.i18n import tr
 
 
 class TelegramAccess(BaseMiddleware):
-    def __init__(self, allowed_ids: frozenset[int]) -> None:
+    def __init__(self, allowed_ids: frozenset[int], admin_chat: int = 0) -> None:
         self.allowed_ids = allowed_ids
+        self.admin_chat = admin_chat
 
     async def __call__(
         self,
@@ -19,6 +20,17 @@ class TelegramAccess(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
+        if isinstance(event, Message):
+            text = event.text or ""
+            command = text.split(" ", 1)[0].split("@")[0]
+            if (
+                event.successful_payment
+                or event.refunded_payment
+                or command in {"/paysupport", "/answer"}
+            ):
+                return await handler(event, data)
+            if event.chat.id == self.admin_chat and command in {"/refund", "/reject", "/ask"}:
+                return await handler(event, data)
         if not self.allowed_ids:
             return await handler(event, data)
         if isinstance(event, (Message, CallbackQuery)):

@@ -77,6 +77,19 @@ async def run_sender(
             await asyncio.sleep(poll_seconds)
 
 
+async def run_refunds(database: Database, bot: Bot, poll_seconds: float) -> None:
+    from goaletto.infrastructure.star_refunds import process_refund
+
+    while True:
+        try:
+            processed = await process_refund(database, bot)
+            if not processed:
+                await asyncio.sleep(poll_seconds)
+        except Exception as error:
+            logger.error("Stars refund iteration failed (%s)", type(error).__name__)
+            await asyncio.sleep(poll_seconds)
+
+
 async def prepare_worker(database: Database, settings: Settings) -> UUID:
     if settings.feedback_comment_retention_days is not None:
         async with database.transaction() as session:
@@ -125,6 +138,8 @@ async def run() -> None:
             async with asyncio.TaskGroup() as tasks:
                 tasks.create_task(run_jobs(database, settings.worker_poll_seconds, instance))
                 if bot is not None:
+                    if settings.payments_enabled:
+                        tasks.create_task(run_refunds(database, bot, settings.worker_poll_seconds))
                     tasks.create_task(
                         run_sender(database, bot, settings.worker_poll_seconds, instance)
                     )

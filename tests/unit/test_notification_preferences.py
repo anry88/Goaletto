@@ -316,3 +316,20 @@ async def test_mutation_requires_caller_transaction() -> None:
         )
     with pytest.raises(ValueError, match="transaction"):
         await get_settings(cast(AsyncSession, fake), fake.actor)
+
+
+@pytest.fixture(autouse=True)
+def isolate_cosmetic_storage(monkeypatch):
+    # These units exercise preference/IO boundaries; cosmetic persistence has PG coverage.
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from goaletto.application import academy, cosmetics
+
+    for name in ("ensure_initial", "ensure_vip_bonus", "available_grant", "vip_payment"):
+        monkeypatch.setattr(cosmetics, name, AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        academy,
+        "current_season",
+        AsyncMock(return_value=SimpleNamespace(status="active", cycle_epoch=NOW.date())),
+    )

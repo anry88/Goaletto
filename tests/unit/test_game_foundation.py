@@ -1,6 +1,7 @@
 """Offline checks only. These do not claim PostgreSQL execution or race coverage."""
 
 import io
+import re
 from pathlib import Path
 
 from alembic import command
@@ -13,7 +14,8 @@ from goaletto.infrastructure.portrait_catalog import catalog_records
 
 
 def normalized(sql: str) -> str:
-    return " ".join(sql.split()).rstrip(";")
+    # PostgreSQL ignores whitespace around these punctuation tokens.
+    return re.sub(r"\s*([(),])\s*", r"\1", " ".join(sql.split())).rstrip(";")
 
 
 def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(

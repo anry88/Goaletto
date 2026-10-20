@@ -14,6 +14,7 @@ from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.match_types import Instruction, Mentality, Side, Tactic
 from goaletto.domain.names import latin_name
+from goaletto.presentation.club_status import club_label
 from goaletto.presentation.i18n import LabelMap, tr
 
 INSTRUCTION_LABELS = LabelMap(
@@ -86,16 +87,22 @@ def render(
     notice: str | None = None,
     feedback_available: bool = False,
 ) -> tuple[str, Keyboard]:
-    lines = [f"⚽ <b>{escape(latin_name(screen.club_name))}</b>"]
+    label = club_label(latin_name(screen.club_name), screen.club_id in screen.vip_clubs)
+    lines = [f"⚽ <b>{escape(label)}</b>"]
     rows = []
     if screen.state is None:
         lines.append(tr("Матч ещё не начался."))
     else:
         state = screen.state
+        home = club_label(
+            latin_name(state.home.snapshot.name), state.home.snapshot.club_id in screen.vip_clubs
+        )
+        away = club_label(
+            latin_name(state.away.snapshot.name), state.away.snapshot.club_id in screen.vip_clubs
+        )
         lines.append(
-            f"{escape(latin_name(state.home.snapshot.name))} "
-            f"{state.home.stats.goals}:{state.away.stats.goals} "
-            f"{escape(latin_name(state.away.snapshot.name))} · {state.game_minute}′"
+            f"{escape(home)} {state.home.stats.goals}:{state.away.stats.goals} "
+            f"{escape(away)} · {state.game_minute}′"
         )
         if state.phase.value in {"half_time", "extra_break", "extra_half_time"}:
             lines.append(tr("Перерыв · замены не расходуют окно замен."))

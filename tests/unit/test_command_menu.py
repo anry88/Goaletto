@@ -37,6 +37,7 @@ async def test_private_menu_refreshes_all_languages_and_game_mode() -> None:
         "history",
         "feedback",
         "settings",
+        "paysupport",
         "help",
     ]
     assert len(bot.menus) == 3

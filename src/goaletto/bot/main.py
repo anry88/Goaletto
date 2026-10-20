@@ -35,16 +35,25 @@ def build_dispatcher(
     game_enabled: bool,
     allowed_telegram_ids: frozenset[int] = frozenset(),
     internal_telegram_ids: frozenset[int] = frozenset(),
+    payments_admin_chat_id: int = 0,
+    payments_enabled: bool = True,
 ) -> Dispatcher:
     dispatcher = Dispatcher(database=database, internal_telegram_ids=internal_telegram_ids)
     dispatcher.message.outer_middleware(UpdateMetrics())
     dispatcher.callback_query.outer_middleware(UpdateMetrics())
-    access = TelegramAccess(allowed_telegram_ids)
+    dispatcher["payments_admin_chat_id"] = payments_admin_chat_id
+    dispatcher["payments_enabled"] = payments_enabled
+    dispatcher["payment_allowed_ids"] = allowed_telegram_ids
+    access = TelegramAccess(allowed_telegram_ids, payments_admin_chat_id)
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
     language = TelegramLanguage(database if game_enabled else None)
     dispatcher.message.outer_middleware(language)
     dispatcher.callback_query.outer_middleware(language)
+    if database is not None:
+        from goaletto.bot.payments_router import router as payments_router
+
+        dispatcher.include_router(fresh_router(payments_router))
     if not game_enabled:
         from goaletto.bot.handlers import router
 
@@ -114,10 +123,14 @@ async def run() -> None:
         raise SystemExit("Set GOALETTO_BOT_TOKEN in .env before starting the bot")
     bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     bot.session.middleware(TelegramMetrics())
-    database = Database(settings) if settings.game_enabled else None
+    database = (
+        Database(settings) if settings.game_enabled or settings.payments_admin_chat_id else None
+    )
     dispatcher = build_dispatcher(
         database,
         game_enabled=settings.game_enabled,
+        payments_admin_chat_id=settings.payments_admin_chat_id,
+        payments_enabled=settings.payments_enabled,
         allowed_telegram_ids=settings.allowed_telegram_ids,
         internal_telegram_ids=settings.internal_telegram_ids,
     )

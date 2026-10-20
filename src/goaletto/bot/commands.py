@@ -27,7 +27,8 @@ COMMANDS = (
     ("table", "Таблица лиги", "League table"),
     ("history", "Результаты и отчёты матчей", "Match results and reports"),
     ("feedback", "Оставить отзыв", "Leave feedback"),
-    ("settings", "Язык и напоминания", "Language and reminders"),
+    ("settings", "Настройки клуба, язык и время", "Club settings, language and time"),
+    ("paysupport", "Покупки Stars и возвраты", "Stars purchases and refunds"),
     ("help", "Помощь по игре", "Game help"),
 )
 

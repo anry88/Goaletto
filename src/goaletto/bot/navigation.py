@@ -35,7 +35,13 @@ async def current_table(session: AsyncSession, actor: Actor) -> tuple[str, Inlin
     if membership is None:
         raise ValueError("Club has no season")
     archive = await get_season_archive(session, actor, membership.season_id)
-    return table_view(archive.table, archive.season_id, archive.league_id, archive.tier)
+    return table_view(
+        archive.table,
+        archive.season_id,
+        archive.league_id,
+        archive.tier,
+        vip_clubs=archive.vip_clubs,
+    )
 
 
 @router.message(Command("club", "squad", "history", "table"))
@@ -85,7 +91,9 @@ async def league_screen(query: CallbackQuery, database: Database) -> None:
                 archive = await get_season_archive(session, actor, season_id)
                 if archive.league_id != league_id:
                     raise PermissionDenied("Foreign league")
-                text, keyboard = table_view(archive.table, season_id, league_id, archive.tier, page)
+                text, keyboard = table_view(
+                    archive.table, season_id, league_id, archive.tier, page, archive.vip_clubs
+                )
     except (PermissionDenied, ValueError):
         await edit_response(
             query.message, tr("Таблица недоступна или кнопка устарела. Откройте /table.")

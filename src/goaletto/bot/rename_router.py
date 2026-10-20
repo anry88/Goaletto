@@ -31,19 +31,28 @@ def view(state: RenameScreen) -> tuple[str, InlineKeyboardMarkup]:
     token = compact_id(state.draft_id) if state.draft_id else "-"
     buttons = []
     if state.state == "done":
-        text = tr(
-            "Название сохранено: <b>{name}</b>. Возможность переименования использована.",
-            name=escape(state.name),
-        )
+        text = tr("Название сохранено: <b>{name}</b>.", name=escape(state.name))
+        if state.allowed:
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=tr("Переименовать клуб"), callback_data=f"rn:i:{key}:{token}"
+                    )
+                ]
+            )
+        buttons.append([InlineKeyboardButton(text=tr("⚙️ Настройки"), callback_data="ntf:open")])
     elif not state.allowed:
-        text = tr(
-            "Вы оставили название <b>{name}</b>. Переименовать клуб можно в межсезонье.",
-            name=escape(state.name),
+        text = tr("Название клуба: <b>{name}</b>.", name=escape(state.name))
+        text += "\n" + (
+            tr("Одна попытка сохранена. Использовать её можно только в межсезонье.")
+            if state.credit
+            else tr("Свободных попыток нет. Купить попытку или подключить VIP можно в настройках.")
         )
+        buttons.append([InlineKeyboardButton(text=tr("⚙️ Настройки"), callback_data="ntf:open")])
     elif state.state == "preview":
         text = tr(
             "Новое название: <b>{name}</b>\nПодтвердить переименование? "
-            "Оно доступно один раз за владение клубом.",
+            "Будет использована одна попытка.",
             name=escape(state.candidate or ""),
         )
         buttons.append(
@@ -56,7 +65,7 @@ def view(state: RenameScreen) -> tuple[str, InlineKeyboardMarkup]:
         text = tr("Пришлите новое название клуба одним сообщением.") + "\n" + tr(RULES)
     else:
         text = tr(
-            "Ваш клуб: <b>{name}</b>\nХотите переименовать его? Это можно сделать один раз. "
+            "Ваш клуб: <b>{name}</b>\nХотите переименовать его? В запасе одна попытка. "
             "После отказа следующая возможность будет в межсезонье.",
             name=escape(state.name),
         )

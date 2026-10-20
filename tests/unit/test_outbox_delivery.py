@@ -579,6 +579,9 @@ async def test_actual_runtime_producer_writes_result_priority_without_live_board
         def __init__(self):
             self.statements = []
 
+        async def scalars(self, statement):
+            return Rows([])
+
         async def execute(self, statement):
             self.statements.append(statement)
             from goaletto.infrastructure.models import MatchStage, MatchTick

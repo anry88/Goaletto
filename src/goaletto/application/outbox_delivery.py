@@ -54,6 +54,7 @@ SUPPORTED_KINDS = frozenset(
         "staff_lifecycle",
         "feedback_prompt",
         "bankruptcy",
+        "payment_notice",
     }
 )
 LEASE_SECONDS = 120.0
@@ -190,6 +191,18 @@ def board_revision(payload: dict[str, Any]) -> int:
 
 def valid_payload(payload: dict[str, Any]) -> bool:
     kind = payload.get("kind")
+    if kind == "payment_notice":
+        return (
+            payload.get("version") == 1
+            and type(payload.get("version")) is int
+            and _payload_uuid(payload, "payment_id") is not None
+            and isinstance(payload.get("body"), str)
+            and 0 < len(payload["body"]) <= 3500
+            and (
+                payload.get("request_id") is None
+                or _payload_uuid(payload, "request_id") is not None
+            )
+        )
     if kind == "bankruptcy":
         return (
             type(payload.get("version")) is int
@@ -360,6 +373,8 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "payment_notice":
+        return escape(str(payload["body"]))
     if kind == "bankruptcy":
         return tr(
             "🏦 Клуб {club} объявлен банкротом: долг {debt} превышает стоимость активов {assets}. "
@@ -492,8 +507,10 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
         )
         # The transport uses Telegram HTML. Names are data, never markup.
         home, away = (
-            escape(latin_name(payload["home"])[:80]),
-            escape(latin_name(payload["away"])[:80]),
+            escape(latin_name(payload["home"])[:80])
+            + (" 👑 VIP" if payload.get("home_vip") else ""),
+            escape(latin_name(payload["away"])[:80])
+            + (" 👑 VIP" if payload.get("away_vip") else ""),
         )
         score = f"{home} {payload['home_goals']}:{payload['away_goals']} {away}"
         if "aggregate" in payload:
@@ -603,6 +620,26 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     payload = message.payload
     if not isinstance(payload, dict) or not valid_payload(payload):
         return Decision.SKIP_STALE
+    if payload["kind"] == "payment_notice":
+        from goaletto.infrastructure.models import PaySupportRequest, StarPayment
+
+        paid = await session.get(StarPayment, _payload_uuid(payload, "payment_id"))
+        if paid is None:
+            return Decision.SKIP_STALE
+        if message.chat_id == paid.payer_id:
+            return Decision.DELIVER
+        request = (
+            await session.get(PaySupportRequest, _payload_uuid(payload, "request_id"))
+            if payload.get("request_id")
+            else None
+        )
+        return (
+            Decision.DELIVER
+            if request is not None
+            and request.payment_id == paid.id
+            and request.admin_chat_id == message.chat_id
+            else Decision.SKIP_STALE
+        )
     if payload["kind"] == "bankruptcy":
         from goaletto.infrastructure.models import BankruptcyReceipt
 

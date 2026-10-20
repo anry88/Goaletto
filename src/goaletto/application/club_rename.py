@@ -6,10 +6,15 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.academy import current_season
+from goaletto.application.cosmetics import (
+    available_grant,
+    ensure_initial,
+    ensure_vip_bonus,
+    offseason,
+)
 from goaletto.application.game_actions import Actor, PermissionDenied, owned_club
 from goaletto.domain.club_names import validate_name
-from goaletto.domain.game_cycle import midnight
-from goaletto.infrastructure.models import ClubNameChoice, ClubNameInput
+from goaletto.infrastructure.models import ClubNameChoice, ClubNameInput, ClubRenameReceipt
 
 
 @dataclass(frozen=True)
@@ -20,6 +25,8 @@ class RenameScreen:
     draft_id: UUID | None
     candidate: str | None
     allowed: bool
+    credit: bool = False
+    offseason: bool = False
 
 
 async def screen(session: AsyncSession, actor: Actor) -> RenameScreen:
@@ -29,14 +36,21 @@ async def screen(session: AsyncSession, actor: Actor) -> RenameScreen:
         row = ClubNameChoice(ownership_id=owner.id, state="offer")
         session.add(row)
         await session.flush()
+    await ensure_initial(session, owner, actor.at)
+    await ensure_vip_bonus(session, club.id, actor.at)
     season = await current_season(session, club.id)
-    offseason = (
-        season.status == "scheduled"
-        and season.cycle_epoch is not None
-        and actor.at < midnight(season.cycle_epoch)
+    free = await available_grant(session, club.id)
+    allowed = free is not None and offseason(season, actor.at)
+    return RenameScreen(
+        owner.id,
+        club.name,
+        row.state,
+        row.draft_id,
+        row.candidate,
+        allowed,
+        free is not None,
+        offseason(season, actor.at),
     )
-    allowed = row.state != "done" and (row.declined_at is None or offseason)
-    return RenameScreen(owner.id, club.name, row.state, row.draft_id, row.candidate, allowed)
 
 
 async def action(
@@ -51,19 +65,19 @@ async def action(
         raise PermissionDenied("Stale ownership")
     row = await session.get(ClubNameChoice, ownership_id)
     assert row is not None
-    if row.state == "done":
-        return view
     if not view.allowed:
         return view
     if kind == "input":
         # Old edit/confirm/decline buttons cannot replace a newer preview.
         if draft_id != row.draft_id:
             raise PermissionDenied("Stale name preview")
+        row.changed_at, row.original_name = None, None
         row.state, row.candidate = "input", None
         row.draft_id = actor.operation_id
     elif kind == "keep":
         if draft_id != row.draft_id:
             raise PermissionDenied("Stale name preview")
+        row.changed_at, row.original_name = None, None
         row.state, row.candidate, row.draft_id = "declined", None, None
         row.declined_at = actor.at
     elif kind == "confirm":
@@ -74,6 +88,21 @@ async def action(
         name = validate_name(row.candidate)
         if name == club.name:
             raise ValueError("Name has not changed")
+        grant = await available_grant(session, club.id)
+        if grant is None:
+            raise PermissionDenied("Rename credit is no longer available")
+        session.add(
+            ClubRenameReceipt(
+                id=draft_id,
+                ownership_id=ownership_id,
+                club_id=club.id,
+                grant_id=grant.id,
+                old_name=club.name,
+                new_name=name,
+                changed_at=actor.at,
+            )
+        )
+        grant.status, grant.consumed_at = "consumed", actor.at
         row.original_name, row.changed_at = club.name, actor.at
         club.name, row.state = name, "done"
         from goaletto.application.analytics import Surface

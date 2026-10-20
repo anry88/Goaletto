@@ -295,6 +295,10 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
 
     for upcoming in future.values():
         await plan_horizon(session, upcoming, at)
+    from goaletto.application.cosmetics import ensure_vip_bonus, vip_clubs
+
+    for vip_club in await vip_clubs(session, set(player_seasons), at):
+        await ensure_vip_bonus(session, vip_club, at)
     from goaletto.application.candidates import replenish_pool
 
     for pool in (await session.scalars(select(CandidatePool))).all():

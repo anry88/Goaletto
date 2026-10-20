@@ -84,9 +84,6 @@ async def test_claim_offers_name_then_restart_confirm_or_decline_until_offseason
         owner = await session.scalar(select(OwnershipPeriod))
         club = await session.get(Club, owner.club_id)
         original = club.name
-        # Midseason refusal: reopening any path must wait for a real offseason.
-        if not confirm:
-            (await session.get(Season, result.season_id)).status = "active"
     if confirm:
         await send(data=initial_input)
         response = await send("<b>Bad name</b>")
@@ -106,6 +103,8 @@ async def test_claim_offers_name_then_restart_confirm_or_decline_until_offseason
             assert (await session.get(ClubNameChoice, owner.id)).state == "done"
     else:
         response = await send(data=initial_keep)
+        async with sessions.begin() as session:
+            (await session.get(Season, result.season_id)).status = "active"
         assert "межсезонье" in (response.text or response.caption)
         response = await send("/rename")
         assert not any(

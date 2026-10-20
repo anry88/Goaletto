@@ -10,6 +10,7 @@ from goaletto.domain.clock import MatchPhase
 from goaletto.domain.match_types import MatchState
 from goaletto.domain.names import latin_name
 from goaletto.domain.standings import LeagueStanding, rank_league
+from goaletto.presentation.club_status import club_label
 from goaletto.presentation.i18n import tr
 
 
@@ -47,6 +48,7 @@ def table_view(
     league_id: UUID,
     tier: int,
     page: int = 1,
+    vip_clubs: frozenset[UUID] = frozenset(),
 ) -> tuple[str, InlineKeyboardMarkup]:
     if type(tier) is not int or not 1 <= tier <= 5:
         raise ValueError("Invalid tier")
@@ -66,7 +68,7 @@ def table_view(
             tr(
                 "<b>{p0}. {p1}{p2}</b>\nОчки: {p4} · Матчи: {p3} · Голы: {p5}:{p6}",
                 p0=index,
-                p1=escape(latin_name(row.name)),
+                p1=escape(club_label(latin_name(row.name), row.club_id in vip_clubs, table=True)),
                 p2=marker,
                 p3=row.played,
                 p4=row.points,

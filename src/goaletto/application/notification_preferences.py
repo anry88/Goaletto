@@ -46,6 +46,9 @@ class SettingsState:
     timezone_name: str = "UTC"
     preferred_kickoff_minute: int | None = None
     observed_at: datetime | None = None
+    rename_available: bool = False
+    rename_offseason: bool = False
+    vip_until: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -108,7 +111,24 @@ async def get_settings(session: AsyncSession, actor: Actor) -> SettingsState:
     club = await session.scalar(select(Club).where(Club.id == ownership.club_id).with_for_update())
     if club is None or club.owner_telegram_id != actor.telegram_id:
         raise PermissionDenied("Current club ownership does not match the actor")
+    from goaletto.application.academy import current_season
+    from goaletto.application.cosmetics import (
+        available_grant,
+        ensure_initial,
+        ensure_vip_bonus,
+        offseason,
+        vip_payment,
+    )
+
+    await ensure_initial(session, ownership, actor.at)
+    await ensure_vip_bonus(session, club.id, actor.at)
+    grant = await available_grant(session, club.id)
+    vip = await vip_payment(session, club.id, actor.at)
+    season = await current_season(session, club.id)
     return SettingsState(
+        rename_available=grant is not None,
+        rename_offseason=offseason(season, actor.at),
+        vip_until=vip.vip_until if vip else None,
         locale=manager.locale,
         timezone_name=manager.timezone_name,
         preferred_kickoff_minute=manager.preferred_kickoff_minute,

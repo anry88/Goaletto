@@ -2495,3 +2495,110 @@ class DataProtection(Base):
     __table_args__ = (CheckConstraint("id = 1", name="ck_data_protection_singleton"),)
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
     protected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class StarOrder(Base):
+    __tablename__ = "star_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "product IN ('rename','vip') AND currency='XTR' AND amount > 0",
+            name="ck_star_order_product",
+        ),
+        CheckConstraint(
+            "status IN ('created','approved','paid','cancelled')", name="ck_star_order_status"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    manager_id: Mapped[UUID] = mapped_column(ForeignKey("managers.id"))
+    payer_id: Mapped[int] = mapped_column(BigInteger)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    product: Mapped[str] = mapped_column(String(16))
+    amount: Mapped[int] = mapped_column(Integer)
+    currency: Mapped[str] = mapped_column(String(3), server_default="XTR")
+    status: Mapped[str] = mapped_column(String(16), server_default="created")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    precheck_id: Mapped[str | None] = mapped_column(String(200), unique=True)
+
+
+class StarPayment(Base):
+    __tablename__ = "star_payments"
+    __table_args__ = (
+        CheckConstraint("amount > 0 AND payer_id > 0", name="ck_star_payment_amount"),
+        CheckConstraint("status IN ('delivered','unfulfilled')", name="ck_star_payment_status"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    order_id: Mapped[UUID | None] = mapped_column(ForeignKey("star_orders.id"))
+    charge_id: Mapped[str] = mapped_column(String(256), unique=True)
+    payer_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), index=True)
+    product: Mapped[str] = mapped_column(String(16))
+    amount: Mapped[int] = mapped_column(Integer)
+    currency: Mapped[str] = mapped_column(String(3))
+    invoice_payload: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(16))
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    vip_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CosmeticGrant(Base):
+    __tablename__ = "cosmetic_grants"
+    __table_args__ = (
+        CheckConstraint("origin IN ('initial','stars','vip')", name="ck_cosmetic_grant_origin"),
+        CheckConstraint(
+            "status IN ('available','consumed','revoked','skipped')",
+            name="ck_cosmetic_grant_status",
+        ),
+        UniqueConstraint("club_id", "season_id", "origin", name="uq_vip_offseason_grant"),
+        Index(
+            "uq_club_available_rename",
+            "club_id",
+            unique=True,
+            postgresql_where=text("status='available'"),
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
+    ownership_id: Mapped[UUID | None] = mapped_column(ForeignKey("ownership_periods.id"))
+    payment_id: Mapped[UUID | None] = mapped_column(ForeignKey("star_payments.id"))
+    season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
+    origin: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ClubRenameReceipt(Base):
+    __tablename__ = "club_rename_receipts"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    grant_id: Mapped[UUID] = mapped_column(ForeignKey("cosmetic_grants.id"), unique=True)
+    old_name: Mapped[str] = mapped_column(String(80))
+    new_name: Mapped[str] = mapped_column(String(30))
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PaySupportRequest(Base):
+    __tablename__ = "pay_support_requests"
+    __table_args__ = (
+        Index("ix_pay_support_pending", "status", "created_at"),
+        CheckConstraint(
+            "status IN ('pending','info','rejected','approved','processing',"
+            "'unknown','failed','refunded')",
+            name="ck_pay_support_status",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    payment_id: Mapped[UUID] = mapped_column(ForeignKey("star_payments.id"), unique=True)
+    payer_id: Mapped[int] = mapped_column(BigInteger)
+    admin_chat_id: Mapped[int] = mapped_column(BigInteger)
+    reason: Mapped[str] = mapped_column(String(1000))
+    status: Mapped[str] = mapped_column(String(16), server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    decided_by: Mapped[int | None] = mapped_column(BigInteger)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    audit: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default="[]")

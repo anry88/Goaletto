@@ -417,6 +417,13 @@ async def queue_notification(
         for code in timelines:
             with using_locale(code):
                 timelines[code] = list(await load_commentary(session, state))
+    from goaletto.application.cosmetics import vip_clubs
+
+    badges = (
+        await vip_clubs(session, {fixture.home_club_id, fixture.away_club_id}, at)
+        if state is not None and owners
+        else frozenset()
+    )
     for ownership, manager in owners:
         payload: dict[str, Any] = {
             "version": 1,
@@ -430,6 +437,8 @@ async def queue_notification(
                 tick=state.tick,
                 phase=state.phase.value,
                 home=state.home.snapshot.name,
+                home_vip=fixture.home_club_id in badges,
+                away_vip=fixture.away_club_id in badges,
                 away=state.away.snapshot.name,
                 home_goals=state.home.stats.goals,
                 away_goals=state.away.stats.goals,

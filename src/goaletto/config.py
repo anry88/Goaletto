@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     database_url: SecretStr = SecretStr(
         "postgresql+asyncpg://goaletto:goaletto_dev_only@localhost:5432/goaletto"
     )
+    payments_enabled: bool = True
+    payments_admin_chat_id: int = 0
     log_level: str = "INFO"
     worker_poll_seconds: float = Field(default=1, ge=0.1, le=60)
     worker_health_file: Path = Path(gettempdir()) / "goaletto-worker-instance"

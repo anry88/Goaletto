@@ -49,6 +49,7 @@ class ClubCard:
     kit_primary: str
     kit_secondary: str
     kit_version: int
+    vip: bool = False
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,7 @@ class PlayerCard:
     kit_primary: str
     kit_secondary: str
     kit_version: int
+    vip: bool = False
     energy_bps: int = 10000
     energy_full_at: datetime | None = None
     country_code: str | None = None
@@ -139,7 +141,7 @@ async def actor_for_callback(
     return Actor(manager.id, manager.telegram_id, analytics_id, operation, at, update_id)
 
 
-def _club_card(club: Club, tier: int) -> ClubCard:
+def _club_card(club: Club, tier: int, vip: bool = False) -> ClubCard:
     if type(tier) is not int or not 1 <= tier <= 5:
         raise ValueError("Invalid league tier")
     return ClubCard(
@@ -152,6 +154,7 @@ def _club_card(club: Club, tier: int) -> ClubCard:
         kit_primary=club.kit_primary,
         kit_secondary=club.kit_secondary,
         kit_version=club.kit_version,
+        vip=vip,
     )
 
 
@@ -166,7 +169,9 @@ async def get_owned_club(session: AsyncSession, actor: Actor, *, record: bool = 
         await user_effect(
             session, actor, "club_opened", Surface.CLUB, ownership=ownership, club_id=club.id
         )
-    return _club_card(club, league.tier)
+    from goaletto.application.cosmetics import vip_payment
+
+    return _club_card(club, league.tier, await vip_payment(session, club.id, actor.at) is not None)
 
 
 async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> SquadPage:

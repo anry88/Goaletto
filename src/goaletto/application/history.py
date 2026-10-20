@@ -211,6 +211,8 @@ class SeasonArchive:
     goals_against: int
     points: int
 
+    vip_clubs: frozenset[UUID] = frozenset()
+
 
 def _page_count(total: int) -> int:
     return max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
@@ -912,6 +914,8 @@ async def get_season_archive(session: AsyncSession, actor: Actor, season_id: UUI
     await user_effect(
         session, actor, "club_opened", Surface.CLUB, ownership=ownership, club_id=club.id
     )
+    from goaletto.application.cosmetics import vip_clubs
+
     return SeasonArchive(
         season.id,
         season.number,
@@ -926,4 +930,5 @@ async def get_season_archive(session: AsyncSession, actor: Actor, season_id: UUI
         own.goals_for,
         own.goals_against,
         own.points,
+        await vip_clubs(session, set(member_ids), actor.at),
     )

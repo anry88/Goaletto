@@ -530,7 +530,13 @@ def seasons_view(
 def archive_view(archive: SeasonArchive, return_page: int = 1) -> tuple[str, InlineKeyboardMarkup]:
     # Table text (with promotion/relegation markers) reused from result_views;
     # keyboard rebuilt for archive navigation. Counters are stored, never re-awarded.
-    text, _ = table_view(archive.table, archive.season_id, archive.league_id, archive.tier)
+    text, _ = table_view(
+        archive.table,
+        archive.season_id,
+        archive.league_id,
+        archive.tier,
+        vip_clubs=archive.vip_clubs,
+    )
     position_line = tr(
         "\n🏟 Ваш клуб — <b>{p0}-е место</b>: {p1} матчей · {p2}В "
         "{p3}Н {p4}П · мячи {p5}:{p6} · {p7} очков.",

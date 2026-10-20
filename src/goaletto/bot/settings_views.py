@@ -102,6 +102,48 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton(text=tr("🌐 Выбрать часовой пояс"), callback_data="tz:open")]
     ]
     if state.has_ownership and state.ownership_id is not None:
+        lines.append(
+            tr("Переименование: одна попытка в запасе.")
+            if state.rename_available
+            else tr("Переименование: свободных попыток нет.")
+        )
+        lines.append(tr("Использовать попытку можно только в межсезонье."))
+        if state.rename_available:
+            buttons.append(
+                [InlineKeyboardButton(text=tr("Название клуба"), callback_data="rn:open")]
+            )
+        else:
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=tr("Купить попытку · 50 ⭐"),
+                        callback_data=f"buy:rename:{compact_id(state.ownership_id)}",
+                    )
+                ]
+            )
+        if state.vip_until:
+            lines.append(
+                tr("👑 VIP до {date} UTC", date=state.vip_until.strftime("%d.%m.%Y %H:%M"))
+            )
+        else:
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=tr("👑 VIP на календарный месяц · 1 ⭐"),
+                        callback_data=f"buy:vip:{compact_id(state.ownership_id)}",
+                    )
+                ]
+            )
+        lines.append(
+            tr(
+                "VIP — видимый другим статус клуба и способ поддержать проект. "
+                "Корона и VIP, одна попытка переименования в межсезонье при пустом запасе. "
+                "Других бонусов нет. Без автопродления."
+            )
+        )
+        buttons.append(
+            [InlineKeyboardButton(text=tr("Поддержка платежей"), callback_data="pay:support")]
+        )
         if state.reminders_enabled:
             buttons.append(
                 [

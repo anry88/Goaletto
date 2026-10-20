@@ -71,6 +71,7 @@ class LiveScreen:
     next_is_home: bool = False
     next_locked: bool = False
     timezone_name: str = "UTC"
+    vip_clubs: frozenset[UUID] = frozenset()
 
 
 async def _context(
@@ -255,6 +256,8 @@ async def load_live_screen(
                 next_is_home = upcoming.home_club_id == club.id
                 next_locked = at >= upcoming.lineup_lock_at
     manager = await session.get(Manager, actor.manager_id)
+    from goaletto.application.cosmetics import vip_clubs
+
     return LiveScreen(
         ownership.id,
         club.id,
@@ -275,6 +278,7 @@ async def load_live_screen(
         next_is_home,
         next_locked,
         manager.timezone_name if manager is not None else "UTC",
+        await vip_clubs(session, {fixture.home_club_id, fixture.away_club_id}, actor.at),
     )
 
 

@@ -21,6 +21,7 @@ from goaletto.bot.history_callbacks import (
 from goaletto.bot.portrait_cache import PORTRAIT_UNAVAILABLE_TEXT
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
+from goaletto.presentation.club_status import club_label
 from goaletto.presentation.i18n import LabelMap, tr
 from goaletto.presentation.person_names import person_name
 
@@ -139,7 +140,6 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
                 InlineKeyboardButton(text=tr("🏟 Стадион"), callback_data="st:open"),
             ],
             [InlineKeyboardButton(text=tr("🎓 Академия"), callback_data="ac:open")],
-            [InlineKeyboardButton(text=tr("Название клуба"), callback_data="rn:open")],
             [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
@@ -152,7 +152,7 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
 def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
     text = tr(
         "🏟 <b>{p0}</b> · Лига {p1}\n💰 Бюджет: {p2}\n🏟 Стадион: {p3:,} · 👥 Болельщики: {p4:,}",
-        p0=escape(latin_name(card.name)),
+        p0=escape(club_label(latin_name(card.name), card.vip)),
         p1=card.tier,
         p2=format_money(card.budget),
         p3=card.stadium_capacity,
@@ -175,11 +175,11 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
                 InlineKeyboardButton(text=tr("🏟 Стадион"), callback_data="st:open"),
             ],
             [InlineKeyboardButton(text=tr("🎓 Академия"), callback_data="ac:open")],
-            [InlineKeyboardButton(text=tr("Название клуба"), callback_data="rn:open")],
             [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
             [InlineKeyboardButton(text=tr("🗂 Сезоны"), callback_data=seasons_callback(1))],
+            [InlineKeyboardButton(text=tr("⚙️ Настройки"), callback_data="ntf:open")],
             [InlineKeyboardButton(text=tr("🏠 Главное меню"), callback_data=MENU_CALLBACK)],
         ]
     )

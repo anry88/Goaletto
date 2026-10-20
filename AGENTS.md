@@ -373,3 +373,14 @@
   the owner's personal PC and infrastructure security/reboot/capacity drills are
   under their manual supervision, not new code approval gates. Prefer data on D.
   Keep backups copied from HDC to a separate Documents folder on this Mac.
+
+- User update 2026-10-20: every rename is offseason-only, with at most one
+  available credit. An empty slot can buy one credit for 50 Stars in settings.
+  VIP costs 1 Star for the current personal test, lasts one calendar month,
+  has no automatic renewal and grants one offseason credit per club/season
+  only when the slot is empty. Crown + VIP in club/match, crown only in tables;
+  no other gameplay benefits. Payment support uses RiverKing's configured admin
+  chat, persisted manual approval and refundStarPayment. Unknown outcomes never
+  auto-retry. Any real production Stars receipt, including internal purchases,
+  latches data protection: do not reset a world containing real payment history.
+  See docs/stars-vip-data-d.md. HDC PGDATA now binds to D, not the old C volume.
