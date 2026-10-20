@@ -46,7 +46,7 @@ try {
     $probe=@($sql | docker exec -i $id psql -X -A -t -v ON_ERROR_STOP=1 `
         -U goaletto -d goaletto 2>$null)
     if ($LASTEXITCODE -ne 0 -or $probe.Count -ne 1) { throw 'target' }
-    if ($probe[0] -notmatch '^goaletto\|t\|[0-9a-z]+$') { throw 'target' }
+    if ($probe[0] -notmatch '^goaletto\|t\|[0-9a-z_]+$') { throw 'target' }
     $revision=$probe[0].Split('|')[2]
     $directory='D:/HomeDataCenter/services/goaletto/backups'
     [IO.Directory]::CreateDirectory($directory) | Out-Null
@@ -102,6 +102,8 @@ def validate_metadata(raw: str, stem: str) -> dict[str, object]:
         or data.get("project") != "goaletto"
         or data.get("database") != "goaletto"
         or data.get("filename") != stem + ".dump"
+        or not isinstance(data.get("schema_revision"), str)
+        or not re.fullmatch(r"[0-9a-z_]{1,64}", data["schema_revision"])
         or data.get("remote_path") != REMOTE_ROOT + "/backups/" + stem + ".dump"
         or not isinstance(data.get("sha256"), str)
         or not re.fullmatch(r"[0-9a-f]{64}", data["sha256"])

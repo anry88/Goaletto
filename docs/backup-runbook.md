@@ -1,4 +1,16 @@
-# Runbook резервного копирования Goaletto · codex/backup-tooling
+# Runbook резервного копирования Goaletto · AND-70
+
+2026-10-20: настроен реальный backup с HDC на рабочий Mac в
+`~/Documents/Goaletto Backups`, проверен фоновый LaunchAgent и restore именно
+из off-host копии. [Точная приёмка и расписание](hdc-acceptance-2026-10-20.md).
+Запуск вручную: `.venv/bin/python scripts/backup_hdc.py`. Checksum и размер
+проверяются до публикации manifest; готовые архивы не перезаписываются.
+
+Сохранение disposable dev-мира не является обязательным условием reset:
+пользователь разрешил свободное пересоздание точной БД Goaletto. Для самого
+restore-drill нужен проверенный архив, из которого проверяется восстановление.
+Описанные ниже старые требования сохранения текущего мира относятся к
+исторической приёмке и не вводят дополнительного approval gate.
 
 Инструмент: `python scripts/backup_goaletto.py`. Даёт проверяемый `pg_dump`
 одной явно согласованной базы `goaletto` в custom-формате плюс SHA256-манифест.

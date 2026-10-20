@@ -26,7 +26,7 @@ def metadata():
         "version": 1,
         "project": "goaletto",
         "database": "goaletto",
-        "schema_revision": "0044",
+        "schema_revision": "0044_operator_reports",
         "filename": STEM + ".dump",
         "remote_path": backup.REMOTE_ROOT + "/backups/" + STEM + ".dump",
         "sha256": hashlib.sha256(DATA).hexdigest(),

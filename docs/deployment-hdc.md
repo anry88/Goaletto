@@ -9,7 +9,9 @@ HDC: Windows host + Docker с Linux-контейнерами, SSH alias hdc.
 Предлагаемый путь: D:\HomeDataCenter\services\goaletto.
 Отдельный Compose project goaletto, volumes и host-only secrets. PostgreSQL без
 публичного порта; bot/worker используют исходящий long polling, без Cloudflare Tunnel.
-Production-деплой Goaletto ещё не выполнялся.
+2026-10-20: выполнен закрытый HDC-запуск для двух внутренних аккаунтов.
+[Релиз, backup на Mac и приёмка](hdc-acceptance-2026-10-20.md).
+Внешняя launch-приёмка остаётся за AND-72/82.
 
 Обновление 2026-10-18: read-only SSH/inventory проверены, HDC отвечает;
 Docker Linux/x86_64, 8 CPU, около 7,71 GiB RAM, Compose 5.1.4. Goaletto ещё не
@@ -115,7 +117,13 @@ migrate — одноразовый сервис; bot/worker стартуют п�
 Новый tag пересоздаёт migrate; при повторе того же tag проверить его предыдущий
 успешный exit status. Каждую native-команду PowerShell проверять по LASTEXITCODE.
 Не печатать docker compose config без --quiet: он раскрывает .env.
-Команды на HDC ещё не выполнялись; release override проверяется локально на dummy env.
+На HDC migrate/bot/worker запущены из одного проверенного runtime image.
+Для этого варианта добавляется `-f deploy/compose.assets.yaml`, в HDC `.env`
+задаётся `GOALETTO_ASSET_DIR` с проверенным read-only каталогом на диске D:.
+Runtime-only image собирается с `--target runtime --platform linux/amd64`;
+обычная сборка включает упакованные whole portraits/маски, без sources.
+SHA-256 image и asset-пакета проверяются отдельно. `create_host_path: false`
+не позволяет молча создать пустую папку при ошибке пути.
 
 ## Проверки и откат
 
