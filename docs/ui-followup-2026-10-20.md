@@ -37,3 +37,9 @@ config `sha256:e37869d32a42819f74ededf117c23775073af6cddb12729f402628ee24bcc63e`
 схема0049 и19соседних контейнеров сохранены. Реальный платёж1→1, data protection
 остаётся true. Health jobs/sender, getMe/private command menu и bot /metrics прошли.
 Реальных денежных операций агент не выполнял.
+
+Последующее повышение цены: на HDC установлен `goaletto:f8ddb6b8-hdc`,
+VIP 100 Stars подтверждён read-only smoke. 1164 unit/offline checks,
+ruff/format/mypy210 и offline SQL прошли. При этом обновлении 2→2 реальных
+платёжных receipt сохранены, защита данных включена, PG/D и 19 соседних
+контейнеров не изменены. Jobs/sender healthy, private metrics/Telegram OK.

@@ -118,5 +118,29 @@ bot отвечает, health CLI worker проходит. Allowlist сохран
 Свежая off-host копия схемы0049 забрана на этот Mac:
 `~/Documents/Goaletto Backups/goaletto-20261020T122436Z-9fbbc8f8.dump` и manifest,
 1 573 188 bytes. Проверены PGDMP, размер и SHA-256; прежние копии сохранены.
-Пользователь может лично проверить VIP за1Star через `/settings`, затем
-`/paysupport`; это не было подменено fake-платежом на HDC.
+На момент этого первого релиза личная проверка VIP за 1 Star через `/settings`
+и `/paysupport` ещё ожидалась. Позднее владелец подтвердил успешную проверку;
+текущая цена повышена до 100 Stars, см. последующее обновление ниже.
+
+## VIP за 100 Stars после личной проверки
+
+Владелец подтвердил работу платежей и поручил установить обычную цену 100 Stars.
+Код main `f8ddb6b8` установлен на HDC как `goaletto:f8ddb6b8-hdc`.
+Config digest из проверенного docker-save архива:
+`sha256:46af334bb8beb79dbad798dcb41ab17c5f1056f319256f3df33d32e2f70a7319`.
+Счёт и кнопка настроек показывают 100 Stars; переименование по-прежнему 50 Stars.
+Старый созданный счёт за 1 Star отменяется при новом заказе и отклоняется на
+precheckout. Уже одобренный платёж получает услугу по исходным условиям;
+receipt и сумма возможного возврата сохраняют фактическую сумму.
+
+Проверки: 1164 unit/offline, ruff/format, mypy 210 модулей, offline migration SQL.
+Локальные PostgreSQL-тесты не запускались параллельно с сезонной калибровкой.
+При установке сохранены 2 реальных receipt и data protection, PostgreSQL container
+и bind mount D; 19 соседних контейнеров не перезапускались. Read-only smoke
+подтвердил цену 100, 18 готовых клубов tier 5, Telegram private commands,
+Prometheus endpoint и healthy jobs/sender. Allowlist пока внутренний.
+Подробности интерфейса: [последующие уточнения](ui-followup-2026-10-20.md).
+[CI повышения цены](https://github.com/anry88/Goaletto/actions/runs/39430506781)
+завершился успешно. Новая off-host копия после реальных покупок:
+`~/Documents/Goaletto Backups/goaletto-20261020T133119Z-2c9911c1.dump`,
+1 590 139 bytes, размер/PGDMP/SHA-256 проверены, прежние копии сохранены.
