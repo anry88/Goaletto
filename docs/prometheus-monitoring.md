@@ -105,7 +105,8 @@ counters, все MetricsQL запросы трёх dashboard через Victoria
 в Grafana. Ошибка БД должна оставлять процессный endpoint доступным, показывать
 snapshot failure/staleness и исчезновение DB gauges, затем восстанавливаться.
 Не выдумывать исторические counters до установки и не reset development-мир
-ради красивых графиков. Реальные HDC результаты фиксируются отдельно.
+ради красивых графиков. [Реальная HDC-приёмка 2026-10-20](monitoring-acceptance-2026-10-20.md):
+оба targets up, 50 запросов, настоящие команды, SQL/CLI parity и DB outage/recovery.
 
 Документация библиотек: [Prometheus instrumentation](https://prometheus.io/docs/practices/instrumentation/),
 [Python client](https://prometheus.github.io/client_python/),

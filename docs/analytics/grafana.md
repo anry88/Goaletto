@@ -15,6 +15,7 @@
   не заменяют человеческую активность и retention.
 
 [Метрики, конфигурация и точные ограничения](../prometheus-monitoring.md).
+[Фактическая HDC-приёмка VictoriaMetrics](../monitoring-acceptance-2026-10-20.md).
 Точные исторические срезы и campaign/locale/variant/tier/set пересечения остаются
 в SQL/CLI, не изображаются как произвольная история в Prometheus.
 

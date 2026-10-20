@@ -20,7 +20,7 @@
     {
       "id": 1,
       "title": "Покрытие и время наблюдения",
-      "description": "Текущий фиксированный SQL-снимок; waiting/unknown и N=0 сохраняются. Timestamp-поля покрытия — Unix seconds. Подробности/исторический as-of доступны через CLI.",
+      "description": "Покрытие фиксированного SQL-снимка: available=1 — доступен, limited=1 — окно выходит за начало покрытия. Времена показаны в UTC. Точный исторический as-of доступен через CLI.",
       "type": "table",
       "datasource": {
         "type": "prometheus",
@@ -34,19 +34,66 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "available_from"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "displayName",
+                "value": "Данные с (UTC)"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "coverage_started_at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "displayName",
+                "value": "Начало покрытия (UTC)"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "report_at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "displayName",
+                "value": "Снимок (UTC)"
+              }
+            ]
+          }
+        ]
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -56,11 +103,22 @@
             "type": "prometheus",
             "uid": "goaletto-vm"
           },
-          "expr": "goaletto_analytics_coverage{job=\"goaletto-worker\",window=\"$window\"} and on(job,instance) (goaletto_db_snapshot_success == 1) and on(job,instance) (time()-goaletto_db_snapshot_timestamp_seconds < 120)",
+          "expr": "sum by(window,measure) (((goaletto_analytics_coverage{job=\"goaletto-worker\",window=\"$window\",measure=~\"available_from|coverage_started_at|report_at\"} * 1000) or goaletto_analytics_coverage{job=\"goaletto-worker\",window=\"$window\",measure=~\"available|limited\"}) and on(job,instance) (goaletto_db_snapshot_success == 1) and on(job,instance) (time()-goaletto_db_snapshot_timestamp_seconds < 120))",
           "legendFormat": "{{measure}}",
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "measure",
+            "rowField": "window",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
         }
       ]
     },
@@ -81,19 +139,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -108,6 +164,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -128,19 +202,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -155,6 +227,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -175,19 +265,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -202,6 +290,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -222,19 +328,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -249,6 +353,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -269,19 +391,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -296,6 +416,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -316,19 +454,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -343,6 +479,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -363,19 +517,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -390,6 +542,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -410,19 +580,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -437,6 +605,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -457,19 +643,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -484,6 +668,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     },
@@ -504,19 +706,17 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "noValue": "Нет наблюдений",
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -531,6 +731,24 @@
           "instant": true,
           "range": false,
           "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app": true,
+              "instance": true,
+              "job": true,
+              "service": true,
+              "window": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
         }
       ]
     }

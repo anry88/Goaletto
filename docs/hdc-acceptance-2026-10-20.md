@@ -1,5 +1,10 @@
 # HDC: закрытый запуск и эксплуатационная приёмка · 2026-10-20
 
+Ниже сохранён первоначальный протокол. Последующее указание пользователя заменило
+прямой SQL datasource на Prometheus → VictoriaMetrics → Grafana; установлен новый
+runtime и пятый monitoring overlay. Текущее состояние и проверки описаны в
+[протоколе мониторинга](monitoring-acceptance-2026-10-20.md).
+
 Реальный Windows HDC, Linux Docker x86_64, Compose 5.1.4. Сервис размещён в
 `D:\HomeDataCenter\services\goaletto`, отдельные сеть `goaletto_default` и volume
 `goaletto_postgres_data`. БД `goaletto` не имеет опубликованного порта. Один bot

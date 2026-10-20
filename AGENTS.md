@@ -343,6 +343,8 @@
   Shared Grafana uses organization 1 and the Goaletto operator folder, by explicit
   user choice. User update 2026-10-20: Grafana must read VictoriaMetrics; bot/worker expose
   private Prometheus /metrics. Remove its direct PostgreSQL datasource/login.
+  This is deployed and verified; see docs/monitoring-acceptance-2026-10-20.md.
+  Future HDC releases must retain deploy/compose.monitoring.yaml as the fifth overlay.
   Keep labels bounded, without personal IDs, payloads or arbitrary text; fixed-window
   SQL snapshot gauges are not durable counters or arbitrary historical cohorts.
   A full Windows reboot and alerts/capacity acceptance remain open; restarting the
