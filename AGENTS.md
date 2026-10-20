@@ -341,7 +341,10 @@
   ~/Documents/Goaletto Backups through scripts/backup_hdc.py and its LaunchAgent;
   an off-host archive was restored and verified against all 85 tables.
   Shared Grafana uses organization 1 and the Goaletto operator folder, by explicit
-  user choice. Only aggregate-function access is granted to its separate DB login.
+  user choice. User update 2026-10-20: Grafana must read VictoriaMetrics; bot/worker expose
+  private Prometheus /metrics. Remove its direct PostgreSQL datasource/login.
+  Keep labels bounded, without personal IDs, payloads or arbitrary text; fixed-window
+  SQL snapshot gauges are not durable counters or arbitrary historical cohorts.
   A full Windows reboot and alerts/capacity acceptance remain open; restarting the
   shared host requires a window for neighboring services. Never reset a live HDC
   world concurrently with a gameplay/recovery check, and verify its exact target

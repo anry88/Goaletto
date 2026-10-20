@@ -9,8 +9,10 @@ from sqlalchemy import select
 from goaletto.bot.access import TelegramAccess
 from goaletto.bot.commands import configure_commands
 from goaletto.bot.language import TelegramLanguage
+from goaletto.bot.metrics import TelegramMetrics, UpdateMetrics
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
+from goaletto.infrastructure.metrics_server import serve_metrics
 from goaletto.infrastructure.models import Manager
 
 
@@ -35,6 +37,8 @@ def build_dispatcher(
     internal_telegram_ids: frozenset[int] = frozenset(),
 ) -> Dispatcher:
     dispatcher = Dispatcher(database=database, internal_telegram_ids=internal_telegram_ids)
+    dispatcher.message.outer_middleware(UpdateMetrics())
+    dispatcher.callback_query.outer_middleware(UpdateMetrics())
     access = TelegramAccess(allowed_telegram_ids)
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
@@ -107,6 +111,7 @@ async def run() -> None:
     if not token:
         raise SystemExit("Set GOALETTO_BOT_TOKEN in .env before starting the bot")
     bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot.session.middleware(TelegramMetrics())
     database = Database(settings) if settings.game_enabled else None
     dispatcher = build_dispatcher(
         database,
@@ -133,7 +138,8 @@ async def run() -> None:
         await configure_commands(
             bot, game_enabled=settings.game_enabled, saved_locales=saved_locales
         )
-        await dispatcher.start_polling(bot, close_bot_session=False)
+        async with serve_metrics(settings, database, "bot"):
+            await dispatcher.start_polling(bot, close_bot_session=False)
     finally:
         await bot.session.close()
         if database is not None:

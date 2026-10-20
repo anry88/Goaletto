@@ -31,7 +31,7 @@ async def test_worker_runs_sender_independently_and_closes_resources(monkeypatch
     class BotStub:
         def __init__(self, token):
             assert token == "stub"
-            self.session = SimpleNamespace(close=self.close)
+            self.session = SimpleNamespace(close=self.close, middleware=lambda observer: observer)
 
         async def close(self):
             stopped.append("bot")
@@ -92,7 +92,7 @@ async def test_startup_failure_closes_bot_and_database(monkeypatch):
 
     class BotStub:
         def __init__(self, token):
-            self.session = SimpleNamespace(close=self.close)
+            self.session = SimpleNamespace(close=self.close, middleware=lambda observer: observer)
 
         async def close(self):
             stopped.append("bot")

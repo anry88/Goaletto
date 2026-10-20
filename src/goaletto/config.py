@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     worker_health_file: Path = Path(gettempdir()) / "goaletto-worker-instance"
     outbox_enabled: bool = False
     game_enabled: bool = False
+    # Private Prometheus exposition only; no gameplay routes or public bind by default.
+    metrics_enabled: bool = False
+    metrics_host: str = "127.0.0.1"
+    metrics_port: int = Field(default=9109, ge=1, le=65535)
+    metrics_snapshot_seconds: float = Field(default=60, ge=15, le=3600)
     # JSON array in the host-only environment; empty preserves unrestricted access.
     allowed_telegram_ids: frozenset[Annotated[int, Field(gt=0)]] = frozenset()
     internal_telegram_ids: frozenset[Annotated[int, Field(gt=0)]] = frozenset()

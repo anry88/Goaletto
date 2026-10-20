@@ -7,9 +7,9 @@
 [Итоговая приёмка штаба, второй карьеры и развития](docs/staff-development-acceptance.md)
 — AND-61/83/64: игровые потоки подключены, сезонная калибровка учитывает все матчи.
 
-[Операторский Grafana](docs/analytics/grafana.md): два dashboard с ограниченным
-SQL-интерфейсом, проверенными правами отдельного логина и совпадением с CLI.
-Локальный Grafana smoke пройден; подключение существующего HDC остаётся отдельным этапом.
+[Операторский Grafana](docs/analytics/grafana.md): bot/worker отдают Prometheus-метрики,
+существующая VictoriaMetrics собирает их для трёх dashboard. Команды, Telegram API,
+worker/SQL/process и фоновые DB-снимки: [мониторинг](docs/prometheus-monitoring.md).
 
 [Работоспособность worker](docs/worker-health.md) и [нагрузка перед запуском](docs/launch-load.md):
 отдельные jobs/sender heartbeat, Docker healthcheck и измеренные live-профили 50/75 матчей.

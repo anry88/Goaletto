@@ -251,4 +251,11 @@ async def process_one_job(
             failure_class=failure,
         )
     )
+    if replay_season_id is None:
+        # Telemetry is consumed only after the caller observes a successful COMMIT.
+        session.info["metrics_job"] = (
+            job.kind,
+            outcome,
+            max(0.0, (processed_at - original_due).total_seconds()),
+        )
     return rescheduled or outcome != "deferred"

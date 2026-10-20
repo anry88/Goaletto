@@ -1,21 +1,17 @@
 apiVersion: 1
-datasources:
+# Remove only Goaletto's previous SQL datasource.
+deleteDatasources:
   - name: Goaletto operator
-    uid: goaletto-operator-pg
     orgId: $GOALETTO_GRAFANA_ORG_ID
-    type: grafana-postgresql-datasource
+datasources:
+  - name: Goaletto VictoriaMetrics
+    uid: goaletto-vm
+    orgId: $GOALETTO_GRAFANA_ORG_ID
+    type: prometheus
     access: proxy
-    url: $GOALETTO_GRAFANA_PG_HOST
-    user: $GOALETTO_GRAFANA_PG_USER
+    url: $GOALETTO_VICTORIAMETRICS_URL
     isDefault: false
     editable: false
     jsonData:
-      database: goaletto
-      sslmode: $GOALETTO_GRAFANA_PG_SSLMODE
-      postgresVersion: 1700
-      timescaledb: false
-      maxOpenConns: 2
-      maxIdleConns: 1
-      connMaxLifetime: 300
-    secureJsonData:
-      password: $GOALETTO_GRAFANA_PG_PASSWORD
+      httpMethod: POST
+      timeInterval: 15s

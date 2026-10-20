@@ -10,6 +10,7 @@ from sqlalchemy import delete, select, update
 
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
+from goaletto.infrastructure.metrics import METRICS
 from goaletto.infrastructure.models import WorkerHeartbeat
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class PulseWriter:
         self.next_due = 0.0
 
     async def beat(self, *, success: bool) -> None:
+        METRICS.pulse(self.component, success, datetime.now(UTC).timestamp())
         if self.instance is None or (success and monotonic() < self.next_due):
             return
         self.next_due = monotonic() + 10
@@ -72,6 +74,7 @@ class PulseWriter:
                         .values(**values)
                     )
         except Exception as error:
+            METRICS.heartbeat_errors.labels(self.component).inc()
             # Monitoring failure must not cancel an already committed game operation.
             logger.warning("Worker heartbeat unavailable (%s)", type(error).__name__)
 

@@ -20,6 +20,7 @@ class Recorder:
         self.added = []
         self.statements = []
         self.nested = 0
+        self.info = {}
 
     async def scalar(self, statement):
         self.statements.append(statement)
@@ -64,6 +65,7 @@ async def test_dispatch_records_attempt_and_uses_savepoint_without_external_deli
     monkeypatch.setattr("goaletto.infrastructure.jobs.handle_calendar_job", handle)
     processed = await process_one_job(cast(AsyncSession, recorder), at=NOW)
     assert recorder.nested == job.attempts == len(recorder.added) == 1
+    assert recorder.info["metrics_job"][:2] == (job.kind, recorder.added[0].outcome)
     attempt = recorder.added[0]
     assert attempt.failure_class in {None, "not_ready", "invalid_state"}
     assert (

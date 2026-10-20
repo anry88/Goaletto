@@ -187,7 +187,9 @@ async def test_reader_cannot_read_people_comments_write_or_hijack_search_path(se
             await sql_report(reader, report, filters)
 
 
-async def test_every_dashboard_query_executes_as_real_reader_and_keeps_unknown(sessions, reader):
+async def test_aggregate_interface_queries_execute_as_real_reader_and_keep_unknown(
+    sessions, reader
+):
     async with sessions.begin() as session:
         session.add(AnalyticsCoverage(version=1, started_at=COVERAGE_AT, retention_days=180))
         session.add(
@@ -204,19 +206,15 @@ async def test_every_dashboard_query_executes_as_real_reader_and_keeps_unknown(s
         )
     sent = (await sql_report(reader, "delivery"))["rows"][0]
     assert sent["delivered"] == 0 and sent["failed_unknown"] == 1 and sent["unknown_messages"] == 1
-    # Execute the literal deployed dashboard SQL after only Grafana macro substitution.
-    for path in (ROOT / "deploy/grafana/dashboards").glob("*.json"):
-        dashboard = json.loads(path.read_text())
-        queries = [t["rawSql"] for p in dashboard["panels"] for t in p.get("targets", [])]
-        queries += [v["query"] for v in dashboard["templating"]["list"] if v["type"] == "query"]
-        for query in queries:
-            query = query.replace("$__timeFrom()", "'2026-10-11T00:00:00Z'").replace(
-                "$__timeTo()", "'2026-10-12T12:00:00Z'"
-            )
-            for name in ("source", "locale", "variant", "tier", "set"):
-                query = query.replace("${" + name + ":sqlstring}", "'all'")
-            async with reader.begin() as session:
-                await session.execute(text(query))
+    # Preserve the frozen aggregate SQL acceptance after Grafana moves to MetricsQL.
+    for query in json.loads((ROOT / "tests/fixtures/operator_queries.json").read_text()):
+        query = query.replace("$__timeFrom()", "'2026-10-11T00:00:00Z'").replace(
+            "$__timeTo()", "'2026-10-12T12:00:00Z'"
+        )
+        for name in ("source", "locale", "variant", "tier", "set"):
+            query = query.replace("${" + name + ":sqlstring}", "'all'")
+        async with reader.begin() as session:
+            await session.execute(text(query))
 
 
 async def test_feedback_aggregates_match_cli_without_exposing_comment(sessions, reader):

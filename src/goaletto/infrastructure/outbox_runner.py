@@ -33,6 +33,7 @@ class TransactionSource(Protocol):
 class DeliveryStep:
     processed: bool
     retry_after: float | None = None
+    outcome: str | None = None
 
 
 def utc_now() -> datetime:
@@ -113,7 +114,9 @@ async def process_one_delivery(
                 retry_after=retry_after,
             )
         # Pause this sender on Telegram 429; the game worker continues independently.
-        return DeliveryStep(True, retry_after if outcome == Outcome.RATE_LIMITED else None)
+        return DeliveryStep(
+            True, retry_after if outcome == Outcome.RATE_LIMITED else None, outcome.value
+        )
     except LeaseLost:
         # Another claim now owns the receipt. Never overwrite its completion.
         return DeliveryStep(True)

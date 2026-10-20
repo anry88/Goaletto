@@ -26,6 +26,7 @@ class TelegramAccess(BaseMiddleware):
             if user is not None and user.id in self.allowed_ids:
                 return await handler(event, data)
             text = tr("Сейчас Goaletto проходит закрытый тест. Доступ пока ограничен.")
+            data["metrics_access_denied"] = True
             if isinstance(event, CallbackQuery):
                 await event.answer(text, show_alert=True)
             else:

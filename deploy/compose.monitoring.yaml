@@ -1,0 +1,22 @@
+# Private metrics-only attachment to the existing VictoriaMetrics network.
+services:
+  bot:
+    environment:
+      GOALETTO_METRICS_ENABLED: "true"
+      GOALETTO_METRICS_HOST: 0.0.0.0
+    networks:
+      default:
+      monitoring:
+        aliases: [goaletto-bot-metrics]
+  worker:
+    environment:
+      GOALETTO_METRICS_ENABLED: "true"
+      GOALETTO_METRICS_HOST: 0.0.0.0
+    networks:
+      default:
+      monitoring:
+        aliases: [goaletto-worker-metrics]
+networks:
+  monitoring:
+    external: true
+    name: ${GOALETTO_MONITORING_NETWORK:-observability_default}
