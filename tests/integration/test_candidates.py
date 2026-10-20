@@ -323,7 +323,7 @@ async def test_actual_telegram_router_signs_player_and_staff_after_commit(sessio
     for command in ("/freeagents", "/staff"):
         screen = await send(text=command)
         if command == "/staff":
-            screen = await send(data="cg:s:2")  # Head coaches, including the occupied role.
+            screen = await send(data="cg:h:2")  # Head coaches on the separate staff market.
         choices = [
             b.callback_data
             for row in screen.reply_markup.inline_keyboard
