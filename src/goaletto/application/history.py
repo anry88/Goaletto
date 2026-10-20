@@ -354,6 +354,14 @@ async def get_club_results(
     if not session.in_transaction():
         raise ValueError("History views need a transaction")
     ownership, club = await owned_club(session, actor)
+    if season_id is not None:
+        membership = await session.scalar(
+            select(SeasonClub).where(
+                SeasonClub.season_id == season_id, SeasonClub.club_id == club.id
+            )
+        )
+        if membership is None:
+            raise PermissionDenied("Season is not available")
     filters = _fixture_filters(club.id, season_id)
     total_value = await session.scalar(select(func.count()).select_from(Fixture).where(*filters))
     total = int(total_value or 0)

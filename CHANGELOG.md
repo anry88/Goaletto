@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- AND-142: матчи выбранного сезона доступны из архива; отчёт возвращает
+  к исходной странице футболиста или сезона, вкладки сохраняют этот переход.
+- AND-81: подготовлен [план трёх экспериментов подсказок](docs/analytics/experiments.md)
+  с назначением, delivery exposure, зрелыми метриками и остановкой; запуск отдельно.
+
 - AND-77: отдельные durable попытки `/match`/live/history, настоящий commit,
   render и Telegram accepted/rejected/unknown, read-only p50/p95. Queue timestamps
   не используют календарное ожидание; исторический bot replay исключён из live lateness.

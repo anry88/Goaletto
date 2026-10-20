@@ -19,7 +19,11 @@ from goaletto.application.history import (
     get_season_archive,
 )
 from goaletto.bot.club_cards import stale_view
-from goaletto.bot.history_callbacks import parse_history_callback, parse_report_callback
+from goaletto.bot.history_callbacks import (
+    parse_context_report_callback,
+    parse_history_callback,
+    parse_report_callback,
+)
 from goaletto.bot.history_cards import (
     archive_view,
     player_history_view,
@@ -87,6 +91,13 @@ async def _load(
     )
     if kind == "results":
         return partial(results_view, await get_club_results(session, actor, page))
+    if kind == "season_results":
+        assert identity is not None
+        return partial(
+            results_view,
+            await get_club_results(session, actor, page, season_id=identity),
+            season_id=identity,
+        )
     if kind == "match":
         assert identity is not None
         return partial(report_view, await get_match_report(session, actor, identity), page)
@@ -100,7 +111,7 @@ async def _load(
         return partial(seasons_view, data.entries, page=data.page, total_pages=data.total_pages)
     if kind == "archive":
         assert identity is not None
-        return partial(archive_view, await get_season_archive(session, actor, identity))
+        return partial(archive_view, await get_season_archive(session, actor, identity), page)
     raise ValueError("Unknown history screen")
 
 
@@ -108,6 +119,7 @@ __all__ = ["router"]
 
 
 @router.callback_query(F.data.startswith("hr:"))
+@router.callback_query(F.data.startswith("ht:"))
 async def report_page(query: CallbackQuery, database: Database) -> None:
     await query.answer()
     if not isinstance(query.message, Message):
@@ -116,7 +128,13 @@ async def report_page(query: CallbackQuery, database: Database) -> None:
     operation = uuid5(CALLBACK_NAMESPACE, f"goaletto:callback:v1:{query.id}")
     async with observe_request(database, operation, "history") as timing:
         try:
-            fixture_id, section, page, return_page = parse_report_callback(query.data or "")
+            data = query.data or ""
+            origin = None
+            if data.startswith("ht:"):
+                fixture_id, section, page, origin = parse_context_report_callback(data)
+                return_page = origin.page
+            else:
+                fixture_id, section, page, return_page = parse_report_callback(data)
             async with timing.transaction() as session:
                 actor = await actor_for_callback(
                     session,
@@ -127,7 +145,7 @@ async def report_page(query: CallbackQuery, database: Database) -> None:
                 report = await get_match_report(session, actor, fixture_id)
                 timing.bind(fixture_id)
             text, keyboard = timing.render(
-                report_view, report, return_page, section=section, page=page
+                report_view, report, return_page, section=section, page=page, origin=origin
             )
         except (PermissionDenied, ValueError):
             await timing.send(

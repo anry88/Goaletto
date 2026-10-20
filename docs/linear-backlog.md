@@ -458,6 +458,9 @@ Crash points: тик до/после commit, rollover, claim, bid/settlement и 
 
 ### [AND-81 · Подготовить последовательные эксперименты подсказок и ожидания первого матча](https://linear.app/andrei-brazhnikov/issue/AND-81/podgotovit-posledovatelnye-eksperimenty-podskazok-i-ozhidaniya-pervogo)
 
+Подготовка завершена 2026-10-20: [паспорта и правила запуска](analytics/experiments.md).
+Runner и внешний запуск не реализованы; baseline и HDC-проверки предшествуют запуску.
+
 Адаптация Frontline AND-37. Дневной retention — диагностика, недельные opportunities — основной результат; никакой гарантии причинности по небольшой когорте.
 
 **Приёмка:** План первых гипотез: следующий шаг после claim, пояснение ожидания, CTA после результата. Зафиксированы primary metric/guardrails, стабильное assignment, actual delivery exposure и версия. Одно изменение за раз, internal отдельно; low traffic qualitative review без ложной статистической победы. Предусмотрены остановка/rollback и исключение unknown exposure; не менять gameplay/экономику. Реальный запуск эксперимента после baseline, runner не блокирует MVP.

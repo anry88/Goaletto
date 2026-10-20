@@ -33,7 +33,7 @@ BENCH_ID = FINAL.home.snapshot.players[15].id
 OPPONENT_ID = FINAL.away.snapshot.players[0].id
 
 
-async def _build_archive(sessions):
+async def _build_archive(sessions, *, mixed_competitions=False):
     from goaletto.domain.ownership import ownership_deadline
     from goaletto.infrastructure.models import (
         Club,
@@ -86,8 +86,8 @@ async def _build_archive(sessions):
                     number=number,
                     status="active" if number == 2 else "finished",
                     seed=7,
-                    starts_at=NOW - timedelta(weeks=20),
-                    ends_at=NOW + timedelta(weeks=20),
+                    starts_at=NOW - timedelta(weeks=52 * (13 - number)),
+                    ends_at=NOW - timedelta(weeks=52 * (13 - number) - 18),
                     rollover_completed_at=None,
                 )
             )
@@ -215,6 +215,11 @@ async def _build_archive(sessions):
                         actual_start_at=at,
                         actual_finish_at=at + timedelta(minutes=33),
                         status="finished",
+                        competition=(
+                            ("cup", "champions", "friendly")[idx]
+                            if mixed_competitions and idx < 3
+                            else "league"
+                        ),
                     )
                 )
         await session.flush()
@@ -250,6 +255,7 @@ async def _build_archive(sessions):
                     home_club_id=fixture.home_club_id,
                     away_club_id=fixture.away_club_id,
                     version=1,
+                    competition=fixture.competition,
                     home_goals=FINAL.home.stats.goals,
                     away_goals=FINAL.away.stats.goals,
                     actual_start_at=fixture.actual_start_at,
@@ -446,3 +452,148 @@ async def test_season_pages_are_bounded_and_callbacks_reach_later_seasons(sessio
         assert [s.number for s in page.entries] == [2, 1]
         with pytest.raises(ValueError, match="page"):
             await get_club_seasons_page(session, actor, 4)
+
+
+async def test_season_matches_and_context_survive_fresh_transactions(sessions):
+    """Archive -> bounded season list -> report -> same list, with real SQL guards."""
+    from dataclasses import replace
+
+    from goaletto.application.game_actions import Actor, PermissionDenied
+    from goaletto.application.history import get_match_report, get_season_archive
+    from goaletto.bot.history_callbacks import (
+        archive_callback,
+        parse_context_report_callback,
+        season_results_callback,
+    )
+    from goaletto.bot.history_cards import archive_view, report_view, results_view
+    from goaletto.infrastructure.models import Fixture, OwnershipPeriod
+
+    manager_id, club_id = await _build_archive(sessions, mixed_competitions=True)
+    actor = Actor(manager_id, 123, None, uuid4(), NOW)
+    async with sessions.begin() as session:
+        fixture = await session.scalar(
+            select(Fixture)
+            .where(Fixture.home_club_id == club_id)
+            .order_by(Fixture.scheduled_start_at.desc())
+            .limit(1)
+        )
+        season_id = fixture.season_id
+        archive = await get_season_archive(session, actor, season_id)
+        assert season_results_callback(season_id) in [
+            b.callback_data for row in archive_view(archive)[1].inline_keyboard for b in row
+        ]
+    async with sessions.begin() as session:
+        page = await get_club_results(
+            session, replace(actor, operation_id=uuid4()), 1, season_id=season_id
+        )
+        assert page.total == 9 and page.total_pages == 2
+        assert {entry.season_id for entry in page.entries} == {season_id}
+        assert {entry.competition for entry in page.entries} == {
+            "cup",
+            "champions",
+            "friendly",
+            "league",
+        }
+        values = [
+            b.callback_data
+            for row in results_view(page, season_id=season_id)[1].inline_keyboard
+            for b in row
+        ]
+        assert season_results_callback(season_id, 2) in values
+        assert archive_callback(season_id) in values
+        report_link = next(value for value in values if value.startswith("ht:"))
+        fixture_id, section, number, origin = parse_context_report_callback(report_link)
+        second = await get_club_results(
+            session, replace(actor, operation_id=uuid4()), 2, season_id=season_id
+        )
+        assert len(second.entries) == 4
+        assert not {e.fixture_id for e in page.entries} & {e.fixture_id for e in second.entries}
+    async with sessions.begin() as session:
+        report = await get_match_report(session, replace(actor, operation_id=uuid4()), fixture_id)
+        digest = report.state_hash
+        values = [
+            b.callback_data
+            for row in report_view(report, section=section, page=number, origin=origin)[
+                1
+            ].inline_keyboard
+            for b in row
+        ]
+        assert season_results_callback(season_id, 1) in values
+    async with sessions.begin() as session:
+        again = await get_match_report(session, replace(actor, operation_id=uuid4()), fixture_id)
+        assert again.state_hash == digest
+        with pytest.raises(PermissionDenied, match="Season"):
+            await get_club_results(
+                session, replace(actor, operation_id=uuid4()), 1, season_id=uuid4()
+            )
+        ownership = await session.scalar(
+            select(OwnershipPeriod).where(OwnershipPeriod.club_id == club_id)
+        )
+        expires_at = ownership.expires_at
+    async with sessions.begin() as session:
+        with pytest.raises(PermissionDenied):
+            await get_club_results(
+                session, replace(actor, operation_id=uuid4(), at=expires_at), 1, season_id=season_id
+            )
+
+
+async def test_contextual_history_callbacks_reach_real_dispatcher(sessions):
+    from aiogram import Bot
+    from aiogram.methods import AnswerCallbackQuery, EditMessageText
+    from aiogram.types import CallbackQuery, Chat, Message, Update, User
+
+    from goaletto.bot.history_callbacks import (
+        ReportOrigin,
+        context_report_callback,
+        season_results_callback,
+    )
+    from goaletto.bot.main import build_dispatcher
+    from goaletto.infrastructure.models import Fixture
+    from tests.integration.test_game_dispatcher import Source, Telegram
+
+    await _build_archive(sessions)
+    async with sessions.begin() as session:
+        fixture = await session.scalar(select(Fixture).limit(1))
+        fixture_id, season_id = fixture.id, fixture.season_id
+    source = Source(sessions)
+    telegram = Telegram(source)
+    bot = Bot("123456:FAKE_LOCAL_TEST_TOKEN", session=telegram)
+    dispatcher = build_dispatcher(source, game_enabled=True)
+    origin = ReportOrigin("player", STARTER_ID, 1)
+    now = datetime.now(UTC)
+    message = Message(message_id=77, date=now, chat=Chat(id=123, type="private"))
+    try:
+        for number, callback in enumerate(
+            (
+                season_results_callback(season_id),
+                context_report_callback(fixture_id, origin),
+                context_report_callback(fixture_id, origin, "home", 2),
+            ),
+            start=1,
+        ):
+            telegram.calls.clear()
+            await dispatcher.feed_update(
+                bot,
+                Update(
+                    update_id=number,
+                    callback_query=CallbackQuery(
+                        id=f"history-{number}",
+                        from_user=User(id=123, is_bot=False, first_name="Test"),
+                        chat_instance="history-test",
+                        data=callback,
+                        message=message,
+                    ),
+                ),
+            )
+            assert isinstance(telegram.calls[0], AnswerCallbackQuery)
+            assert isinstance(telegram.calls[-1], EditMessageText)
+            text = telegram.calls[-1].text
+            assert "устарела" not in text and "недоступен" not in text
+            if number > 1:
+                assert origin.callback() in [
+                    b.callback_data
+                    for row in telegram.last_message.reply_markup.inline_keyboard
+                    for b in row
+                ]
+    finally:
+        await bot.session.close()

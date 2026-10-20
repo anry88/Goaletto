@@ -6,6 +6,7 @@ stored Standing counters ordered by rank_league. No MVP or derived ratings.
 """
 
 from html import escape
+from uuid import UUID
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -20,11 +21,14 @@ from goaletto.application.match_commentary import INSTRUCTIONS, MENTALITIES, TAC
 from goaletto.bot.club_cards import CLUB_CALLBACK, MENU_CALLBACK, SKILL_LABELS
 from goaletto.bot.history_callbacks import (
     REPORT_SECTIONS,
+    ReportOrigin,
     archive_callback,
+    context_report_callback,
     match_callback,
     player_history_callback,
     report_callback,
     results_callback,
+    season_results_callback,
     seasons_callback,
 )
 from goaletto.bot.result_views import table_view
@@ -49,7 +53,9 @@ def _nav(
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
+def results_view(
+    page: ClubResultsPage, *, season_id: UUID | None = None
+) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
         tr(
             "📜 <b>{p0}</b> · Матчи {p1}/{p2}",
@@ -61,6 +67,15 @@ def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
         "",
     ]
     buttons: list[list[InlineKeyboardButton]] = []
+
+    def open_report(fixture_id: UUID) -> str:
+        if season_id is not None:
+            return context_report_callback(fixture_id, ReportOrigin("season", season_id, page.page))
+        return match_callback(fixture_id, page.page)
+
+    def open_page(number: int) -> str:
+        return season_results_callback(season_id, number) if season_id else results_callback(number)
+
     for entry in page.entries:
         marker = OUTCOME_MARKERS.get(entry.outcome, "")
         date = entry.scheduled_start_at.strftime("%d.%m")
@@ -85,7 +100,7 @@ def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
                 [
                     InlineKeyboardButton(
                         text=tr("📋 Отчёт о матче"),
-                        callback_data=match_callback(entry.fixture_id, page.page),
+                        callback_data=open_report(entry.fixture_id),
                     )
                 ]
             )
@@ -111,7 +126,7 @@ def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
                         p1=entry.home_goals,
                         p2=entry.away_goals,
                     )[:60],
-                    callback_data=match_callback(entry.fixture_id, page.page),
+                    callback_data=open_report(entry.fixture_id),
                 )
             ]
         )
@@ -119,19 +134,17 @@ def results_view(page: ClubResultsPage) -> tuple[str, InlineKeyboardMarkup]:
         lines.append(tr("Сыгранных матчей пока нет."))
     nav: list[InlineKeyboardButton] = []
     if page.page > 1:
-        nav.append(
-            InlineKeyboardButton(text=tr("← Назад"), callback_data=results_callback(page.page - 1))
-        )
+        nav.append(InlineKeyboardButton(text=tr("← Назад"), callback_data=open_page(page.page - 1)))
     if page.page < page.total_pages:
         nav.append(
-            InlineKeyboardButton(text=tr("Вперёд →"), callback_data=results_callback(page.page + 1))
+            InlineKeyboardButton(text=tr("Вперёд →"), callback_data=open_page(page.page + 1))
         )
     if nav:
         buttons.append(nav)
     buttons.append(
         [InlineKeyboardButton(text=tr("🏟 Клуб"), callback_data=CLUB_CALLBACK)],
     )
-    return "\n".join(lines), _nav(buttons, back=None)
+    return "\n".join(lines), _nav(buttons, back=archive_callback(season_id) if season_id else None)
 
 
 def _event_line(
@@ -201,7 +214,12 @@ def _event_line(
 
 
 def report_view(
-    report: MatchReport, return_page: int = 1, *, section: str = "events", page: int = 1
+    report: MatchReport,
+    return_page: int = 1,
+    *,
+    section: str = "events",
+    page: int = 1,
+    origin: ReportOrigin | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
     if section not in REPORT_SECTIONS or type(page) is not int or page < 1:
         raise ValueError("Invalid report view")
@@ -361,7 +379,12 @@ def report_view(
     buttons: list[list[InlineKeyboardButton]] = [
         [
             InlineKeyboardButton(
-                text=label, callback_data=report_callback(report.fixture_id, tab, 1, return_page)
+                text=label,
+                callback_data=(
+                    context_report_callback(report.fixture_id, origin, tab, 1)
+                    if origin
+                    else report_callback(report.fixture_id, tab, 1, return_page)
+                ),
             )
             for tab, label in (
                 ("events", tr("⚽ События")),
@@ -376,19 +399,29 @@ def report_view(
         nav.append(
             InlineKeyboardButton(
                 text=tr("← Предыдущая"),
-                callback_data=report_callback(report.fixture_id, section, page - 1, return_page),
+                callback_data=(
+                    context_report_callback(report.fixture_id, origin, section, page - 1)
+                    if origin
+                    else report_callback(report.fixture_id, section, page - 1, return_page)
+                ),
             )
         )
     if page < total_pages:
         nav.append(
             InlineKeyboardButton(
                 text=tr("Следующая →"),
-                callback_data=report_callback(report.fixture_id, section, page + 1, return_page),
+                callback_data=(
+                    context_report_callback(report.fixture_id, origin, section, page + 1)
+                    if origin
+                    else report_callback(report.fixture_id, section, page + 1, return_page)
+                ),
             )
         )
     if nav:
         buttons.append(nav)
-    return "\n".join(lines).rstrip(), _nav(buttons, back=results_callback(return_page))
+    return "\n".join(lines).rstrip(), _nav(
+        buttons, back=origin.callback() if origin else results_callback(return_page)
+    )
 
 
 def player_history_view(page: PlayerHistoryPage) -> tuple[str, InlineKeyboardMarkup]:
@@ -431,7 +464,9 @@ def player_history_view(page: PlayerHistoryPage) -> tuple[str, InlineKeyboardMar
                     text=tr("Тур {p0}: отчёт", p0=entry.round_number)[:60]
                     if entry.competition == "league"
                     else tr("📋 Отчёт о матче"),
-                    callback_data=match_callback(entry.fixture_id, 1),
+                    callback_data=context_report_callback(
+                        entry.fixture_id, ReportOrigin("player", page.person_id, page.page)
+                    ),
                 )
             ]
         )
@@ -469,7 +504,7 @@ def seasons_view(
             [
                 InlineKeyboardButton(
                     text=tr("Сезон {p0} · Лига {p1}", p0=summary.number, p1=summary.tier),
-                    callback_data=archive_callback(summary.season_id),
+                    callback_data=archive_callback(summary.season_id, page),
                 )
             ]
         )
@@ -491,7 +526,7 @@ def seasons_view(
     return "\n".join(lines), _nav(buttons, back=None)
 
 
-def archive_view(archive: SeasonArchive) -> tuple[str, InlineKeyboardMarkup]:
+def archive_view(archive: SeasonArchive, return_page: int = 1) -> tuple[str, InlineKeyboardMarkup]:
     # Table text (with promotion/relegation markers) reused from result_views;
     # keyboard rebuilt for archive navigation. Counters are stored, never re-awarded.
     text, _ = table_view(archive.table, archive.season_id, archive.league_id, archive.tier, 1)
@@ -509,9 +544,14 @@ def archive_view(archive: SeasonArchive) -> tuple[str, InlineKeyboardMarkup]:
         p7=archive.points,
     )
     buttons: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(
+                text=tr("📜 Матчи сезона"), callback_data=season_results_callback(archive.season_id)
+            )
+        ],
         [InlineKeyboardButton(text=tr("🏟 Клуб"), callback_data=CLUB_CALLBACK)],
     ]
-    keyboard = _nav(buttons, back=seasons_callback(1))
+    keyboard = _nav(buttons, back=seasons_callback(return_page))
     return (
         tr("🗂 <b>Сезон {p0}</b> · Лига {p1}\n\n", p0=archive.number, p1=archive.tier)
         + text
