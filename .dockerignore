@@ -13,3 +13,15 @@ secrets
 tests
 docs/reference
 assets/concepts
+# Runtime uses packed whole portraits and garment masks. Keep production sources
+# and rejected experiments in the repository, outside release images.
+assets/portraits/*
+!assets/portraits/whole-v2
+assets/portraits/whole-v2/sources
+assets/portraits/whole-v2/previews
+assets/portraits/whole-v2/prompts
+assets/portraits/whole-v2/*.html
+assets/portraits/whole-v2/lifecycle-v1/sources
+assets/portraits/whole-v2/lifecycle-v1/previews
+assets/portraits/whole-v2/lifecycle-v1/prompts
+assets/portraits/whole-v2/lifecycle-v1/*.html

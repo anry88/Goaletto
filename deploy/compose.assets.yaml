@@ -1,0 +1,26 @@
+# Optional runtime-only image: versioned packed assets live on the HDC data disk.
+services:
+  migrate:
+    volumes:
+      - type: bind
+        source: ${GOALETTO_ASSET_DIR:?Set GOALETTO_ASSET_DIR to the verified release assets}
+        target: /app/assets/portraits/whole-v2
+        read_only: true
+        bind:
+          create_host_path: false
+  bot:
+    volumes:
+      - type: bind
+        source: ${GOALETTO_ASSET_DIR:?Set GOALETTO_ASSET_DIR to the verified release assets}
+        target: /app/assets/portraits/whole-v2
+        read_only: true
+        bind:
+          create_host_path: false
+  worker:
+    volumes:
+      - type: bind
+        source: ${GOALETTO_ASSET_DIR:?Set GOALETTO_ASSET_DIR to the verified release assets}
+        target: /app/assets/portraits/whole-v2
+        read_only: true
+        bind:
+          create_host_path: false

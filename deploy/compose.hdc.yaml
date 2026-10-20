@@ -2,9 +2,15 @@
 services:
   postgres:
     ports: !reset []
+    mem_limit: 512m
+    cpus: 1
   bot:
+    mem_limit: 512m
+    cpus: 1
     environment:
       GOALETTO_ENVIRONMENT: production
   worker:
+    mem_limit: 1g
+    cpus: 2
     environment:
       GOALETTO_ENVIRONMENT: production
