@@ -50,6 +50,7 @@ from tests.integration.test_game_dispatcher import Source, Telegram
 
 pytestmark = pytest.mark.integration
 ADMIN = 9001
+VIP_PRICE = stars.PRICES["vip"]
 
 
 async def rename_once(session, actor, name):
@@ -91,16 +92,16 @@ async def test_invoice_validation_receipt_retry_and_immutable_terms(sessions):
         for payer, amount, currency in ((1002, 1, "XTR"), (1001, 50, "XTR"), (1001, 1, "EUR")):
             assert not await stars.precheckout(session, body, payer, amount, currency, "bad", NOW)
         assert not await vip_clubs(session, {club}, NOW)
-        assert await stars.precheckout(session, body, 1001, 1, "XTR", "approved", NOW)
-        assert await stars.precheckout(session, body, 1001, 1, "XTR", "approved", NOW)
-        assert not await stars.precheckout(session, body, 1001, 1, "XTR", "second", NOW)
+        assert await stars.precheckout(session, body, 1001, VIP_PRICE, "XTR", "approved", NOW)
+        assert await stars.precheckout(session, body, 1001, VIP_PRICE, "XTR", "approved", NOW)
+        assert not await stars.precheckout(session, body, 1001, VIP_PRICE, "XTR", "second", NOW)
     with pytest.raises(RuntimeError):
         async with sessions.begin() as session:
             await stars.successful(
                 session,
                 value=body,
                 payer=1001,
-                amount=1,
+                amount=VIP_PRICE,
                 currency="XTR",
                 charge="retry-charge",
                 at=NOW,
@@ -109,10 +110,22 @@ async def test_invoice_validation_receipt_retry_and_immutable_terms(sessions):
     async with sessions.begin() as session:
         assert await session.scalar(select(func.count()).select_from(StarPayment)) == 0
         paid = await stars.successful(
-            session, value=body, payer=1001, amount=1, currency="XTR", charge="retry-charge", at=NOW
+            session,
+            value=body,
+            payer=1001,
+            amount=VIP_PRICE,
+            currency="XTR",
+            charge="retry-charge",
+            at=NOW,
         )
         again = await stars.successful(
-            session, value=body, payer=1001, amount=1, currency="XTR", charge="retry-charge", at=NOW
+            session,
+            value=body,
+            payer=1001,
+            amount=VIP_PRICE,
+            currency="XTR",
+            charge="retry-charge",
+            at=NOW,
         )
         assert paid.id == again.id and paid.status == "delivered"
         assert paid.vip_until == datetime(2026, 11, 12, 12, tzinfo=UTC)
@@ -123,7 +136,7 @@ async def test_invoice_validation_receipt_retry_and_immutable_terms(sessions):
                 session,
                 value=body,
                 payer=1002,
-                amount=1,
+                amount=VIP_PRICE,
                 currency="XTR",
                 charge="retry-charge",
                 at=NOW,
@@ -226,7 +239,7 @@ async def test_unfulfillable_charge_kept_for_refund_after_ownership_change(sessi
         owner = (await screen(session, actor)).ownership_id
         order = await stars.create_order(session, action(actor), "vip", owner)
         value = stars.payload(order)
-        assert await stars.precheckout(session, value, 1001, 1, "XTR", "old", NOW)
+        assert await stars.precheckout(session, value, 1001, VIP_PRICE, "XTR", "old", NOW)
         from goaletto.infrastructure.models import OwnershipPeriod
 
         period = await session.get(OwnershipPeriod, owner)
@@ -234,7 +247,13 @@ async def test_unfulfillable_charge_kept_for_refund_after_ownership_change(sessi
         (await session.get(Club, club)).owner_telegram_id = None
     async with sessions.begin() as session:
         paid = await stars.successful(
-            session, value=value, payer=1001, amount=1, currency="XTR", charge="late-owner", at=NOW
+            session,
+            value=value,
+            payer=1001,
+            amount=VIP_PRICE,
+            currency="XTR",
+            charge="late-owner",
+            at=NOW,
         )
         assert paid.status == "unfulfilled" and not await vip_clubs(session, {club}, NOW)
         req = await stars.support(session, 1001, paid.id, "Ownership changed", ADMIN, NOW)
@@ -403,7 +422,7 @@ async def test_real_dispatcher_invoice_checkout_success_support_and_admin_chat(s
     reply = await send(data=button(reply, "en:p:"))
     await send(data=button(reply, "en:c:"))
     reply = await send("/settings")
-    assert "1 ⭐" in str(reply.reply_markup) and not any(
+    assert f"{VIP_PRICE} ⭐" in str(reply.reply_markup) and not any(
         (b.callback_data or "").startswith("buy:rename")
         for row in reply.reply_markup.inline_keyboard
         for b in row
@@ -411,7 +430,9 @@ async def test_real_dispatcher_invoice_checkout_success_support_and_admin_chat(s
     await send(data=button(reply, "buy:vip:"))
     invoice = next(c for c in transport.calls if isinstance(c, SendInvoice))
     assert (
-        invoice.currency == "XTR" and invoice.prices[0].amount == 1 and invoice.provider_token == ""
+        invoice.currency == "XTR"
+        and invoice.prices[0].amount == VIP_PRICE
+        and invoice.provider_token == ""
     )
     async with sessions.begin() as session:
         assert await session.scalar(select(func.count()).select_from(StarPayment)) == 0
@@ -431,14 +452,14 @@ async def test_real_dispatcher_invoice_checkout_success_support_and_admin_chat(s
             id="real",
             from_user=user,
             currency="XTR",
-            total_amount=1,
+            total_amount=VIP_PRICE,
             invoice_payload=invoice.payload,
         )
     )
     assert [c for c in transport.calls if isinstance(c, AnswerPreCheckoutQuery)][-1].ok
     paid = SuccessfulPayment(
         currency="XTR",
-        total_amount=1,
+        total_amount=VIP_PRICE,
         invoice_payload=invoice.payload,
         telegram_payment_charge_id="ui-paid",
         provider_payment_charge_id="",

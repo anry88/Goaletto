@@ -120,7 +120,7 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
             buttons.append(
                 [
                     InlineKeyboardButton(
-                        text=tr("👑 VIP статус · 1 ⭐"),
+                        text=tr("👑 VIP статус · 100 ⭐"),
                         callback_data=f"buy:vip:{compact_id(state.ownership_id)}",
                     )
                 ]

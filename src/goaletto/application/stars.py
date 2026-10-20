@@ -23,7 +23,7 @@ from goaletto.infrastructure.models import (
     StarPayment,
 )
 
-PRICES = {"rename": 50, "vip": 1}
+PRICES = {"rename": 50, "vip": 100}
 
 
 def payload(order: StarOrder) -> str:
@@ -67,6 +67,12 @@ async def create_order(
         .order_by(StarOrder.created_at)
         .limit(1)
     )
+    if pending and pending.amount != PRICES[product]:
+        if pending.status == "approved":
+            raise ValueError("An earlier approved payment is still pending")
+        pending.status = "cancelled"
+        await session.flush()
+        pending = None
     if pending:
         if not await eligible(session, pending, actor.at):
             raise ValueError("Product is already available")
@@ -88,6 +94,8 @@ async def create_order(
     )
     existing = await session.get(StarOrder, row.id)
     if existing:
+        if existing.amount != PRICES[product] or existing.status not in {"created", "approved"}:
+            raise ValueError("Invoice price has changed")
         return existing
     if not await eligible(session, row, actor.at):
         raise ValueError("Product is already available")
@@ -109,6 +117,8 @@ async def precheckout(
     key = order_id(value)
     row = await session.get(StarOrder, key, with_for_update=True) if key else None
     if row is None or (row.payer_id, row.amount, row.currency) != (payer, amount, currency):
+        return False
+    if row.amount != PRICES.get(row.product):
         return False
     if row.expires_at <= at or row.status not in {"created", "approved"}:
         return False

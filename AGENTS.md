@@ -376,7 +376,7 @@
 
 - User update 2026-10-20: every rename is offseason-only, with at most one
   available credit. An empty slot can buy one credit for 50 Stars in settings.
-  VIP costs 1 Star for the current personal test, lasts one calendar month,
+  VIP costs 100 Stars after the completed personal test, lasts one calendar month,
   has no automatic renewal and grants one offseason credit per club/season
   only when the slot is empty. Crown + VIP in club/match, crown only in tables;
   no other gameplay benefits. Payment support uses RiverKing's configured admin
