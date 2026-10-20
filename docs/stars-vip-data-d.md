@@ -30,7 +30,7 @@ pre-checkout проверяются плательщик, сумма, валют
 Поздний/несоответствующий платёж не пропадает: receipt `unfulfilled` доступен
 через поддержку. Telegram IO выполняется после commit и вне транзакции.
 
-`/paysupport` показывает собственные неоплаченные возвратом покупки с пагинацией.
+`/paysupport` показывает собственные покупки без выполненного возврата с пагинацией.
 `/paysupport PAYMENT_UUID причина` создаёт один durable запрос. Отправка идёт в
 **тот же админ-чат, что у RiverKing**: числовой ID перенесён на HDC из его host-only
 конфигурации, токены и другие настройки не копировались. Команды администратора:
@@ -93,3 +93,29 @@ Goaletto development DB: точные invoice terms, pre-checkout без выд�
 запретил downgrade с потерей истории, transactional DDL сохранил head и receipt.
 Новую тестовую БД не создавали. **Реальные Stars не покупали и не возвращали**:
 личная платёжная приёмка владельца за 1 Star остаётся отдельным действием.
+
+## HDC release и backup
+
+Развёрнут main `42db6df339782bb376134f3d838b205ce962fee3`,
+`goaletto:42db6df3-hdc` (linux/amd64, runtime target). Архив 76 319 232 bytes,
+SHA-256 `69ca640aab13e1c1cc94929778046ef70341d6d4f1261c91c7ab082b7180f525`,
+config digest `sha256:8f43f04f978e2d2c295f0f22fb64c84e820423f4407f441bec2fd4948b1d36a7`.
+[CI реализации](https://github.com/anry88/Goaletto/actions/runs/39421516903) — success.
+
+При остановленных только bot/worker применён upgrade 0044→0049. Online
+`alembic check` прошёл в том же image на HDC. PostgreSQL не пересоздавался во
+время app rollout; D mount сохранился. После upgrade: 100 клубов, 2100 людей,
+270 тиков, 0 платежей. Все 19 соседних контейнеров независимо сравнены с
+baseline до переноса: ID/StartedAt не изменились. Bot/worker используют новый
+image, running=true, restarts=0; PostgreSQL и worker healthy.
+
+Read-only Telegram getMe/getMyCommands проверяет `/settings` и `/paysupport`
+в `all_private_chats`, без invoice или сообщений. Private Prometheus endpoint
+bot отвечает, health CLI worker проходит. Allowlist сохранён, внешнего запуска
+и реальных денежных операций не было. Host-only support chat настроен.
+
+Свежая off-host копия схемы0049 забрана на этот Mac:
+`~/Documents/Goaletto Backups/goaletto-20261020T122436Z-9fbbc8f8.dump` и manifest,
+1 573 188 bytes. Проверены PGDMP, размер и SHA-256; прежние копии сохранены.
+Пользователь может лично проверить VIP за1Star через `/settings`, затем
+`/paysupport`; это не было подменено fake-платежом на HDC.
