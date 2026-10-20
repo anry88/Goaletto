@@ -144,7 +144,7 @@ async def schedule_lease(
     manager = await session.get(Manager, ownership.manager_id)
     if manager is None:
         raise ValueError("Lease has no manager")
-    months = policy.reminder_months if manager.reminders_enabled and manager.bot_available else ()
+    months = policy.reminder_months if manager.bot_available else ()
     stages = tuple((f"remind:{month}", "ownership.remind", month) for month in months) + (
         ("expire", "ownership.expire", 6),
     )
@@ -396,12 +396,7 @@ async def handle_lease_job(session: AsyncSession, job: Job, at: datetime) -> Non
         await end_expired(session, ownership, at)
         return
     manager = await session.get(Manager, ownership.manager_id)
-    if (
-        manager is None
-        or not manager.reminders_enabled
-        or not manager.bot_available
-        or ownership.expires_at <= at
-    ):
+    if manager is None or not manager.bot_available or ownership.expires_at <= at:
         return
     await session.execute(
         insert(OutboxMessage)

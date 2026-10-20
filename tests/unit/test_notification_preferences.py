@@ -217,7 +217,7 @@ async def test_opt_out_without_analytics_still_applies_operational_dedupe(
     assert retry.duplicate and fake.manager.reminders_enabled is False
 
 
-async def test_disabled_queued_reminder_is_suppressed_before_send() -> None:
+async def test_ownership_reminder_ignores_retired_preference() -> None:
     fake = session()
     await set_reminders_enabled(
         cast(AsyncSession, fake), fake.actor, enabled=False, ownership_id=fake.ownership.id
@@ -258,7 +258,7 @@ async def test_disabled_queued_reminder_is_suppressed_before_send() -> None:
         priority=10,
     )
     decision = await check_recipient(cast(AsyncSession, SenderSession()), message, NOW)
-    assert decision == Decision.SKIP_STALE
+    assert decision == Decision.DELIVER
 
 
 async def test_reenable_restores_schedule_without_moving_deadline() -> None:

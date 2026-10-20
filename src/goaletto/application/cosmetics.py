@@ -150,3 +150,14 @@ async def ensure_vip_bonus(session: AsyncSession, club: UUID, at: datetime) -> N
         )
     )
     await session.flush()
+
+
+def initial_rename(grant: CosmeticGrant | None, choice: ClubNameChoice | None, owner: UUID) -> bool:
+    """The first claim offer is usable immediately, until explicitly declined."""
+    return bool(
+        grant is not None
+        and grant.origin == "initial"
+        and grant.ownership_id == owner
+        and grant.status == "available"
+        and (choice is None or choice.declined_at is None)
+    )

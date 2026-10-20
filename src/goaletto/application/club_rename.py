@@ -10,6 +10,7 @@ from goaletto.application.cosmetics import (
     available_grant,
     ensure_initial,
     ensure_vip_bonus,
+    initial_rename,
     offseason,
 )
 from goaletto.application.game_actions import Actor, PermissionDenied, owned_club
@@ -40,7 +41,9 @@ async def screen(session: AsyncSession, actor: Actor) -> RenameScreen:
     await ensure_vip_bonus(session, club.id, actor.at)
     season = await current_season(session, club.id)
     free = await available_grant(session, club.id)
-    allowed = free is not None and offseason(season, actor.at)
+    allowed = free is not None and (
+        offseason(season, actor.at) or initial_rename(free, row, owner.id)
+    )
     return RenameScreen(
         owner.id,
         club.name,

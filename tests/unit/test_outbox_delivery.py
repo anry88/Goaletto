@@ -537,7 +537,10 @@ async def test_guard_is_rechecked_after_claim_commit(store, change):
     store.after_commit = changed
     transport = Transport(store)
     await process_one_delivery(store, transport, clock=lambda: store.now)
-    assert row.status == "failed" and not transport.calls
+    if change == "preferences":
+        assert row.status == "sent" and transport.calls
+    else:
+        assert row.status == "failed" and not transport.calls
 
 
 async def test_stale_fixture_reminder_and_foreign_fixture_never_send(store):

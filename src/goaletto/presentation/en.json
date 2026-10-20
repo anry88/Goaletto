@@ -799,5 +799,15 @@
   "Свободных попыток нет. Купить попытку или подключить VIP можно в настройках.": "No credits available. You can buy a credit or activate VIP in settings.",
   "Счёт устарел или покупка больше не нужна. Откройте /settings.": "The invoice expired or this purchase is no longer needed. Open /settings.",
   "👑 VIP до {date} UTC": "👑 VIP until {date} UTC",
-  "👑 VIP на календарный месяц · 1 ⭐": "👑 VIP for one calendar month · 1 ⭐"
+  "👑 VIP на календарный месяц · 1 ⭐": "👑 VIP for one calendar month · 1 ⭐",
+  "VIP статус": "VIP status",
+  "👑 VIP статус · 1 ⭐": "👑 VIP status · 1 ⭐",
+  "Видимый другим статус клуба и способ поддержать проект. В межсезонье позволяет переименовать клуб. Срок — один календарный месяц.": "A club status visible to others and a way to support the project. Lets you rename your club during the offseason. Lasts one calendar month.",
+  "VIP статус — способ поддержать проект. В межсезонье позволяет переименовать клуб. Срок — один календарный месяц.": "VIP status supports the project. Lets you rename your club during the offseason. Lasts one calendar month.",
+  "👑 VIP статус": "👑 VIP status",
+  "Нажмите кнопку покупки, вставьте скопированную команду и допишите причину возврата.": "Tap the purchase button, paste the copied command and add your refund reason.",
+  "Переименование клуба": "Club rename",
+  "📣 Каналы Goaletto: <a href=\"https://t.me/goaletto_ru\">Русский</a> · <a href=\"https://t.me/goaletto_en\">English</a>": "📣 Goaletto channels: <a href=\"https://t.me/goaletto_ru\">Русский</a> · <a href=\"https://t.me/goaletto_en\">English</a>",
+  "/start — клуб или выбор клуба\n/squad — состав\n/lineup — расстановка\n/match — матч и live-команды\n/table — таблица\n/history — результаты\n/train — недельные тренировки\n/finance — финансы клуба\n/stadium — стадион и посещаемость\n/market — аукционы и продажа игроков\n/feedback — добровольный отзыв\n/settings — настройки клуба\n/help — помощь": "/start — club or club selection\n/squad — squad\n/lineup — lineup\n/match — match and live commands\n/table — league table\n/history — match results\n/train — weekly training\n/finance — club finances\n/stadium — stadium and attendance\n/market — auctions and player sales\n/feedback — voluntary feedback\n/settings — club settings\n/help — help",
+  "/start — клуб или выбор клуба\n/squad — состав\n/lineup — расстановка\n/match — матч и live-команды\n/calendar — расписание матчей\n/table — таблица\n/history — результаты\n/train — тренировки\n/finance — финансы клуба\n/stadium — стадион и посещаемость\n/market — аукционы и продажа игроков\n/freeagents — свободные футболисты\n/staff — персонал и найм\n/feedback — добровольный отзыв\n/settings — настройки клуба\n/help — помощь": "/start — club or club selection\n/squad — squad\n/lineup — lineup\n/match — match and live commands\n/calendar — match schedule\n/table — standings\n/history — results\n/train — training\n/finance — club finances\n/stadium — stadium and attendance\n/market — auctions and player sales\n/freeagents — free players\n/staff — staff and hiring\n/feedback — voluntary feedback\n/settings — club settings\n/help — help"
 }

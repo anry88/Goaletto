@@ -143,10 +143,10 @@ async def test_settings_command_answers_after_commit() -> None:
     await settings_router.settings_command(
         cast(object, message), cast(object, db), cast(object, update)
     )  # type: ignore[arg-type]
-    assert len(message.answers) == 1 and "включены" in message.answers[0][0]
+    assert len(message.answers) == 1 and "Настройки" in message.answers[0][0]
 
 
-async def test_settings_disable_retry_stays_disabled_after_commit(
+async def test_retired_disable_button_never_changes_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings_router, "Message", object)
@@ -155,13 +155,13 @@ async def test_settings_disable_retry_stays_disabled_after_commit(
     data = disable_callback(db.ownership.id)
     first = FakeQuery(db, message, data, "callback-1")
     await settings_router.settings_callback(cast(object, first), cast(object, db))  # type: ignore[arg-type]
-    assert first.answered and db.manager.reminders_enabled is False
-    assert len(message.edits) == 1 and "выключены" in message.edits[0][0]
+    assert first.answered and db.manager.reminders_enabled is True
+    assert len(message.edits) == 1 and "/settings" in message.edits[0][0]
     # Same explicit callback delivered again: still disabled, never toggled back.
     second = FakeQuery(db, message, data, "callback-1")
     await settings_router.settings_callback(cast(object, second), cast(object, db))  # type: ignore[arg-type]
-    assert db.manager.reminders_enabled is False
-    assert len(message.edits) == 2 and "выключены" in message.edits[1][0]
+    assert db.manager.reminders_enabled is True
+    assert len(message.edits) == 2 and "/settings" in message.edits[1][0]
     # Ownership deadline was preserved by the mutation path.
     assert db.ownership.expires_at == ownership_deadline(db.ownership.last_game_action_at)
     assert db.manager.bot_available is True

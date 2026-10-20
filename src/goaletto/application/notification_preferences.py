@@ -25,7 +25,13 @@ from goaletto.application.game_actions import (
     allocation_lock,
     schedule_lease,
 )
-from goaletto.infrastructure.models import Club, GameActionReceipt, Manager, OwnershipPeriod
+from goaletto.infrastructure.models import (
+    Club,
+    ClubNameChoice,
+    GameActionReceipt,
+    Manager,
+    OwnershipPeriod,
+)
 
 SETTINGS_KIND = "notification_preferences"
 
@@ -48,6 +54,7 @@ class SettingsState:
     observed_at: datetime | None = None
     rename_available: bool = False
     rename_offseason: bool = False
+    rename_initial: bool = False
     vip_until: datetime | None = None
 
 
@@ -116,6 +123,7 @@ async def get_settings(session: AsyncSession, actor: Actor) -> SettingsState:
         available_grant,
         ensure_initial,
         ensure_vip_bonus,
+        initial_rename,
         offseason,
         vip_payment,
     )
@@ -127,6 +135,9 @@ async def get_settings(session: AsyncSession, actor: Actor) -> SettingsState:
     season = await current_season(session, club.id)
     return SettingsState(
         rename_available=grant is not None,
+        rename_initial=initial_rename(
+            grant, await session.get(ClubNameChoice, ownership.id), ownership.id
+        ),
         rename_offseason=offseason(season, actor.at),
         vip_until=vip.vip_until if vip else None,
         locale=manager.locale,

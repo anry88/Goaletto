@@ -2,6 +2,7 @@ from aiogram import Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from goaletto.presentation.channels import channel_links
 from goaletto.presentation.i18n import tr
 
 router = Router(name="prototype")
@@ -30,7 +31,9 @@ async def start(message: Message) -> None:
             "⚽ <b>Goaletto · Голетто</b>\nВаш клуб. Ваш состав. Ваш путь "
             "к чемпионству.\n\nЭто предварительный интерфейс: игровые "
             "функции ещё разрабатываются."
-        ),
+        )
+        + "\n\n"
+        + channel_links(),
         reply_markup=MENU,
     )
 
@@ -42,6 +45,8 @@ async def help_command(message: Message) -> None:
             "/start — главное меню\n/help — помощь\n\nИгра будет работать "
             "целиком в Telegram через сообщения и кнопки."
         )
+        + "\n\n"
+        + channel_links()
     )
 
 

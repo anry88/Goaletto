@@ -15,7 +15,6 @@ from goaletto.application.notification_preferences import SettingsState
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.bot.time_settings_views import timezone_label
 from goaletto.domain.kickoff import local_datetime
-from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import tr
 
 SETTINGS_OPEN = "ntf:open"
@@ -60,18 +59,9 @@ def is_settings_callback(value: str | None) -> bool:
 def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
     if not isinstance(state, SettingsState):
         raise ValueError("Invalid settings state")
-    status = tr("включены 🔔") if state.reminders_enabled else tr("выключены 🔕")
-    lines = [tr("⚙️ <b>Настройки</b>"), "", tr("🔔 Напоминания: {p0}", p0=status)]
-    if state.has_ownership and state.club_name is not None and state.expires_at is not None:
-        lines.append(tr("Клуб: {p0}", p0=escape(latin_name(state.club_name))))
-        lines.append(tr("Владение до: {p0}", p0=state.expires_at.strftime("%Y-%m-%d %H:%M UTC")))
-        lines.append(tr("Напоминания: «Ваш клуб ждёт вас» до истечения владения."))
-    else:
+    lines = [tr("⚙️ <b>Настройки</b>")]
+    if not state.has_ownership:
         lines.append(tr("Клуба пока нет. Откройте /start, чтобы получить клуб лиги 5."))
-    if not state.bot_available:
-        lines.append(
-            tr("Отправка сейчас недоступна; доступность подтверждает /start, а не настройки.")
-        )
     lines.extend(
         ("", tr("🌐 Часовой пояс: {zone}", zone=escape(timezone_label(state.timezone_name))))
     )
@@ -107,7 +97,8 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
             if state.rename_available
             else tr("Переименование: свободных попыток нет.")
         )
-        lines.append(tr("Использовать попытку можно только в межсезонье."))
+        if not state.rename_initial:
+            lines.append(tr("Использовать попытку можно только в межсезонье."))
         if state.rename_available:
             buttons.append(
                 [InlineKeyboardButton(text=tr("Название клуба"), callback_data="rn:open")]
@@ -129,39 +120,20 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
             buttons.append(
                 [
                     InlineKeyboardButton(
-                        text=tr("👑 VIP на календарный месяц · 1 ⭐"),
+                        text=tr("👑 VIP статус · 1 ⭐"),
                         callback_data=f"buy:vip:{compact_id(state.ownership_id)}",
                     )
                 ]
             )
         lines.append(
             tr(
-                "VIP — видимый другим статус клуба и способ поддержать проект. "
-                "Корона и VIP, одна попытка переименования в межсезонье при пустом запасе. "
-                "Других бонусов нет. Без автопродления."
+                "VIP статус — способ поддержать проект. "
+                "В межсезонье позволяет переименовать клуб. Срок — один календарный месяц."
             )
         )
         buttons.append(
             [InlineKeyboardButton(text=tr("Поддержка платежей"), callback_data="pay:support")]
         )
-        if state.reminders_enabled:
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=tr("🔕 Выключить напоминания"),
-                        callback_data=disable_callback(state.ownership_id),
-                    )
-                ]
-            )
-        else:
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=tr("🔔 Включить напоминания"),
-                        callback_data=enable_callback(state.ownership_id),
-                    )
-                ]
-            )
         buttons.append([InlineKeyboardButton(text=tr("🏟 Мой клуб"), callback_data="vc:c")])
     buttons.append([InlineKeyboardButton(text=tr("🏠 Главное меню"), callback_data="vc:menu")])
     lines.append("\n" + tr("Язык / Language"))

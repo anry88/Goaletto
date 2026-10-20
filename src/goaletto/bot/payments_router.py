@@ -7,6 +7,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import (
     CallbackQuery,
+    CopyTextButton,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     LabeledPrice,
@@ -55,14 +56,13 @@ async def buy(
             tr("Покупка уже доступна или кнопка устарела. Откройте /settings.")
         )
         return
-    title = tr("Попытка переименования") if product == "rename" else "VIP"
+    title = tr("Попытка переименования") if product == "rename" else tr("👑 VIP статус")
     description = (
         tr("Одна попытка, используется только в межсезонье. Запас не превышает одну.")
         if product == "rename"
         else tr(
-            "VIP на календарный месяц: видимый статус клуба и поддержка "
-            "проекта. Корона и VIP, одна попытка в межсезонье при пустом запасе. "
-            "Без игровых бонусов и автопродления."
+            "Видимый другим статус клуба и способ поддержать проект. "
+            "В межсезонье позволяет переименовать клуб. Срок — один календарный месяц."
         )
     )
     assert query.bot is not None
@@ -166,16 +166,36 @@ async def purchase_list(
     body = (
         tr("Покупок не найдено.")
         if not rows
-        else tr("Для возврата: /paysupport ID причина")
+        else tr(
+            "Нажмите кнопку покупки, вставьте скопированную команду и допишите причину возврата."
+        )
         + "\n"
-        + "\n".join(f"{r.id}: {r.product} — {r.amount} {r.currency}" for r in rows)
+        + "\n".join(
+            f"{r.received_at:%d.%m.%Y}: "
+            f"{tr('👑 VIP статус') if r.product == 'vip' else tr('Переименование клуба')} "
+            f"— {r.amount} ⭐"
+            for r in rows
+        )
     )
     buttons = [
         InlineKeyboardButton(text=label, callback_data=f"pay:list:{p}")
         for label, p in (("◀️", page - 1), ("▶️", page + 1))
         if 0 <= p < pages
     ]
-    return body, InlineKeyboardMarkup(inline_keyboard=[buttons]) if buttons else None
+    purchases = [
+        [
+            InlineKeyboardButton(
+                text=f"📋 {r.received_at:%d.%m} · "
+                f"{tr('👑 VIP статус') if r.product == 'vip' else tr('Переименование клуба')} "
+                f"· {r.amount} ⭐",
+                copy_text=CopyTextButton(text=f"/paysupport {r.id} "),
+            )
+        ]
+        for r in rows
+    ]
+    if buttons:
+        purchases.append(buttons)
+    return body, InlineKeyboardMarkup(inline_keyboard=purchases) if purchases else None
 
 
 @router.message(Command("paysupport"), F.chat.type == "private")

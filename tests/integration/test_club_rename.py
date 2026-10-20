@@ -16,9 +16,13 @@ def another(actor):
 
 
 async def test_preview_stale_confirm_once_and_history(sessions):
-    _, actor, club_id = await setup_world(sessions)
+    result, actor, club_id = await setup_world(sessions)
     async with sessions.begin() as session:
+        season = await session.get(Season, result.season_id)
+        season.status = "active"
+        await session.flush()
         state = await screen(session, actor)
+        assert state.allowed  # First unused offer is available immediately after claim.
         owner = state.ownership_id
         before = state.name
         state = await action(session, another(actor), owner, "input")

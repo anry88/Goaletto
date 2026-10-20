@@ -384,3 +384,11 @@
   auto-retry. Any real production Stars receipt, including internal purchases,
   latches data protection: do not reset a world containing real payment history.
   See docs/stars-vip-data-d.md. HDC PGDATA now binds to D, not the old C volume.
+
+- Later user clarification 2026-10-20: restore the initial free rename immediately
+  after claim, including midseason, until explicitly declined. Paid/VIP credits
+  remain offseason-only. Settings hide ownership deadlines/reminder mechanics;
+  ownership reminders are mandatory and legacy off buttons cannot disable them.
+  VIP product is named "👑 VIP статус" with simple offseason-rename wording.
+  /paysupport must offer a copyable full refund command, no manual UUID extraction.
+  /start and /help link both https://t.me/goaletto_ru and https://t.me/goaletto_en.

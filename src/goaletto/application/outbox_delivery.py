@@ -374,7 +374,13 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
     if kind == "payment_notice":
-        return escape(str(payload["body"]))
+        body = escape(str(payload["body"]))
+        # Telegram renders these as tap-to-copy text, including admin request IDs.
+        for field in ("payment_id", "request_id"):
+            if payload.get(field):
+                key = str(payload[field])
+                body = body.replace(key, f"<code>{key}</code>")
+        return body
     if kind == "bankruptcy":
         return tr(
             "🏦 Клуб {club} объявлен банкротом: долг {debt} превышает стоимость активов {assets}. "
@@ -878,8 +884,7 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
         return Decision.DELIVER
     if kind == "ownership_reminder":
         if (
-            not manager.reminders_enabled
-            or _payload_uuid(payload, "club_id") != ownership.club_id
+            _payload_uuid(payload, "club_id") != ownership.club_id
             or datetime.fromisoformat(payload["last_action_at"]) != ownership.last_game_action_at
         ):
             return Decision.SKIP_STALE

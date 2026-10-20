@@ -80,7 +80,7 @@ async def test_settings_retry_stale_expiry_and_reenable_on_postgres(sessions):  
         assert ownership is not None
         assert (ownership.last_game_action_at, ownership.expires_at) == (last_action, expires)
 
-    # Queued ownership reminder for the same epoch is suppressed before send.
+    # Ownership reminders are mandatory even with an old disabled flag.
     async with sessions.begin() as session:
         ownership = await session.get(OwnershipPeriod, ownership_id)
         assert ownership is not None
@@ -100,7 +100,7 @@ async def test_settings_retry_stale_expiry_and_reenable_on_postgres(sessions):  
             attempts=0,
             priority=10,
         )
-        assert await check_recipient(session, message, NOW) == Decision.SKIP_STALE
+        assert await check_recipient(session, message, NOW) == Decision.DELIVER
 
     # Re-enable restores remind jobs while preserving the deadline.
     async with sessions.begin() as session:

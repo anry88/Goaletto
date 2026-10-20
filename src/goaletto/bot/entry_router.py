@@ -27,6 +27,7 @@ from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import Person, Player
+from goaletto.presentation.channels import channel_links
 from goaletto.presentation.i18n import tr
 from goaletto.presentation.person_names import person_name
 
@@ -95,6 +96,7 @@ async def game_start(
                     "После банкротства новый клуб можно получить с {date} UTC.",
                     date=entry.claim_blocked_until.strftime("%d.%m.%Y %H:%M"),
                 )
+    text += "\n\n" + channel_links()
     if card is not None:
         await show_club(message, database, card, edit=False, view=(text, keyboard))
     else:
@@ -236,7 +238,9 @@ async def game_help(message: Message) -> None:
             "/freeagents — свободные футболисты\n"
             "/staff — персонал и найм\n"
             "/feedback — добровольный отзыв\n"
-            "/settings — язык и напоминания\n"
+            "/settings — настройки клуба\n"
             "/help — помощь"
         )
+        + "\n\n"
+        + channel_links()
     )

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied, actor_for
 from goaletto.application.language import set_language
-from goaletto.application.notification_preferences import get_settings, set_reminders_enabled
+from goaletto.application.notification_preferences import get_settings
 from goaletto.bot.commands import command_menu
 from goaletto.bot.responses import edit_response
 from goaletto.bot.settings_views import parse_settings_callback, settings_view, stale_settings_view
@@ -66,14 +66,9 @@ async def settings_callback(query: CallbackQuery, database: Database) -> None:
             )
             if action == "open":
                 text, keyboard = settings_view(await get_settings(session, actor))
-            elif action in {"on", "off"} and ownership_id is not None:
-                await set_reminders_enabled(
-                    session,
-                    actor,
-                    enabled=(action == "on"),
-                    ownership_id=ownership_id,
-                )
-                text, keyboard = settings_view(await get_settings(session, actor))
+            elif action in {"on", "off"}:
+                # Old notification controls no longer change the delivery policy.
+                raise ValueError("Retired reminder control")
             else:
                 raise ValueError("Stale settings callback")
     except (PermissionDenied, ValueError):

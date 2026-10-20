@@ -220,7 +220,7 @@ async def test_release_is_idempotent_keeps_club_state_and_return_before_deadline
     assert len(recorder.events) == 1 and recorder.events[0].origin.value == "system"
 
 
-async def test_stale_or_opted_out_reminder_never_creates_outbox():
+async def test_stale_reminder_is_suppressed_but_old_optout_is_ignored():
     recorder, owner = await claimed()
     work = Job(
         id=uuid4(),
@@ -235,7 +235,8 @@ async def test_stale_or_opted_out_reminder_never_creates_outbox():
     recorder.statements = []
     recorder.manager.reminders_enabled = False
     await handle_lease_job(cast(AsyncSession, recorder), work, NOW + timedelta(days=40))
-    assert not any(getattr(s, "is_insert", False) for s in recorder.statements)
+    assert any(getattr(s, "is_insert", False) for s in recorder.statements)
+    recorder.statements = []
 
     recorder.manager.reminders_enabled = True
     owner.last_game_action_at = NOW + timedelta(days=1)
@@ -243,12 +244,16 @@ async def test_stale_or_opted_out_reminder_never_creates_outbox():
     assert not any(getattr(s, "is_insert", False) for s in recorder.statements)
 
 
-async def test_opted_out_manager_schedules_expiry_without_new_reminders():
+async def test_old_optout_still_schedules_mandatory_ownership_reminders():
     recorder = Recorder()
     recorder.manager.reminders_enabled = False
     await claim_club(cast(AsyncSession, recorder), recorder.actor, recorder.club.id)
     inserts = [s for s in recorder.statements if getattr(s, "is_insert", False)]
-    assert {s.compile().params["kind"] for s in inserts} == {"ownership.expire", "world.reserve"}
+    assert {s.compile().params["kind"] for s in inserts} == {
+        "ownership.expire",
+        "ownership.remind",
+        "world.reserve",
+    }
 
 
 async def test_empty_capacity_only_queues_background_work(monkeypatch):

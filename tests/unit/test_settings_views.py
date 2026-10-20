@@ -49,17 +49,17 @@ def test_explicit_callbacks_round_trip_and_never_toggle() -> None:
     assert is_settings_callback(on) and not is_settings_callback("vc:c")
 
 
-def test_enabled_view_offers_explicit_disable_and_club_return() -> None:
+def test_settings_hide_lease_details_and_offer_no_reminder_controls() -> None:
     text, keyboard = settings_view(enabled_state())
     assert text.startswith("⚙️ <b>Настройки</b>")
-    assert "🔔 Напоминания:" in text
-    assert "включены" in text and "&lt;Avrora&gt;" in text
+    assert "Напоминания" not in text and "Владение до" not in text
+    assert "2027-04-11" not in text
     callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
-    assert any(c is not None and c.startswith("ntf:off:") for c in callbacks)
+    assert not any(c is not None and c.startswith("ntf:") for c in callbacks)
     assert "vc:c" in callbacks and "vc:menu" in callbacks
 
 
-def test_disabled_view_offers_explicit_enable_without_toggle() -> None:
+def test_legacy_disabled_flag_has_no_user_control() -> None:
     state = enabled_state()
     disabled = SettingsState(
         manager_id=state.manager_id,
@@ -74,9 +74,9 @@ def test_disabled_view_offers_explicit_enable_without_toggle() -> None:
         last_game_action_at=state.last_game_action_at,
     )
     text, keyboard = settings_view(disabled)
-    assert "выключены" in text
+    assert "Напоминания" not in text
     callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
-    assert any(c is not None and c.startswith("ntf:on:") for c in callbacks)
+    assert not any(c is not None and c.startswith("ntf:on:") for c in callbacks)
     assert not any(c is not None and c.startswith("ntf:off:") for c in callbacks)
 
 
@@ -94,7 +94,7 @@ def test_view_without_ownership_and_unavailable_bot() -> None:
         last_game_action_at=None,
     )
     text, keyboard = settings_view(state)
-    assert "/start" in text and "доступность подтверждает /start" in text
+    assert "/start" in text and "доступность подтверждает" not in text
     callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
     assert "vc:menu" in callbacks and "vc:c" not in callbacks
     stale_text, _ = stale_settings_view()
