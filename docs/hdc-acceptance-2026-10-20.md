@@ -57,7 +57,9 @@ postgres контейнер проекта Goaletto, имя БД и схему, 
 Локальная публикация пары `.dump` / `.manifest.json` происходит только после
 сверки PGDMP header, размера и SHA-256 с HDC. Папка 0700, архив/manifest 0600;
 частичный transfer не оставляет успешную пару. Готовые имена не перезаписываются,
-автоматического удаления старых архивов нет. `.backup.lock` исключает overlap.
+`.backup.lock` исключает overlap. По уточнению владельца добавлена очистка
+Goaletto archive/manifest пар старше 14 дней на Mac и HDC; сначала проверяется
+наличие исправной недавней копии. [Точные границы](backup-runbook.md).
 
 Установлен пользовательский LaunchAgent `local.goaletto.hdc-backup`:
 `~/Library/LaunchAgents/local.goaletto.hdc-backup.plist`. Проверка при входе,
