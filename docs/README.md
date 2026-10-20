@@ -1,7 +1,8 @@
 # Документация Goaletto
 
-[Закрытый HDC-запуск и backup на Mac](hdc-acceptance-2026-10-20.md) — AND-69/70/72:
-immutable image, read-only assets, restore и реальный reconnect worker.
+[HDC: закрытый запуск, backup на Mac и Grafana](hdc-acceptance-2026-10-20.md) —
+AND-69/70/72/80/82: immutable images, read-only assets, restore, reconnect/recovery,
+совместимый rollback и настоящие ограниченные SQL-панели.
 
 [План экспериментов подсказок](analytics/experiments.md) — AND-81: три последовательные
 гипотезы, назначение, подтверждённая доставка, зрелые метрики и остановка.

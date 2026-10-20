@@ -333,3 +333,16 @@
   simulate_staff_training now uses current V2 for every match, including optional
   friendlies and knockout ET; its 1056 scenarios are an upper-bound calibration,
   never fabricated DB results. Balance/HDC/portrait-production tasks stay separate.
+
+- HDC closed deployment is running as of 2026-10-20; see
+  docs/hdc-acceptance-2026-10-20.md. Only HDC runs this token's polling bot;
+  do not start a competing local poller. Keep the internal allowlist and feedback-off
+  settings until external launch is explicitly requested. Backup pulls to this Mac's
+  ~/Documents/Goaletto Backups through scripts/backup_hdc.py and its LaunchAgent;
+  an off-host archive was restored and verified against all 85 tables.
+  Shared Grafana uses organization 1 and the Goaletto operator folder, by explicit
+  user choice. Only aggregate-function access is granted to its separate DB login.
+  A full Windows reboot and alerts/capacity acceptance remain open; restarting the
+  shared host requires a window for neighboring services. Never reset a live HDC
+  world concurrently with a gameplay/recovery check, and verify its exact target
+  and absence of external players before using the development reset permission.
