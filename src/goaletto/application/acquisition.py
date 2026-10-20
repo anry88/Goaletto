@@ -1,4 +1,4 @@
-"""Opaque deep-link codes and transactional start attribution, before club claim."""
+"""Automatic deep-link sources and transactional start attribution before club claim."""
 
 import re
 import secrets
@@ -75,15 +75,38 @@ async def create_campaign(
 async def classify_start(
     session: AsyncSession,
     payload: str | None,
+    *,
+    at: datetime,
 ) -> tuple[TouchKind, UUID | None]:
+    require_utc(at)
+    if not session.in_transaction():
+        raise ValueError("Start source recognition needs a transaction")
     if payload is None or payload == "":
         return TouchKind.DIRECT, None
     if CODE.fullmatch(payload) is None:
         return TouchKind.UNKNOWN, None
-    campaign_id = await session.scalar(
-        select(AcquisitionCampaign.id).where(AcquisitionCampaign.code == payload)
-    )
-    return (TouchKind.KNOWN, campaign_id) if campaign_id is not None else (TouchKind.UNKNOWN, None)
+    query = select(AcquisitionCampaign.id).where(AcquisitionCampaign.code == payload)
+    campaign_id = await session.scalar(query)
+    if campaign_id is None:
+        # The URL is sufficient: first accepted use creates its exact, case-sensitive
+        # code. Concurrent first arrivals share one row; existing curated metadata
+        # stays immutable. Publication date is unknown, so use first observation.
+        await session.execute(
+            insert(AcquisitionCampaign)
+            .values(
+                id=uuid5(NAMESPACE_URL, f"goaletto:acquisition-code:v1:{payload}"),
+                code=payload,
+                source="other",
+                placement=payload.lower(),
+                published_on=at.date(),
+                created_at=at,
+            )
+            .on_conflict_do_nothing(index_elements=["code"])
+        )
+        campaign_id = await session.scalar(query)
+        if campaign_id is None:
+            raise ValueError("Start source was not persisted")
+    return TouchKind.KNOWN, campaign_id
 
 
 @dataclass(frozen=True)
@@ -147,7 +170,7 @@ async def accept_start(
             previous.campaign_id,
             False,
         )
-    kind, campaign_id = await classify_start(session, payload)
+    kind, campaign_id = await classify_start(session, payload, at=at)
     first = await session.get(AcquisitionFirstTouch, analytics_id)
     first_start = manager.first_game_start_at is None
     if first is None and first_start:

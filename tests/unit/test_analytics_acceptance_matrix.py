@@ -123,8 +123,8 @@ def test_a1_source_funnel_sql_groups_direct_unknown_known() -> None:
     ):
         assert needle in sql
     # Hand-shaped aggregate rows: direct 2, unknown 1, known 1 (one campaign).
-    # Contract: absent/empty payload -> direct, registered code -> known,
-    # unknown/invalid code -> unknown; raw unknown payload is never stored.
+    # Contract: absent/empty payload -> direct, valid code -> known (automatic),
+    # invalid code -> unknown; raw invalid payload is never stored.
     good_direct = {
         "kind": "direct",
         "campaign_id": None,

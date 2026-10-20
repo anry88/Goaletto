@@ -1,5 +1,12 @@
 # Working on Goaletto
 
+- User update 2026-10-20: acquisition start codes require no preregistration.
+  Any valid 1..64-character Telegram payload (ASCII letters/digits/underscore/hyphen)
+  automatically becomes a known, exact case-sensitive source on first accepted
+  external start. Reuse existing registry metadata, preserve first-touch/history,
+  exclude internal/opt-out and keep arbitrary codes out of Prometheus labels.
+  Empty is direct; malformed is unknown. See docs/analytics/acquisition.md.
+
 - PUBLIC LAUNCH / FINAL RESET, user instruction 2026-10-20: the owner authorized
   one final complete HDC world reset after both personal Stars purchases were
   refunded. This exception is consumed by the launch in
