@@ -1,5 +1,17 @@
 # Working on Goaletto
 
+- PUBLIC LAUNCH / FINAL RESET, user instruction 2026-10-20: the owner authorized
+  one final complete HDC world reset after both personal Stars purchases were
+  refunded. This exception is consumed by the launch in
+  docs/public-launch-2026-10-20.md. From that point the HDC/application production
+  database MUST NEVER be dropped, truncated, reset, regenerated or replaced with
+  a disposable world, even for an internal purchase, calibration or convenient
+  testing. Never clear/bypass the production latch or remove PGDATA/volumes.
+  Preserve all users, payments, ownership and game history; use migrations and
+  targeted, reviewed repairs. Older development reset permissions below apply
+  only to the separately configured disposable LOCAL development database, never
+  HDC/production. Do not run destructive integration tests against production.
+
 - `main` is the common integration branch. Start each new task branch from the
   latest `origin/main`; use the `codex/` prefix by default. After review and
   relevant checks, merge completed work into `main` and publish the updated
