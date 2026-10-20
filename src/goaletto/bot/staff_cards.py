@@ -13,13 +13,14 @@ from goaletto.domain.market import encode_price
 from goaletto.domain.names import latin_name
 from goaletto.domain.staff_quality import quality_tier, staff_abilities
 from goaletto.presentation.i18n import tr
+from goaletto.presentation.person_names import person_name
 
 
 def staff_card_view(card: StaffCard, page: int = 0) -> tuple[str, Keyboard]:
     person, terms = card.person, card.terms
     skill, wage = int(terms["skill"]), int(terms["wage"])
     lines = [
-        f"<b>{escape(latin_name(person.name))}</b> · {person.age}",
+        f"<b>{escape(person_name(person))}</b> · {person.age}",
         f"{ROLES[card.role]} · {QUALITY_LABELS[quality_tier(skill)]} · {skill}/20",
         tr("В штабе клуба") if card.employed else tr("Кандидат на должность"),
         tr("Зарплата: {wage}/4 дня", wage=amount(wage)),

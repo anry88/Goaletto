@@ -25,6 +25,13 @@ async def sessions() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     engine = create_async_engine(url)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     # Reset the one application DB only while development data has no real users.
+    async with engine.connect() as connection:
+        exists = await connection.scalar(text("SELECT to_regclass('public.data_protection')"))
+        if exists and await connection.scalar(
+            text("SELECT EXISTS (SELECT 1 FROM data_protection WHERE protected_at IS NOT NULL)")
+        ):
+            await engine.dispose()
+            raise pytest.UsageError("Real Goaletto data: development reset is forbidden")
     tables = ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
     async with engine.begin() as connection:
         await connection.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))

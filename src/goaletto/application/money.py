@@ -14,6 +14,12 @@ from goaletto.domain.finances import MAX_MONEY, money
 from goaletto.infrastructure.models import Club, FinanceAccount, LedgerEntry, MoneyReservation
 
 
+def signed_money(value: int) -> int:
+    if type(value) is not int or abs(value) > MAX_MONEY:
+        raise ValueError("Signed balance must fit BIGINT")
+    return value
+
+
 class InsufficientFunds(ValueError):
     pass
 
@@ -25,7 +31,7 @@ class Account:
 
     @property
     def available(self) -> int:
-        return self.club.budget - self.record.reserved
+        return max(0, self.club.budget - self.record.reserved)
 
 
 async def locked_accounts(session: AsyncSession, *club_ids: UUID) -> dict[UUID, Account]:
@@ -59,11 +65,13 @@ async def locked_accounts(session: AsyncSession, *club_ids: UUID) -> dict[UUID, 
             row.arrears,
         ):
             raise ValueError("Account does not reconcile with ledger")
-        money(club.budget)
+        signed_money(club.budget)
         money(row.reserved)
         money(row.arrears)
-        if row.reserved > club.budget:
-            raise ValueError("Reservations exceed cash")
+        from goaletto.application.club_valuation import valuation
+
+        row.valuation = await valuation(session, club)
+        row.credit_limit = sum(row.valuation.values())
         result[club_id] = Account(club, row)
     return result
 
@@ -102,11 +110,9 @@ async def record(
     require_utc(at)
     if any(type(v) is not int or abs(v) > MAX_MONEY for v in (cash, reserved, arrears)):
         raise ValueError("Invalid ledger delta")
-    balance = money(account.club.budget + cash)
+    balance = signed_money(account.club.budget + cash)
     hold = money(account.record.reserved + reserved)
     debt = money(account.record.arrears + arrears)
-    if hold > balance:
-        raise InsufficientFunds("Reserved funds cannot be spent")
     if not any((cash, reserved, arrears)):
         raise ValueError("Empty money effect")
     account.record.sequence += 1
@@ -128,11 +134,13 @@ async def record(
             request=body,
         )
     )
+    session.info.setdefault("economy_clubs", set()).add(account.club.id)
+    session.info["economy_at"] = at
     await session.flush()
 
 
 async def repay_arrears(session: AsyncSession, account: Account, key: str, at: datetime) -> None:
-    paid = min(account.available, account.record.arrears)
+    paid = min(max(0, account.club.budget - account.record.reserved), account.record.arrears)
     if paid:
         body = request("arrears_paid", paid)
         await record(session, account, key + ":arrears", body, at, cash=-paid, arrears=-paid)
@@ -183,6 +191,13 @@ async def debit_locked(
         "academy_upgrade",
     }:
         raise ValueError("Unsupported debit kind")
+    if mandatory and kind not in {
+        "player_salary",
+        "staff_salary",
+        "stadium_upkeep",
+        "academy_upkeep",
+    }:
+        raise ValueError("Only wages and upkeep may create debt")
     body = request(kind, amount, {**(details or {}), "mandatory": mandatory})
     if await existing(session, account, key, body):
         return False
@@ -190,8 +205,7 @@ async def debit_locked(
         raise ValueError("Debit must be positive")
     if not mandatory and (account.record.arrears or account.available < amount):
         raise InsufficientFunds("Insufficient available funds or unpaid obligations")
-    paid = min(account.available, amount)
-    await record(session, account, key, body, at, cash=-paid, arrears=amount - paid)
+    await record(session, account, key, body, at, cash=-amount)
     return True
 
 
@@ -277,6 +291,8 @@ async def settle(
         return False
     if row.status != "active":
         raise ValueError("Reservation is no longer active")
+    if accounts[payer].club.budget < accounts[payer].record.reserved:
+        raise InsufficientFunds("Reservation is no longer covered by cash")
     row.status, row.closed_at = "settled", at
     await record(session, accounts[payer], key, body, at, cash=-row.amount, reserved=-row.amount)
     await credit_locked(

@@ -13,6 +13,7 @@ from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.academy import academy_upkeep
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import tr
+from goaletto.presentation.person_names import person_name
 
 _LABELS = {name: label for name, label in SKILL_LABELS}
 
@@ -45,7 +46,7 @@ def _candidate_lines(view: CandidateView) -> list[str]:
     header = tr(
         "{slot}. <b>{name}</b> · {position} · {age} лет",
         slot=view.slot,
-        name=escape(latin_name(view.name)),
+        name=escape(person_name(view)),
         position=position,
         age=view.age,
     )
@@ -116,7 +117,10 @@ def academy_view(screen: AcademyScreen, notice: str | None = None) -> tuple[str,
             rows.append(
                 [
                     Button(
-                        text=tr("Подписать: {name}", name=latin_name(view.name)),
+                        text=tr(
+                            "Подписать: {name}",
+                            name=person_name(view),
+                        ),
                         callback_data=f"ac:g:{compact_id(screen.ownership_id)}:{compact_id(screen.season_id)}:{view.slot}",
                     )
                 ]

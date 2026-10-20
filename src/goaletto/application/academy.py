@@ -30,6 +30,7 @@ from goaletto.domain.academy import (
 from goaletto.domain.academy import candidate as build_candidate
 from goaletto.domain.finances import accrued_wage
 from goaletto.domain.game_cycle import CYCLE_SECONDS, midnight
+from goaletto.domain.nationalities import nationality
 from goaletto.domain.training import POLICY_VERSION as TRAINING
 from goaletto.domain.training import PROGRESS_KEYS
 from goaletto.domain.world import SKILL_NAMES
@@ -60,6 +61,7 @@ class CandidateView:
     skills: dict[str, int]
     caps: dict[str, int]
     status: str
+    country_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -164,6 +166,7 @@ def _view(row: AcademyCandidate) -> CandidateView:
     return CandidateView(
         slot=row.slot,
         name=row.name,
+        country_code=nationality(row.id),
         age=row.age,
         position=row.position,
         alternatives=tuple(row.alternative_positions),

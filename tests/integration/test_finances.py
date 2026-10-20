@@ -50,11 +50,14 @@ pytestmark = pytest.mark.integration
 async def test_concurrent_reserves_settle_once_and_rollback(sessions):
     _, _, club_id = await setup_world(sessions)
     ids = (uuid4(), uuid4())
+    async with sessions.begin() as session:
+        account = (await locked_accounts(session, club_id))[club_id]
+        held_amount = account.available * 3 // 4
 
     async def attempt(key):
         try:
             async with sessions.begin() as session:
-                await reserve(session, club_id, key, 40000, {"auction": "test"}, NOW)
+                await reserve(session, club_id, key, held_amount, {"auction": "test"}, NOW)
             return True
         except InsufficientFunds:
             return False
@@ -69,9 +72,9 @@ async def test_concurrent_reserves_settle_once_and_rollback(sessions):
         assert await settle(session, club_id, receiver, winning, NOW)
         assert not await settle(session, club_id, receiver, winning, NOW)
         account = (await locked_accounts(session, club_id))[club_id]
-        assert account.club.budget == 10000 and account.record.reserved == 0
+        assert account.club.budget == 50000 - held_amount and account.record.reserved == 0
         other = (await locked_accounts(session, receiver))[receiver]
-        assert other.club.budget == 90000
+        assert other.club.budget == 50000 + held_amount
         with pytest.raises(ValueError, match="different scope"):
             await credit_locked(session, other, f"settle:{winning}", "transfer_in", 39999, NOW)
     with pytest.raises(RuntimeError):
@@ -80,7 +83,7 @@ async def test_concurrent_reserves_settle_once_and_rollback(sessions):
             raise RuntimeError("Abort full money transaction")
     async with sessions.begin() as session:
         account = (await locked_accounts(session, club_id))[club_id]
-        assert (account.club.budget, account.record.reserved) == (10000, 0)
+        assert (account.club.budget, account.record.reserved) == (50000 - held_amount, 0)
         entries = (
             await session.scalars(
                 select(LedgerEntry)
@@ -92,7 +95,7 @@ async def test_concurrent_reserves_settle_once_and_rollback(sessions):
         assert [e.sequence for e in entries] == list(range(1, account.record.sequence + 1))
 
 
-async def test_bills_protect_reservations_and_income_repays_arrears(sessions):
+async def test_bills_use_credit_protect_reservations_and_income_repays_debt(sessions):
     _, _, club_id = await setup_world(sessions)
     key = uuid4()
     async with sessions.begin() as session:
@@ -102,19 +105,21 @@ async def test_bills_protect_reservations_and_income_repays_arrears(sessions):
             session, account, "test-wages", "player_salary", 60000, NOW, mandatory=True
         )
         assert (account.club.budget, account.record.reserved, account.record.arrears) == (
+            -10000,
             40000,
-            40000,
-            50000,
+            0,
         )
         assert not await debit_locked(
             session, account, "test-wages", "player_salary", 60000, NOW, mandatory=True
         )
         with pytest.raises(InsufficientFunds):
-            await debit_locked(session, account, "upgrade", "stadium_upgrade", 1, NOW)
+            await debit_locked(
+                session, account, "upgrade", "stadium_upgrade", account.available + 1, NOW
+            )
         assert await release(session, club_id, key, NOW)
         assert not await release(session, club_id, key, NOW)
         account = (await locked_accounts(session, club_id))[club_id]
-        assert (account.club.budget, account.record.arrears) == (0, 10000)
+        assert (account.club.budget, account.record.arrears) == (-10000, 0)
         await credit_locked(session, account, "grant", "grant", 20000, NOW)
         assert (account.club.budget, account.record.arrears) == (10000, 0)
         assert not await credit_locked(session, account, "grant", "grant", 20000, NOW)

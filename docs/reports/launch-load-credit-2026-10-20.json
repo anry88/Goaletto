@@ -1,0 +1,121 @@
+{
+  "scope": "first live tick on synthetic held-history worlds; real UTC; fake Telegram",
+  "sets": 2,
+  "simultaneous_matches": 50,
+  "workers": 1,
+  "worker_poll_seconds": 1.0,
+  "committed_ticks": {
+    "count": 50,
+    "completion_lateness_p95_seconds": 2.16720655,
+    "processing_p95_seconds": 0.059037499999999986
+  },
+  "deferred_tick_attempts": 1,
+  "machine": {
+    "os": "Darwin",
+    "architecture": "arm64",
+    "cpu_count": 12
+  },
+  "postgres": "PostgreSQL 17.10 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+  "tick_batch_seconds": 3.4197214159648865,
+  "registrations": {
+    "count": 5,
+    "p50_seconds": 0.79762758302968,
+    "p95_seconds": 0.895249817171134
+  },
+  "bids": {
+    "count": 20,
+    "p50_seconds": 1.0406095414655283,
+    "p95_seconds": 2.0088722083659376
+  },
+  "metrics": [
+    {
+      "metric": "request_commit",
+      "observations": 45,
+      "measured": 45,
+      "unknown": 0,
+      "p50_seconds": 0.678868,
+      "p95_seconds": 2.0427616
+    },
+    {
+      "metric": "request_render",
+      "observations": 45,
+      "measured": 45,
+      "unknown": 0,
+      "p50_seconds": 0.000146,
+      "p95_seconds": 0.0002902
+    },
+    {
+      "metric": "request_telegram",
+      "observations": 45,
+      "measured": 45,
+      "unknown": 0,
+      "p50_seconds": 0.003471,
+      "p95_seconds": 0.1185302
+    },
+    {
+      "metric": "request_total",
+      "observations": 45,
+      "measured": 45,
+      "unknown": 0,
+      "p50_seconds": 0.683929,
+      "p95_seconds": 2.04873
+    },
+    {
+      "metric": "worker_processing",
+      "observations": 51,
+      "measured": 51,
+      "unknown": 0,
+      "p50_seconds": 0.031817,
+      "p95_seconds": 0.0641875
+    },
+    {
+      "metric": "worker_lateness",
+      "observations": 51,
+      "measured": 51,
+      "unknown": 0,
+      "p50_seconds": 1.865263,
+      "p95_seconds": 2.137003
+    },
+    {
+      "metric": "delivery_enqueue_to_claim",
+      "observations": 0,
+      "measured": 0,
+      "unknown": 0,
+      "p50_seconds": null,
+      "p95_seconds": null
+    },
+    {
+      "metric": "delivery_render",
+      "observations": 0,
+      "measured": 0,
+      "unknown": 0,
+      "p50_seconds": null,
+      "p95_seconds": null
+    },
+    {
+      "metric": "delivery_telegram",
+      "observations": 0,
+      "measured": 0,
+      "unknown": 0,
+      "p50_seconds": null,
+      "p95_seconds": null
+    },
+    {
+      "metric": "command_wait_for_tick",
+      "observations": 5,
+      "measured": 5,
+      "unknown": 0,
+      "p50_seconds": 57.892907,
+      "p95_seconds": 58.805627
+    }
+  ],
+  "request_outcomes": [
+    {
+      "business_outcome": "committed",
+      "delivery_outcome": "accepted",
+      "attempts": 45
+    }
+  ],
+  "invariants": "passed",
+  "hdc_capacity_proven": false
+}

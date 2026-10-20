@@ -57,6 +57,7 @@ class Club(Base):
     # Compatibility projection; ownership_periods is the authoritative history.
     owner_telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     budget: Mapped[int] = mapped_column(BigInteger, default=0)
+    bankrupt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     kit_primary: Mapped[str] = mapped_column(String(7), server_default="#743D42")
     kit_secondary: Mapped[str] = mapped_column(String(7), server_default="#F2E9D8")
     kit_version: Mapped[int] = mapped_column(Integer, server_default="1")
@@ -64,7 +65,7 @@ class Club(Base):
     supporters: Mapped[int] = mapped_column(Integer, server_default="2500")
     academy_level: Mapped[int] = mapped_column(SmallInteger, server_default="1")
     __table_args__ = (
-        CheckConstraint("budget >= 0", name="ck_club_budget"),
+        CheckConstraint("budget >= -9223372036854775807", name="ck_club_budget"),
         CheckConstraint("kit_primary ~ '^#[0-9A-Fa-f]{6}$'", name="ck_club_primary_color"),
         CheckConstraint("kit_secondary ~ '^#[0-9A-Fa-f]{6}$'", name="ck_club_secondary_color"),
         CheckConstraint("kit_version > 0", name="ck_club_kit_version"),
@@ -235,6 +236,7 @@ class Manager(Base):
     locale: Mapped[str] = mapped_column(String(16), server_default="ru")
     is_internal: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    bankruptcy_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     timezone_name: Mapped[str] = mapped_column(String(64), server_default="UTC")
     preferred_kickoff_minute: Mapped[int | None] = mapped_column(SmallInteger)
     # NULL for legacy/imported managers; preview /start does not create a launch cohort.
@@ -308,7 +310,7 @@ class OwnershipPeriod(Base):
         CheckConstraint(
             "(ended_at IS NULL AND end_reason IS NULL) OR "
             "(ended_at IS NOT NULL AND end_reason IS NOT NULL AND "
-            "end_reason IN ('inactive', 'operator', 'voluntary'))",
+            "end_reason IN ('inactive', 'operator', 'voluntary', 'bankrupt'))",
             name="ck_ownership_end_reason",
         ),
         Index(
@@ -444,6 +446,12 @@ class AppearanceVariant(Base):
     mask_path: Mapped[str] = mapped_column(String(240))
 
 
+def _person_country(context: Any) -> str:
+    from goaletto.domain.nationalities import nationality
+
+    return nationality(context.get_current_parameters()["id"])
+
+
 class Person(Base):
     __tablename__ = "persons"
     __table_args__ = (
@@ -453,9 +461,11 @@ class Person(Base):
             name="fk_person_same_face_variant",
         ),
         CheckConstraint("age BETWEEN 0 AND 150", name="ck_person_age"),
+        CheckConstraint("country_code ~ '^[A-Z]{2}$'", name="ck_person_country"),
         CheckConstraint("career IN ('player', 'staff', 'retired')", name="ck_person_career"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    country_code: Mapped[str] = mapped_column(String(2), default=_person_country)
     creation_key: Mapped[str] = mapped_column(String(200), unique=True)
     name: Mapped[str] = mapped_column(String(120))
     age: Mapped[int] = mapped_column(SmallInteger)
@@ -520,7 +530,9 @@ class Player(Base):
         ),
     )
     person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
-    club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), index=True)
+    club_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("clubs.id"), index=True, active_history=True
+    )
     position: Mapped[str] = mapped_column(String(3))
     alternative_positions: Mapped[list[str]] = mapped_column(ARRAY(String(3)), default=list)
     goalkeeping: Mapped[int] = mapped_column(SmallInteger)
@@ -566,7 +578,9 @@ class Staff(Base):
         ),
     )
     person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
-    club_id: Mapped[UUID | None] = mapped_column(ForeignKey("clubs.id"), index=True)
+    club_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("clubs.id"), index=True, active_history=True
+    )
     role: Mapped[str | None] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(16), default="active")
     last_season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
@@ -1602,10 +1616,13 @@ class FinanceAccount(Base):
     __tablename__ = "finance_accounts"
     __table_args__ = (
         CheckConstraint(
-            "reserved >= 0 AND arrears >= 0 AND sequence >= 1", name="ck_finance_account"
+            "credit_limit >= 0 AND reserved >= 0 AND arrears >= 0 AND sequence >= 1",
+            name="ck_finance_account",
         ),
     )
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+    credit_limit: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    valuation: Mapped[dict[str, int]] = mapped_column(JSONB, server_default="{}")
     reserved: Mapped[int] = mapped_column(BigInteger, server_default="0")
     arrears: Mapped[int] = mapped_column(BigInteger, server_default="0")
     sequence: Mapped[int] = mapped_column(Integer, server_default="1")
@@ -1618,8 +1635,7 @@ class LedgerEntry(Base):
         UniqueConstraint("club_id", "sequence", name="uq_ledger_sequence"),
         CheckConstraint("sequence >= 1", name="ck_ledger_sequence"),
         CheckConstraint(
-            "balance_after >= 0 AND reserved_after >= 0 AND "
-            "reserved_after <= balance_after AND arrears_after >= 0",
+            "balance_after >= -9223372036854775807 AND reserved_after >= 0 AND arrears_after >= 0",
             name="ck_ledger_balances",
         ),
         CheckConstraint(
@@ -1630,7 +1646,7 @@ class LedgerEntry(Base):
             "kind IN ('opening','grant','tickets','sponsor','merchandise',"
             "'player_salary','staff_salary','stadium_upkeep','prize','reserve','release',"
             "'transfer_in','transfer_out','arrears_paid','stadium_upgrade','signing_fee',"
-            "'scout_search','academy_upkeep','academy_upgrade')",
+            "'scout_search','academy_upkeep','academy_upgrade','debt_conversion')",
             name="ck_ledger_kind",
         ),
         Index("ix_ledger_club_page", "club_id", "sequence"),
@@ -2428,3 +2444,54 @@ class AcademyIntake(Base):
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
     season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
     level: Mapped[int] = mapped_column(SmallInteger)
+
+
+class ClubNameChoice(Base):
+    __tablename__ = "club_name_choices"
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('offer','input','preview','declined','done')", name="ck_club_name_state"
+        ),
+        CheckConstraint(
+            "(state IN ('preview','done')) = (candidate IS NOT NULL)", name="ck_club_name_candidate"
+        ),
+        CheckConstraint(
+            "(state = 'done') = (changed_at IS NOT NULL AND original_name IS NOT NULL)",
+            name="ck_club_name_completed",
+        ),
+    )
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"), primary_key=True)
+    state: Mapped[str] = mapped_column(String(8))
+    draft_id: Mapped[UUID | None] = mapped_column(Uuid)
+    candidate: Mapped[str | None] = mapped_column(String(30))
+    original_name: Mapped[str | None] = mapped_column(String(80))
+    declined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ClubNameInput(Base):
+    __tablename__ = "club_name_inputs"
+    operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"), index=True)
+    value: Mapped[str] = mapped_column(String(200))
+
+
+class BankruptcyReceipt(Base):
+    __tablename__ = "bankruptcy_receipts"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
+    ownership_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("ownership_periods.id"), unique=True
+    )
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    balance: Mapped[int] = mapped_column(BigInteger)
+    assets: Mapped[int] = mapped_column(BigInteger)
+    policy: Mapped[str] = mapped_column(String(32))
+    valuation: Mapped[dict[str, int]] = mapped_column(JSONB)
+
+
+class DataProtection(Base):
+    __tablename__ = "data_protection"
+    __table_args__ = (CheckConstraint("id = 1", name="ck_data_protection_singleton"),)
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    protected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

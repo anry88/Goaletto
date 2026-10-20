@@ -704,7 +704,10 @@ async def close_auction(session: AsyncSession, job: Job, at: datetime) -> bool:
     hold = await session.get(MoneyReservation, bid.reservation_id)
     if hold is None or hold.status != "active" or hold.amount != bid.amount:
         raise ValueError("Highest bid lacks a funded reservation")
-    if accounts[auction.seller_club_id].club.budget > MAX_MONEY - bid.amount:
+    if (
+        accounts[bid.buyer_club_id].club.budget < accounts[bid.buyer_club_id].record.reserved
+        or accounts[auction.seller_club_id].club.budget > MAX_MONEY - bid.amount
+    ):
         await cancel_auction(session, auction, "funds_changed", at)
         return False
     # Validate roster repair before committing any transfer; full rollback on fault.

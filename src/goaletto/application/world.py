@@ -18,6 +18,7 @@ from goaletto.domain.calendar import (
     next_season_kickoff,
 )
 from goaletto.domain.game_cycle import CYCLE_CALENDAR, midnight, season_end, season_epoch
+from goaletto.domain.nationalities import nationality
 from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS, SKILLS, initial_caps
 from goaletto.domain.world import SKILL_NAMES, WORLD_POLICY, WorldOptions, WorldPlan, build_world
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
@@ -222,6 +223,7 @@ async def initialize_world(
                 "id": person.id,
                 "creation_key": f"world:{options.key}:person:{person.id}",
                 "name": person.name,
+                "country_code": nationality(person.id),
                 "age": person.age,
                 "career": "player",
                 "appearance_identity_id": prepared.portraits[person.id].identity_id,

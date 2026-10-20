@@ -66,6 +66,7 @@ class SquadMember:
     last_season: bool
     injured: bool
     energy_bps: int = 10000
+    country_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -276,6 +277,7 @@ async def _assemble(
             player.status == "last_season",
             player.injured_until is not None and player.injured_until > actor.at,
             energies[player.person_id],
+            person.country_code,
         )
         if slot.slot <= 11:
             starters.append(member)
@@ -292,6 +294,7 @@ async def _assemble(
             p.status == "last_season",
             p.injured_until is not None and p.injured_until > actor.at,
             energies[p.person_id],
+            persons[p.person_id].country_code,
         )
         for p in players
         if p.person_id not in selected

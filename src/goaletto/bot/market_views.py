@@ -14,6 +14,7 @@ from goaletto.domain.finances import MAX_MONEY
 from goaletto.domain.market import BID_STEP, decode_price, encode_price, minimum_bid
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
+from goaletto.presentation.person_names import person_name
 
 STATES = LabelMap(
     {"open": "Открыт", "sold": "Продан", "expired": "Без ставок", "cancelled": "Отменён"}
@@ -78,7 +79,7 @@ def market_view(screen: MarketScreen, notice: str | None = None) -> tuple[str, K
         tr("💰 <b>Рынок · {club}</b>", club=escape(latin_name(screen.club_name))),
         tr(
             "Доступно: {available} · в резерве: {reserved}",
-            available=amount(screen.cash - screen.reserved),
+            available=amount(max(0, screen.cash - screen.reserved)),
             reserved=amount(screen.reserved),
         ),
         tr(
@@ -105,7 +106,7 @@ def market_view(screen: MarketScreen, notice: str | None = None) -> tuple[str, K
         lines.extend(
             (
                 "",
-                f"{escape(latin_name(item.person.name))} · "
+                f"{escape(person_name(item.person))} · "
                 f"{item.person.age} · "
                 + "/".join((item.player.position, *item.player.alternative_positions)),
                 tr(
@@ -116,7 +117,14 @@ def market_view(screen: MarketScreen, notice: str | None = None) -> tuple[str, K
                 ),
             )
         )
-        rows.append([button(latin_name(item.person.name), f"mk:a:{compact_id(auc.id)}")])
+        rows.append(
+            [
+                button(
+                    person_name(item.person),
+                    f"mk:a:{compact_id(auc.id)}",
+                )
+            ]
+        )
     rows.append([button(tr("Свободные футболисты"), "cg:p:0"), button(tr("Персонал"), "cg:s:0")])
     if opened:
         rows.append([button(tr("Продать игрока"), "mk:sell:0")])
@@ -148,7 +156,7 @@ def seller_view(screen: MarketScreen, page: int) -> tuple[str, Keyboard]:
         rows.append(
             [
                 button(
-                    f"{latin_name(person.name)} · {person.age} · "
+                    f"{person_name(person)} · {person.age} · "
                     + "/".join((player.position, *player.alternative_positions)),
                     f"mk:q:{compact_id(person.id)}:{compact_id(screen.ownership_id)}",
                 )
@@ -172,7 +180,10 @@ def listing_quote(screen: MarketScreen, person_id: UUID) -> tuple[str, Keyboard]
     if person is None:
         raise ValueError("Player not eligible to list")
     lines = [
-        tr("<b>Стартовая цена · {player}</b>", player=escape(latin_name(person.name))),
+        tr(
+            "<b>Стартовая цена · {player}</b>",
+            player=escape(person_name(person)),
+        ),
         tr("Аукцион: 48 часов. При ставке в последние 2 часа срок продлевается на 30 минут."),
         tr("После первой ставки снять лот нельзя."),
     ]
@@ -195,7 +206,10 @@ def auction_view(
     auc = item.auction
     bid = item.highest
     lines = [
-        tr("💰 <b>Аукцион · {player}</b>", player=escape(latin_name(item.person.name))),
+        tr(
+            "💰 <b>Аукцион · {player}</b>",
+            player=escape(person_name(item.person)),
+        ),
         tr(
             "Клуб: {club} · {age} лет · {position}",
             club=escape(latin_name(item.seller_name)),

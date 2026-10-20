@@ -10,9 +10,9 @@ from goaletto.bot.finance_views import amount
 from goaletto.bot.market_views import button
 from goaletto.bot.result_views import compact_id
 from goaletto.domain.finances import SCOUT_SEARCH_DAYS, scout_mission_fee
-from goaletto.domain.names import latin_name
 from goaletto.domain.player_positions import ADJACENT
 from goaletto.presentation.i18n import tr
+from goaletto.presentation.person_names import person_name
 
 
 def view(screen: ScoutScreen, notice: str | None = None) -> tuple[str, Keyboard]:
@@ -21,7 +21,7 @@ def view(screen: ScoutScreen, notice: str | None = None) -> tuple[str, Keyboard]
     rows = []
     if screen.scout:
         lines += [
-            f"{escape(latin_name(screen.scout.name))} · {screen.skill}/20",
+            f"{escape(person_name(screen.scout))} · {screen.skill}/20",
             tr("Содержание: {wage}/4 дня", wage=amount(screen.cycle_rate)),
         ]
     else:
@@ -137,14 +137,14 @@ def report(screen: ScoutScreen, mission_id: UUID) -> tuple[str, Keyboard]:
         if item.offer.mission_id != mission.id:
             continue
         lines.append(
-            f"{escape(latin_name(item.person.name))} · {item.person.age} · "
+            f"{escape(person_name(item.person))} · {item.person.age} · "
             + "/".join((item.player.position, *item.player.alternative_positions))
             + f" · {amount(item.offer.fee)}"
         )
         rows.append(
             [
                 button(
-                    latin_name(item.person.name),
+                    person_name(item.person),
                     f"ss:f:{compact_id(screen.ownership_id)}:{compact_id(item.person.id)}",
                 )
             ]
@@ -161,7 +161,7 @@ def finding_view(item: Finding, owner: UUID) -> tuple[str, Keyboard]:
 
     own, person = compact_id(owner), compact_id(item.person.id)
     lines = [
-        f"<b>{escape(latin_name(item.person.name))}</b> · {item.person.age} · "
+        f"<b>{escape(person_name(item.person))}</b> · {item.person.age} · "
         + "/".join((item.player.position, *item.player.alternative_positions))
     ]
     lines += [f"{tr(label)}: {getattr(item.player, key)}" for key, label in SKILL_LABELS[:8]]

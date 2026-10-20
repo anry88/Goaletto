@@ -60,6 +60,7 @@ class SquadMember:
     form: int
     status: str
     slot: int | None
+    country_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,7 @@ class PlayerCard:
     kit_version: int
     energy_bps: int = 10000
     energy_full_at: datetime | None = None
+    country_code: str | None = None
 
 
 async def actor_for_callback(
@@ -215,6 +217,7 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
             SquadMember(
                 person_id=row.person_id,
                 name=member_person.name,
+                country_code=member_person.country_code,
                 age=member_person.age,
                 position=row.position,
                 form=row.form,
@@ -294,6 +297,7 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
     return PlayerCard(
         person_id=person.id,
         name=person.name,
+        country_code=person.country_code,
         age=person.age,
         position=player.position,
         alternative_positions=tuple(player.alternative_positions or ()),

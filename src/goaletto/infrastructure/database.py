@@ -10,12 +10,14 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from goaletto.config import Settings
+from goaletto.infrastructure import economy_transaction  # noqa: F401
 from goaletto.infrastructure.metrics import METRICS
 from goaletto.infrastructure.metrics_sql import install
 
 
 class Database:
     def __init__(self, settings: Settings) -> None:
+        self.environment = settings.environment
         self.engine = create_async_engine(
             settings.database_url.get_secret_value(), pool_pre_ping=True
         )
@@ -27,6 +29,7 @@ class Database:
         started, outcome = perf_counter(), "error"
         try:
             async with self.sessions.begin() as session:
+                session.info["production"] = self.environment == "production"
                 yield session
             outcome = "committed"
         finally:

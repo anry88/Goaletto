@@ -234,9 +234,15 @@ async def test_late_bid_extends_once_insufficient_money_withdrawal_and_lease_exp
     at = NOW + timedelta(hours=47)
     bidder = action(people[1][0], at)
     async with sessions.begin() as session:
+        account = (await locked_accounts(session, people[1][1]))[people[1][1]]
         with pytest.raises(InsufficientFunds):
             await place_bid(
-                session, action(bidder, at), people[1][2], auction_id, 2000000, clock=lambda: at
+                session,
+                action(bidder, at),
+                people[1][2],
+                auction_id,
+                account.available + 1,
+                clock=lambda: at,
             )
         await place_bid(session, bidder, people[1][2], auction_id, 100000, clock=lambda: at)
         await place_bid(session, bidder, people[1][2], auction_id, 100000, clock=lambda: at)

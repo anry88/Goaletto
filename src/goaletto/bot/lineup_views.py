@@ -11,6 +11,7 @@ from goaletto.domain.lineup import FORMATION_SHAPES
 from goaletto.domain.match_types import Mentality, Tactic
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
+from goaletto.presentation.person_names import person_name
 
 TACTIC_LABELS = LabelMap(
     {
@@ -71,7 +72,10 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
     lines.append(tr("Тактика: {p0} · Настрой: {p1}", p0=escape(tactic), p1=escape(mentality)))
     captain = next((m for m in data.starters if m.person_id == data.captain_id), None)
     lines.append(
-        tr("Капитан: {p0}", p0=escape(latin_name(captain.name)) if captain else tr("— не выбран"))
+        tr(
+            "Капитан: {p0}",
+            p0=escape(person_name(captain)) if captain else tr("— не выбран"),
+        )
     )
     if data.lock_at is not None:
         stamp = data.lock_at.strftime("%d.%m %H:%M UTC")
@@ -84,7 +88,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
     lines.append(tr("<b>Основа:</b>"))
     for index, member in enumerate(data.starters, start=1):
         lines.append(
-            f"{index}. {escape(latin_name(member.name))} ({escape(member.slot_position)})"
+            f"{index}. {escape(person_name(member))} ({escape(member.slot_position)})"
             f"{_badges(member.person_id, member.slot_position, data)}"
             + (
                 f" · {'/'.join((member.position, *member.alternatives))}"
@@ -97,7 +101,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
     lines.append(tr("<b>Запас:</b>"))
     for index, member in enumerate(data.bench, start=12):
         lines.append(
-            f"{index}. {escape(latin_name(member.name))} "
+            f"{index}. {escape(person_name(member))} "
             f"({escape('/'.join((member.position, *member.alternatives)))})"
             f"{_badges(member.person_id, member.position, data)}"
             f" · ⚡ {member.energy_bps / 100:.0f}%"
@@ -107,7 +111,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
         lines.extend(("", tr("<b>Вне заявки:</b>")))
         for member in data.reserves:
             lines.append(
-                f"{escape(latin_name(member.name))} "
+                f"{escape(person_name(member))} "
                 f"({escape('/'.join((member.position, *member.alternatives)))})"
                 f"{_badges(member.person_id, member.position, data)}"
                 f" · ⚡ {member.energy_bps / 100:.0f}%"
@@ -206,7 +210,7 @@ def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
     rows.extend(
         [
             _button(
-                f"⇄ {latin_name(member.name)}",
+                f"⇄ {person_name(member)}",
                 f"ln:s:{slot}:{compact_id(member.person_id)}:{version}",
             )
         ]
@@ -219,7 +223,12 @@ def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
 def bench_slots_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
     rows = [
-        [_button(f"{index}. {latin_name(member.name)}", f"ln:bsel:{index}:{version}")]
+        [
+            _button(
+                f"{index}. {person_name(member)}",
+                f"ln:bsel:{index}:{version}",
+            )
+        ]
         for index, member in enumerate(data.bench, 12)
     ]
     if len(data.bench) < 9 and data.reserves:
@@ -233,7 +242,12 @@ def bench_choices_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
         raise ValueError("Invalid bench slot")
     version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
     rows = [
-        [_button(latin_name(m.name), f"ln:b:{slot}:{compact_id(m.person_id)}:{version}")]
+        [
+            _button(
+                person_name(m),
+                f"ln:b:{slot}:{compact_id(m.person_id)}:{version}",
+            )
+        ]
         for m in data.reserves
     ]
     if slot < 12 + len(data.bench):
@@ -245,7 +259,12 @@ def bench_choices_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
 def starter_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
     rows = [
-        [_button(f"{index}. {latin_name(member.name)}", f"ln:sel:{index}:{version}")]
+        [
+            _button(
+                f"{index}. {person_name(member)}",
+                f"ln:sel:{index}:{version}",
+            )
+        ]
         for index, member in enumerate(data.starters, start=1)
     ]
     rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
@@ -257,7 +276,7 @@ def captain_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     rows = [
         [
             _button(
-                f"{'© ' if member.person_id == data.captain_id else ''}{latin_name(member.name)}",
+                f"{'© ' if member.person_id == data.captain_id else ''}{person_name(member)}",
                 f"ln:cap:{compact_id(member.person_id)}:{version}",
             )
         ]

@@ -22,6 +22,7 @@ from goaletto.bot.portrait_cache import PORTRAIT_UNAVAILABLE_TEXT
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
+from goaletto.presentation.person_names import person_name
 
 MENU_CALLBACK = "vc:menu"
 CLUB_CALLBACK = "vc:c"
@@ -56,8 +57,8 @@ LAST_SEASON_NOTE = "Завершит карьеру после текущего 
 
 
 def format_money(value: int) -> str:
-    if type(value) is not int or value < 0:
-        raise ValueError("Money must be a nonnegative integer")
+    if type(value) is not int:
+        raise ValueError("Money must be an integer")
     return f"{value:,}".replace(",", " ")
 
 
@@ -138,6 +139,7 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
                 InlineKeyboardButton(text=tr("🏟 Стадион"), callback_data="st:open"),
             ],
             [InlineKeyboardButton(text=tr("🎓 Академия"), callback_data="ac:open")],
+            [InlineKeyboardButton(text=tr("Название клуба"), callback_data="rn:open")],
             [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
@@ -173,6 +175,7 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
                 InlineKeyboardButton(text=tr("🏟 Стадион"), callback_data="st:open"),
             ],
             [InlineKeyboardButton(text=tr("🎓 Академия"), callback_data="ac:open")],
+            [InlineKeyboardButton(text=tr("Название клуба"), callback_data="rn:open")],
             [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
@@ -214,7 +217,7 @@ def squad_view(page: SquadPage) -> tuple[str, InlineKeyboardMarkup]:
         lines.append(
             _member_line(
                 offset,
-                latin_name(member.name),
+                person_name(member),
                 member.position,
                 member.age,
                 member.form,
@@ -224,7 +227,7 @@ def squad_view(page: SquadPage) -> tuple[str, InlineKeyboardMarkup]:
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f"{offset}. {latin_name(member.name)}"[:60],
+                    text=f"{offset}. {person_name(member)}"[:60],
                     callback_data=player_callback(member.person_id, page.page),
                 )
             ]
@@ -276,7 +279,7 @@ def player_view(
     lines = [
         tr(
             "👤 <b>{p0}</b> · {p1} · возраст {p2}",
-            p0=escape(latin_name(card.name)),
+            p0=escape(person_name(card)),
             p1=escape(card.position),
             p2=card.age,
         ),

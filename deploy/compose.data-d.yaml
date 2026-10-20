@@ -1,0 +1,20 @@
+# Opt-in only AFTER moving Goaletto's existing PGDATA while its processes are stopped.
+# Do not add this overlay to a running named-volume installation with an empty path.
+services:
+  postgres:
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        test -s /var/lib/postgresql/data/PG_VERSION
+        test "$$(cat /var/lib/postgresql/data/PG_VERSION)" = 17
+        test -d /var/lib/postgresql/data/global
+        test -d /var/lib/postgresql/data/base
+        test -d /var/lib/postgresql/data/pg_wal
+        exec docker-entrypoint.sh postgres
+    volumes:
+      - type: bind
+        source: ${GOALETTO_POSTGRES_DIR:?Set an existing Goaletto PGDATA directory on D}
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false

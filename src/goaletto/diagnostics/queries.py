@@ -430,7 +430,13 @@ async def _collect_finance(
     connection: AsyncConnection, limit: int
 ) -> tuple[list[FinanceAccountRow], bool]:
     statement = (
-        select(Club.id, Club.budget, FinanceAccount.reserved, FinanceAccount.arrears)
+        select(
+            Club.id,
+            Club.budget,
+            FinanceAccount.reserved,
+            FinanceAccount.arrears,
+            FinanceAccount.credit_limit,
+        )
         .join(FinanceAccount, FinanceAccount.club_id == Club.id)
         .order_by(Club.id.asc())
         .limit(limit + 1)
@@ -442,6 +448,7 @@ async def _collect_finance(
             cash=int(row[1]),
             reserved=int(row[2]),
             arrears=int(row[3]),
+            credit_limit=int(row[4]),
         )
         for row in raw
         if isinstance(row[0], UUID)

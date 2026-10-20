@@ -53,6 +53,7 @@ SUPPORTED_KINDS = frozenset(
         "player_lifecycle",
         "staff_lifecycle",
         "feedback_prompt",
+        "bankruptcy",
     }
 )
 LEASE_SECONDS = 120.0
@@ -61,6 +62,7 @@ BACKOFF_BASE_SECONDS = 5.0
 BACKOFF_CAP_SECONDS = 600.0
 PRIORITY_BY_KIND = {
     "match_result": 100,
+    "bankruptcy": 100,
     "friendly_invitation": 70,
     "market_notice": 70,
     "scout_report": 70,
@@ -188,6 +190,19 @@ def board_revision(payload: dict[str, Any]) -> int:
 
 def valid_payload(payload: dict[str, Any]) -> bool:
     kind = payload.get("kind")
+    if kind == "bankruptcy":
+        return (
+            type(payload.get("version")) is int
+            and payload.get("version") == 1
+            and _payload_uuid(payload, "ownership_id") is not None
+            and _payload_uuid(payload, "receipt_id") is not None
+            and isinstance(payload.get("club_name"), str)
+            and 0 < len(payload["club_name"]) <= 80
+            and type(payload.get("balance")) is int
+            and -(2**63) < payload["balance"] < 0
+            and type(payload.get("assets")) is int
+            and 0 <= payload["assets"] < 2**63
+        )
     if kind == "feedback_prompt":
         return (
             set(payload) == {"version", "kind", "response_id", "manager_id", "trigger", "target"}
@@ -345,6 +360,14 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
     if not valid_payload(payload):
         raise ValueError("Unsupported notification")
     kind = payload["kind"]
+    if kind == "bankruptcy":
+        return tr(
+            "🏦 Клуб {club} объявлен банкротом: долг {debt} превышает стоимость активов {assets}. "
+            "Клубом управляет бот. Получить другой клуб можно в следующем сезоне.",
+            club=escape(payload["club_name"]),
+            debt=f"{-payload['balance']:,}",
+            assets=f"{payload['assets']:,}",
+        )
     if kind == "feedback_prompt":
         next_step = (
             tr("/start — продолжить выбор клуба.")
@@ -580,6 +603,24 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
     payload = message.payload
     if not isinstance(payload, dict) or not valid_payload(payload):
         return Decision.SKIP_STALE
+    if payload["kind"] == "bankruptcy":
+        from goaletto.infrastructure.models import BankruptcyReceipt
+
+        receipt = await session.get(BankruptcyReceipt, _payload_uuid(payload, "receipt_id"))
+        owner = await session.get(OwnershipPeriod, _payload_uuid(payload, "ownership_id"))
+        manager = await session.get(Manager, owner.manager_id) if owner else None
+        if (
+            receipt is None
+            or owner is None
+            or manager is None
+            or receipt.ownership_id != owner.id
+            or owner.end_reason != "bankrupt"
+            or manager.telegram_id != message.chat_id
+            or payload["balance"] != receipt.balance
+            or payload["assets"] != receipt.assets
+        ):
+            return Decision.SKIP_STALE
+        return Decision.DELIVER if manager.bot_available else Decision.SKIP_UNAVAILABLE
     if payload["kind"] == "feedback_prompt":
         from goaletto.application.feedback_automation import deliverable
         from goaletto.infrastructure.models import FeedbackResponse

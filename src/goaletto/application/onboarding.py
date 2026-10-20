@@ -47,6 +47,7 @@ class Entry:
     club_id: UUID | None
     offers: tuple[ClubOffer, ...]
     no_capacity: bool = False
+    claim_blocked_until: datetime | None = None
 
 
 class ClubUnavailable(ValueError):
@@ -74,6 +75,7 @@ async def offers(session: AsyncSession, page: int = 1) -> tuple[ClubOffer, ...]:
             .where(
                 League.tier == 5,
                 Club.owner_telegram_id.is_(None),
+                Club.bankrupt_at.is_(None),
                 ~active,
                 ready_set_predicate(),
             )
@@ -189,6 +191,8 @@ async def begin_game(
                 policy=policy,
             )
         return Entry(actor, ownership.id, club.id, ())
+    if manager.bankruptcy_until is not None and manager.bankruptcy_until > at:
+        return Entry(actor, None, None, (), claim_blocked_until=manager.bankruptcy_until)
     available = await ensure_entry_capacity(session, at)
     return Entry(actor, None, None, await offers(session) if available else (), not available)
 
@@ -207,6 +211,7 @@ async def preview_club(session: AsyncSession, actor: Actor, club_id: UUID) -> Cl
             Club.id == club_id,
             League.tier == 5,
             Club.owner_telegram_id.is_(None),
+            Club.bankrupt_at.is_(None),
             ~active,
             ready_set_predicate(),
         )
@@ -232,6 +237,8 @@ async def claim_club(
     )
     if manager is None or manager.telegram_id != actor.telegram_id:
         raise PermissionDenied("Manager identity mismatch")
+    if manager.bankruptcy_until is not None and actor.at < manager.bankruptcy_until:
+        raise ClubUnavailable("New club claims reopen after bankruptcy in the next season")
     key = f"claim:v1:{actor.operation_id}"
     previous = await session.scalar(
         select(OwnershipPeriod).where(OwnershipPeriod.operation_key == key)
@@ -268,6 +275,7 @@ async def claim_club(
             Club.id == club_id,
             League.tier == 5,
             Club.owner_telegram_id.is_(None),
+            Club.bankrupt_at.is_(None),
             ~active,
             ready_set_predicate(),
         )
@@ -288,6 +296,10 @@ async def claim_club(
         end_reason=None,
     )
     session.add(ownership)
+    if session.info.get("production") and not manager.is_internal:
+        from goaletto.application.data_protection import protect
+
+        await protect(session, actor.at)
     club.owner_telegram_id = manager.telegram_id
     await session.flush()
     await user_effect(

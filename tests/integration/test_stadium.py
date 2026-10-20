@@ -105,7 +105,7 @@ async def test_reservations_block_upgrade_and_abort_rolls_back_payment_and_job(s
     async with sessions.begin() as session:
         account = (await locked_accounts(session, club_id))[club_id]
         await credit_locked(session, account, "test-capital", "grant", 300000, NOW)
-        await reserve(session, club_id, hold, 100000, {"auction": "test"}, NOW)
+        await reserve(session, club_id, hold, account.available - 250000, {"auction": "test"}, NOW)
         owner = await session.scalar(
             select(OwnershipPeriod.id).where(
                 OwnershipPeriod.club_id == club_id, OwnershipPeriod.ended_at.is_(None)

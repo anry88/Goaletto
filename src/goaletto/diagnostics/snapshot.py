@@ -196,6 +196,7 @@ class FinanceAccountRow:
     cash: int
     reserved: int
     arrears: int
+    credit_limit: int = 0
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -36,6 +36,7 @@ from goaletto.domain.candidates import (
 )
 from goaletto.domain.finances import POLICY_VERSION as ECONOMY_POLICY
 from goaletto.domain.market_players import market_player
+from goaletto.domain.nationalities import flag_name
 from goaletto.domain.retirement import player_last_season, staff_last_season
 from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS
 from goaletto.domain.world import SKILL_NAMES
@@ -433,6 +434,7 @@ async def load_candidates(
                 StaffQualification.skill,
                 Staff.status,
                 Staff.person_id,
+                Person.country_code,
             )
             .join(Person)
             .join(
@@ -454,8 +456,8 @@ async def load_candidates(
         account.available,
         tuple(items),
         tuple(
-            (cast(str, role), name, age, skill, status)
-            for role, name, age, skill, status, _ in employed
+            (cast(str, role), flag_name(name, country), age, skill, status)
+            for role, name, age, skill, status, _, country in employed
         ),
         tuple(row[5] for row in employed),
     )

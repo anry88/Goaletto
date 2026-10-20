@@ -56,7 +56,11 @@ async def available_clubs(session: AsyncSession) -> int:
             .select_from(Club)
             .join(League, League.id == Club.league_id)
             .where(
-                League.tier == 5, Club.owner_telegram_id.is_(None), ~active, ready_set_predicate()
+                League.tier == 5,
+                Club.owner_telegram_id.is_(None),
+                Club.bankrupt_at.is_(None),
+                ~active,
+                ready_set_predicate(),
             )
         )
         or 0

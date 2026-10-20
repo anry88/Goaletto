@@ -195,7 +195,8 @@ async def test_unaffordable_replace_and_interrupted_transaction_keep_old_contrac
     _, actor, club_id = await funded(sessions)
     async with sessions.begin() as session:
         screen, item = await offer_for(session, actor)
-        item.offer.fee = 3_000_000
+        account = (await locked_accounts(session, club_id))[club_id]
+        item.offer.fee = account.available + 1
         quote = await quote_for(session, actor, item, screen.ownership_id)
         old_id = quote.outgoing_id
     with pytest.raises(ValueError):
@@ -381,10 +382,10 @@ async def test_dismissing_scout_cancels_paid_mission_in_same_transaction(session
             session, action(actor), owner, scout_id, "FC", 4, scout_mission_fee(skill, 4)
         )
         quote = await quote_change(session, action(actor), owner, outgoing_id=scout_id)
-        budget = (await locked_accounts(session, club_id))[club_id].available
+        budget = (await locked_accounts(session, club_id))[club_id].club.budget
         await execute_change(session, action(actor), quote.id, at=NOW)
         assert (await session.get(ScoutMission, mission.id)).status == "cancelled"
-        assert (await locked_accounts(session, club_id))[club_id].available == budget
+        assert (await locked_accounts(session, club_id))[club_id].club.budget == budget
     async with sessions.begin() as session:
         pending = await session.scalar(select(Job).where(Job.kind == "scout.complete"))
         await complete_search(session, pending, NOW + timedelta(days=4))

@@ -14,6 +14,7 @@ from goaletto.application.finance_seed import cycle_job
 from goaletto.application.game_actions import Actor, allocation_lock, owned_club, user_effect
 from goaletto.application.match_runtime import NotReady
 from goaletto.application.money import credit_locked, debit_locked, locked_accounts
+from goaletto.domain.academy import academy_upkeep
 from goaletto.domain.finances import (
     POLICY_VERSION,
     SALARY_POLICIES,
@@ -490,6 +491,9 @@ class FinanceScreen:
     page: int
     pages: int
     sponsorship: SponsorContract | None = None
+    credit_limit: int = 0
+    valuation: dict[str, int] | None = None
+    academy_upkeep: int = 0
 
 
 async def load_finances(
@@ -572,4 +576,7 @@ async def load_finances(
         page,
         pages,
         sponsor,
+        account.record.credit_limit,
+        account.record.valuation,
+        academy_upkeep(club.academy_level),
     )

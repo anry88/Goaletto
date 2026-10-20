@@ -22,6 +22,7 @@ from goaletto.application.training import (
     week_start,
 )
 from goaletto.bot.finance_views import finance_view
+from goaletto.domain.game_cycle import Phase, cycle_on
 from goaletto.domain.sponsorship import sponsor_terms
 from goaletto.domain.training import Focus, Intensity
 from goaletto.infrastructure.models import (
@@ -192,37 +193,43 @@ async def test_contract_boundary_offseason_rounding_retry_and_database_immutabil
         assert (await session.get(SponsorContract, contract_id)).ends_at is None
 
 
+async def free_dates(session, actor):
+    screen = await load_training(session, actor, record=False)
+    return [choice.day for choice in screen.dates if choice.reason is None]
+
+
 async def test_future_dates_include_conditional_matches_and_allow_multiple_sessions(sessions):
     result, actor, club = await funded(sessions)
     day = week_start(NOW)
     async with sessions.begin() as session:
         owner = (await load_training(session, actor, record=False)).ownership_id
+        chosen = (await free_dates(session, actor))[:3]
+        assert len(chosen) == 3
+        conditional_day = chosen[0]
         conditional = FixturePlan(
             id=uuid4(),
             season_id=result.season_id,
             competition="cup",
             round_number=1,
-            assigned_day=(day + timedelta(days=1)).date(),
+            assigned_day=conditional_day.date(),
             conditional_ref="winner:future-tie",
             possible_club_ids=[str(club)],
         )
         session.add(conditional)
         await session.flush()
-        screen = await load_training(
-            session, action(actor), day=day + timedelta(days=1), record=False
-        )
+        screen = await load_training(session, action(actor), day=conditional_day, record=False)
         assert len(screen.dates) == 10
         assert screen.blocked and screen.block_reason.reason == "conditional"
         assert screen.block_reason.competition == "cup"
         with pytest.raises(ValueError, match="match day"):
-            await choose(session, actor, owner, day + timedelta(days=1))
+            await choose(session, actor, owner, conditional_day)
         # An eliminated club is no longer in the conditional pool, without materialized jobs.
         conditional.possible_club_ids = []
         await session.flush()
         assert not (
-            await load_training(session, action(actor), day=day + timedelta(days=1), record=False)
+            await load_training(session, action(actor), day=conditional_day, record=False)
         ).blocked
-        plans = [await choose(session, actor, owner, day + timedelta(days=i)) for i in (1, 2, 3)]
+        plans = [await choose(session, actor, owner, selected) for selected in chosen]
         assert len({p.id for p in plans}) == 3
         player = await session.scalar(
             select(Player.person_id).where(Player.club_id == club).limit(1)
@@ -240,7 +247,7 @@ async def test_future_dates_include_conditional_matches_and_allow_multiple_sessi
                 await choose(session, actor, owner, invalid)
         late = replace(action(actor), at=day + timedelta(days=2))
         with pytest.raises(ValueError, match="horizon"):
-            await choose(session, late, owner, day + timedelta(days=1))
+            await choose(session, late, owner, conditional_day)
 
 
 async def test_official_match_cancels_once_notifies_and_friendly_preserves_training(sessions):
@@ -248,6 +255,8 @@ async def test_official_match_cancels_once_notifies_and_friendly_preserves_train
     day = week_start(NOW) + timedelta(days=1)
     async with sessions.begin() as session:
         owner = (await load_training(session, actor, record=False)).ownership_id
+        selected = await free_dates(session, actor)
+        day = selected[0]
         plan = await choose(session, actor, owner, day)
         with pytest.raises(ValueError, match="occupies"):
             await reserve_match_day(session, (club,), day.date(), NOW, competition="friendly")
@@ -269,7 +278,7 @@ async def test_official_match_cancels_once_notifies_and_friendly_preserves_train
         )
         await apply_training(session, await training_job(session, plan), plan.due_at)
         assert plan.status == "cancelled" and plan.applied_at is None
-        second = await choose(session, actor, owner, day + timedelta(days=1))
+        second = await choose(session, actor, owner, selected[1])
         await apply_training(session, await training_job(session, second), second.due_at)
         with pytest.raises(ValueError, match="occupies"):
             await reserve_match_day(
@@ -352,14 +361,20 @@ async def test_unfinished_match_blocks_current_day_but_not_all_future_days(sessi
 
 async def test_moving_an_unannounced_official_plan_cancels_training_before_jobs_exist(sessions):
     result, actor, club = await funded(sessions)
-    day = week_start(NOW) + timedelta(days=2)  # Cup phase, not an existing league date.
     async with sessions.begin() as session:
         owner = (await load_training(session, actor, record=False)).ownership_id
+        season = await session.get(Season, result.season_id)
+        day = next(
+            d
+            for d in await free_dates(session, actor)
+            if d.date() > NOW.date()
+            and cycle_on(season.cycle_epoch, d.date()).phase == Phase.CHAMPIONS
+        )
         training = await choose(session, actor, owner, day)
         plan = FixturePlan(
             id=uuid4(),
             season_id=result.season_id,
-            competition="cup",
+            competition="champions",
             round_number=1,
             conditional_ref="winner:moving-tie",
             possible_club_ids=[str(club)],

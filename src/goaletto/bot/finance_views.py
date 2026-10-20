@@ -15,6 +15,7 @@ from goaletto.presentation.i18n import LabelMap, tr
 KINDS = LabelMap(
     {
         "opening": "Начальный баланс",
+        "debt_conversion": "Перенос задолженности в баланс",
         "grant": "Стартовый капитал",
         "tickets": "Билеты",
         "sponsor": "Спонсор",
@@ -62,6 +63,7 @@ def finance_view(screen: FinanceScreen) -> tuple[str, Keyboard]:
         - screen.weekly_player_wages
         - screen.weekly_staff_wages
         - screen.upkeep
+        - screen.academy_upkeep
     )
     lines = [
         tr("📈 <b>Финансы · {club}</b>", club=escape(latin_name(screen.club_name))),
@@ -70,9 +72,21 @@ def finance_view(screen: FinanceScreen) -> tuple[str, Keyboard]:
         tr(
             "В резерве: {reserved} · доступно: <b>{available}</b>",
             reserved=amount(screen.reserved),
-            available=amount(screen.balance - screen.reserved),
+            available=amount(max(0, screen.balance - screen.reserved)),
         ),
-        tr("Задолженность: {arrears}", arrears=amount(screen.arrears)),
+        tr(
+            "Долг: {debt} · лимит: {limit}",
+            debt=amount(max(0, -screen.balance)),
+            limit=amount(screen.credit_limit),
+        ),
+        tr(
+            "Активы клуба: игроки {players}, штаб {staff}, стадион {stadium}, "
+            "академия {academy}, стройка {construction}.",
+            **{
+                key: amount((screen.valuation or {}).get(key, 0))
+                for key in ("players", "staff", "stadium", "academy", "construction")
+            },
+        ),
         "",
         tr("<b>Прогноз на 4 дня</b>"),
         tr(
@@ -86,11 +100,13 @@ def finance_view(screen: FinanceScreen) -> tuple[str, Keyboard]:
             staff=amount(screen.weekly_staff_wages),
         ),
         tr(
-            "Стадион: −{upkeep} · итог: {net}",
+            "Стадион: −{upkeep} · академия: −{academy} · итог: {net}",
             upkeep=amount(screen.upkeep),
+            academy=amount(screen.academy_upkeep),
             net=("+" if forecast >= 0 else "−") + amount(abs(forecast)),
         ),
         tr("Билеты и призовые начисляются отдельно."),
+        tr("Покупки и ставки — только за свободные деньги."),
     ]
     if screen.sponsorship:
         contract = screen.sponsorship

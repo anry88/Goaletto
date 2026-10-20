@@ -28,6 +28,7 @@ from goaletto.domain.names import latin_name
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import Person, Player
 from goaletto.presentation.i18n import tr
+from goaletto.presentation.person_names import person_name
 
 router = Router(name="game-entry")
 
@@ -89,6 +90,11 @@ async def game_start(
             text, keyboard = club_view(card)
         else:
             text, keyboard = offer_view(entry.offers)
+            if entry.claim_blocked_until is not None:
+                text = tr(
+                    "После банкротства новый клуб можно получить с {date} UTC.",
+                    date=entry.claim_blocked_until.strftime("%d.%m.%Y %H:%M"),
+                )
     if card is not None:
         await show_club(message, database, card, edit=False, view=(text, keyboard))
     else:
@@ -157,7 +163,7 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                 for player, person in roster:
                     badge = tr(" · Последний сезон") if player.status == "last_season" else ""
                     lines.append(
-                        f"{escape(latin_name(person.name)[:80])} · {person.age} · "
+                        f"{escape(person_name(person)[:80])} · {person.age} · "
                         f"{player.position}{badge}"
                     )
                 text = "\n".join(lines)
@@ -179,7 +185,10 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
             elif parts[1] == "c" and len(parts) == 3:
                 await claim_club(session, actor, expand_id(parts[2]))
                 card = await get_owned_club(session, actor, record=False)
-                text, keyboard = club_view(card)
+                from goaletto.application.club_rename import screen
+                from goaletto.bot.rename_router import view
+
+                text, keyboard = view(await screen(session, actor))
             else:
                 raise ValueError("Stale entry callback")
     except (PermissionDenied, ClubUnavailable, ValueError) as error:

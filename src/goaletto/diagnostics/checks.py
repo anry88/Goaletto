@@ -141,7 +141,7 @@ FINDING_CODES: dict[str, tuple[str, str]] = {
     ),
     FINANCE_RESERVE_EXCEEDS_CASH: (
         SEVERITY_ALARM,
-        "Finance accounts holding more reserved funds than cash on hand.",
+        "Finance accounts holding more reserved funds than cash.",
     ),
     FINANCE_RESERVATION_MISMATCH: (
         SEVERITY_ALARM,
@@ -952,9 +952,9 @@ def _check_finances(snapshot: Snapshot) -> list[Finding]:
     findings: list[Finding] = []
     over_reserved: list[UUID] = []
     for account in snapshot.finance_accounts:
-        if account.reserved < 0 or account.cash < 0:
+        if account.reserved < 0 or account.credit_limit < 0:
             over_reserved.append(account.club_id)
-        elif account.reserved > account.cash:
+        elif account.reserved > max(0, account.cash):
             over_reserved.append(account.club_id)
     if over_reserved:
         findings.append(
@@ -962,8 +962,7 @@ def _check_finances(snapshot: Snapshot) -> list[Finding]:
                 code=FINANCE_RESERVE_EXCEEDS_CASH,
                 severity=SEVERITY_ALARM,
                 summary=(
-                    f"{len(over_reserved)} finance accounts hold more reserved funds "
-                    "than cash on hand."
+                    f"{len(over_reserved)} finance accounts hold more reserved funds than cash."
                 ),
                 count=len(over_reserved),
                 club_ids=_sample_ids(tuple(dict.fromkeys(over_reserved))),

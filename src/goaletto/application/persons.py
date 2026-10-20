@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from goaletto.domain.nationalities import nationality
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
 from goaletto.infrastructure.models import AppearanceIdentity, AppearanceVariant, Person
 
@@ -85,6 +86,7 @@ async def create_person(session: AsyncSession, request: NewPerson) -> Person:
     person = Person(
         id=request.id,
         creation_key=request.creation_key,
+        country_code=nationality(request.id),
         name=request.name,
         age=request.age,
         career=request.career,

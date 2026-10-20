@@ -15,6 +15,7 @@ from goaletto.domain.names import latin_name
 from goaletto.domain.staff_quality import QUALITY_NAMES, quality_tier
 from goaletto.infrastructure.models import StaffChange
 from goaletto.presentation.i18n import LabelMap, tr
+from goaletto.presentation.person_names import person_name
 
 ROLES = LabelMap(
     {
@@ -136,7 +137,7 @@ def candidate_list(
         lines.extend(
             (
                 "",
-                f"<b>{escape(latin_name(person.name))}</b> · {person.age} · {role}",
+                f"<b>{escape(person_name(person))}</b> · {person.age} · {role}",
                 ability,
                 tr(
                     "Подписание: {fee} · зарплата: {wage}/4 дня",
@@ -163,7 +164,10 @@ def candidate_list(
             rows.append(
                 [
                     button(
-                        tr("Отказаться: {name}", name=latin_name(person.name)),
+                        tr(
+                            "Отказаться: {name}",
+                            name=person_name(person),
+                        ),
                         f"cg:d:{compact_id(person.id)}:{compact_id(screen.ownership_id)}:0",
                     )
                 ]
@@ -173,7 +177,7 @@ def candidate_list(
         rows.append(
             [
                 button(
-                    latin_name(person.name),
+                    person_name(person),
                     f"cg:{action}:{compact_id(person.id)}:{compact_id(screen.ownership_id)}:{encode_price(value)}",
                 )
             ]
@@ -214,7 +218,7 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
     )
     text = tr(
         "Подписать {name} · {role}?\nРазово: {fee}\nЗарплата: {wage}/4 дня",
-        name=escape(latin_name(person.name)),
+        name=escape(person_name(person)),
         role=role,
         fee=amount(offer.fee),
         wage=amount(item.wage if item.wage is not None else offer.weekly_rate),

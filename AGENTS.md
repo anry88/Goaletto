@@ -360,3 +360,16 @@
   it bankrupts the club and ends human ownership. Signed ledger/valuation/bankruptcy
   runtime is pending AND-147; older cash/arrears docs describe current code, not a
   design prohibition. Do not close these pending tasks with presentation alone.
+
+- User clarification 2026-10-20: offer one confirmed club rename per ownership after
+  claim; refusal delays the next opportunity until offseason. Nationalities are
+  immutable person data, displayed as flags. Only wages and upkeep may create
+  negative cash; purchases, hires, improvements, scout missions and bids require
+  available cash after reservations. Insolvency is strict debt > all owned club
+  assets (squad, staff, stadium, academy, paid construction), checked atomically.
+  Preserve debts/history and end ownership into bot mode. Real external production
+  claims permanently latch data protection; never reset a protected application DB.
+- User clarification 2026-10-20: prioritize remaining prelaunch code work; HDC is
+  the owner's personal PC and infrastructure security/reboot/capacity drills are
+  under their manual supervision, not new code approval gates. Prefer data on D.
+  Keep backups copied from HDC to a separate Documents folder on this Mac.

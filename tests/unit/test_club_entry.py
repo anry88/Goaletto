@@ -39,6 +39,7 @@ class Rows:
 
 class Recorder:
     def __init__(self):
+        self.info = {}
         self.manager = Manager(
             id=uuid4(), telegram_id=123, reminders_enabled=True, bot_available=True
         )
