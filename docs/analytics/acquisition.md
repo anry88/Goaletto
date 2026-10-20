@@ -26,6 +26,19 @@
 их исходные параметры не сохранялись, восстановить их достоверно нельзя.
 Произвольные метки не становятся Prometheus labels; точный разрез остаётся в SQL CLI.
 
+Проверено 20 октября: 1170 unit/offline, 15 PostgreSQL сценариев, Ruff/format,
+mypy, SQL render и `alembic check`. Настоящий Dispatcher принимает именно
+`/start ai_match_prediction` без заранее созданной кампании; проверены source
+funnel, параллельный первый вход, retry, rollback, регистр/64 символа и исключения.
+Схема не меняется (0050). HDC обновлён release `goaletto:c5087854-hdc` в 15:16 UTC.
+Контрольные hashes людей, клубов, владений, платежей, ledger, fixtures/plans,
+кампаний, touches/journey и protection совпали до/после обновления при остановленных
+bot/worker. PostgreSQL и 19 соседних контейнеров не перезапускались.
+Runtime smoke распознал метку в откатываемой транзакции, без создания пользователей
+или искусственных переходов; публичный доступ, private metrics и jobs/sender health
+исправны, failed jobs нет, защита production сохранена. Backup перед обновлением:
+`~/Documents/Goaletto Backups/goaletto-20261020T151316Z-d021341f.dump`.
+
 Обновление 2026-10-18: [игровое подключение и PG-приёмка AND-75/76/79](../launch-measurement.md).
 Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
 match-opportunities подключены к операторскому CLI. Технические latency и
