@@ -28,6 +28,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     sql = normalized(output.getvalue())
     old = {"league_sets", "leagues", "clubs", "jobs", "outbox_messages"}
     altered = {
+        "academy_candidates",
         "finance_accounts",
         "ownership_periods",
         "feedback_responses",
@@ -80,6 +81,8 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 "ck_tick_game_minute",
                 "ck_command_kind",
                 "ck_club_crowd",
+                "ck_club_country",
+                "ck_academy_country",
                 "ck_action_kind",
                 "ck_journey_name",
                 "ck_signing_kind",

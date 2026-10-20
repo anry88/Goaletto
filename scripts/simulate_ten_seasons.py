@@ -280,7 +280,7 @@ class Simulation:
                 raise ValueError("Protected real game/payment data: reset forbidden")
             if (
                 await s.scalar(text("SELECT version_num FROM alembic_version"))
-                != "0049_stars_cosmetics"
+                != "0050_club_country"
             ):
                 raise ValueError(
                     "Apply the current migrations to the existing local database first"
@@ -677,6 +677,7 @@ class Simulation:
     async def team(self, s, case):
         players = await self.players(s, case.club_id)
         picks, bench = pick_lineup(players, datetime(2100, 1, 1, tzinfo=UTC))
+        selected = {p.person_id for p in picks} | set(bench)
         club = await s.get(Club, case.club_id)
         return TeamSnapshot(
             club_id=club.id,
@@ -690,8 +691,10 @@ class Simulation:
                     age=25,
                     form=6,
                     morale=50,
+                    alternatives=tuple(p.alternative_positions),
                 )
                 for p in players
+                if p.person_id in selected
             ),
             lineup=tuple(FieldSlot(p.person_id, p.slot_position) for p in picks),
             bench=bench,
@@ -1053,6 +1056,7 @@ class Simulation:
                     )
                 try:
                     picks, bench = pick_lineup(people, datetime(2100, 1, 1, tzinfo=UTC))
+                    selected = {p.person_id for p in picks} | set(bench)
                     team = TeamSnapshot(
                         club_id=UUID(row["club"]),
                         name=row["strategy"],
@@ -1068,6 +1072,7 @@ class Simulation:
                                 alternatives=tuple(p.alternative_positions),
                             )
                             for p in people
+                            if p.person_id in selected
                         ),
                         lineup=tuple(FieldSlot(p.person_id, p.slot_position) for p in picks),
                         bench=bench,
@@ -1164,6 +1169,7 @@ class Simulation:
                 result = await rollover_season(s, season_id, at)
                 season_id = result.next_season_id
                 await activate_season(s, season_id, at)
+        await self.refresh_reports()
         self.write(True)
 
 

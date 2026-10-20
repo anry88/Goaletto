@@ -65,6 +65,7 @@ def build_dispatcher(
         academy_router,
         candidate_router,
         club_router,
+        country_router,
         entry_router,
         feedback_router,
         finance_router,
@@ -90,6 +91,7 @@ def build_dispatcher(
     root.callback_query.filter(F.message.chat.type == "private")
     for module in (
         entry_router,
+        country_router,
         rename_router,
         feedback_router,
         finance_router,

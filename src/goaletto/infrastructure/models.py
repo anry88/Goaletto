@@ -54,6 +54,11 @@ class Club(Base):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     league_id: Mapped[UUID] = mapped_column(ForeignKey("leagues.id"), index=True)
     name: Mapped[str] = mapped_column(String(80))
+    country_code: Mapped[str | None] = mapped_column(String(2))
+    country_selected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    country_ownership_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("ownership_periods.id", name="fk_club_country_owner", use_alter=True)
+    )
     # Compatibility projection; ownership_periods is the authoritative history.
     owner_telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     budget: Mapped[int] = mapped_column(BigInteger, default=0)
@@ -71,6 +76,13 @@ class Club(Base):
         CheckConstraint("kit_version > 0", name="ck_club_kit_version"),
         CheckConstraint("stadium_capacity >= 0 AND supporters >= 0", name="ck_club_crowd"),
         CheckConstraint("academy_level BETWEEN 1 AND 5", name="ck_club_academy_level"),
+        CheckConstraint(
+            "(country_code IS NULL AND country_selected_at IS NULL "
+            "AND country_ownership_id IS NULL) OR (country_code IS NOT NULL "
+            "AND country_code ~ '^[A-Z]{2}$' AND country_selected_at IS NOT NULL "
+            "AND country_ownership_id IS NOT NULL)",
+            name="ck_club_country",
+        ),
     )
 
 
@@ -1544,6 +1556,7 @@ class AcademyCandidate(Base):
         ),
         CheckConstraint("status IN ('available','signed','expired')", name="ck_academy_status"),
         CheckConstraint("(status = 'signed') = (signed_at IS NOT NULL)", name="ck_academy_signed"),
+        CheckConstraint("country_code ~ '^[A-Z]{2}$'", name="ck_academy_country"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
@@ -1551,6 +1564,7 @@ class AcademyCandidate(Base):
     slot: Mapped[int] = mapped_column(SmallInteger)
     policy_version: Mapped[str] = mapped_column(String(32), server_default="academy-v1")
     name: Mapped[str] = mapped_column(String(120))
+    country_code: Mapped[str] = mapped_column(String(2), default=_person_country)
     age: Mapped[int] = mapped_column(SmallInteger)
     position: Mapped[str] = mapped_column(String(3))
     alternative_positions: Mapped[list[str]] = mapped_column(ARRAY(String(3)), default=list)

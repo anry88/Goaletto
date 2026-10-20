@@ -19,6 +19,7 @@ COMMANDS = (
     ("market", "Аукционы и продажа игроков", "Auctions and player sales"),
     ("stadium", "Стадион и посещаемость", "Stadium and attendance"),
     ("academy", "Академия и выпуск юношей", "Academy and youth promotion"),
+    ("country", "Страна клуба для академии", "Club country for academy graduates"),
     ("finance", "Финансы клуба", "Club finances"),
     ("train", "Тренировки", "Training"),
     ("calendar", "Расписание ближайших матчей", "Upcoming fixtures"),

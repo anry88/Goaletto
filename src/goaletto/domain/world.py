@@ -11,6 +11,7 @@ from uuid import UUID, uuid5
 
 from goaletto.domain.calendar import validate_kickoff
 from goaletto.domain.names import INTERNATIONAL_CLUBS, NAMING_POLICY, international_catalog
+from goaletto.domain.person_names import PERSON_NAMING_POLICY, generated_name
 from goaletto.domain.retirement import RetirementDecision, player_last_season
 
 WORLD_POLICY = "world-seed-v1"
@@ -228,7 +229,7 @@ class WorldOptions:
     seed: int
     first_kickoff: datetime
     initial_budget: int = 0
-    naming_policy: str = NAMING_POLICY
+    naming_policy: str = PERSON_NAMING_POLICY
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", self.key):
@@ -237,7 +238,7 @@ class WorldOptions:
             raise ValueError("Seed must fit a nonnegative BIGINT")
         if type(self.initial_budget) is not int or not 0 <= self.initial_budget < 2**63:
             raise ValueError("Budget must be nonnegative integer units")
-        if self.naming_policy not in {NAMING_POLICY, "legacy-v1"}:
+        if self.naming_policy not in {NAMING_POLICY, PERSON_NAMING_POLICY, "legacy-v1"}:
             raise ValueError("Invalid naming policy")
         validate_kickoff(self.first_kickoff)
 
@@ -325,6 +326,7 @@ def build_world(options: WorldOptions) -> WorldPlan:
     international_names = international_catalog(options.seed)
     club_names = list(CLUB_NAMES if options.naming_policy == "legacy-v1" else INTERNATIONAL_CLUBS)
     rng.shuffle(club_names)
+    used_names: set[str] = set()
     leagues: list[StartingLeague] = []
     for tier in range(1, 6):
         league_id = uuid5(set_id, f"league:{tier}")
@@ -339,14 +341,25 @@ def build_world(options: WorldOptions) -> WorldPlan:
                 person_id = uuid5(club_id, f"person:{slot}")
                 player_rng = Random(stable_seed(options.seed, str(person_id)))
                 first, last = names[club_number * 20 + slot - 1]
+                display_name = (
+                    f"{first} {last}"
+                    if options.naming_policy == "legacy-v1"
+                    else international_names[club_number * 20 + slot - 1][1]
+                )
+                if options.naming_policy == PERSON_NAMING_POLICY:
+                    for attempt in range(10000):
+                        display_name = generated_name(person_id, attempt=attempt).name
+                        if display_name not in used_names:
+                            break
+                    else:
+                        raise ValueError("Starting world name pool exhausted")
+                used_names.add(display_name)
                 players.append(
                     StartingPlayer(
                         person_id,
                         club_id,
                         slot,
-                        f"{first} {last}"
-                        if options.naming_policy == "legacy-v1"
-                        else international_names[club_number * 20 + slot - 1][1],
+                        display_name,
                         age,
                         position,
                         _skills(position, player_rng),

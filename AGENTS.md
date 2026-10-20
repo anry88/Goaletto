@@ -392,3 +392,15 @@
   VIP product is named "👑 VIP статус" with simple offseason-rename wording.
   /paysupport must offer a copyable full refund command, no manual UUID extraction.
   /start and /help link both https://t.me/goaletto_ru and https://t.me/goaletto_en.
+
+- User update 2026-10-20: nationality-v2 expands the cosmetic country catalog to81;
+  nationality-names-v2 uses a matching local name tradition about90% of the time
+  and a foreign tradition about10%. Apply to new people only; preserve existing
+  names, countries, faces and historical match documents. Read persisted countries
+  in reports; do not infer old flags from a newer catalog. Legacy v1 backfill stays frozen.
+  After claim, offer one confirmed club country choice, also available in settings.
+  Latest clarification: it affects only future academy intakes, never current squad,
+  public market or scout people. Persist country on the academy offer and pass it
+  to Person on signing/publication. Existing intakes retain their frozen country.
+  Club choice is permanent and has no skill, potential, financial or tactical bonus.
+  See docs/club-country-and-names.md; migration0050 preserves used choices/history.

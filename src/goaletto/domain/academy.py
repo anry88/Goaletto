@@ -7,7 +7,8 @@ from uuid import UUID, uuid5
 from goaletto.domain.development import SKILLS
 from goaletto.domain.finances import PRIMARY
 from goaletto.domain.match_types import POSITIONS
-from goaletto.domain.names import international_catalog
+from goaletto.domain.nationalities import nationality
+from goaletto.domain.person_names import person_name
 from goaletto.domain.player_positions import alternative_positions
 from goaletto.domain.world import SKILL_NAMES, stable_seed
 
@@ -37,6 +38,7 @@ class AcademyCandidate:
     alternatives: tuple[str, ...]
     skills: tuple[int, ...]
     caps: dict[str, int]
+    country_code: str = ""
 
 
 def _check_level(level: int) -> int:
@@ -70,7 +72,9 @@ def skill_band(level: int) -> tuple[int, int]:
     return _SKILL_BAND[_check_level(level)]
 
 
-def candidate(club_id: UUID, season_id: UUID, slot: int, level: int) -> AcademyCandidate:
+def candidate(
+    club_id: UUID, season_id: UUID, slot: int, level: int, *, country: str | None = None
+) -> AcademyCandidate:
     """Deterministic candidate for one intake slot; retries reproduce the same person."""
     _check_level(level)
     if not isinstance(club_id, UUID) or not isinstance(season_id, UUID):
@@ -95,9 +99,9 @@ def candidate(club_id: UUID, season_id: UUID, slot: int, level: int) -> AcademyC
         for skill, value in zip(SKILLS, values, strict=True)
     }
     caps[SKILLS[primary]] = min(20, caps[SKILLS[primary]] + level)
-    catalog = international_catalog(seed)
-    _, name = catalog[seed % len(catalog)]
     person_id = _person_id(club_id, season_id, slot)
+    country = country or nationality(person_id)
+    name = person_name(person_id, country)
     return AcademyCandidate(
         person_id=person_id,
         name=name,
@@ -106,6 +110,7 @@ def candidate(club_id: UUID, season_id: UUID, slot: int, level: int) -> AcademyC
         alternatives=alternative_positions(person_id, position),
         skills=tuple(skills),
         caps=caps,
+        country_code=country,
     )
 
 

@@ -30,7 +30,6 @@ from goaletto.domain.academy import (
 from goaletto.domain.academy import candidate as build_candidate
 from goaletto.domain.finances import accrued_wage
 from goaletto.domain.game_cycle import CYCLE_SECONDS, midnight
-from goaletto.domain.nationalities import nationality
 from goaletto.domain.training import POLICY_VERSION as TRAINING
 from goaletto.domain.training import PROGRESS_KEYS
 from goaletto.domain.world import SKILL_NAMES
@@ -39,6 +38,7 @@ from goaletto.infrastructure.models import (
     AcademyIntake,
     AppearanceIdentity,
     AppearanceVariant,
+    Club,
     GameActionReceipt,
     LedgerEntry,
     Player,
@@ -119,8 +119,11 @@ async def ensure_intake(
     )
     if rows:
         return rows
+    club = await session.get(Club, club_id)
+    if club is None:
+        raise ValueError("Unknown academy club")
     for slot in range(1, candidate_count(level) + 1):
-        profile = build_candidate(club_id, season_id, slot, level)
+        profile = build_candidate(club_id, season_id, slot, level, country=club.country_code)
         session.add(
             AcademyCandidate(
                 id=profile.person_id,
@@ -129,6 +132,7 @@ async def ensure_intake(
                 slot=slot,
                 policy_version=POLICY,
                 name=profile.name,
+                country_code=profile.country_code,
                 age=profile.age,
                 position=profile.position,
                 alternative_positions=list(profile.alternatives),
@@ -166,7 +170,7 @@ def _view(row: AcademyCandidate) -> CandidateView:
     return CandidateView(
         slot=row.slot,
         name=row.name,
-        country_code=nationality(row.id),
+        country_code=row.country_code,
         age=row.age,
         position=row.position,
         alternatives=tuple(row.alternative_positions),
@@ -329,6 +333,7 @@ async def _materialize(
             id=row.id,
             creation_key=f"{POLICY}:{row.club_id}:{row.season_id}:{row.slot}",
             name=row.name,
+            country_code=row.country_code,
             age=CANDIDATE_AGE,
             career="player",
             origin_bank="players",

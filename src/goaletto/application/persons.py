@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from goaletto.domain.nationalities import nationality
+from goaletto.domain.nationalities import COUNTRIES, nationality
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
 from goaletto.infrastructure.models import AppearanceIdentity, AppearanceVariant, Person
 
@@ -26,6 +26,7 @@ class NewPerson:
     # Caller chooses reviewed, age-appropriate variants; no random wrong-age fallback.
     eligible_variant_ids: tuple[str, ...]
     home_league_set_id: UUID | None = None
+    country_code: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, UUID):
@@ -34,6 +35,8 @@ class NewPerson:
             raise ValueError("Invalid person creation key")
         if not self.name.strip() or len(self.name) > 120:
             raise ValueError("Invalid person name")
+        if self.country_code is not None and self.country_code not in COUNTRIES:
+            raise ValueError("Unknown person country")
         if type(self.age) is not int or not 0 <= self.age <= 150:
             raise ValueError("Invalid person age")
         if self.career not in {"player", "staff"}:
@@ -86,7 +89,7 @@ async def create_person(session: AsyncSession, request: NewPerson) -> Person:
     person = Person(
         id=request.id,
         creation_key=request.creation_key,
-        country_code=nationality(request.id),
+        country_code=request.country_code or nationality(request.id),
         name=request.name,
         age=request.age,
         career=request.career,

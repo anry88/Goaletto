@@ -56,6 +56,7 @@ class SettingsState:
     rename_offseason: bool = False
     rename_initial: bool = False
     vip_until: datetime | None = None
+    country_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -152,6 +153,7 @@ async def get_settings(session: AsyncSession, actor: Actor) -> SettingsState:
         ownership_id=ownership.id,
         club_id=club.id,
         club_name=club.name,
+        country_code=club.country_code,
         expires_at=ownership.expires_at,
         last_game_action_at=ownership.last_game_action_at,
     )

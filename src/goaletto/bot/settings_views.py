@@ -15,7 +15,8 @@ from goaletto.application.notification_preferences import SettingsState
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.bot.time_settings_views import timezone_label
 from goaletto.domain.kickoff import local_datetime
-from goaletto.presentation.i18n import tr
+from goaletto.domain.nationalities import country_label
+from goaletto.presentation.i18n import locale, tr
 
 SETTINGS_OPEN = "ntf:open"
 
@@ -92,6 +93,11 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton(text=tr("🌐 Выбрать часовой пояс"), callback_data="tz:open")]
     ]
     if state.has_ownership and state.ownership_id is not None:
+        buttons.append([InlineKeyboardButton(text=tr("🌍 Страна клуба"), callback_data="ct:open")])
+        if state.country_code:
+            lines.append(
+                tr("Страна клуба: {country}", country=country_label(state.country_code, locale()))
+            )
         lines.append(
             tr("Переименование: одна попытка в запасе.")
             if state.rename_available

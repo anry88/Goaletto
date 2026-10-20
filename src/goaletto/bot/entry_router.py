@@ -187,10 +187,17 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
             elif parts[1] == "c" and len(parts) == 3:
                 await claim_club(session, actor, expand_id(parts[2]))
                 card = await get_owned_club(session, actor, record=False)
+                from goaletto.application.club_country import screen as country_screen
                 from goaletto.application.club_rename import screen
+                from goaletto.bot.country_router import view as country_view
                 from goaletto.bot.rename_router import view
 
-                text, keyboard = view(await screen(session, actor))
+                country = await country_screen(session, actor, record=False)
+                text, keyboard = (
+                    country_view(country, mode="r")
+                    if country.country_code is None
+                    else view(await screen(session, actor))
+                )
             else:
                 raise ValueError("Stale entry callback")
     except (PermissionDenied, ClubUnavailable, ValueError) as error:

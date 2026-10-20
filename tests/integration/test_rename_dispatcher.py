@@ -78,6 +78,18 @@ async def test_claim_offers_name_then_restart_confirm_or_decline_until_offseason
     response = await send("/start")
     response = await send(data=button(response, "en:p:"))
     response = await send(data=button(response, "en:c:"))
+    assert "Страна клуба" in (response.text or response.caption)
+    country = next(
+        b.callback_data
+        for row in response.reply_markup.inline_keyboard
+        for b in row
+        if (b.callback_data or "").startswith("ct:v:") and b.callback_data.endswith(":UA")
+    )
+    response = await send(data=country)
+    async with sessions.begin() as session:
+        owner = await session.scalar(select(OwnershipPeriod))
+        assert (await session.get(Club, owner.club_id)).country_code is None
+    response = await send(data=button(response, "ct:c:"))
     assert "Хотите переименовать" in (response.text or response.caption)
     initial_input, initial_keep = button(response, "rn:i:"), button(response, "rn:k:")
     async with sessions.begin() as session:

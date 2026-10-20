@@ -23,11 +23,11 @@ from goaletto.application.money import debit_locked, locked_accounts
 from goaletto.application.persons import NewPerson, create_person
 from goaletto.domain.finances import POLICY_VERSION as ECONOMY
 from goaletto.domain.finances import PRIMARY, player_wage, scout_mission_fee, scout_signing_fee
-from goaletto.domain.names import international_catalog
+from goaletto.domain.person_names import person_name
 from goaletto.domain.scouting import POLICY, discovery, findings_count, potential_range
 from goaletto.domain.training import POLICY_VERSION as TRAINING
 from goaletto.domain.training import PROGRESS_KEYS
-from goaletto.domain.world import SKILL_NAMES, stable_seed
+from goaletto.domain.world import SKILL_NAMES
 from goaletto.infrastructure.models import (
     Fixture,
     Job,
@@ -332,14 +332,12 @@ async def complete_search(session: AsyncSession, job: Job, at: datetime) -> None
     for rank in range(1, findings_count(mission.days) + 1):
         person_id = uuid5(mission.id, f"finding:{rank}")
         profile = discovery(person_id, mission.position, mission.skill)
-        seed = stable_seed(0, f"{POLICY}:{person_id}")
-        names = international_catalog(seed)
         person = await create_person(
             session,
             NewPerson(
                 id=person_id,
                 creation_key=f"{POLICY}:{mission.id}:{rank}",
-                name=names[seed % len(names)][1],
+                name=person_name(person_id),
                 age=profile.age,
                 career="player",
                 origin_bank="players",

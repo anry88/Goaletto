@@ -6,17 +6,15 @@ import pytest
 from goaletto.application.outbox_delivery import render_text, valid_payload
 from goaletto.domain.candidates import (
     PLAYER_POSITIONS,
-    POOL_POLICY,
     STAFF_ROLES,
     candidate_profile,
     deficit,
 )
 from goaletto.domain.finances import player_fee, player_wage
 from goaletto.domain.market_players import market_player
-from goaletto.domain.names import international_catalog
+from goaletto.domain.person_names import person_name
 from goaletto.domain.retirement import STAFF_PROBABILITIES_BPS, staff_last_season
 from goaletto.domain.season_rollover import rollover_kickoff
-from goaletto.domain.world import stable_seed
 from goaletto.presentation.i18n import using_locale
 
 
@@ -61,8 +59,7 @@ def test_new_baseline_players_cover_positions_reproducibly(position):
     profile = candidate_profile(person_id, "player", position)
     assert profile == candidate_profile(person_id, "player", position)
     name, age, skills, fee, wage = profile
-    seed = stable_seed(0, f"{POOL_POLICY}:{person_id}")
-    assert name in {name for _, name in international_catalog(seed)}
+    assert name == person_name(person_id)
     assert name and 26 <= age <= 30 and len(skills) == 10
     assert all(1 <= skill <= 20 for skill in skills)
     assert fee == player_fee(
@@ -94,7 +91,4 @@ def test_lifecycle_notification_escapes_names_and_translates(kind, action):
 @pytest.mark.parametrize("role", STAFF_ROLES)
 def test_new_staff_name_does_not_include_catalog_metadata(role):
     person_id = uuid4()
-    seed = stable_seed(0, f"{POOL_POLICY}:{person_id}")
-    assert candidate_profile(person_id, "staff", role)[0] in {
-        name for _, name in international_catalog(seed)
-    }
+    assert candidate_profile(person_id, "staff", role)[0] == person_name(person_id)

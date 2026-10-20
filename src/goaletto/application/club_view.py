@@ -50,6 +50,7 @@ class ClubCard:
     kit_secondary: str
     kit_version: int
     vip: bool = False
+    country_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -155,6 +156,7 @@ def _club_card(club: Club, tier: int, vip: bool = False) -> ClubCard:
         kit_secondary=club.kit_secondary,
         kit_version=club.kit_version,
         vip=vip,
+        country_code=club.country_code,
     )
 
 

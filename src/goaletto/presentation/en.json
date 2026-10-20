@@ -817,5 +817,17 @@
   "Кандидаты для найма в клуб.": "Candidates available to hire for your club.",
   "В клубе пока нет сотрудников.": "Your club has no staff yet.",
   "Кандидатов на рынке персонала сейчас нет.": "No candidates are available on the staff market right now.",
-  "👥 Персонал клуба": "👥 Club staff"
+  "👥 Персонал клуба": "👥 Club staff",
+  "🌍 <b>Страна клуба</b> · {club}": "🌍 <b>Club country</b> · {club}",
+  "Страна выбрана. Новые выпуски академии будут из этой страны.": "Country selected. Future academy graduates will come from this country.",
+  "Подтвердить страну клуба? После подтверждения изменить её нельзя.": "Confirm the club country? It cannot be changed after confirmation.",
+  "Выбрать другую": "Choose another",
+  "Выберите страну для будущих выпусков академии. Текущий состав сохранится.": "Choose a country for future academy graduates. Your current squad will stay as it is.",
+  "Поиск по названию или коду: /country Украина или /country UA": "Search by name or code: /country Ukraine or /country UA",
+  "Страна не найдена. Попробуйте русское/английское название или двухбуквенный код.": "Country not found. Try its Russian/English name or two-letter code.",
+  "Все страны": "All countries",
+  "Позже": "Later",
+  "Страна клуба: {country}": "Club country: {country}",
+  "Страна или кнопка больше недоступна. Откройте /country заново.": "Country or button is no longer available. Open /country again.",
+  "🌍 Страна клуба": "🌍 Club country"
 }

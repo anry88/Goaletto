@@ -33,7 +33,7 @@ from goaletto.bot.history_callbacks import (
 )
 from goaletto.bot.result_views import table_view
 from goaletto.domain.names import latin_name
-from goaletto.domain.nationalities import flag_name, nationality
+from goaletto.domain.nationalities import flag_name, legacy_nationality
 from goaletto.presentation.i18n import tr
 
 OUTCOME_MARKERS = {"win": "✅", "draw": "➖", "loss": "❌"}
@@ -318,7 +318,12 @@ def report_view(
                 tr(
                     "<b>{p0}</b> · {p1}{p2}\n{p3} · возраст {p4} · сыграл {p5} "
                     "мин\nФорма до матча: {p6}/8 · Энергия после: {p7}",
-                    p0=escape(flag_name(latin_name(member.name), nationality(member.person_id))),
+                    p0=escape(
+                        flag_name(
+                            latin_name(member.name),
+                            member.country_code or legacy_nationality(member.person_id),
+                        )
+                    ),
                     p1=escape(member.position),
                     p2=extra,
                     p3=role,
@@ -429,7 +434,12 @@ def player_history_view(page: PlayerHistoryPage) -> tuple[str, InlineKeyboardMar
     lines = [
         tr(
             "📜 <b>{p0}</b> · Матчи {p1}/{p2}",
-            p0=escape(flag_name(latin_name(page.person_name), nationality(page.person_id))),
+            p0=escape(
+                flag_name(
+                    latin_name(page.person_name),
+                    page.country_code or legacy_nationality(page.person_id),
+                )
+            ),
             p1=page.page,
             p2=page.total_pages,
         ),

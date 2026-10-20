@@ -21,8 +21,9 @@ from goaletto.bot.history_callbacks import (
 from goaletto.bot.portrait_cache import PORTRAIT_UNAVAILABLE_TEXT
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
+from goaletto.domain.nationalities import country_label
 from goaletto.presentation.club_status import club_label
-from goaletto.presentation.i18n import LabelMap, tr
+from goaletto.presentation.i18n import LabelMap, locale, tr
 from goaletto.presentation.person_names import person_name
 
 MENU_CALLBACK = "vc:menu"
@@ -158,6 +159,10 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
         p3=card.stadium_capacity,
         p4=card.supporters,
     )
+    if card.country_code:
+        text += "\n" + tr(
+            "Страна клуба: {country}", country=country_label(card.country_code, locale())
+        )
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=tr("👥 Состав"), callback_data=squad_callback(1))],

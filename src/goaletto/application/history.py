@@ -122,6 +122,7 @@ class ReportLineupPlayer:
     form_before: int | None = None
     form_after: int | None = None
     skill_gains: tuple[tuple[str, int], ...] = ()
+    country_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -178,6 +179,7 @@ class PlayerHistoryPage:
     page: int
     total_pages: int
     total: int
+    country_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -509,6 +511,14 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         for team in (initial.home.snapshot, initial.away.snapshot)
         for p in team.players
     }
+    countries = {
+        key: code
+        for key, code in (
+            await session.execute(
+                select(Person.id, Person.country_code).where(Person.id.in_(names))
+            )
+        ).all()
+    }
     raw_events = await stored_events(session, match.id)
     events: list[ReportEvent] = []
     for raw in raw_events:
@@ -573,6 +583,7 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                         .items()
                         if value
                     ),
+                    country_code=countries.get(snapshot_player.id),
                 )
             )
         rows_out.sort(key=lambda r: (not r.started, not r.appeared, r.name, str(r.person_id)))
@@ -708,7 +719,15 @@ async def get_player_matches(
         await user_effect(
             session, actor, "lineup_opened", Surface.SQUAD, ownership=ownership, club_id=club.id
         )
-        return PlayerHistoryPage(person_id, fallback_name, (), page, 1, 0)
+        return PlayerHistoryPage(
+            person_id,
+            fallback_name,
+            (),
+            page,
+            1,
+            0,
+            country_code=person_row.country_code if person_row else None,
+        )
     total_pages = _page_count(total)
     if page > total_pages:
         raise ValueError("Invalid history page")
@@ -788,7 +807,10 @@ async def get_player_matches(
     await user_effect(
         session, actor, "lineup_opened", Surface.SQUAD, ownership=ownership, club_id=club.id
     )
-    return PlayerHistoryPage(person_id, person_name, tuple(entries), page, total_pages, total)
+    country = await session.scalar(select(Person.country_code).where(Person.id == person_id))
+    return PlayerHistoryPage(
+        person_id, person_name, tuple(entries), page, total_pages, total, country_code=country
+    )
 
 
 def _raw_person(value: object) -> UUID | None:

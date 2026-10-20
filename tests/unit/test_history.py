@@ -296,8 +296,11 @@ class Recorder:
     def in_transaction(self) -> bool:
         return True
 
-    async def execute(self, statement: object, params: object = None) -> None:
+    async def execute(self, statement: object, params: object = None) -> Rows | None:
         self.statements.append(statement)
+        if "persons.country_code" in str(statement) and self.person_row is not None:
+            return Rows([(self.person_row.id, self.person_row.country_code)])
+        return None
 
     def _params(self, statement: object) -> dict[str, object]:
         try:
@@ -413,6 +416,8 @@ class Recorder:
             if wanted_club is not None and str(self.live_player.club_id) != str(wanted_club):
                 return None
             return self.live_player
+        if entity is Person:
+            return self.person_row.country_code if self.person_row else None
         return None
 
     async def scalars(self, statement: object) -> Rows:
@@ -626,6 +631,7 @@ async def test_results_need_current_ownership_and_receipt() -> None:
 
 async def test_match_report_uses_frozen_snapshot_not_live_names() -> None:
     recorder = Recorder()
+    recorder.person_row.country_code = "UA"
     report = await get_match_report(session(recorder), recorder.actor, recorder.fixture.id)
     assert (report.home_goals, report.away_goals) == (1, 2)
     assert report.home_name == "Янтарь"  # frozen; live club was renamed
@@ -635,6 +641,8 @@ async def test_match_report_uses_frozen_snapshot_not_live_names() -> None:
     starter = next(p for p in report.home_lineup if p.person_id == STARTER_ID)
     assert starter.started and starter.minutes == 90 and starter.goals == 1
     assert starter.age == 25 and starter.name == STARTER_NAME
+    assert starter.country_code == "UA"
+    assert any("🇺🇦" in report_view(report, section="home", page=i)[0] for i in range(1, 5))
     text, keyboard = report_view(report, 1)
     assert "Yantar 1:2 Mayak" in text and "⚽ 15′" in text and "🟨 27′" in text
     assert latin_name(STARTER_NAME) in text

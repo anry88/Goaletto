@@ -4,7 +4,7 @@ from datetime import datetime
 from random import Random
 from uuid import UUID
 
-from goaletto.domain.names import international_catalog
+from goaletto.domain.person_names import person_name
 from goaletto.domain.world import _skills, stable_seed
 
 ROLLOVER_POLICY = "season-rollover-v1"
@@ -24,6 +24,5 @@ def youth_profile(seed: int, person_id: UUID, position: str) -> tuple[str, tuple
     if baseline not in {"GK", "DL", "DC", "DR", "ML", "MC", "MR", "FC"}:
         raise ValueError("Youth position lacks an approved baseline")
     local_seed = stable_seed(seed, f"youth:{person_id}")
-    catalog = international_catalog(seed)
-    _, name = catalog[local_seed % len(catalog)]
+    name = person_name(person_id)
     return name, _skills(baseline, Random(local_seed))
