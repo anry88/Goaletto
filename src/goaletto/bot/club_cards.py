@@ -141,7 +141,7 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
             [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
-            [InlineKeyboardButton(text=tr("🔔 Напоминания"), callback_data="ntf:open")],
+            [InlineKeyboardButton(text=tr("⚙️ Настройки"), callback_data="ntf:open")],
         ]
     )
     return text, keyboard

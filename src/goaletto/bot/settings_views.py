@@ -13,6 +13,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from goaletto.application.notification_preferences import SettingsState
 from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.bot.time_settings_views import timezone_label
 from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import tr
@@ -60,7 +61,7 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
     if not isinstance(state, SettingsState):
         raise ValueError("Invalid settings state")
     status = tr("включены 🔔") if state.reminders_enabled else tr("выключены 🔕")
-    lines = [tr("🔔 <b>Напоминания</b>"), tr("Статус: {p0}", p0=status)]
+    lines = [tr("⚙️ <b>Настройки</b>"), "", tr("🔔 Напоминания: {p0}", p0=status)]
     if state.has_ownership and state.club_name is not None and state.expires_at is not None:
         lines.append(tr("Клуб: {p0}", p0=escape(latin_name(state.club_name))))
         lines.append(tr("Владение до: {p0}", p0=state.expires_at.strftime("%Y-%m-%d %H:%M UTC")))
@@ -71,7 +72,9 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
         lines.append(
             tr("Отправка сейчас недоступна; доступность подтверждает /start, а не настройки.")
         )
-    lines.extend(("", tr("🌐 Часовой пояс: {zone}", zone=escape(state.timezone_name))))
+    lines.extend(
+        ("", tr("🌐 Часовой пояс: {zone}", zone=escape(timezone_label(state.timezone_name))))
+    )
     if state.observed_at is not None:
         lines.append(
             tr(

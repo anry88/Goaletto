@@ -14,6 +14,7 @@ from goaletto.application.kickoff_preferences import (
     set_kickoff_preference,
 )
 from goaletto.application.notification_preferences import get_settings
+from goaletto.bot.time_settings_views import offset_callback, parse_offset_callback
 from goaletto.infrastructure.models import (
     Fixture,
     KickoffDecisionReceipt,
@@ -36,16 +37,20 @@ async def test_preferences_retry_restart_rollback_and_fixture_immutability(sessi
         before = owner.expires_at, owner.last_game_action_at
         fixtures = list((await session.scalars(select(Fixture).order_by(Fixture.id))).all())
         starts = [(f.id, f.scheduled_start_at) for f in fixtures]
-        await set_kickoff_preference(session, first, zone="Asia/Kathmandu", minute=1140)
+        await set_kickoff_preference(
+            session, first, zone=parse_offset_callback(offset_callback(14)), minute=1140
+        )
     async with sessions.begin() as session:
         state = await get_settings(session, actor)
-        assert state.timezone_name == "Asia/Kathmandu" and state.preferred_kickoff_minute == 1140
+        assert state.timezone_name == "Etc/GMT-14" and state.preferred_kickoff_minute == 1140
         assert (state.expires_at, state.last_game_action_at) == before
         later = replace(actor, operation_id=uuid4())
-        await set_kickoff_preference(session, later, zone="Europe/Belgrade", minute=1200)
+        await set_kickoff_preference(
+            session, later, zone=parse_offset_callback(offset_callback(2)), minute=1200
+        )
         assert (
-            await set_kickoff_preference(session, first, zone="Asia/Kathmandu", minute=1140)
-        ).timezone_name == "Europe/Belgrade"
+            await set_kickoff_preference(session, first, zone="Etc/GMT-14", minute=1140)
+        ).timezone_name == "Etc/GMT-2"
         assert await session.scalar(select(func.count()).select_from(KickoffPreferenceReceipt)) == 2
         assert starts == list(
             (
@@ -62,7 +67,7 @@ async def test_preferences_retry_restart_rollback_and_fixture_immutability(sessi
             await set_kickoff_preference(session, replace(actor, operation_id=uuid4()), zone="UTC")
             raise RuntimeError("rollback")
     async with sessions.begin() as session:
-        assert (await session.get(Manager, actor.manager_id)).timezone_name == "Europe/Belgrade"
+        assert (await session.get(Manager, actor.manager_id)).timezone_name == "Etc/GMT-2"
         other = next(
             f.away_club_id if f.home_club_id == club_id else f.home_club_id
             for f in fixtures

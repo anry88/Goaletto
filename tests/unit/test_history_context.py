@@ -100,6 +100,9 @@ async def test_season_archive_results_and_report_navigation_in_both_languages():
                 seasons_view((recorder_summary(archive),), page=3, total_pages=3)
             )
             values = callbacks(archive_view(archive, 3))
+            archive_text = archive_view(archive, 3)[0]
+            for place in range(1, 11):
+                assert archive_text.count(f"<b>{place}. ") == 1
             assert seasons_callback(3) in values
             assert season_results_callback(archive.season_id) in values
             values = callbacks(results_view(page, season_id=archive.season_id))

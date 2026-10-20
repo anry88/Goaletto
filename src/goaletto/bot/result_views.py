@@ -1,4 +1,4 @@
-"""Compact Telegram result/table presenters, independent of delivery and the database."""
+"""Telegram results and complete ten-club tables, independent of delivery/DB."""
 
 import base64
 from html import escape
@@ -52,18 +52,19 @@ def table_view(
         raise ValueError("Invalid tier")
     if type(page) is not int or page not in {1, 2}:
         raise ValueError("Invalid table page")
-    callback = table_callback(season_id, league_id, 3 - page)
+    # Existing page-2 buttons still open this same full table.
+    callback = table_callback(season_id, league_id, 1)
     ranked = rank_league(rows)
     lines = [
-        tr("🏆 <b>Лига {p0}</b> · {p1}/2", p0=tier, p1=page),
-        tr("И — матчи · О — очки · М — мячи"),
+        tr("🏆 <b>Лига {p0}</b>", p0=tier),
+        tr("Голы — забитые:пропущенные."),
         "",
     ]
-    for index, row in enumerate(ranked[(page - 1) * 5 : page * 5], start=(page - 1) * 5 + 1):
+    for index, row in enumerate(ranked, start=1):
         marker = " ↑" if index <= 2 and tier > 1 else " ↓" if index >= 9 and tier < 5 else ""
         lines.append(
             tr(
-                "<b>{p0}. {p1}{p2}</b>\nИ {p3} · О {p4} · М {p5}:{p6}",
+                "<b>{p0}. {p1}{p2}</b>\nОчки: {p4} · Матчи: {p3} · Голы: {p5}:{p6}",
                 p0=index,
                 p1=escape(latin_name(row.name)),
                 p2=marker,
@@ -73,9 +74,14 @@ def table_view(
                 p6=row.goals_against,
             )
         )
+        lines.append("")
+    if tier > 1:
+        lines.append(tr("↑ Повышение: места 1–2."))
+    if tier < 5:
+        lines.append(tr("↓ Вылет: места 9–10."))
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="← 1–5" if page == 2 else "6–10 →", callback_data=callback)],
+            [InlineKeyboardButton(text=tr("🔄 Обновить"), callback_data=callback)],
             [InlineKeyboardButton(text=tr("Мой клуб"), callback_data="vc:c")],
         ]
     )

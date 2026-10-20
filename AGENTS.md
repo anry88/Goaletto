@@ -351,3 +351,12 @@
   shared host requires a window for neighboring services. Never reset a live HDC
   world concurrently with a gameplay/recovery check, and verify its exact target
   and absence of external players before using the development reset permission.
+
+- User update 2026-10-20: docs/ui-feedback-2026-10-20.md tracks AND-143..147.
+  Tables show all ten clubs with explicit points/played/goals; settings use whole
+  fixed UTC offsets -12..+14 and current local clocks, stored as correct-sign IANA
+  Etc/GMT zones. Nationality flags and optional validated/confirmed club naming
+  after claim remain pending. The accepted debt limit is team valuation; exceeding
+  it bankrupts the club and ends human ownership. Signed ledger/valuation/bankruptcy
+  runtime is pending AND-147; older cash/arrears docs describe current code, not a
+  design prohibition. Do not close these pending tasks with presentation alone.

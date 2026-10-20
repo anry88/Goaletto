@@ -191,18 +191,27 @@ async def test_changed_or_abandoned_result_never_assigns_points():
     assert recorder.added == []
 
 
-def test_telegram_pages_and_report_buttons_fit_callbacks_and_escape_html():
+def test_full_table_and_report_buttons_fit_callbacks_and_escape_html():
     rows = league()
     season, league_id = uuid4(), uuid4()
     rows = (replace(rows[0], name="<b>Club&</b>"), *rows[1:])
     text, kb = table_view(rows, season, league_id, 5)
     assert "&lt;b&gt;Club&amp;&lt;/b&gt;" in text
-    assert "Club 6" not in text and "↓" not in text
+    assert "Club 6" in text and "Club 10" in text and "↓" not in text
+    assert "Очки:" in text and "Матчи:" in text and "Голы:" in text
+    assert "1/2" not in text and "2/2" not in text
     callback = kb.inline_keyboard[0][0].callback_data
     assert len(callback.encode()) <= 64
-    assert parse_table_callback(callback) == (season, league_id, 2)
-    text, _ = table_view(rows, season, league_id, 1, 2)
-    assert "Club 10" in text and "↑" not in text
+    assert parse_table_callback(callback) == (season, league_id, 1)
+    assert kb.inline_keyboard[0][0].text == "🔄 Обновить"
+    for tier in (1, 3, 5):
+        first, _ = table_view(rows, season, league_id, tier)
+        old_second, _ = table_view(rows, season, league_id, tier, 2)
+        assert first == old_second
+        assert sum(f"<b>{place}. " in first for place in range(1, 11)) == 10
+        assert ("↑" in first) == (tier > 1)
+        assert ("↓" in first) == (tier < 5)
+        assert len(first.encode("utf-16-le")) // 2 < 4096
     state, _ = simulate_match(demo_match(7))
     assert "Финальный свисток" in result_view(state) and "1:2" in result_view(state)
     assert len(result_keyboard(uuid4()).inline_keyboard[0][0].callback_data.encode()) <= 64

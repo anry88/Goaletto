@@ -742,5 +742,17 @@
   "/start — продолжить выбор клуба.": "/start — continue choosing a club.",
   "/lineup — подготовить состав к следующему матчу.": "/lineup — prepare your lineup for the next match.",
   "/calendar — посмотреть ближайшие игры.": "/calendar — see upcoming matches.",
-  "Если хотите, расскажите, что было неудобно: /feedback. Это добровольно и ни на что не влияет.": "If you like, tell us what was inconvenient: /feedback. This is optional and has no effect on your game."
+  "Если хотите, расскажите, что было неудобно: /feedback. Это добровольно и ни на что не влияет.": "If you like, tell us what was inconvenient: /feedback. This is optional and has no effect on your game.",
+  "🏆 <b>Лига {p0}</b>": "🏆 <b>League {p0}</b>",
+  "Голы — забитые:пропущенные.": "Goals — scored:conceded.",
+  "<b>{p0}. {p1}{p2}</b>\nОчки: {p4} · Матчи: {p3} · Голы: {p5}:{p6}": "<b>{p0}. {p1}{p2}</b>\nPoints: {p4} · Played: {p3} · Goals: {p5}:{p6}",
+  "↑ Повышение: места 1–2.": "↑ Promotion: places 1–2.",
+  "↓ Вылет: места 9–10.": "↓ Relegation: places 9–10.",
+  "⚙️ <b>Настройки</b>": "⚙️ <b>Settings</b>",
+  "⚙️ Настройки": "⚙️ Settings",
+  "🔔 Напоминания: {p0}": "🔔 Reminders: {p0}",
+  "🌐 <b>Часовой пояс</b>": "🌐 <b>Timezone</b>",
+  "Выберите смещение от UTC. В скобках — местное время при открытии списка.": "Choose a UTC offset. The brackets show local time when this list was opened.",
+  "Смещение фиксированное, без сезонного перевода часов.": "The offset is fixed, without seasonal clock changes.",
+  "Выбор устарел или недопустим. Выберите пояс из этого списка.": "This choice is outdated or invalid. Choose an offset from this list."
 }

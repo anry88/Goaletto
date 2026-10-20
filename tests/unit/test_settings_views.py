@@ -51,6 +51,8 @@ def test_explicit_callbacks_round_trip_and_never_toggle() -> None:
 
 def test_enabled_view_offers_explicit_disable_and_club_return() -> None:
     text, keyboard = settings_view(enabled_state())
+    assert text.startswith("⚙️ <b>Настройки</b>")
+    assert "🔔 Напоминания:" in text
     assert "включены" in text and "&lt;Avrora&gt;" in text
     callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
     assert any(c is not None and c.startswith("ntf:off:") for c in callbacks)

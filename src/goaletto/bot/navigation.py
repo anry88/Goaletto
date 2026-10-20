@@ -1,4 +1,4 @@
-"""Command fallbacks and authorized current/archived league table pagination."""
+"""Command fallbacks and authorized full current/archived league tables."""
 
 from datetime import UTC, datetime
 

@@ -1,4 +1,4 @@
-"""Notification settings router. Commits state before any Telegram I/O.
+"""Manager settings router. Commits state before any Telegram I/O.
 
 Game state lives in PostgreSQL; callbacks carry only the explicit desired
 value plus the ownership they were rendered for. The application layer
@@ -23,7 +23,7 @@ from goaletto.bot.settings_views import parse_settings_callback, settings_view, 
 from goaletto.infrastructure.database import Database
 from goaletto.presentation.i18n import tr, using_locale
 
-router = Router(name="notification-settings")
+router = Router(name="manager-settings")
 
 
 async def build_settings_response(
@@ -112,9 +112,8 @@ async def language_callback(query: CallbackQuery, database: Database) -> None:
 async def timezone_command(message: Message, database: Database, event_update: Update) -> None:
     if message.from_user is None or message.chat.type != "private":
         return
-    from goaletto.bot.time_settings_views import zone_search_view
+    from goaletto.bot.time_settings_views import utc_offset_view
 
-    query = (message.text or "").partition(" ")[2].strip()
     at = datetime.now(UTC)
     try:
         async with database.transaction() as session:
@@ -122,7 +121,7 @@ async def timezone_command(message: Message, database: Database, event_update: U
     except PermissionDenied:
         await message.answer(tr("Сначала откройте /start, затем /settings."))
         return
-    text, keyboard = zone_search_view(query, at)
+    text, keyboard = utc_offset_view(at)
     await message.answer(text, reply_markup=keyboard)
 
 
@@ -132,18 +131,24 @@ async def timezone_callback(query: CallbackQuery, database: Database) -> None:
     if not isinstance(query.message, Message) or query.message.chat.type != "private":
         return
     from goaletto.application.kickoff_preferences import set_kickoff_preference
-    from goaletto.bot.time_settings_views import zone_search_view
+    from goaletto.bot.time_settings_views import parse_offset_callback, utc_offset_view
 
     at = datetime.now(UTC)
     if query.data == "tz:open":
-        text, keyboard = zone_search_view("", at)
+        text, keyboard = utc_offset_view(at)
     else:
+        try:
+            zone = parse_offset_callback(query.data or "")
+        except ValueError:
+            text, keyboard = utc_offset_view(at, stale=True)
+            await edit_response(query.message, text, keyboard)
+            return
         try:
             async with database.transaction() as session:
                 actor = await actor_for_callback(
                     session, telegram_id=query.from_user.id, callback_id=query.id, at=at
                 )
-                await set_kickoff_preference(session, actor, zone=(query.data or "")[3:])
+                await set_kickoff_preference(session, actor, zone=zone)
                 text, keyboard = settings_view(await get_settings(session, actor))
         except (PermissionDenied, ValueError):
             text, keyboard = stale_settings_view()
