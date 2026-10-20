@@ -63,3 +63,36 @@
 в реализации AND-147; одной смены отображаемого числа недостаточно. Нужны
 signed ledger/schema, единая проверка денег/оценки и атомарное завершение владения
 с отменой незавершённых действий, без двойных списаний/возвратов и reset exploit.
+
+## Приёмка AND-143/144
+
+CI реализации [39402174634](https://github.com/anry88/Goaletto/actions/runs/39402174634):
+1137 unit/offline, ruff/format, mypy 194 modules, offline Alembic SQL — success.
+45 целевых unit прошли отдельно. На единственной local application DB Goaletto
+127.0.0.1:5433 серийно прошли 5 PostgreSQL-сценариев: preference retry/restart/
+rollback, fixed +14/+2 offsets, неизменность назначенных fixtures, reminders и
+language. `alembic upgrade head` / `alembic check` без новых операций; schema 0044.
+
+HDC установлен из чистого `9137a34d3d93f4d63b499988edacb59466d8e8fd`,
+tag `goaletto:9137a34d-hdc`, Linux/amd64. Архив 76 130 304 bytes,
+SHA-256 `2f3d605286801b51c2254c7dec5235e2f9bf4fa0a97e881d9f445fcf04bf2e17`,
+Docker config digest
+`sha256:656967b2d55165021fa86ed7139b445a6223956299c0c48224fbb7e4a77922b6`.
+Проверены архив/образ; перед установкой Goaletto database, 0 внешних менеджеров,
+0 live fixtures. Обновлены только bot/worker, все пять overlay сохранены.
+Остальные 20 контейнеров, включая Goaletto PostgreSQL/Grafana/VictoriaMetrics,
+сохранили ID/StartedAt. PostgreSQL/worker healthy; оба metrics targets up=1,
+публичных портов нет. База и мир не пересоздавались, новый polling на Mac не запускался.
+
+В настоящем Telegram внутреннего аккаунта `/table` показал все десять мест:
+Sakura 3 очка / 1 матч / 2:1 и Teranga 0 / 1 / 1:2, остальные восемь — 0 / 0 / 0:0.
+`/settings` показал «Настройки» и отдельный статус напоминаний. `/timezone` вывел
+все 27 кнопок; например, при UTC 09:42 кнопки показывали UTC−2 (07:42),
+UTC (09:42), UTC+1 (10:42), UTC+14 (23:42).
+
+Реально нажаты UTC+1 и затем исходный UTC: PostgreSQL последовательно сохранил
+Etc/GMT-1 / UTC, две preference receipts; Telegram показал UTC+1 и 10:43 при
+UTC 09:43, затем UTC. `preferred_kickoff_minute` остался NULL. При обратном
+переключении сверены hashes времени всех 184 fixtures, due_at всех match jobs,
+last_game_action_at и expires_at: не изменились. Срок оставался от `/table`
+09:41:20Z; настройки его не продлевали. Тестовому аккаунту возвращён исходный UTC.
