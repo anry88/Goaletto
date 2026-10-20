@@ -1,5 +1,12 @@
 # Working on Goaletto
 
+- User clarification 2026-10-20: retain the original HDC → Mac backup schedule
+  (hourly checks, login and 03:30; a new archive only without a verified copy
+  younger than 20 hours). Automatically prune owned backup archive/manifest pairs
+  older than 14 days on Mac and HDC after confirming a recent verified copy.
+  Never remove DB/PGDATA, unrelated files or links. Grafana DB snapshot age is
+  minute-scale monitoring aggregation, not a backup; keep its normal freshness.
+
 - User update 2026-10-20: acquisition start codes require no preregistration.
   Any valid 1..64-character Telegram payload (ASCII letters/digits/underscore/hyphen)
   automatically becomes a known, exact case-sensitive source on first accepted

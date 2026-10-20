@@ -4,6 +4,7 @@ No credentials are copied or printed. PostgreSQL remains private; only the
 container labelled project=goaletto/service=postgres is eligible. Completed
 local backup pairs are immutable. A manifest is published only after checksum
 verification, and a failed transfer leaves no successful-looking local dump.
+Verified backup pairs older than fourteen days are removed from both backup folders.
 """
 
 from __future__ import annotations
@@ -23,6 +24,8 @@ from uuid import uuid4
 
 REMOTE_ROOT = "D:/HomeDataCenter/services/goaletto"
 DEFAULT_DIRECTORY = Path.home() / "Documents" / "Goaletto Backups"
+RETENTION_DAYS = 14
+BACKUP_NAME = re.compile(r"goaletto-(?P<stamp>\d{8}T\d{6}Z)-[0-9a-f]{8}")
 
 
 class BackupError(Exception):
@@ -87,6 +90,93 @@ def call(argv: list[str], *, timeout: int = 600) -> str:
     if result.returncode:
         raise BackupError("transport_failed")
     return result.stdout
+
+
+def remote_cleanup_script() -> str:
+    """Only matched Goaletto archive/manifest pairs in the dedicated HDC folder."""
+    return r"""
+$ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
+try {
+ $d='D:/HomeDataCenter/services/goaletto/backups';$n=0
+ if(Test-Path -LiteralPath $d){
+  if((Get-Item -LiteralPath $d).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'link'}
+  $cut=[DateTime]::UtcNow.AddDays(-14)
+  Get-ChildItem -LiteralPath $d -File -Filter 'goaletto-*.manifest.json'|ForEach-Object{
+   $f=$_
+   if($f.Attributes -band [IO.FileAttributes]::ReparsePoint){return}
+   if($f.Name -notmatch '^(goaletto-(\d{8}T\d{6}Z)-[0-9a-f]{8})\.manifest\.json$'){return}
+   $s=$Matches[1];$stamp=$Matches[2]
+   try{
+    $date=[DateTime]::ParseExact($stamp,"yyyyMMdd'T'HHmmss'Z'",[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::AssumeUniversal).ToUniversalTime()
+    $m=Get-Content -LiteralPath $f.FullName -Raw|ConvertFrom-Json
+   }catch{return}
+   if($date -ge $cut){return}
+   $a=Join-Path $d ($s+'.dump')
+   if($m.version -ne 1 -or $m.project -ne 'goaletto' -or
+      $m.database -ne 'goaletto' -or $m.filename -ne ($s+'.dump') -or
+      $m.remote_path -ne ($d+'/'+$s+'.dump')){return}
+   if(-not(Test-Path -LiteralPath $a -PathType Leaf)){return}
+   if((Get-Item -LiteralPath $a).Attributes -band [IO.FileAttributes]::ReparsePoint){return}
+   Remove-Item -LiteralPath $a
+   Remove-Item -LiteralPath $f.FullName
+   $n++
+  }
+ }
+ Write-Output ('{"removed_pairs":'+$n+'}')
+}catch{Write-Output '{"error":"hdc_cleanup_failed"}';exit 1}
+"""
+
+
+def prune_local(directory: Path, now: datetime) -> int:
+    """Remove only owned pairs by UTC creation stamp, never logs/parts/links."""
+    cutoff, removed = now - timedelta(days=RETENTION_DAYS), 0
+    for manifest in directory.glob("goaletto-*.manifest.json"):
+        stem = manifest.name.removesuffix(".manifest.json")
+        match = BACKUP_NAME.fullmatch(stem)
+        if match is None or manifest.is_symlink() or not manifest.is_file():
+            continue
+        try:
+            created = datetime.strptime(match["stamp"], "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+            if created >= cutoff:
+                continue
+            data = validate_metadata(manifest.read_text(), stem)
+        except (ValueError, BackupError):
+            continue
+        archive = directory / str(data["filename"])
+        if archive.is_symlink() or not archive.is_file():
+            continue
+        archive.unlink()
+        manifest.unlink()
+        removed += 1
+    return removed
+
+
+def cleanup(directory: Path, now: datetime, ssh_host: str) -> dict[str, int]:
+    # A failed new backup must never cause deletion of the remaining old copies.
+    if not recent_backup(directory, now, RETENTION_DAYS * 24):
+        raise BackupError("cleanup_requires_verified_recent_backup")
+    encoded = base64.b64encode(remote_cleanup_script().encode("utf-16le")).decode("ascii")
+    raw = call(
+        [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=15",
+            ssh_host,
+            "powershell -NoProfile -NonInteractive -EncodedCommand " + encoded,
+        ]
+    )
+    result = json.loads(raw.strip())
+    if not isinstance(result, dict) or type(result.get("removed_pairs")) is not int:
+        raise BackupError("invalid_cleanup_result")
+    if result["removed_pairs"] < 0:
+        raise BackupError("invalid_cleanup_result")
+    return {
+        "local_removed_pairs": prune_local(directory, now),
+        "hdc_removed_pairs": result["removed_pairs"],
+    }
 
 
 def validate_metadata(raw: str, stem: str) -> dict[str, object]:
@@ -200,7 +290,8 @@ def main() -> int:
                 return 0
             now = datetime.now(UTC)
             if recent_backup(directory, now, args.minimum_interval_hours):
-                print('{"status":"recent_verified_backup"}')
+                removed = cleanup(directory, now, args.ssh_host)
+                print(json.dumps({"status": "recent_verified_backup", **removed}))
                 return 0
             stem = f"goaletto-{now:%Y%m%dT%H%M%SZ}-{uuid4().hex[:8]}"
             encoded = base64.b64encode(remote_script(stem).encode("utf-16le")).decode("ascii")
@@ -235,9 +326,15 @@ def main() -> int:
             metadata["source"] = args.ssh_host
             metadata["copied_at"] = datetime.now(UTC).isoformat()
             manifest = publish(directory, partial, metadata)
+            removed = cleanup(directory, datetime.now(UTC), args.ssh_host)
             print(
                 json.dumps(
-                    {"status": "verified", "manifest": str(manifest), "bytes": metadata["bytes"]}
+                    {
+                        "status": "verified",
+                        "manifest": str(manifest),
+                        "bytes": metadata["bytes"],
+                        **removed,
+                    }
                 )
             )
             return 0

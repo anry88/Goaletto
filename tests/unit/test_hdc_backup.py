@@ -5,7 +5,7 @@ import importlib.util
 import json
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -114,3 +114,77 @@ def test_clock_reversal_does_not_suppress_backup(tmp_path):
     now = datetime.now(UTC)
     os.utime(manifest, (now.timestamp() + 86400, now.timestamp() + 86400))
     assert not backup.recent_backup(tmp_path, now, 20)
+
+
+def test_retention_deletes_only_older_than_fourteen_days_owned_pairs(tmp_path):
+    now = datetime(2026, 10, 20, 12, tzinfo=UTC)
+    paths = {}
+    for age in (13, 14, 15):
+        stamp = now - timedelta(days=age)
+        stem = f"goaletto-{stamp:%Y%m%dT%H%M%SZ}-1234abcd"
+        paths[age] = tmp_path / (stem + ".dump"), tmp_path / (stem + ".manifest.json")
+        data = metadata()
+        data.update(
+            filename=stem + ".dump", remote_path=backup.REMOTE_ROOT + "/backups/" + stem + ".dump"
+        )
+        paths[age][0].write_bytes(DATA)
+        paths[age][1].write_text(json.dumps(data))
+    orphan = tmp_path / "goaletto-20260901T100000Z-1234abcd.dump"
+    orphan.write_bytes(DATA)
+    log = tmp_path / "backup.log"
+    log.write_text("keep log")
+    assert backup.prune_local(tmp_path, now) == 1
+    assert all(p.exists() for age in (13, 14) for p in paths[age])
+    assert not any(p.exists() for p in paths[15])
+    assert orphan.exists() and log.exists()
+
+
+@pytest.mark.parametrize("kind", ["foreign", "symlink", "bad_date"])
+def test_retention_keeps_foreign_invalid_and_symlinked_files(tmp_path, kind):
+    stem = "goaletto-20260901T100000Z-1234abcd"
+    if kind == "bad_date":
+        stem = "goaletto-20269999T100000Z-1234abcd"
+    data = metadata()
+    data.update(
+        filename=stem + ".dump", remote_path=backup.REMOTE_ROOT + "/backups/" + stem + ".dump"
+    )
+    if kind == "foreign":
+        data["database"] = "another_project"
+    archive = tmp_path / (stem + ".dump")
+    archive.write_bytes(DATA)
+    manifest = tmp_path / (stem + ".manifest.json")
+    manifest.write_text(json.dumps(data))
+    if kind == "symlink":
+        archive.unlink()
+        archive.symlink_to(manifest)
+    assert backup.prune_local(tmp_path, datetime(2026, 10, 20, tzinfo=UTC)) == 0
+    assert manifest.exists() and archive.exists()
+
+
+def test_cleanup_requires_verified_recent_backup_before_any_remote_deletion(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("Must not call SSH without a verified recent backup")
+
+    monkeypatch.setattr(backup, "call", forbidden)
+    with pytest.raises(backup.BackupError, match="requires_verified_recent_backup"):
+        backup.cleanup(tmp_path, datetime.now(UTC), "hdc")
+
+
+def test_recent_backup_skips_dump_but_runs_retention(tmp_path, monkeypatch, capsys):
+    part = tmp_path / ".dump.part"
+    part.write_bytes(DATA)
+    backup.publish(tmp_path, part, metadata())
+    monkeypatch.setattr(
+        sys, "argv", ["backup_hdc", "--directory", str(tmp_path), "--minimum-interval-hours", "20"]
+    )
+    calls = []
+
+    def cleanup_remote(argv, **kwargs):
+        calls.append(argv)
+        return '{"removed_pairs":2}'
+
+    monkeypatch.setattr(backup, "call", cleanup_remote)
+    assert backup.main() == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "recent_verified_backup" and result["hdc_removed_pairs"] == 2
+    assert len(calls) == 1 and calls[0][0] == "ssh"
