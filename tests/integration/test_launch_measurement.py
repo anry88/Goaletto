@@ -10,7 +10,6 @@ from aiogram import Bot
 from aiogram.types import CallbackQuery, Chat, Message, Update, User
 from sqlalchemy import func, select
 
-from goaletto.application.acquisition import create_campaign
 from goaletto.application.analytics import Reason, Surface
 from goaletto.application.lineup import LineupInput, load_lineup, save_lineup
 from goaletto.application.onboarding_measurement import rejection, response_accepted
@@ -45,7 +44,7 @@ async def test_campaign_entry_errors_help_and_manual_ready_through_dispatcher(se
             ),
             initialized_at=now,
         )
-        campaign = await create_campaign(session, "community", "launch", now.date(), now)
+    campaign_code = "ai_match_prediction"  # The URL needs no operator registration.
     source = Source(sessions)
     telegram = Telegram(source)
     bot = Bot("123456:FAKE_LOCAL_TEST_TOKEN", session=telegram)
@@ -87,13 +86,13 @@ async def test_campaign_entry_errors_help_and_manual_ready_through_dispatcher(se
         return telegram.last_message, update
 
     try:
-        first, update = await send(1001, f"/start {campaign.code}")
+        first, update = await send(1001, f"/start {campaign_code}")
         await send(1001, repeat=update)
         chosen = first.reply_markup.inline_keyboard[0][0].callback_data
         club_code = chosen.split(":")[2]
         await send(1001, data=chosen)
         await send(1001, data=f"en:c:{club_code}")
-        await send(1002, "/start private_unknown_payload")
+        await send(1002, "/start private/unknown_payload")
         await send(1002, data=f"en:c:{club_code}")  # Lost claim race.
         await send(1002, data="en:o:1")
         # The claim shortcut is valid; a preview is optional.
@@ -102,7 +101,7 @@ async def test_campaign_entry_errors_help_and_manual_ready_through_dispatcher(se
         )[2]
         await send(1002, data=f"en:c:{direct_code}")
         await send(1003, "/start")
-        await send(1004, f"/start {campaign.code}")
+        await send(1004, f"/start {campaign_code}")
         await send(1001, data="ln:malformed")
         current, _ = await send(1001, "/lineup")
         panel = next(
@@ -140,13 +139,14 @@ async def test_campaign_entry_errors_help_and_manual_ready_through_dispatcher(se
             }
             assert all(not e.user_activity for e in errors)
             assert sum(e.name == "help_delivered" for e in events) == 3
-            assert not any("private_unknown_payload" in str(e.envelope) for e in events)
+            assert not any("private/unknown_payload" in str(e.envelope) for e in events)
             assert (
                 await session.scalar(select(func.count()).select_from(AcquisitionFirstTouch)) == 3
             )
             assert await session.scalar(select(func.count()).select_from(AcquisitionTouch)) == 3
             source_report = await source_funnel(session, now, now + timedelta(days=1, minutes=5))
             rows = {r["kind"]: r for r in source_report.rows}
+            assert rows["known"]["placement"] == campaign_code
             assert {k: (v["starts"], v["claimed"], v["ready"]) for k, v in rows.items()} == {
                 "known": (1, 1, 1),
                 "unknown": (1, 1, 0),

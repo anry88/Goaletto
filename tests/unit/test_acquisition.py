@@ -34,6 +34,7 @@ class Recorder:
         self.campaign = AcquisitionCampaign(
             id=uuid4(), code="c_opaque", source="community", placement="launch"
         )
+        self.campaigns = {self.campaign.code: self.campaign}
         self.touch = None
         self.first = None
         self.added = []
@@ -45,16 +46,16 @@ class Recorder:
 
     async def execute(self, statement, params=None):
         self.statements.append(statement)
+        if statement.table.name == "acquisition_campaigns":
+            values = statement.compile().params
+            self.campaigns.setdefault(values["code"], AcquisitionCampaign(**values))
 
     async def scalar(self, statement):
         self.statements.append(statement)
         entity = statement.column_descriptions[0]["entity"]
         if entity is AcquisitionCampaign:
-            return (
-                self.campaign.id
-                if statement.compile().params["code_1"] == self.campaign.code
-                else None
-            )
+            row = self.campaigns.get(statement.compile().params["code_1"])
+            return row.id if row else None
         return self.manager
 
     async def get(self, model, key):
@@ -93,11 +94,13 @@ def capture(monkeypatch):
     [
         (None, "direct"),
         ("", "direct"),
-        ("missing_code", "unknown"),
+        ("missing_code", "known"),
+        ("ai_match_prediction", "known"),
+        ("x" * 64, "known"),
         ("raw private text /start", "unknown"),
         ("x" * 65, "unknown"),
         ("c_opaque", "known"),
-        ("C_opaque", "unknown"),
+        ("C_opaque", "known"),
     ],
 )
 async def test_first_touch_classification_before_claim_has_no_raw_payload(payload, kind):
@@ -115,7 +118,7 @@ async def test_first_touch_classification_before_claim_has_no_raw_payload(payloa
     assert all(e.club_id is None and e.ownership_id is None for e in recorder.events)
     assert not hasattr(recorder.touch, "payload") and not hasattr(recorder.first, "code")
     if kind == "known":
-        assert result.campaign_id == recorder.campaign.id
+        assert result.campaign_id == recorder.campaigns[payload].id
         assert any(e.name == "campaign_touched" for e in recorder.events)
 
 
@@ -180,7 +183,30 @@ async def test_opaque_campaign_registry_and_link_limits():
         await create_campaign(
             cast(AsyncSession, recorder), "free_source", "launch", date(2026, 10, 12), NOW
         )
-    assert await classify_start(cast(AsyncSession, recorder), " ") == (TouchKind.UNKNOWN, None)
+    assert await classify_start(cast(AsyncSession, recorder), " ", at=NOW) == (
+        TouchKind.UNKNOWN,
+        None,
+    )
+
+
+async def test_automatic_source_keeps_exact_code_and_reuses_existing_metadata():
+    recorder = Recorder()
+    session = cast(AsyncSession, recorder)
+    kind, source_id = await classify_start(session, "AI_match-prediction", at=NOW)
+    row = recorder.campaigns["AI_match-prediction"]
+    assert kind == TouchKind.KNOWN and row.id == source_id
+    assert (row.source, row.placement, row.published_on) == (
+        "other",
+        "ai_match-prediction",
+        NOW.date(),
+    )
+    assert await classify_start(session, row.code, at=NOW + timedelta(days=1)) == (kind, source_id)
+    assert row.created_at == NOW
+    assert await classify_start(session, "c_opaque", at=NOW) == (
+        TouchKind.KNOWN,
+        recorder.campaign.id,
+    )
+    assert recorder.campaign.source == "community" and recorder.campaign.placement == "launch"
 
 
 def aggregate():

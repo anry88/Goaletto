@@ -44,7 +44,7 @@ match-opportunities подключены к операторскому CLI. Те
 
 | Case | Вход | T | Ожидание (hand) | Обоснование |
 |---|---|---|---|---|
-| A1 · direct/unknown/known | first touches: direct×1, unknown×1, known×1 (кампания `community/launch`); internal и opt-out отдельно | 12 Oct 12:00Z | source rows: каждый kind `starts 1, eligible 1`; entry `starts 3` | `acquisition.md`: absent/empty→direct, известный код→known, прочее→unknown; internal/opt-out не получают attribution; `SOURCE_FUNNEL_SQL` группирует по kind/campaign |
+| A1 · direct/unknown/known | first touches: direct×1, unknown×1, known×1 (кампания `community/launch`); internal и opt-out отдельно | 12 Oct 12:00Z | source rows: каждый kind `starts 1, eligible 1`; entry `starts 3` | `acquisition.md`: absent/empty→direct, корректный код→known (с 20 октября автоматически), невалидный→unknown; internal/opt-out не получают attribution; `SOURCE_FUNNEL_SQL` группирует по kind/campaign |
 | A2 · internal/opt-out исключены | 1 внешний + 1 internal + 1 excluded, у всех claim в окне | 12 Oct 12:00Z | entry `starts 1, eligible 1, claimed 1/1, ready 0/1` | contract-v1: внутренние исключены по operational flag; opt-out каскадно стёрт; SQL: `NOT m.is_internal`, `NOT EXISTS analytics_exclusions` |
 | A3 · удалённое mapping | когорта пуста (mapping удалён/CASCADE) | 12 Oct 12:00Z | entry `0/0`, retention все `0/0`, delivery `0` | storage.md: opt-out оставляет tombstone, journey/sessions удалены CASCADE; пустая выборка — не нулевая конверсия |
 | B1 · зрелость входа | старты ровно `T−24h` и `T−24h+1s` | 12 Oct 12:00Z | `starts 2, eligible 1, W 1` | contract: `started+24h ≤ T`; граница включительна |
