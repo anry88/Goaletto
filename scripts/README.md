@@ -38,3 +38,8 @@ pages, clothing/alpha checks and continuity review pairs. Gallery previews use n
 Dugout colors; technical magenta/cyan remains in renderer inputs. See
 docs/portrait-lifecycle.md. render_whole_portrait.py accepts --age together with --bank
 to select a prepared stage of the same person; missing stages never borrow another face.
+
+`simulate_ten_seasons.py` / `run_calibration_local.py`: десять сезонов на единственной
+локальной Goaletto development DB, реальные сервисы и ускоренный движок, семь
+стратегий и стресс пределов роста. Сбрасывает disposable локальный мир, не HDC;
+не создаёт новую БД и не запускает Telegram. [Методика и команды](../docs/ten-season-calibration.md).

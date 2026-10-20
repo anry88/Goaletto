@@ -26,3 +26,11 @@
 локальной development Goaletto DB; 1159 unit/offline checks, ruff/format/mypy210,
 offline SQL. Локальный сезон симулятора сохранён перед PG-тестами и возвращён
 в ту же БД после них; HDC и реальные платежи не использовались в этих проверках.
+
+Установлен на HDC `goaletto:f6892b35-hdc`,
+config `sha256:e37869d32a42819f74ededf117c23775073af6cddb12729f402628ee24bcc63e`.
+[CI](https://github.com/anry88/Goaletto/actions/runs/39427113806) — success.
+Выполнено только обновление app image bot/worker: PostgreSQL container/D mount,
+схема0049 и19соседних контейнеров сохранены. Реальный платёж1→1, data protection
+остаётся true. Health jobs/sender, getMe/private command menu и bot /metrics прошли.
+Реальных денежных операций агент не выполнял.
