@@ -78,7 +78,7 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
         lines.append(tr("Время матча не выбрано: по умолчанию 18:00 UTC."))
     else:
         lines.append(
-            tr("Удобное местное время матча: {time}", time=f"{chosen // 60:02}:{chosen % 60:02}")
+            tr("Приоритетное время матча: {time}", time=f"{chosen // 60:02}:{chosen % 60:02}")
         )
     lines.extend(
         (
@@ -90,7 +90,8 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
         )
     )
     buttons: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton(text=tr("🌐 Выбрать часовой пояс"), callback_data="tz:open")]
+        [InlineKeyboardButton(text=tr("🌐 Выбрать часовой пояс"), callback_data="tz:open")],
+        [InlineKeyboardButton(text=tr("🕒 Приоритетное время матча"), callback_data="ko:open")],
     ]
     if state.has_ownership and state.ownership_id is not None:
         buttons.append([InlineKeyboardButton(text=tr("🌍 Страна клуба"), callback_data="ct:open")])
@@ -113,7 +114,7 @@ def settings_view(state: SettingsState) -> tuple[str, InlineKeyboardMarkup]:
             buttons.append(
                 [
                     InlineKeyboardButton(
-                        text=tr("Купить попытку · 50 ⭐"),
+                        text=tr("Купить переименование клуба · 50 ⭐"),
                         callback_data=f"buy:rename:{compact_id(state.ownership_id)}",
                     )
                 ]

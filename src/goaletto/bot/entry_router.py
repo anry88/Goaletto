@@ -36,6 +36,7 @@ router = Router(name="game-entry")
 
 def offer_view(items: tuple[ClubOffer, ...], page: int = 1) -> tuple[str, InlineKeyboardMarkup]:
     lines = [tr("⚽ <b>Goaletto</b>\nВыберите свободный клуб лиги 5:")]
+    lines.append(tr("Название клуба можно будет изменить позже."))
     buttons = []
     for item in items:
         lines.append(
@@ -160,6 +161,7 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                 lines = [
                     tr("🏟 <b>{p0}</b> · Лига 5", p0=escape(latin_name(item.name))),
                     tr("Бюджет: {p0}", p0=format_money(item.budget)),
+                    tr("Название клуба можно будет изменить позже."),
                     tr("\nСостав:"),
                 ]
                 for player, person in roster:

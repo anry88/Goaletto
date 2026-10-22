@@ -8,14 +8,106 @@ import pytest
 from goaletto.bot.settings_views import settings_view
 from goaletto.bot.time_settings_views import (
     UTC_OFFSETS,
+    kickoff_time_view,
     offset_callback,
     offset_zone,
+    parse_kickoff_callback,
     parse_offset_callback,
     utc_offset_view,
 )
 from goaletto.domain.kickoff import KickoffPreference, preference_utc, validate_zone
 from goaletto.presentation.i18n import using_locale
 from tests.unit.test_settings_views import enabled_state
+
+
+def test_kickoff_picker_has_every_half_hour_and_keeps_language_independent_callbacks():
+    callbacks = []
+    for language in ("ru", "en"):
+        with using_locale(language):
+            text, keyboard = kickoff_time_view("Etc/GMT-2", 1170)
+            settings, settings_keyboard = settings_view(
+                replace(enabled_state(), timezone_name="Etc/GMT-2", preferred_kickoff_minute=1170)
+            )
+        choices = [b for row in keyboard.inline_keyboard[:-1] for b in row]
+        assert len(choices) == 48
+        assert [parse_kickoff_callback(b.callback_data) for b in choices] == list(
+            range(0, 1440, 30)
+        )
+        assert [b.text for b in choices if b.text.startswith("✓")] == ["✓ 19:30"]
+        assert "UTC+2" in text and "19:30" in text and "19:30" in settings
+        assert len(text) < 4096
+        assert all(len(b.callback_data.encode()) <= 64 for b in choices)
+        assert any(
+            b.callback_data == "ko:open" for row in settings_keyboard.inline_keyboard for b in row
+        )
+        callbacks.append([b.callback_data for b in choices])
+        with using_locale(language):
+            default, _ = kickoff_time_view("UTC", None)
+        assert "18:00 UTC" in default
+    assert callbacks[0] == callbacks[1]
+    for value in (
+        "ko:minute:1",
+        "ko:minute:-30",
+        "ko:minute:1440",
+        "ko:minute:030",
+        "ko:minute:30:extra",
+    ):
+        with pytest.raises(ValueError):
+            parse_kickoff_callback(value)
+
+
+async def test_kickoff_button_commits_before_display_and_reopens_saved_choice(monkeypatch):
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from aiogram.types import CallbackQuery, Chat, Message, User
+
+    from goaletto.bot import settings_router
+
+    events = []
+    saved = enabled_state()
+    session, actor = object(), object()
+
+    @asynccontextmanager
+    async def transaction():
+        events.append("begin")
+        yield session
+        events.append("commit")
+
+    async def save(actual_session, actual_actor, *, minute):
+        nonlocal saved
+        assert (actual_session, actual_actor) == (session, actor)
+        saved = replace(saved, preferred_kickoff_minute=minute)
+
+    async def settings(*args):
+        return saved
+
+    async def edit(message, text, keyboard):
+        assert events[-1] == "commit"
+        assert "19:30" in text
+        events.append(keyboard)
+
+    monkeypatch.setattr(CallbackQuery, "answer", AsyncMock())
+    monkeypatch.setattr(settings_router, "actor_for_callback", AsyncMock(return_value=actor))
+    monkeypatch.setattr(settings_router, "get_settings", settings)
+    monkeypatch.setattr(settings_router, "edit_response", edit)
+    setter = AsyncMock(side_effect=save)
+    monkeypatch.setattr("goaletto.application.kickoff_preferences.set_kickoff_preference", setter)
+    user = User(id=123, is_bot=False, first_name="Manager")
+    message = Message(
+        message_id=1, date=datetime(2026, 10, 22, tzinfo=UTC), chat=Chat(id=123, type="private")
+    )
+    query = CallbackQuery(
+        id="save", from_user=user, chat_instance="private", message=message, data="ko:minute:1170"
+    )
+    database = SimpleNamespace(transaction=transaction)
+    await settings_router.kickoff_callback(query, database)
+    await settings_router.kickoff_callback(
+        query.model_copy(update={"id": "open", "data": "ko:open"}), database
+    )
+    setter.assert_awaited_once_with(session, actor, minute=1170)
+    assert any(b.text == "✓ 19:30" for row in events[-1].inline_keyboard for b in row)
 
 
 def test_all_offsets_show_the_same_instant_and_use_correct_iana_sign():

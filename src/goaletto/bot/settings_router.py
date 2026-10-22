@@ -173,3 +173,30 @@ async def kickoff_command(message: Message, database: Database, event_update: Up
         await message.answer(tr("Сначала откройте /start, затем /settings."))
         return
     await message.answer(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("ko:"))
+async def kickoff_callback(query: CallbackQuery, database: Database) -> None:
+    await query.answer()
+    if not isinstance(query.message, Message) or query.message.chat.type != "private":
+        return
+    from goaletto.application.kickoff_preferences import set_kickoff_preference
+    from goaletto.bot.time_settings_views import kickoff_time_view, parse_kickoff_callback
+
+    try:
+        minute = None if query.data == "ko:open" else parse_kickoff_callback(query.data or "")
+        async with database.transaction() as session:
+            actor = await actor_for_callback(
+                session, telegram_id=query.from_user.id, callback_id=query.id, at=datetime.now(UTC)
+            )
+            if minute is not None:
+                await set_kickoff_preference(session, actor, minute=minute)
+            state = await get_settings(session, actor)
+        text, keyboard = (
+            kickoff_time_view(state.timezone_name, state.preferred_kickoff_minute)
+            if minute is None
+            else settings_view(state)
+        )
+    except (PermissionDenied, ValueError):
+        text, keyboard = stale_settings_view()
+    await edit_response(query.message, text, keyboard)
