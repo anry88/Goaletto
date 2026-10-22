@@ -41,7 +41,7 @@ def build_dashboard(labels: tuple[SourceLabel, ...], coverage: datetime | None) 
             "id": 1,
             "type": "text",
             "title": "Как читать цифры",
-            "gridPos": {"x": 0, "y": 0, "w": 24, "h": 3},
+            "gridPos": {"x": 0, "y": 0, "w": 24, "h": 4},
             "options": {"mode": "markdown", "content": description + "\n\n" + coverage_text},
         }
     )
@@ -130,7 +130,7 @@ def build_dashboard(labels: tuple[SourceLabel, ...], coverage: datetime | None) 
             [target("A", query(window, measure), title)],
             "stat",
             i % 4 * 6,
-            3 + i // 4 * 4,
+            4 + i // 4 * 4,
             6,
             4,
         )
@@ -141,9 +141,9 @@ def build_dashboard(labels: tuple[SourceLabel, ...], coverage: datetime | None) 
         ("other", "Другие источники"),
     ]
     for title, window, measure, x, y, width in (
-        ("Регистрации по источникам · всего", "all", "registered", 0, 11, 12),
-        ("Новые регистрации по источникам · $period", "$period", "registered", 12, 11, 12),
-        ("Активные по источникам · $period", "$period", "active", 0, 20, 24),
+        ("Регистрации по источникам · всего", "all", "registered", 0, 12, 12),
+        ("Новые регистрации по источникам · $period", "$period", "registered", 12, 12, 12),
+        ("Активные по источникам · $period", "$period", "active", 0, 21, 24),
     ):
         targets = [
             target(f"S{i:02}", query(window, measure, bucket), name)
@@ -151,7 +151,7 @@ def build_dashboard(labels: tuple[SourceLabel, ...], coverage: datetime | None) 
         ]
         add(title, targets, "bargauge", x, y, width, max(9, len(names)))
     # Keep rows separate even with the maximum source catalog.
-    panels[-1]["gridPos"]["y"] = 11 + max(9, len(names))
+    panels[-1]["gridPos"]["y"] = 12 + max(9, len(names))
     return {
         "uid": "goaletto-audience",
         "title": "Goaletto · игроки и источники",
