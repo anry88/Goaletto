@@ -11,6 +11,7 @@ from goaletto.application.training import TrainingDate, TrainingScreen
 from goaletto.bot.candidate_views import ROLES
 from goaletto.bot.club_cards import SKILL_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
+from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.names import latin_name
 from goaletto.domain.training import SPECIALISTS, Focus, Intensity
 from goaletto.infrastructure.models import TrainingPlan
@@ -111,7 +112,7 @@ def training_view(
     lines = [
         tr("🏋️ <b>{p0}</b> · Тренировки", p0=escape(latin_name(screen.club_name))),
         tr("Дата тренировки: {p0}", p0=screen.week_start.strftime("%d.%m.%Y")),
-        tr("Результат: ") + screen.due_at.strftime("%d.%m.%Y %H:%M UTC"),
+        tr("Время тренировки: {time}", time=escape(local_datetime(screen.due_at, screen.zone))),
         "",
     ]
     calendar_rows = []
@@ -242,11 +243,20 @@ def training_view(
                 )
             ]
         )
+    if screen.plan and screen.plan.status == "scheduled":
+        rows.append(
+            [
+                _button(
+                    tr("Отменить тренировку"),
+                    f"tr:x:{compact_id(screen.plan.id)}:{compact_id(screen.ownership_id)}",
+                )
+            ]
+        )
     if screen.last_result:
         rows.append(
             [_button(tr("📋 Последний результат"), f"tr:r:{compact_id(screen.last_result.id)}:1")]
         )
-    lines.append(tr("Выбор можно менять до конца UTC-дня. Без выбора тренировки нет."))
+    lines.append(tr("Выбор можно менять до времени тренировки. Без выбора тренировки нет."))
     rows.append([_button(tr("🏟 Клуб"), "vc:c"), _button(tr("🏠 Главное меню"), "vc:menu")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)
 
@@ -327,6 +337,8 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
 
 
 def cancellation_reason(plan: TrainingPlan) -> str:
+    if plan.results and plan.results[0].get("reason") == "manager_cancelled":
+        return tr("Тренировка отменена менеджером.")
     reason = str(plan.results[0].get("reason", "")) if plan.results else ""
     return {
         "staff_changed": tr(
@@ -363,6 +375,8 @@ def parse_date(value: str) -> tuple[UUID, datetime]:
 
 
 def date_description(item: TrainingDate | None) -> str:
+    if item and item.reason == "time_passed":
+        return tr("Время тренировки уже прошло. Выберите другую дату.")
     if item is None:
         return ""
     if item.reason == "calendar_pending":

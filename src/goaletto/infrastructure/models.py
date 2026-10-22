@@ -671,12 +671,7 @@ class CandidateSigning(Base):
         ),
         CheckConstraint("fee > 0 AND weekly_rate > 0", name="ck_signing_price"),
         CheckConstraint("kind IN ('player','staff')", name="ck_signing_kind"),
-        Index(
-            "uq_candidate_player_signing",
-            "person_id",
-            unique=True,
-            postgresql_where=text("kind = 'player'"),
-        ),
+        Index("ix_candidate_person_signing", "person_id", "signed_at"),
     )
     operation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     person_id: Mapped[UUID] = mapped_column(ForeignKey("candidate_offers.person_id"))
@@ -688,6 +683,27 @@ class CandidateSigning(Base):
     economy_policy: Mapped[str] = mapped_column(String(32), server_default="economy-cycle-v1")
     weekly_rate: Mapped[int] = mapped_column(Integer)
     signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PlayerRelease(Base):
+    """Immutable terms and one result for a confirmed player termination."""
+
+    __tablename__ = "player_releases"
+    __table_args__ = (
+        CheckConstraint("compensation >= 0", name="ck_player_release_compensation"),
+        CheckConstraint(
+            "confirmed_at IS NULL OR confirmed_at >= created_at", name="ck_player_release_time"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"))
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"))
+    salary_id: Mapped[UUID] = mapped_column(ForeignKey("salary_contracts.id"))
+    compensation: Mapped[int] = mapped_column(BigInteger)
+    name: Mapped[str] = mapped_column(String(160))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class StaffChange(Base):
@@ -1165,6 +1181,7 @@ JOURNEY_NAMES = (
     "bot_youth_replacement_created",
     "campaign_touched",
     "candidate_signed",
+    "player_contract_released",
     "club_claimed",
     "club_offer_delivered",
     "club_opened",
@@ -1204,6 +1221,7 @@ JOURNEY_NAMES = (
     "start_accepted",
     "training_opened",
     "training_plan_saved",
+    "training_plan_cancelled",
     "scout_search_started",
     "scout_search_cancelled",
 )
@@ -1461,7 +1479,7 @@ class GameActionReceipt(Base):
             "'training_opened','training_plan_saved','language_preferences','finances_opened','stadium_opened','stadium_expansion_ordered','market_opened',"
             "'market_listing_created','market_bid_accepted','market_listing_cancelled','candidate_signed',"
             "'scout_search_started','scout_search_cancelled','academy_opened','academy_upgraded',"
-            "'academy_candidate_signed','friendly_opened','friendly_scheduled','friendly_invited',"
+            "'training_plan_cancelled','player_contract_released','academy_candidate_signed','friendly_opened','friendly_scheduled','friendly_invited',"
             "'friendly_responded','entry_opened')",
             name="ck_action_kind",
         ),
@@ -1577,7 +1595,13 @@ class AcademyCandidate(Base):
 class TrainingPlan(Base):
     __tablename__ = "training_plans"
     __table_args__ = (
-        UniqueConstraint("club_id", "week_start", name="uq_training_club_week"),
+        Index(
+            "uq_training_current_day",
+            "club_id",
+            "week_start",
+            unique=True,
+            postgresql_where=text("status <> 'cancelled'"),
+        ),
         CheckConstraint(
             "focus IN ('goalkeeping','defending','playmaking','winger','attacking',"
             "'set_pieces','physical','team')",
@@ -1589,7 +1613,10 @@ class TrainingPlan(Base):
             "(status = 'applied') = (applied_at IS NOT NULL)", name="ck_training_applied"
         ),
         CheckConstraint(
-            "due_at = week_start + interval '1 day' "
+            "((schedule_policy = 'training-midnight-v1' AND due_at = week_start +"
+            " interval '1 day') "
+            "OR (schedule_policy = 'training-preference-v1' AND due_at >= week_start "
+            "AND due_at < week_start + interval '1 day')) "
             "AND selected_at >= week_start - interval '9 days' "
             "AND selected_at < due_at",
             name="ck_training_week",
@@ -1615,7 +1642,18 @@ class TrainingPlan(Base):
     policy_version: Mapped[str] = mapped_column(String(32))
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     staff_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    schedule_policy: Mapped[str] = mapped_column(String(32), server_default="training-midnight-v1")
     results: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+
+
+class FriendlySearch(Base):
+    """Reply target and date survive bot restarts; never an in-memory FSM."""
+
+    __tablename__ = "friendly_searches"
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"), primary_key=True)
+    assigned_day: Mapped[date] = mapped_column(Date)
+    selected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    prompt_message_id: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class TrainingDecision(Base):
@@ -1660,7 +1698,7 @@ class LedgerEntry(Base):
             "kind IN ('opening','grant','tickets','sponsor','merchandise',"
             "'player_salary','staff_salary','stadium_upkeep','prize','reserve','release',"
             "'transfer_in','transfer_out','arrears_paid','stadium_upgrade','signing_fee',"
-            "'scout_search','academy_upkeep','academy_upgrade','debt_conversion')",
+            "'scout_search','academy_upkeep','academy_upgrade','debt_conversion','player_release')",
             name="ck_ledger_kind",
         ),
         Index("ix_ledger_club_page", "club_id", "sequence"),

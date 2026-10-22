@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied, actor_for, owned_club
-from goaletto.application.training import load_training, select_training
+from goaletto.application.training import cancel_training, load_training, select_training
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import expand_id
 from goaletto.bot.training_views import parse_choice, parse_date, training_report, training_view
@@ -51,7 +51,15 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
                 update_id=event_update.update_id,
             )
             data = query.data or ""
-            if data.startswith("tr:r:"):
+            if data.startswith("tr:x:"):
+                parts = data.split(":")
+                if len(parts) != 4 or len(data.encode()) > 64:
+                    raise ValueError("Invalid training cancellation")
+                await cancel_training(session, actor, expand_id(parts[2]), expand_id(parts[3]))
+                text, keyboard = training_view(
+                    await load_training(session, actor), notice=tr("Тренировка отменена.")
+                )
+            elif data.startswith("tr:r:"):
                 parts = data.split(":")
                 if (
                     len(parts) != 4

@@ -140,6 +140,7 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
                 InlineKeyboardButton(text=tr("💰 Рынок"), callback_data="mk:open"),
                 InlineKeyboardButton(text=tr("🏟 Стадион"), callback_data="st:open"),
             ],
+            [InlineKeyboardButton(text=tr("🤝 Товарищеские матчи"), callback_data="fr:open")],
             [InlineKeyboardButton(text=tr("🎓 Академия"), callback_data="ac:open")],
             [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
             [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
@@ -360,6 +361,21 @@ def player_view(
             [InlineKeyboardButton(text=tr("🏠 Главное меню"), callback_data=MENU_CALLBACK)],
         ]
     )
+    if card.ownership_id is not None and card.club_id is not None and card.status == "active":
+        from goaletto.bot.result_views import compact_id
+
+        person_key, owner_key = compact_id(card.person_id), compact_id(card.ownership_id)
+        keyboard.inline_keyboard.insert(
+            0,
+            [
+                InlineKeyboardButton(
+                    text=tr("💰 Продать"), callback_data=f"mk:q:{person_key}:{owner_key}"
+                ),
+                InlineKeyboardButton(
+                    text=tr("Расторгнуть контракт"), callback_data=f"pr:q:{person_key}:{owner_key}"
+                ),
+            ],
+        )
     return "\n".join(lines), keyboard
 
 

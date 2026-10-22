@@ -632,7 +632,7 @@ async def sign_candidate(
         quoted_player_wage=offer.weekly_rate if offer.kind == "player" else None,
         quoted_staff_wage=wage if offer.kind == "staff" else None,
         policy_version=offer.economy_policy,
-        employment_id=actor.operation_id if offer.kind == "staff" else None,
+        employment_id=actor.operation_id,
     )
     receipt = CandidateSigning(
         operation_id=actor.operation_id,

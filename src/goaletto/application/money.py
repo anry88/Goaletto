@@ -186,6 +186,7 @@ async def debit_locked(
         "stadium_upkeep",
         "stadium_upgrade",
         "signing_fee",
+        "player_release",
         "scout_search",
         "academy_upkeep",
         "academy_upgrade",

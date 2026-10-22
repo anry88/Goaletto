@@ -7,8 +7,10 @@ from aiogram.types import InlineKeyboardMarkup as Keyboard
 
 from goaletto.application.schedule import ScheduleScreen
 from goaletto.bot.result_views import compact_id
+from goaletto.bot.training_views import FOCUS_LABELS, INTENSITY_LABELS
 from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.names import latin_name
+from goaletto.domain.training import Focus, Intensity
 from goaletto.presentation.i18n import LabelMap, tr
 
 PHASES = LabelMap(
@@ -53,7 +55,7 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
     title = tr("🗓 Ближайшие 10 дней") if screen.competition is None else tr("🏆 Сетка турнира")
     lines = [
         f"<b>{title} · {escape(latin_name(screen.club_name))}</b>",
-        tr("Время матчей: {zone}", zone=escape(screen.zone)),
+        tr("Время событий: {zone}", zone=escape(screen.zone)),
         tr("Дни соревнований указаны по UTC."),
         "",
     ]
@@ -64,6 +66,18 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
         if not day.entries:
             lines.append(tr("Матчей нет."))
         for entry in day.entries:
+            if entry.competition == "training":
+                assert entry.focus is not None and entry.intensity is not None
+                lines.append(
+                    tr(
+                        "🏋️ Тренировка · {focus} · {intensity}",
+                        focus=FOCUS_LABELS[Focus(entry.focus)],
+                        intensity=INTENSITY_LABELS[Intensity(entry.intensity)],
+                    )
+                )
+                if entry.kickoff:
+                    lines.append("🕒 " + escape(local_datetime(entry.kickoff, screen.zone)))
+                continue
             home = escape(latin_name(entry.home)) if entry.home else tr("Соперник определится")
             away = escape(latin_name(entry.away)) if entry.away else tr("Соперник определится")
             stage = (

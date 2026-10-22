@@ -305,7 +305,7 @@ async def _assemble(
     tactics = lineup.tactics if isinstance(lineup.tactics, dict) else {}
     captain = await _latest_captain(session, club.id)
     if captain is not None and captain not in {m.person_id for m in starters}:
-        captain = None
+        captain = starters[0].person_id if starters else None
     upcoming = await _locked_fixture(session, club.id, actor.at) or await _next_fixture(
         session, club.id
     )
