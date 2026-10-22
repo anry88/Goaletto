@@ -829,5 +829,13 @@
   "Позже": "Later",
   "Страна клуба: {country}": "Club country: {country}",
   "Страна или кнопка больше недоступна. Откройте /country заново.": "Country or button is no longer available. Open /country again.",
-  "🌍 Страна клуба": "🌍 Club country"
+  "🌍 Страна клуба": "🌍 Club country",
+  "Приоритетное время матча: {time}": "Preferred match time: {time}",
+  "🕒 Приоритетное время матча": "🕒 Preferred match time",
+  "🕒 <b>Приоритетное время матча</b>": "🕒 <b>Preferred match time</b>",
+  "Выберите удобное местное время с шагом 30 минут.": "Choose your preferred local time in 30-minute steps.",
+  "Купить переименование клуба · 50 ⭐": "Buy club rename · 50 ⭐",
+  "Свободных попыток нет. Купить переименование клуба или подключить VIP можно в настройках.": "No credits available. You can buy a club rename or activate VIP in settings.",
+  "Название клуба можно будет изменить позже.": "You can change the club name later.",
+  "Одно переименование клуба в межсезонье. В запасе может быть только одно.": "One club rename during the offseason. You can hold at most one."
 }

@@ -1,6 +1,6 @@
 {
-  "checked_variants": 5780,
-  "identities": 880,
+  "checked_variants": 6160,
+  "identities": 1080,
   "status": "partial-generation",
   "alpha_and_pixels_outside_mask_preserved": true,
   "all_garments_change_color": true,
@@ -108,6 +108,14 @@
       "margin": 15
     },
     {
+      "variant": "p0807-player-youth-l1",
+      "identity_id": "dugout-whole-v2/p0807",
+      "own_rank": 5,
+      "own_distance": 67,
+      "closest_identity": "dugout-whole-v2/p0820",
+      "margin": 15
+    },
+    {
       "variant": "s0075-staff-senior-l1",
       "identity_id": "dugout-whole-v2/s0075",
       "own_rank": 3,
@@ -180,6 +188,14 @@
       "margin": 11
     },
     {
+      "variant": "p0809-player-youth-l1",
+      "identity_id": "dugout-whole-v2/p0809",
+      "own_rank": 2,
+      "own_distance": 51,
+      "closest_identity": "dugout-whole-v2/p0802",
+      "margin": 11
+    },
+    {
       "variant": "p0253-staff-middle-l1",
       "identity_id": "dugout-whole-v2/p0253",
       "own_rank": 4,
@@ -249,22 +265,6 @@
       "own_rank": 4,
       "own_distance": 65,
       "closest_identity": "dugout-whole-v2/s0061",
-      "margin": 8
-    },
-    {
-      "variant": "p0211-staff-early-l1",
-      "identity_id": "dugout-whole-v2/p0211",
-      "own_rank": 5,
-      "own_distance": 63,
-      "closest_identity": "dugout-whole-v2/p0216",
-      "margin": 8
-    },
-    {
-      "variant": "p0394-staff-early-l1",
-      "identity_id": "dugout-whole-v2/p0394",
-      "own_rank": 4,
-      "own_distance": 59,
-      "closest_identity": "dugout-whole-v2/p0389",
       "margin": 8
     }
   ],

@@ -46,7 +46,10 @@ def view(state: RenameScreen) -> tuple[str, InlineKeyboardMarkup]:
         text += "\n" + (
             tr("Одна попытка сохранена. Использовать её можно только в межсезонье.")
             if state.credit
-            else tr("Свободных попыток нет. Купить попытку или подключить VIP можно в настройках.")
+            else tr(
+                "Свободных попыток нет. Купить переименование клуба "
+                "или подключить VIP можно в настройках."
+            )
         )
         buttons.append([InlineKeyboardButton(text=tr("⚙️ Настройки"), callback_data="ntf:open")])
     elif state.state == "preview":

@@ -1,6 +1,7 @@
 """Explicit fixed UTC offsets. Time is supplied by the bot boundary."""
 
 from datetime import datetime
+from html import escape
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -8,6 +9,40 @@ from goaletto.domain.kickoff import validate_zone
 from goaletto.presentation.i18n import tr
 
 UTC_OFFSETS = tuple(range(-12, 15))
+KICKOFF_MINUTES = tuple(range(0, 1440, 30))
+
+
+def parse_kickoff_callback(value: str) -> int:
+    for minute in KICKOFF_MINUTES:
+        if value == f"ko:minute:{minute}":
+            return minute
+    raise ValueError("Invalid kickoff choice")
+
+
+def kickoff_time_view(zone: str, minute: int | None) -> tuple[str, InlineKeyboardMarkup]:
+    validate_zone(zone)
+    lines = [
+        tr("🕒 <b>Приоритетное время матча</b>"),
+        tr("🌐 Часовой пояс: {zone}", zone=escape(timezone_label(zone))),
+        tr("Выберите удобное местное время с шагом 30 минут."),
+        tr("Время матча не выбрано: по умолчанию 18:00 UTC.")
+        if minute is None
+        else tr("Приоритетное время матча: {time}", time=f"{minute // 60:02}:{minute % 60:02}"),
+        tr(
+            "Назначенные матчи сохраняют время. "
+            "Новое предпочтение учтётся в матчах за пределами ближайших 10 дней."
+        ),
+    ]
+    buttons = [
+        InlineKeyboardButton(
+            text=("✓ " if chosen == minute else "") + f"{chosen // 60:02}:{chosen % 60:02}",
+            callback_data=f"ko:minute:{chosen}",
+        )
+        for chosen in KICKOFF_MINUTES
+    ]
+    rows = [buttons[index : index + 4] for index in range(0, len(buttons), 4)]
+    rows.append([InlineKeyboardButton(text=tr("← Настройки"), callback_data="ntf:open")])
+    return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def offset_zone(hours: int) -> str:

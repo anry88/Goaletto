@@ -80,3 +80,21 @@ and appearance identities remain unchanged; lifecycle exports were reimported.
 Ruff check/format and mypy passed; 213 non-integration tests passed, two integration
 tests were deselected. The final expanded catalog also passed all 24 portrait
 lifecycle tests. No database was used for these checks.
+
+## Дополнение 2026-10-22
+
+Встроенным Imagegen продолжены сохранённые identity-preserving prompts исходных
+листов. Добавлены 19 листов / 380 вариантов: все четыре футбольных возраста
+players-41, adult/mature для 42, youth для 43, adult для 44, adult/veteran/youth
+для 45, youth для 46, adult/veteran для 47, adult/mature/veteran для 48, veteran
+для 49 и adult для 50. Это приоритетный набор по read-only аудиту HDC: 22 действующих
+футболиста в клубах менеджеров не имели иллюстрации своего текущего диапазона.
+Лица, person IDs и исторические рецепты не переназначаются.
+
+Итог: 308 из 362 листов / 6 160 из 7 240 дополнительных возрастных и карьерных
+вариантов. Каталог остаётся `partial-generation`; 54 листа ещё отсутствуют
+(21 футбольный и 33 кадровых). Точный остаток — `generation-checkpoint.json`.
+Историческая ошибка квоты от 13 октября больше не описывает состояние генерации.
+Исходники и исходные prompts сохранены; runtime использует локальные PNG 256 px,
+маски материала формы и миниатюры 96 px. Новые иллюстрации просмотрены рядом с
+исходными двадцатью лицами каждого листа; технический аудит проверяется отдельно.
