@@ -7,7 +7,13 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from goaletto.application.lineup import LineupData
 from goaletto.bot.result_views import compact_id, expand_id
-from goaletto.domain.lineup import FORMATION_SHAPES
+from goaletto.domain.lineup import (
+    ATT_POSITIONS,
+    DEF_POSITIONS,
+    FORMATION_SHAPES,
+    FORMATION_SLOTS,
+    MID_POSITIONS,
+)
 from goaletto.domain.match_types import Mentality, Tactic
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
@@ -175,6 +181,36 @@ def formation_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     ]
     rows.append([_button(tr("← Назад"), f"ln:panel:main:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def formation_view(data: LineupData) -> str:
+    lines = [
+        tr("📋 <b>Выбор схемы</b>"),
+        tr("Линии ниже показывают места, для которых нужны игроки."),
+    ]
+    for name, slots in sorted(FORMATION_SLOTS.items()):
+        lines.append("\n<b>" + name + (" ✓" if name == data.formation else "") + "</b>")
+        for label, allowed in (
+            (tr("Защитники"), DEF_POSITIONS),
+            (tr("Полузащита"), MID_POSITIONS),
+            (tr("Атакующие"), ATT_POSITIONS),
+        ):
+            lines.append(label + ": " + " · ".join(p for p in slots if p in allowed))
+        lines.append(tr("Есть место DM.") if "DM" in slots else tr("Отдельного места DM нет."))
+    lines.extend(
+        (
+            "",
+            tr("<b>Позиции</b>"),
+            tr("GK — вратарь; DL/DC/DR — левый/центральный/правый защитник."),
+            tr("DM — опорный; MC — центральный; ML/MR — левый/правый полузащитник."),
+            tr("AMC — атакующий полузащитник; AML/AMR — левый/правый вингер; FC — нападающий."),
+            tr(
+                "В каждой схеме нужен один GK. Дополнительная позиция даёт 85% навыков, "
+                "незнакомая полевая — 60%."
+            ),
+        )
+    )
+    return "\n".join(lines)
 
 
 def tactic_keyboard(data: LineupData) -> InlineKeyboardMarkup:

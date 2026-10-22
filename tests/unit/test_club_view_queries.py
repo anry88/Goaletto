@@ -16,6 +16,7 @@ from goaletto.application.club_view import (
     get_squad_page,
 )
 from goaletto.application.game_actions import Actor, PermissionDenied
+from goaletto.domain.lineup import FORMATION_SLOTS
 from goaletto.domain.ownership import ownership_deadline
 from goaletto.infrastructure.models import (
     AnalyticsManager,
@@ -334,3 +335,55 @@ def full_energy_projection(monkeypatch):
         "goaletto.application.recovery.energy_status",
         AsyncMock(return_value=EnergyStatus(10000, None)),
     )
+
+
+@pytest.mark.parametrize(
+    "formation",
+    list(FORMATION_SLOTS),
+)
+async def test_squad_pages_use_saved_slots_and_preserve_all_people(formation):
+    from goaletto.bot.club_cards import squad_view
+    from goaletto.infrastructure.models import ClubLineup
+
+    recorder = Recorder()
+    for i in range(7, 24):
+        recorder._person(f"Added {i}", 25, "active", recorder.club.id, i if i <= 20 else None)
+    for row, position in zip(
+        sorted(recorder.slots, key=lambda s: s.slot)[:11], FORMATION_SLOTS[formation], strict=True
+    ):
+        row.position = position
+        recorder.players[row.person_id].alternative_positions = ["DM"]
+    original_scalar = recorder.scalar
+
+    async def scalar(statement, params=None):
+        if (
+            not isinstance(statement, TextClause)
+            and statement.column_descriptions[0].get("entity") is ClubLineup
+        ):
+            return ClubLineup(
+                club_id=recorder.club.id,
+                formation=formation,
+                version=1,
+                tactics_version=1,
+                tactics={},
+            )
+        return await original_scalar(statement, params)
+
+    recorder.scalar = scalar
+    pages = [await get_squad_page(recorder, recorder.actor, i) for i in range(1, 6)]
+    people = [m for p in pages for m in p.members]
+    assert len(people) == len({m.person_id for m in people}) == 23
+    assert tuple(m.slot_position for m in people[:11]) == FORMATION_SLOTS[formation]
+    assert all(p.formation == formation for p in pages)
+    assert all(m.slot_position is None for m in people[11:])
+    for page in pages:
+        text, keyboard = squad_view(page)
+        assert formation in text
+        assert len(
+            [
+                b
+                for row in keyboard.inline_keyboard
+                for b in row
+                if b.callback_data.startswith("vc:p:")
+            ]
+        ) == len(page.members)

@@ -5,6 +5,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from time import monotonic, perf_counter, time
 
 from aiohttp import web
@@ -31,7 +32,12 @@ def metrics_app(metrics: Metrics = METRICS) -> web.Application:
     return app
 
 
-async def snapshots(database: Database, interval: float, metrics: Metrics = METRICS) -> None:
+async def snapshots(
+    database: Database,
+    interval: float,
+    metrics: Metrics = METRICS,
+    dashboard_path: Path | None = None,
+) -> None:
     while True:
         started = perf_counter()
         try:
@@ -47,6 +53,14 @@ async def snapshots(database: Database, interval: float, metrics: Metrics = METR
             logger.warning("Metrics snapshot unavailable (%s)", type(error).__name__)
         finally:
             metrics.snapshot_seconds.observe(perf_counter() - started)
+        if dashboard_path is not None:
+            from goaletto.infrastructure.audience_dashboard import publish_dashboard
+
+            try:
+                async with asyncio.timeout(5):
+                    await publish_dashboard(database, dashboard_path)
+            except Exception as error:
+                logger.warning("Audience dashboard unavailable (%s)", type(error).__name__)
         await asyncio.sleep(interval)
 
 
@@ -81,7 +95,13 @@ async def serve_metrics(
         tasks.append(asyncio.create_task(event_loop_probe(database)))
         if role == "worker" and database is not None:
             tasks.append(
-                asyncio.create_task(snapshots(database, settings.metrics_snapshot_seconds))
+                asyncio.create_task(
+                    snapshots(
+                        database,
+                        settings.metrics_snapshot_seconds,
+                        dashboard_path=settings.metrics_dashboard_path,
+                    )
+                )
             )
         yield
     finally:

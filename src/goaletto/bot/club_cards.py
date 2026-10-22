@@ -218,12 +218,31 @@ def squad_view(page: SquadPage) -> tuple[str, InlineKeyboardMarkup]:
         "",
     ]
     buttons: list[list[InlineKeyboardButton]] = []
+    if page.formation is not None:
+        lines.insert(-1, tr("Схема: {formation}", formation=escape(page.formation)))
+    previous_group = ""
     for offset, member in enumerate(page.members, start=(page.page - 1) * PAGE_SIZE + 1):
+        group = (
+            tr("<b>Основа:</b>")
+            if member.slot is not None and member.slot <= 11
+            else tr("<b>Запас:</b>")
+            if member.slot is not None
+            else tr("<b>Вне заявки:</b>")
+        )
+        if group != previous_group:
+            lines.append(group)
+            previous_group = group
+        position = "/".join((member.position, *member.alternatives))
+        if member.slot_position is not None:
+            position = member.slot_position
+            if position != member.position:
+                match = "↔85%" if position in member.alternatives else "⚠️60%"
+                position += f" ← {member.position} {match}"
         lines.append(
             _member_line(
                 offset,
                 person_name(member),
-                member.position,
+                position,
                 member.age,
                 member.form,
                 member.status,

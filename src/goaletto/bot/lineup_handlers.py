@@ -93,6 +93,8 @@ async def build_callback_response(
     if result is not None:
         data = await load_lineup(session, actor)
     if action == "panel":
+        if args[0] == "formation":
+            return views.formation_view(data), views.formation_keyboard(data)
         return views.render_main(data), _panel_keyboard(args[0], data)
     if action == "bsel":
         return views.render_main(data), views.bench_choices_keyboard(data, int(args[0]))

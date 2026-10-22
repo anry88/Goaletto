@@ -1,0 +1,12 @@
+# Narrow writable directory for source display names in the one native dashboard.
+# All numerical panel queries still use the existing VictoriaMetrics datasource.
+services:
+  worker:
+    environment:
+      GOALETTO_METRICS_DASHBOARD_PATH: /var/lib/goaletto-audience/audience.json
+    volumes:
+      - type: bind
+        source: ${GOALETTO_AUDIENCE_DASHBOARD_DIR:?Set the dedicated audience dashboard directory}
+        target: /var/lib/goaletto-audience
+        bind:
+          create_host_path: false

@@ -123,6 +123,22 @@ Runtime-only image собирается с `--target runtime --platform linux/am
 SHA-256 image и asset-пакета проверяются отдельно. `create_host_path: false`
 не позволяет молча создать пустую папку при ошибке пути.
 
+## Текущие overlays на HDC (2026-10-22)
+
+Сохранять полный порядок при следующих обновлениях:
+
+```powershell
+$composeArgs = @("-f", "compose.yaml", "-f", "deploy/compose.hdc.yaml",
+                 "-f", "deploy/compose.release.yaml", "-f", "deploy/compose.assets.yaml",
+                 "-f", "deploy/compose.monitoring.yaml", "-f", "deploy/compose.data-d.yaml",
+                 "-f", "deploy/compose.audience.yaml")
+```
+
+Последний overlay публикует [дашборд аудитории](analytics/audience-dashboard.md)
+в отдельный подкаталог существующего Grafana file provisioning. Он не заменяет
+monitoring, asset mount или PGDATA на D. При отсутствии миграций обновляются только
+bot/worker с `--no-deps --no-build --pull never`; Grafana и PostgreSQL не пересоздаются.
+
 ## Проверки и откат
 
 Сейчас smoke: /start, /help, preview-кнопки, worker, миграции, отсутствие публичного
