@@ -23,6 +23,7 @@ from goaletto.infrastructure.models import (
     AnalyticsManager,
     AppearanceIdentity,
     Club,
+    ClubLineup,
     League,
     LineupSlot,
     Manager,
@@ -63,6 +64,8 @@ class SquadMember:
     status: str
     slot: int | None
     country_code: str | None = None
+    slot_position: str | None = None
+    alternatives: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,7 @@ class SquadPage:
     page: int
     total_pages: int
     total_members: int
+    formation: str | None = None
 
 
 @dataclass(frozen=True)
@@ -204,6 +208,8 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
         ).all():
             persons[person.id] = person
     slots = {row.person_id: row.slot for row in slot_rows}
+    slot_positions = {row.person_id: row.position for row in slot_rows if row.slot <= 11}
+    lineup = await session.scalar(select(ClubLineup).where(ClubLineup.club_id == club.id))
 
     def sort_key(row: Player) -> tuple[int, str, str]:
         person = persons.get(row.person_id)
@@ -230,6 +236,8 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
                 form=row.form,
                 status=row.status,
                 slot=slots.get(row.person_id),
+                slot_position=slot_positions.get(row.person_id),
+                alternatives=tuple(row.alternative_positions or ()),
             )
         )
     await user_effect(
@@ -240,7 +248,14 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
         ownership=ownership,
         club_id=club.id,
     )
-    return SquadPage(card, tuple(members), page, total_pages, total)
+    return SquadPage(
+        card,
+        tuple(members),
+        page,
+        total_pages,
+        total,
+        formation=lineup.formation if lineup is not None else None,
+    )
 
 
 async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) -> PlayerCard:

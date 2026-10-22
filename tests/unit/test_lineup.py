@@ -688,3 +688,22 @@ def full_energy_projection(monkeypatch):
         "goaletto.application.recovery.energy_status",
         AsyncMock(return_value=EnergyStatus(10000, None)),
     )
+
+
+def test_all_formation_descriptions_match_real_slots_and_fit_telegram():
+    from types import SimpleNamespace
+
+    from goaletto.bot.lineup_views import formation_view
+    from goaletto.domain.lineup import FORMATION_SLOTS
+    from goaletto.presentation.i18n import using_locale
+
+    for language in ("ru", "en"):
+        with using_locale(language):
+            text = formation_view(SimpleNamespace(formation="4-4-2"))
+        assert len(text.encode("utf-16-le")) // 2 < 4096
+        for formation, slots in FORMATION_SLOTS.items():
+            segment = text.split("<b>" + formation)[1].split("<b>")[0]
+            assert " · ".join(p for p in slots if p in {"DL", "DC", "DR"}) in segment
+            if formation in {"4-3-3", "3-5-2"}:
+                assert "DM" in segment
+        assert "85%" in text and "60%" in text and "AMC" in text and "AMR" in text

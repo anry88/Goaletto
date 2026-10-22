@@ -3,7 +3,7 @@
   "title": "Goaletto · вход и участие",
   "description": "Текущий снимок фиксированного окна стартов 1/7/30 UTC-дней, рассчитанный существующим SQL. Не произвольный исторический cohort по time picker Grafana. Динамика — история снимков; значения не суммировать и не применять rate/increase. Internal/opt-out исключены из journey. Подробные campaign/locale/variant/tier/set срезы и исторический as-of остаются в операторском SQL/CLI, без идентификаторов в метках Prometheus.",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "tags": [
     "goaletto",
     "operator",
@@ -769,5 +769,14 @@
         "options": []
       }
     ]
-  }
+  },
+  "links": [
+    {
+      "title": "Игроки и источники",
+      "type": "link",
+      "url": "/d/goaletto-audience",
+      "icon": "external link",
+      "targetBlank": false
+    }
+  ]
 }

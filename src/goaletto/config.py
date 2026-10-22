@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     metrics_host: str = "127.0.0.1"
     metrics_port: int = Field(default=9109, ge=1, le=65535)
     metrics_snapshot_seconds: float = Field(default=60, ge=15, le=3600)
+    metrics_dashboard_path: Path | None = None
     # JSON array in the host-only environment; empty preserves unrestricted access.
     allowed_telegram_ids: frozenset[Annotated[int, Field(gt=0)]] = frozenset()
     internal_telegram_ids: frozenset[Annotated[int, Field(gt=0)]] = frozenset()

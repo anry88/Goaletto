@@ -10,6 +10,7 @@ from prometheus_client.core import GaugeMetricFamily, Metric
 from sqlalchemy import text
 
 from goaletto.application.analytics import Reason, Surface
+from goaletto.infrastructure.audience import audience_families
 from goaletto.infrastructure.database import Database
 
 WINDOWS = (1, 7, 30)
@@ -223,6 +224,7 @@ async def collect_snapshot(database: Database, at: datetime) -> tuple[Metric, ..
     families: list[Metric] = []
     async with database.read_transaction() as session:
         await session.execute(text("SET LOCAL statement_timeout = '2000ms'"))
+        families.extend(await audience_families(session, at))
         queues = GaugeMetricFamily(
             "goaletto_queue_items",
             "Durable queue state; due/oldest apply only to pending items.",

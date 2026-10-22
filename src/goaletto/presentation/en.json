@@ -837,5 +837,18 @@
   "Купить переименование клуба · 50 ⭐": "Buy club rename · 50 ⭐",
   "Свободных попыток нет. Купить переименование клуба или подключить VIP можно в настройках.": "No credits available. You can buy a club rename or activate VIP in settings.",
   "Название клуба можно будет изменить позже.": "You can change the club name later.",
-  "Одно переименование клуба в межсезонье. В запасе может быть только одно.": "One club rename during the offseason. You can hold at most one."
+  "Одно переименование клуба в межсезонье. В запасе может быть только одно.": "One club rename during the offseason. You can hold at most one.",
+  "Схема: {formation}": "Formation: {formation}",
+  "📋 <b>Выбор схемы</b>": "📋 <b>Choose formation</b>",
+  "Линии ниже показывают места, для которых нужны игроки.": "The lines below show the positions you need to fill.",
+  "Полузащита": "Midfield",
+  "Есть место DM.": "Includes a DM position.",
+  "Отдельного места DM нет.": "No dedicated DM position.",
+  "<b>Позиции</b>": "<b>Positions</b>",
+  "GK — вратарь; DL/DC/DR — левый/центральный/правый защитник.": "GK — goalkeeper; DL/DC/DR — left/centre/right defender.",
+  "DM — опорный; MC — центральный; ML/MR — левый/правый полузащитник.": "DM — defensive; MC — central; ML/MR — left/right midfielder.",
+  "AMC — атакующий полузащитник; AML/AMR — левый/правый вингер; FC — нападающий.": "AMC — attacking midfielder; AML/AMR — left/right winger; FC — striker.",
+  "В каждой схеме нужен один GK. Дополнительная позиция даёт 85% навыков, незнакомая полевая — 60%.": "Every formation needs one GK. An additional position uses 85% of skills; an unfamiliar outfield position uses 60%.",
+  "Защитники": "Defenders",
+  "Атакующие": "Attackers"
 }
