@@ -11,6 +11,7 @@ from datetime import date, datetime
 from uuid import UUID, uuid4, uuid5
 
 from sqlalchemy import or_, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import Surface, require_utc
@@ -27,12 +28,15 @@ from goaletto.infrastructure.models import (
     Fixture,
     FixturePlan,
     FriendlyInvitation,
+    FriendlySearch,
     Manager,
     OutboxMessage,
     OwnershipPeriod,
     Season,
     SeasonClub,
+    SeasonContestant,
     TrainingPlan,
+    WorldAdmission,
 )
 
 
@@ -50,6 +54,32 @@ async def _active_season(session: AsyncSession, club_id: UUID) -> Season:
     if season is None or season.cycle_epoch is None:
         raise ValueError("Missing club calendar")
     return season
+
+
+async def compatible_opponent_season(
+    session: AsyncSession, home: Season, away_id: UUID, day: date
+) -> Season:
+    away = await _active_season(session, away_id)
+    if (
+        away.cycle_epoch != home.cycle_epoch
+        or away.ends_at != home.ends_at
+        or not home.calendar_enabled
+        or not away.calendar_enabled
+        or await session.scalar(
+            select(WorldAdmission.season_id)
+            .where(
+                WorldAdmission.season_id.in_((home.id, away.id)), WorldAdmission.ready_at.is_(None)
+            )
+            .limit(1)
+        )
+        is not None
+    ):
+        raise ValueError("Opponent calendar is not ready or incompatible")
+    assert away.cycle_epoch is not None
+    cycle = cycle_on(away.cycle_epoch, day)
+    if not 0 <= cycle.index < 18 or cycle.phase != Phase.FREE:
+        raise ValueError("Opponent is outside a free season day")
+    return away
 
 
 def _require_future_free_day(today: date, day: date, epoch: date) -> None:
@@ -133,6 +163,11 @@ async def _create_plan(
         assigned_day=day,
         revision=1,
     )
+    await session.execute(
+        insert(SeasonContestant)
+        .values(season_id=season.id, club_id=away_id)
+        .on_conflict_do_nothing()
+    )
     session.add(plan)
     await session.flush()
     from goaletto.application.calendar_planning import plan_horizon
@@ -153,7 +188,7 @@ async def schedule_friendly(
       request. No automatic matchmaking, invitations or jobs are created.
     - ``day`` must be a strictly future UTC date within the 10-day horizon
       and fall on the FREE phase of the club's active four-day season.
-    - Opponent must belong to the same season and currently be a bot club.
+    - Opponent must have a compatible ready calendar and currently be a bot club.
       Owned clubs play only by invitation: see :func:`invite_friendly`.
     - Either club having any FixturePlan that day (including conditional
       tournament slots) rejects the request. ``reserve_match_day`` with
@@ -175,11 +210,7 @@ async def schedule_friendly(
     epoch = season.cycle_epoch
     assert epoch is not None
     _require_future_free_day(actor.at.date(), day, epoch)
-    opponent_membership = await session.scalar(
-        select(SeasonClub).where(SeasonClub.season_id == season.id, SeasonClub.club_id == away.id)
-    )
-    if opponent_membership is None:
-        raise ValueError("Friendly opponent must share the season")
+    await compatible_opponent_season(session, season, away.id, day)
     active_owner: UUID | None = await session.scalar(
         select(OwnershipPeriod.id).where(
             OwnershipPeriod.club_id == away.id,
@@ -217,7 +248,6 @@ async def schedule_friendly(
 
 async def _pending_invite(
     session: AsyncSession,
-    season_id: UUID,
     first_id: UUID,
     second_id: UUID,
     day: date,
@@ -225,7 +255,6 @@ async def _pending_invite(
     exclude: UUID | None = None,
 ) -> FriendlyInvitation | None:
     filters = [
-        FriendlyInvitation.season_id == season_id,
         FriendlyInvitation.assigned_day == day,
         FriendlyInvitation.status == "pending",
         or_(
@@ -274,11 +303,7 @@ async def invite_friendly(
     epoch = season.cycle_epoch
     assert epoch is not None
     _require_future_free_day(actor.at.date(), day, epoch)
-    opponent_membership = await session.scalar(
-        select(SeasonClub).where(SeasonClub.season_id == season.id, SeasonClub.club_id == away.id)
-    )
-    if opponent_membership is None:
-        raise ValueError("Friendly opponent must share the season")
+    await compatible_opponent_season(session, season, away.id, day)
     bot_check: UUID | None = await session.scalar(
         select(OwnershipPeriod.id).where(
             OwnershipPeriod.club_id == away.id,
@@ -290,7 +315,7 @@ async def invite_friendly(
         raise ValueError("Bot clubs need no invitation; schedule the friendly directly")
     if await _clash_plan(session, (home.id, away.id), day) is not None:
         raise ValueError("A club already has a match that day")
-    duplicate = await _pending_invite(session, season.id, home.id, away.id, day)
+    duplicate = await _pending_invite(session, home.id, away.id, day)
     if duplicate is not None:
         same_owners = (
             duplicate.challenger_ownership_id == ownership.id
@@ -403,14 +428,10 @@ async def respond_friendly(
             or season.status not in {"scheduled", "active"}
         ):
             raise ValueError("Missing club calendar")
-        for club_id in (row.home_club_id, row.away_club_id):
-            membership = await session.scalar(
-                select(SeasonClub).where(
-                    SeasonClub.season_id == row.season_id, SeasonClub.club_id == club_id
-                )
-            )
-            if membership is None:
-                raise ValueError("Friendly clubs must share the season")
+        current_home = await _active_season(session, row.home_club_id)
+        if current_home.id != season.id:
+            raise ValueError("Challenge belongs to an earlier season")
+        await compatible_opponent_season(session, season, row.away_club_id, row.assigned_day)
         cycle = cycle_on(season.cycle_epoch, row.assigned_day)
         if not 0 <= cycle.index < 18 or cycle.phase != Phase.FREE:
             raise ValueError("Friendly matches are played on the free day of the cycle")
@@ -421,7 +442,6 @@ async def respond_friendly(
         await session.execute(
             update(FriendlyInvitation)
             .where(
-                FriendlyInvitation.season_id == row.season_id,
                 FriendlyInvitation.assigned_day == row.assigned_day,
                 FriendlyInvitation.status == "pending",
                 FriendlyInvitation.id != row.id,
@@ -604,25 +624,41 @@ async def challenge_days(session: AsyncSession, actor: Actor) -> tuple[date, ...
 
 
 async def challenge_opponents(
-    session: AsyncSession, actor: Actor, day: date
+    session: AsyncSession, actor: Actor, day: date, query: str
 ) -> tuple[FriendlyOpponent, ...]:
-    """Every other club of the season with ownership and busyness markers."""
+    """Bounded literal name search across ready clubs on the common calendar."""
     _, club = await owned_club(session, actor)
     season = await _active_season(session, club.id)
-    if type(day) is not date:
-        raise ValueError("Friendly day must be a UTC date")
-    members = (
-        await session.scalars(
-            select(SeasonClub).where(
-                SeasonClub.season_id == season.id, SeasonClub.club_id != club.id
+    assert season.cycle_epoch is not None
+    _require_future_free_day(actor.at.date(), day, season.cycle_epoch)
+    key = query.strip()
+    if not 1 <= len(key) <= 80:
+        raise ValueError("Enter 1..80 characters of a club name")
+    candidates = (
+        await session.execute(
+            select(Club.id, Club.name)
+            .join(SeasonClub, SeasonClub.club_id == Club.id)
+            .join(Season, Season.id == SeasonClub.season_id)
+            .where(
+                Club.id != club.id,
+                Club.name.icontains(key, autoescape=True),
+                Season.status.in_(("scheduled", "active")),
+                Season.calendar_enabled.is_(True),
+                Season.cycle_epoch == season.cycle_epoch,
+                Season.ends_at == season.ends_at,
+                ~select(WorldAdmission.season_id)
+                .where(WorldAdmission.season_id == Season.id, WorldAdmission.ready_at.is_(None))
+                .exists(),
             )
+            .distinct()
+            .order_by(Club.name, Club.id)
+            .limit(11)
         )
     ).all()
-    if not members:
+    names: dict[UUID, str] = {cid: name for cid, name in candidates}
+    ids = list(names)
+    if not ids:
         return ()
-    ids = [m.club_id for m in members]
-    name_rows = await session.execute(select(Club.id, Club.name).where(Club.id.in_(ids)))
-    names: dict[UUID, str] = {club_id: name for club_id, name in name_rows.all()}
     owned_ids = {
         row.club_id
         for row in (
@@ -674,8 +710,7 @@ async def challenge_opponents(
         ).all()
     )
     return tuple(
-        FriendlyOpponent(cid, names.get(cid, "?"), cid in owned_ids, cid in busy)
-        for cid in sorted(ids, key=str)
+        FriendlyOpponent(cid, names.get(cid, "?"), cid in owned_ids, cid in busy) for cid in ids
     )
 
 
@@ -709,3 +744,23 @@ async def authenticate_fixture(session: AsyncSession, fixture: "Fixture") -> Non
         or plan.assigned_day != fixture.scheduled_start_at.date()
     ):
         raise ValueError("Friendly fixture has no genuine accepted request")
+
+
+async def begin_opponent_search(session: AsyncSession, actor: Actor, day: date) -> UUID:
+    owner, club = await owned_club(session, actor)
+    if day not in await challenge_days(session, actor):
+        raise ValueError("Friendly day is no longer available")
+    await session.execute(
+        insert(FriendlySearch)
+        .values(
+            ownership_id=owner.id, assigned_day=day, selected_at=actor.at, prompt_message_id=None
+        )
+        .on_conflict_do_update(
+            index_elements=["ownership_id"],
+            set_={"assigned_day": day, "selected_at": actor.at, "prompt_message_id": None},
+        )
+    )
+    await user_effect(
+        session, actor, "friendly_opened", Surface.CALENDAR, ownership=owner, club_id=club.id
+    )
+    return owner.id

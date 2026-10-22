@@ -10,7 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from goaletto.application.analytics import Surface
 from goaletto.application.game_actions import Actor, PermissionDenied, owned_club, user_effect
 from goaletto.domain.game_cycle import cycle_on
-from goaletto.infrastructure.models import Club, Fixture, FixturePlan, Manager, Season, SeasonClub
+from goaletto.infrastructure.models import (
+    Club,
+    Fixture,
+    FixturePlan,
+    Manager,
+    Season,
+    SeasonClub,
+    TrainingPlan,
+)
 
 
 @dataclass(frozen=True)
@@ -27,6 +35,8 @@ class ScheduleEntry:
     stage: str | None
     leg: int | None
     status: str
+    focus: str | None = None
+    intensity: str | None = None
 
 
 @dataclass(frozen=True)
@@ -80,6 +90,8 @@ async def load_schedule(
         or_(
             FixturePlan.season_id == season.id,
             (FixturePlan.competition == "champions") & FixturePlan.season_id.in_(hosts),
+            (FixturePlan.competition == "friendly")
+            & or_(FixturePlan.home_club_id == club.id, FixturePlan.away_club_id == club.id),
         )
     )
     if competition is None:
@@ -137,6 +149,40 @@ async def load_schedule(
                 plan.leg,
                 fixture.status if fixture else "unannounced",
             )
+        )
+    if competition is None:
+        trainings = (
+            await session.scalars(
+                select(TrainingPlan)
+                .where(
+                    TrainingPlan.club_id == club.id,
+                    TrainingPlan.ownership_id == owner.id,
+                    TrainingPlan.status == "scheduled",
+                    TrainingPlan.week_start
+                    >= actor.at.replace(hour=0, minute=0, second=0, microsecond=0),
+                    TrainingPlan.week_start <= until,
+                )
+                .order_by(TrainingPlan.week_start)
+            )
+        ).all()
+        entries.extend(
+            ScheduleEntry(
+                t.id,
+                t.week_start.date(),
+                "training",
+                0,
+                None,
+                None,
+                "home",
+                t.due_at,
+                False,
+                None,
+                None,
+                t.status,
+                t.focus,
+                t.intensity,
+            )
+            for t in trainings
         )
     if competition is None:
         all_days = tuple(actor.at.date() + timedelta(days=i) for i in range(11))

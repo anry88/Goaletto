@@ -112,6 +112,7 @@ class PlayerCard:
     energy_bps: int = 10000
     energy_full_at: datetime | None = None
     country_code: str | None = None
+    ownership_id: UUID | None = None
 
 
 async def actor_for_callback(
@@ -318,6 +319,7 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
     )
     return PlayerCard(
         person_id=person.id,
+        ownership_id=ownership.id,
         name=person.name,
         country_code=person.country_code,
         age=person.age,

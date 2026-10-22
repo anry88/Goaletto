@@ -1,17 +1,21 @@
 """Friendly challenge commands and callbacks; commit before showing results."""
 
 from datetime import UTC, date, datetime
+from typing import Any
 from uuid import UUID
 
 from aiogram import F, Router
+from aiogram.dispatcher.event.bases import UNHANDLED
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message, Update
+from aiogram.types import CallbackQuery, ForceReply, Message, Update
 from aiogram.types import InlineKeyboardMarkup as Keyboard
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from goaletto.application.analytics import Surface
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.friendly import (
+    begin_opponent_search,
     challenge_days,
     challenge_opponents,
     invite_friendly,
@@ -19,7 +23,13 @@ from goaletto.application.friendly import (
     respond_friendly,
     schedule_friendly,
 )
-from goaletto.application.game_actions import Actor, PermissionDenied, actor_for
+from goaletto.application.game_actions import (
+    Actor,
+    PermissionDenied,
+    actor_for,
+    owned_club,
+    user_effect,
+)
 from goaletto.bot.friendly_views import (
     challenge_dates_view,
     challenge_opponents_view,
@@ -30,7 +40,7 @@ from goaletto.bot.friendly_views import (
 )
 from goaletto.bot.responses import edit_response
 from goaletto.infrastructure.database import Database
-from goaletto.infrastructure.models import OwnershipPeriod
+from goaletto.infrastructure.models import FriendlySearch, Manager, OwnershipPeriod
 from goaletto.presentation.i18n import tr
 
 router = Router(name="friendly")
@@ -48,7 +58,7 @@ async def _challenge(
     )
     if owned is None:
         await schedule_friendly(session, actor, club_id, day)
-        notice = tr("Матч с бот-клубом назначен. Смотрите /calendar.")
+        notice = tr("Матч назначен. Смотрите /calendar.")
     else:
         await invite_friendly(session, actor, club_id, day)
         notice = tr("Вызов отправлен. Ответ появится здесь же.")
@@ -76,6 +86,7 @@ async def friendly_callback(query: CallbackQuery, database: Database, event_upda
     await query.answer()
     if not isinstance(query.message, Message):
         return
+    search_owner = None
     try:
         async with database.transaction() as session:
             actor = await actor_for_callback(
@@ -92,9 +103,9 @@ async def friendly_callback(query: CallbackQuery, database: Database, event_upda
                 text, keyboard = challenge_dates_view(await challenge_days(session, actor))
             elif data.startswith("fr:d:"):
                 day = parse_day(data)
-                text, keyboard = challenge_opponents_view(
-                    day, await challenge_opponents(session, actor, day)
-                )
+                search_owner = await begin_opponent_search(session, actor, day)
+                text = tr("Ответьте на сообщение поиска названием команды или его частью.")
+                keyboard = None
             elif data.startswith("fr:o:"):
                 day, club_id = parse_opponent(data)
                 text, keyboard = await _challenge(session, actor, day, club_id)
@@ -131,3 +142,59 @@ async def friendly_callback(query: CallbackQuery, database: Database, event_upda
         )
         return
     await edit_response(query.message, text, keyboard)
+    if search_owner is not None:
+        prompt = await query.message.answer(
+            tr(
+                "🔎 Соперник на {day} UTC. Ответьте названием команды или его частью.",
+                day=day.strftime("%d.%m.%Y"),
+            ),
+            reply_markup=ForceReply(selective=True),
+        )
+        async with database.transaction() as session:
+            search = await session.get(FriendlySearch, search_owner, with_for_update=True)
+            if search and search.selected_at == actor.at and search.assigned_day == day:
+                search.prompt_message_id = prompt.message_id
+
+
+@router.message(F.text, F.reply_to_message.from_user.is_bot, ~F.text.startswith("/"))
+async def opponent_search_message(
+    message: Message, database: Database, event_update: Update
+) -> Any:
+    if message.from_user is None or message.reply_to_message is None:
+        return UNHANDLED
+    try:
+        async with database.transaction() as session:
+            row = await session.scalar(
+                select(FriendlySearch)
+                .join(OwnershipPeriod)
+                .join(Manager)
+                .where(
+                    Manager.telegram_id == message.from_user.id,
+                    OwnershipPeriod.ended_at.is_(None),
+                    OwnershipPeriod.expires_at > datetime.now(UTC),
+                    FriendlySearch.prompt_message_id == message.reply_to_message.message_id,
+                )
+            )
+            if row is None:
+                return UNHANDLED
+            actor = await actor_for(
+                session, message.from_user.id, event_update.update_id, datetime.now(UTC)
+            )
+            owner, club = await owned_club(session, actor)
+            await user_effect(
+                session,
+                actor,
+                "friendly_opened",
+                Surface.CALENDAR,
+                ownership=owner,
+                club_id=club.id,
+            )
+            text, keyboard = challenge_opponents_view(
+                row.assigned_day,
+                await challenge_opponents(session, actor, row.assigned_day, message.text or ""),
+            )
+    except (PermissionDenied, ValueError):
+        await message.answer(tr("Поиск устарел. Выберите дату заново в /friendly."))
+        return None
+    await message.answer(text, reply_markup=keyboard)
+    return None

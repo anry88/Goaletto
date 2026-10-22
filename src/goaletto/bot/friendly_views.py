@@ -106,25 +106,32 @@ def challenge_opponents_view(
 ) -> tuple[str, Keyboard]:
     lines = [
         tr("<b>Соперник на {day} UTC:</b>", day=day.strftime("%d.%m")),
-        tr("👤 — менеджер, нужен его ответ. 🤖 — бот, матч сразу в расписание."),
+        tr("Выберите клуб или уточните название ответом на сообщение поиска."),
     ]
     rows: list[list[Button]] = []
-    for opponent in opponents:
+    for opponent in opponents[:10]:
         name = latin_name(opponent.name)[:50]
         if opponent.busy:
             lines.append(tr("⛔ {name} — занят в этот день.", name=escape(name)))
             continue
-        marker = tr("👤 ") if opponent.owned else tr("🤖 ")
         rows.append(
             [
                 Button(
-                    text=f"{marker}{name}",
+                    text=name,
                     callback_data=f"fr:o:{day.isoformat()}:{opponent.club_id}",
                 )
             ]
         )
     if not rows:
-        lines.append(tr("Все клубы заняты в этот день. Выберите другую дату."))
+        lines.append(
+            tr(
+                "Подходящих свободных клубов не найдено. Уточните название или "
+                "выберите другую дату."
+            )
+        )
+    if len(opponents) > 10:
+        lines.append(tr("Показаны первые 10 совпадений. Уточните название."))
+    rows.append([Button(text=tr("🔎 Другой поиск"), callback_data=f"fr:d:{day.isoformat()}")])
     rows.append([Button(text=tr("← К датам"), callback_data="fr:c")])
     return "\n".join(lines), Keyboard(inline_keyboard=rows)
 

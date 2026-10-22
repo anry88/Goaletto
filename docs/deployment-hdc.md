@@ -155,3 +155,19 @@ PostgreSQL-порта. Это не означает готовность gamepla
 Основания: [Docker save](https://docs.docker.com/reference/cli/docker/image/save/),
 [Compose merge/reset](https://docs.docker.com/reference/compose-file/merge/),
 [Compose startup order](https://docs.docker.com/compose/how-tos/startup-order/).
+
+Для миграции перед обновлением bot/worker:
+
+```powershell
+docker compose @composeArgs stop bot worker
+docker compose @composeArgs run --rm --no-deps --pull never migrate
+if ($LASTEXITCODE -ne 0) { throw "Migration failed; restore the previous application image" }
+docker compose @composeArgs up -d --no-deps --no-build --pull never bot worker
+```
+
+`run` в HDC Compose не поддерживает `--no-build`: использовать загруженный image
+с release overlay (build уже сброшен), без `--build`, с `--pull never`.
+`--rm` удаляет одноразовый migrate после завершения. После приёмки удалять только
+завершённые Goaletto migrate-контейнеры и неиспользуемые образы `goaletto:*`;
+сохранять текущий и один предыдущий образ. Не использовать глобальный prune,
+force removal, удаление volumes или чужих образов/контейнеров.

@@ -31,6 +31,7 @@ KINDS = LabelMap(
         "arrears_paid": "Погашение задолженности",
         "scout_search": "Скаутский поиск",
         "signing_fee": "Подписание",
+        "player_release": "Расторжение контракта",
         "stadium_upgrade": "Расширение стадиона",
         "academy_upkeep": "Содержание академии",
         "academy_upgrade": "Развитие академии",
