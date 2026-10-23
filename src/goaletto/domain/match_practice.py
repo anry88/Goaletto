@@ -8,7 +8,7 @@ minutes of total actual play (extra time is the summed minutes, never a
 second reward for the first 90 and never a separate full award for an
 extra segment; penalty shootouts grant no minutes). Friendlies scale the
 official skill and experience gains by explicit integer factors in
-1..9999 bps. Form uses a separate seeded probabilistic step, 1..8, with
+1..9999 bps. Form uses a separate seeded probabilistic step, 1..10 in V3, with
 no guaranteed +1 and no fast saturation.
 
 Existing ``match-development-v1`` receipts and replay are untouched: this
@@ -33,7 +33,8 @@ from goaletto.domain.staff_effects import seeded_draw
 from goaletto.domain.training import PRIMARY_SKILLS, TrainingPlayer, age_multiplier
 
 POLICY = "match-practice-v1"
-CURRENT_POLICY = "match-practice-v2"
+V2_POLICY = "match-practice-v2"
+CURRENT_POLICY = "match-practice-v3"
 
 # Proposal values, not user decisions. Calibration compares 2500/5000/7500.
 DEFAULT_FRIENDLY_SKILL_FACTOR = 5000
@@ -92,7 +93,7 @@ def _check_seed(match_seed: str) -> str:
 
 
 def _check_policy(policy: str) -> str:
-    if policy not in (POLICY, CURRENT_POLICY):
+    if policy not in (POLICY, V2_POLICY, CURRENT_POLICY):
         raise ValueError("Unknown practice policy")
     return policy
 
@@ -136,17 +137,21 @@ class FormOutcome:
     down_chance: int = 0
 
 
-def form_chances(minutes: int, form: int) -> tuple[int, int]:
-    """V2: modest practice around form 5–6; exceptional form can subside.
+def form_chances(minutes: int, form: int, *, policy: str = CURRENT_POLICY) -> tuple[int, int]:
+    """Modest practice around form 5–6; V3 extends the upper edge to ten.
 
     One disjoint draw gives -1/0/+1. More minutes give more exposure,
     not larger jumps. Neither edge is absorbing; no appearance means no change.
     """
     _check_minutes(minutes)
-    if type(form) is not int or not 1 <= form <= 8:
+    _check_policy(policy)
+    maximum = 10 if policy == CURRENT_POLICY else 8
+    if type(form) is not int or not 1 <= form <= maximum:
         raise ValueError("Invalid form")
-    up = (1800, 1700, 1500, 1200, 800, 500, 200, 0)[form - 1]
-    down = (0, 100, 200, 300, 500, 800, 1200, 1800)[form - 1]
+    up_table = (1800, 1700, 1500, 1200, 800, 500, 200, 100, 50, 0)
+    down_table = (0, 100, 200, 300, 500, 800, 1200, 1800, 2200, 2600)
+    up = up_table[form - 1] if form < maximum else 0
+    down = down_table[form - 1]
     return up * minutes // 90, down * minutes // 90
 
 
@@ -166,20 +171,21 @@ def practice_form(
     """
     _check_policy(policy)
     _check_minutes(minutes)
-    if type(form) is not int or not 1 <= form <= 8:
+    maximum = 10 if policy == CURRENT_POLICY else 8
+    if type(form) is not int or not 1 <= form <= maximum:
         raise ValueError("Invalid form")
     if not isinstance(person_id, UUID):
         raise ValueError("Invalid person id")
     _check_seed(match_seed)
     chance, down = (
-        form_chances(minutes, form)
-        if policy == CURRENT_POLICY
+        form_chances(minutes, form, policy=policy)
+        if policy in (V2_POLICY, CURRENT_POLICY)
         else (form_up_chance(minutes, form), 0)
     )
     draw = seeded_draw(match_seed, person_id, "form", policy=policy)
     if down and chance <= draw < chance + down:
         return FormOutcome(form - 1, draw, chance, down)
-    if minutes > 0 and form < 8 and draw < chance:
+    if minutes > 0 and form < maximum and draw < chance:
         return FormOutcome(form + 1, draw, chance, down)
     return FormOutcome(form, draw, chance, down)
 

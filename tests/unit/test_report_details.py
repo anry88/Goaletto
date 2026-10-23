@@ -27,7 +27,7 @@ async def test_form_energy_and_substitutes_use_frozen_data() -> None:
     changed = replace(report, home_lineup=(starter, substitute, unused))
     text, _ = report_view(changed, section="home")
     assert "возраст 31 · сыграл 90 мин" in text
-    assert "Форма до матча: 5/8 · Энергия после: 61%" in text
+    assert "Форма до матча: 5/10 · Энергия после: 61%" in text
     assert "Vyshedshiy &lt;igrok&gt;" in text and "Вышел на замену" in text
     assert "Не выходил" in text
 
@@ -148,14 +148,14 @@ async def test_practice_report_shows_skill_fraction_form_and_legacy_absence():
     text, _ = report_view(changed, section="home")
     assert "Плеймейкинг: +2.88% балла" in text
     assert "опыт +12.00% балла" in text
-    assert "Форма после матча: 8 → 7/8" in text
+    assert "Форма после матча: 8 → 7/10" in text
     assert text.count("Форма после матча") == 1
     # Legacy/unused players have no inferred zeroes or retrospective form changes.
     original, _ = report_view(report, section="home")
     assert "Форма после матча" not in original
     with using_locale("en"):
         english, _ = report_view(changed, section="home")
-    assert "Form after match: 8 → 7/8" in english
+    assert "Form after match: 8 → 7/10" in english
     assert "Playmaking: +2.88%" in english
 
 

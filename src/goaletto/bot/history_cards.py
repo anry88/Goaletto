@@ -328,7 +328,7 @@ def report_view(
             entries.append(
                 tr(
                     "<b>{p0}</b> · {p1}{p2}\n{p3} · возраст {p4} · сыграл {p5} "
-                    "мин\nФорма до матча: {p6}/8 · Энергия после: {p7}",
+                    "мин\nФорма до матча: {p6}/10 · Энергия после: {p7}",
                     p0=escape(
                         flag_name(
                             latin_name(member.name),
@@ -368,7 +368,7 @@ def report_view(
                 )
                 + (
                     tr(
-                        "\nФорма после матча: {before} → {after}/8",
+                        "\nФорма после матча: {before} → {after}/10",
                         before=member.form_before,
                         after=member.form_after,
                     )

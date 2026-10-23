@@ -56,7 +56,7 @@ def test_market_varies_ages_quality_and_potential_without_changing_youth():
     gk = [market_player(UUID(int=n), "GK") for n in range(100)]
     assert any(p.skills[0] >= 17 for p in gk)
     _, youth = youth_profile(0, UUID(int=7), "MC")
-    assert youth[2] == 12 and sum(youth[:8]) == 74
+    assert youth[2] == 6 and sum(youth[:8]) == 39
 
 
 def test_scout_idleness_is_cheap_but_repeated_discoveries_are_not_a_youth_faucet():

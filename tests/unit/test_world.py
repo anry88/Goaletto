@@ -45,7 +45,7 @@ def test_world_population_coverage_and_equal_baseline() -> None:
             }
             for p in club.players:
                 assert all(1 <= skill <= 20 for skill in p.skills)
-                assert p.skills[SKILL_NAMES.index(PRIMARY_SKILL[p.position])] >= 12
+                assert p.skills[SKILL_NAMES.index(PRIMARY_SKILL[p.position])] in (6, 7)
             sums.append(sum(sum(p.skills[:8]) for p in club.players))
     assert len(set(sums)) == 1  # No top-tier starting advantage.
     assert len({p.skills for p in plan.players}) > 20

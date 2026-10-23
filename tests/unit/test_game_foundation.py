@@ -29,6 +29,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     old = {"league_sets", "leagues", "clubs", "jobs", "outbox_messages"}
     altered = {
         "academy_candidates",
+        "players",
         "finance_accounts",
         "ownership_periods",
         "feedback_responses",
@@ -74,6 +75,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
         for constraint in Base.metadata.tables[table].constraints:
             if constraint.name and constraint.name in {
                 "ck_fixture_status",
+                "ck_player_form",
                 "ck_fixture_finish",
                 "ck_fixture_started",
                 "ck_match_phase",

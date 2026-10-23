@@ -13,6 +13,7 @@ from goaletto.domain.calendar import validate_kickoff
 from goaletto.domain.names import INTERNATIONAL_CLUBS, NAMING_POLICY, international_catalog
 from goaletto.domain.person_names import PERSON_NAMING_POLICY, generated_name
 from goaletto.domain.retirement import RetirementDecision, player_last_season
+from goaletto.domain.starter_squads import LEGACY_STARTER_POLICY, STARTER_POLICY, starter_skills
 
 WORLD_POLICY = "world-seed-v1"
 WORLD_NAMESPACE = UUID("4c5e18f0-c8ad-5bfd-a852-a2f93342c42e")
@@ -230,6 +231,7 @@ class WorldOptions:
     first_kickoff: datetime
     initial_budget: int = 0
     naming_policy: str = PERSON_NAMING_POLICY
+    starter_policy: str = STARTER_POLICY
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", self.key):
@@ -241,6 +243,8 @@ class WorldOptions:
         if self.naming_policy not in {NAMING_POLICY, PERSON_NAMING_POLICY, "legacy-v1"}:
             raise ValueError("Invalid naming policy")
         validate_kickoff(self.first_kickoff)
+        if self.starter_policy not in (LEGACY_STARTER_POLICY, STARTER_POLICY):
+            raise ValueError("Invalid starter skill policy")
 
     @property
     def fingerprint(self) -> str:
@@ -248,6 +252,8 @@ class WorldOptions:
         data["first_kickoff"] = self.first_kickoff.isoformat()
         if self.naming_policy == "legacy-v1":
             data.pop("naming_policy")
+        if self.starter_policy == LEGACY_STARTER_POLICY:
+            data.pop("starter_policy")
         data["policy"] = WORLD_POLICY
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
@@ -299,23 +305,8 @@ def stable_seed(seed: int, key: str) -> int:
     return int.from_bytes(hashlib.sha256(f"{seed}:{key}".encode()).digest()[:8], "big") % 2**63
 
 
-def _skills(position: str, rng: Random) -> tuple[int, ...]:
-    if position == "GK":
-        values = [14, 6, 8, 6, 6, 8, 11, 8, 10, 10]
-    elif position in {"DL", "DC", "DR"}:
-        values = [1, 12, 9, 10, 7, 9, 11, 10, 10, 10]
-    elif position in {"ML", "MC", "MR"}:
-        values = [1, 9, 12, 12, 9, 10, 11, 10, 10, 10]
-    else:
-        values = [1, 7, 10, 10, 12, 10, 11, 12, 10, 10]
-    primary = SKILL_NAMES.index(PRIMARY_SKILL[position])
-    eligible = [index for index in range(1, 8) if index != primary]
-    left, right = rng.sample(eligible, 2)
-    values[left] += 1
-    values[right] -= 1
-    values[8] = rng.randint(9, 11)
-    values[9] = rng.randint(9, 11)
-    return tuple(values)
+def _skills(position: str, rng: Random, policy: str = STARTER_POLICY) -> tuple[int, ...]:
+    return starter_skills(position, rng, policy)
 
 
 def build_world(options: WorldOptions) -> WorldPlan:
@@ -362,7 +353,7 @@ def build_world(options: WorldOptions) -> WorldPlan:
                         display_name,
                         age,
                         position,
-                        _skills(position, player_rng),
+                        _skills(position, player_rng, options.starter_policy),
                         player_last_season(age, player_rng.randrange(10000)),
                     )
                 )

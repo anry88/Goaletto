@@ -43,11 +43,11 @@ async def completed_checkpoint(sessions, fixture_id, at):
 
 async def test_concurrent_finalize_persists_practice_once_and_history_is_frozen(sessions):
     _, actor, club = await funded(sessions)
-    # Give form 8 before the snapshot: V2 must permit a fall from the maximum.
+    # Give form 10 before the snapshot: V3 must permit a fall from the maximum.
     async with sessions.begin() as session:
         players = (await session.scalars(select(Player))).all()
         for player in players:
-            player.form = 8
+            player.form = 10
     fixture, at = await start_fixture(sessions, club)
     final = await completed_checkpoint(sessions, fixture, at)
     async with sessions.begin() as session:
@@ -82,10 +82,10 @@ async def test_concurrent_finalize_persists_practice_once_and_history_is_frozen(
                     assert row is None and player.form == before[player.person_id]
                     continue
                 assert row["minutes"] == condition.minutes_played
-                assert row["form_before"] == 8 and row["form_after"] == player.form
+                assert row["form_before"] == 10 and row["form_after"] == player.form
                 assert row["competition"] == "league" and row["skill_factor"] == 10000
                 assert 0 <= row["form_draw"] < 10000
-                expected = 7 if row["form_draw"] < row["form_down_chance"] else 8
+                expected = 9 if row["form_draw"] < row["form_down_chance"] else 10
                 assert player.form == expected
                 dev = await session.get(PlayerDevelopment, player.person_id)
                 assert dev.season_gains["match"] == row["gain_bps"]

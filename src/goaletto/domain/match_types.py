@@ -106,8 +106,8 @@ class PlayerSnapshot:
             raise ValueError("At most two distinct alternative positions")
         if self.position in self.alternatives:
             raise ValueError("Alternative position repeats main position")
-        if type(self.form) is not int or not 1 <= self.form <= 8:
-            raise ValueError("Form must be an integer from 1 through 8")
+        if type(self.form) is not int or not 1 <= self.form <= 10:
+            raise ValueError("Form must be an integer from 1 through 10")
         if type(self.morale) is not int or not 0 <= self.morale <= 100:
             raise ValueError("Morale must be an integer from 0 through 100")
         if type(self.age) is not int or not 17 <= self.age <= 38:

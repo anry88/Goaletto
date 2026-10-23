@@ -15,6 +15,7 @@ from goaletto.domain.match_practice import (
     CURRENT_POLICY,
     DEFAULT_FRIENDLY_EXPERIENCE_FACTOR,
     DEFAULT_FRIENDLY_SKILL_FACTOR,
+    V2_POLICY,
     MatchPracticeResult,
     develop_match_practice,
 )
@@ -128,9 +129,9 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
     )
     if receipt is None or receipt.applied_at is not None:
         return  # Old matches without a pinned policy never receive retroactive rewards.
-    if receipt.policy_version not in (POLICY, CURRENT_POLICY):
+    if receipt.policy_version not in (POLICY, V2_POLICY, CURRENT_POLICY):
         raise ValueError("Unknown match development policy")
-    practice = receipt.policy_version == CURRENT_POLICY
+    practice = receipt.policy_version in (V2_POLICY, CURRENT_POLICY)
     results = []
     if receipt.eligible:
         if practice:

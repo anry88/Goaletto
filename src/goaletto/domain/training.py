@@ -150,7 +150,7 @@ class TrainingPlayer:
             raise ValueError("Invalid potential or skill")
         if (
             type(self.form) is not int
-            or not 1 <= self.form <= 8
+            or not 1 <= self.form <= 10
             or type(self.experience) is not int
             or self.experience < 0
         ):
@@ -258,7 +258,7 @@ def train_player(
         if seeded_draw(seed, player.id, "form", policy=SESSION_POLICY) < (
             200 if intensity == Intensity.LOW else 100
         ):
-            form = min(8, form + 1)
+            form = min(10, form + 1)
     injury_rate = (
         (14 * (10000 - physio_skill * 150) + 9999) // 10000 if intensity == Intensity.HIGH else 0
     )

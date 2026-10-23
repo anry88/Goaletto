@@ -19,6 +19,7 @@ from goaletto.domain.calendar import (
 )
 from goaletto.domain.game_cycle import CYCLE_CALENDAR, midnight, season_end, season_epoch
 from goaletto.domain.nationalities import nationality
+from goaletto.domain.starter_squads import LEGACY_STARTER_POLICY
 from goaletto.domain.training import POLICY_VERSION, PROGRESS_KEYS, SKILLS, initial_caps
 from goaletto.domain.world import SKILL_NAMES, WORLD_POLICY, WorldOptions, WorldPlan, build_world
 from goaletto.infrastructure.locks import APPEARANCE_ALLOCATION_LOCK
@@ -140,6 +141,8 @@ async def initialize_world(
             if "naming_policy" in receipt.config
             else replace(options, naming_policy="legacy-v1")
         )
+        if "starter_policy" not in receipt.config:
+            expected = replace(expected, starter_policy=LEGACY_STARTER_POLICY)
         if receipt.config_hash != expected.fingerprint:
             raise ValueError("World key already has a different seed configuration")
         from goaletto.application.coaches import ensure_starting_coaches
@@ -382,6 +385,7 @@ async def initialize_world(
                     "first_kickoff": options.first_kickoff.isoformat(),
                     "initial_budget": options.initial_budget,
                     "naming_policy": options.naming_policy,
+                    "starter_policy": options.starter_policy,
                     "calendar_policy": CYCLE_CALENDAR,
                     "season_number": season_number or 1,
                 },

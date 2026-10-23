@@ -1,5 +1,6 @@
 """SQL recording only: no database, no connection and no claim of PG race coverage."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import cast
 from unittest.mock import AsyncMock
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.dml import Insert
 
 from goaletto.application.world import initialize_world
+from goaletto.domain.starter_squads import LEGACY_STARTER_POLICY
 from goaletto.domain.world import WORLD_POLICY, WorldOptions, build_world
 from goaletto.infrastructure.models import Club, WorldSeedReceipt
 
@@ -58,7 +60,7 @@ def receipt() -> WorldSeedReceipt:
         season_id=plan.season_id,
         config_hash=OPTIONS.fingerprint,
         policy_version=WORLD_POLICY,
-        config={"naming_policy": OPTIONS.naming_policy},
+        config={"naming_policy": OPTIONS.naming_policy, "starter_policy": OPTIONS.starter_policy},
         created_at=NOW,
     )
 
@@ -143,3 +145,15 @@ async def test_closed_preparation_window_is_rejected_before_any_population_write
             cast(AsyncSession, session), OPTIONS, initialized_at=OPTIONS.first_kickoff
         )
     assert session.writes == []
+
+
+async def test_pre_policy_world_receipt_is_retryable_without_rewriting_history(monkeypatch):
+    monkeypatch.setattr(
+        "goaletto.application.coaches.ensure_starting_coaches", AsyncMock(return_value=0)
+    )
+    saved = receipt()
+    saved.config = {"naming_policy": OPTIONS.naming_policy}
+    saved.config_hash = replace(OPTIONS, starter_policy=LEGACY_STARTER_POLICY).fingerprint
+    session = SQLRecorder(saved)
+    result = await initialize_world(cast(AsyncSession, session), OPTIONS, initialized_at=NOW)
+    assert not result.created and session.writes == []

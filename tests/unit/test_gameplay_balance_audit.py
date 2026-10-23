@@ -234,4 +234,4 @@ def test_affordability_includes_the_scouts_hire_and_wages():
     result = AUDIT.run_audit([7])["scout"]["affordability"]
     assert result["scout_hire"] == F.staff_fee("scout", 5, 50)
     assert result["scout_wage_per_cycle"] == F.staff_wage("scout", 5, 50)
-    assert result["existing_wages_per_cycle"] >= 40000
+    assert 10000 <= result["existing_wages_per_cycle"] <= 13000

@@ -527,7 +527,7 @@ class Player(Base):
                 "loyalty",
             )
         ),
-        CheckConstraint("form BETWEEN 1 AND 8", name="ck_player_form"),
+        CheckConstraint("form BETWEEN 1 AND 10", name="ck_player_form"),
         CheckConstraint("experience >= 0", name="ck_player_experience"),
         CheckConstraint("morale BETWEEN 0 AND 100", name="ck_player_morale"),
         CheckConstraint("status IN ('active', 'last_season', 'retired')", name="ck_player_status"),
@@ -1183,6 +1183,29 @@ class WorldSeedReceipt(Base):
     policy_version: Mapped[str] = mapped_column(String(80))
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class StarterRebalanceReceipt(Base):
+    """One audited removal of the legacy free starter advantage per person."""
+
+    __tablename__ = "starter_rebalance_receipts"
+    __table_args__ = (
+        CheckConstraint("policy_version = 'starter-squad-v2'", name="ck_starter_rebalance_policy"),
+        CheckConstraint(
+            "jsonb_typeof(before_skills) = 'object' AND jsonb_typeof(after_skills) = 'object' "
+            "AND jsonb_typeof(old_baseline) = 'object' AND jsonb_typeof(new_baseline) = 'object'",
+            name="ck_starter_rebalance_skills",
+        ),
+    )
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
+    world_key: Mapped[str] = mapped_column(ForeignKey("world_seed_receipts.key"))
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    policy_version: Mapped[str] = mapped_column(String(32))
+    before_skills: Mapped[dict[str, int]] = mapped_column(JSONB)
+    after_skills: Mapped[dict[str, int]] = mapped_column(JSONB)
+    old_baseline: Mapped[dict[str, int]] = mapped_column(JSONB)
+    new_baseline: Mapped[dict[str, int]] = mapped_column(JSONB)
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class AnalyticsCoverage(Base):
@@ -2191,7 +2214,7 @@ class MatchDevelopment(Base):
     __tablename__ = "match_development"
     __table_args__ = (
         CheckConstraint(
-            "policy_version IN ('match-development-v1','match-practice-v2')",
+            "policy_version IN ('match-development-v1','match-practice-v2','match-practice-v3')",
             name="ck_match_development_policy",
         ),
         CheckConstraint(

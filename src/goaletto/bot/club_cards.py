@@ -298,7 +298,7 @@ def player_view(
     )
     if any(type(v) is not int or not 1 <= v <= 20 for v in skills):
         raise ValueError("Invalid player skills")
-    if type(card.form) is not int or not 1 <= card.form <= 8:
+    if type(card.form) is not int or not 1 <= card.form <= 10:
         raise ValueError("Invalid player form")
     status = STATUS_TEXT.get(card.status, card.status)
     lines = [
@@ -325,7 +325,7 @@ def player_view(
     lines.append(tr("<b>Навыки (1–20)</b>\n{p0}", p0=skill_text))
     lines.append(
         tr(
-            "Форма: {p0}/8 · Опыт: {p1} · Мораль: {p2}",
+            "Форма: {p0}/10 · Опыт: {p1} · Мораль: {p2}",
             p0=card.form,
             p1=card.experience,
             p2=card.morale,

@@ -15,6 +15,7 @@ from goaletto.domain.match_types import (
     PlayerSnapshot,
     TeamSnapshot,
 )
+from goaletto.domain.starter_squads import LEGACY_STARTER_POLICY
 from goaletto.domain.world import StartingClub, WorldOptions, build_world
 
 
@@ -45,6 +46,7 @@ def demo_match(seed: int = 7) -> MatchState:
             seed=0,
             first_kickoff=datetime(2000, 1, 1, 18, tzinfo=UTC),
             naming_policy="legacy-v1",
+            starter_policy=LEGACY_STARTER_POLICY,
         )
     )
     home, away = world.leagues[0].clubs[:2]

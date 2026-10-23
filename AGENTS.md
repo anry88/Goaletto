@@ -50,6 +50,14 @@
   before kickoff using existing eligible club reserves, for humans and bots;
   preserve the saved template and do not spend in-match substitutions.
   See docs/tournament-discipline.md (AND-164).
+- User update 2026-10-23 (AND-165): free starter-squad-v2 profiles have primary
+  skills 6 (GK 7), so academy level 1 and ordinary scouts can supply useful youth.
+  Rebase only proven original free starters, preserving earned whole/fractional
+  development, caps, identity, contracts and immutable match/payment history.
+  Exclude acquired/released/listed people; refuse locked matches or insolvency
+  introduced by the change. Never reset production. Form now ranges 1..10;
+  new matches pin match-practice-v3, frozen V2 retains its original outcomes.
+  See docs/starter-squads-and-form.md.
 - Each league set has 5 leagues of exactly 10 clubs. New managers enter only tier 5.
   User update 2026-10-14: promotion/relegation happens simultaneously across
   compatible completed seasons, with two clubs each way between adjacent tiers.

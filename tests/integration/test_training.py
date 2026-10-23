@@ -121,7 +121,7 @@ async def test_weekly_training_retry_fractional_progress_rollback_and_owner_expi
             for d in (await session.scalars(select(PlayerDevelopment))).all()
         }
         assert ownership.last_game_action_at == last_action
-    # The next chosen week is cancelled after ownership expires, without training bots.
+    # The next chosen UTC day is cancelled after ownership expires, without training bots.
     later = due + timedelta(hours=1)
     later_actor = replace(actor, operation_id=uuid4(), at=later)
     async with sessions.begin() as session:
@@ -129,7 +129,7 @@ async def test_weekly_training_retry_fractional_progress_rollback_and_owner_expi
             session,
             later_actor,
             ownership_id=owner_id,
-            week=week_start(later),
+            week=week_start(later + timedelta(days=1)),
             focus=Focus.TEAM,
             intensity=Intensity.MEDIUM,
             clock=lambda: later,
