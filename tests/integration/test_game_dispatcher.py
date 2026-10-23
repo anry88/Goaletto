@@ -16,7 +16,15 @@ from aiogram.methods import (
     SendPhoto,
     SetMyCommands,
 )
-from aiogram.types import CallbackQuery, Chat, Message, PhotoSize, Update, User
+from aiogram.types import (
+    CallbackQuery,
+    Chat,
+    InlineKeyboardMarkup,
+    Message,
+    PhotoSize,
+    Update,
+    User,
+)
 from sqlalchemy import select
 
 from goaletto.application.world import initialize_world
@@ -80,7 +88,10 @@ class Telegram(BaseSession):
             ]
             if photo
             else None,
-            reply_markup=method.reply_markup,
+            # Telegram returns inline markup on Message, not outgoing ForceReply.
+            reply_markup=method.reply_markup
+            if isinstance(method.reply_markup, InlineKeyboardMarkup)
+            else None,
         )
         return self.last_message
 

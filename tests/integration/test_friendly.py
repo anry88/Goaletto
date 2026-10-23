@@ -435,7 +435,7 @@ async def test_telegram_friendly_request_is_explicit_and_replay_safe(sessions, m
     user = User(id=1001, is_bot=False, first_name="Manager")
     sequence = 900
 
-    async def send(data=None):
+    async def send(data=None, *, search=None):
         nonlocal sequence
         sequence += 1
         if data is None:
@@ -446,7 +446,8 @@ async def test_telegram_friendly_request_is_explicit_and_replay_safe(sessions, m
                     date=NOW,
                     chat=Chat(id=1001, type="private"),
                     from_user=user,
-                    text="/friendly",
+                    text=search or "/friendly",
+                    reply_to_message=transport.last_message if search else None,
                 ),
             )
         else:
@@ -476,9 +477,16 @@ async def test_telegram_friendly_request_is_explicit_and_replay_safe(sessions, m
         assert await session.scalar(select(func.count()).select_from(FriendlyInvitation)) == 0
     message = await send(button(message, "fr:c"))
     message = await send(button(message, "fr:d:"))
+    # The current UI asks for a name in a ForceReply search before offering clubs.
+    _, opponent, _ = await _free_day_and_opponent(sessions, _club)
+    async with sessions.begin() as session:
+        from goaletto.infrastructure.models import Club
+
+        opponent_name = (await session.get(Club, opponent)).name
+    message = await send(search=opponent_name)
     request = button(message, "fr:o:")
     message = await send(request)
-    assert "Матч с бот-клубом назначен" in message.text
+    assert "Матч назначен" in message.text
     await send(request)
     async with sessions.begin() as session:
         assert await session.scalar(select(func.count()).select_from(FriendlyInvitation)) == 1
