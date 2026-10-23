@@ -277,6 +277,17 @@ def report_view(
             tr("Пенальти: {home}:{away}", home=report.penalties[0], away=report.penalties[1])
         )
     if section == "events":
+        for name, club_id, awarded, served, carried in report.discipline:
+            club = report.home_name if club_id == report.home_club_id else report.away_name
+            label = escape(latin_name(name)) + " (" + escape(latin_name(club)) + ")"
+            if awarded:
+                entries.append(
+                    tr("⛔ {player}: пропуск следующего матча этого турнира.", player=label)
+                )
+            elif served:
+                entries.append(tr("✅ {player}: дисквалификация отбыта.", player=label))
+            elif carried:
+                entries.append(tr("🟨 {player}: 1/2 предупреждений в турнире.", player=label))
         for event in sorted(report.events, key=lambda e: e.minute):
             line = _event_line(
                 event.kind,

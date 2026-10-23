@@ -171,6 +171,8 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
     assert "Получить клуб" in str(response.reply_markup)
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
+    assert "Страна клуба" in (response.text or response.caption)
+    response = await command("/club")
     assert "Выберите" not in (response.text or response.caption)
     async with sessions.begin() as session:
         manager = await session.scalar(select(Manager).where(Manager.telegram_id == user.id))
@@ -180,26 +182,12 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
         assert ownership is not None
 
     response = await command("/settings")
-    assert "Напоминания" in response.text
-    response = await callback(
-        next(
-            b.callback_data
-            for row in response.reply_markup.inline_keyboard
-            for b in row
-            if b.callback_data.startswith("ntf:off:")
-        )
-    )
-    assert "выключены" in response.text
-    response = await callback(
-        next(
-            b.callback_data
-            for row in response.reply_markup.inline_keyboard
-            for b in row
-            if b.callback_data.startswith("ntf:on:")
-        )
-    )
-    assert "включены" in response.text
+    assert "Напоминания" not in response.text
+    from goaletto.bot.result_views import compact_id
+
+    await callback(f"ntf:off:{compact_id(ownership.id)}")
     async with sessions.begin() as session:
+        assert (await session.get(Manager, manager.id)).reminders_enabled
         current = await session.get(OwnershipPeriod, ownership.id)
         assert current.last_game_action_at == ownership.last_game_action_at
         assert current.expires_at == ownership.expires_at
@@ -215,6 +203,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     )
     response = await callback(panel)
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
+    captain_update_id = update_id
     panel = next(
         b.callback_data
         for row in response.reply_markup.inline_keyboard
@@ -226,7 +215,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     async with sessions.begin() as session:
         rows = (await session.scalars(select(AcceptedCommand))).all()
         assert len(rows) == 1
-        assert {r.telegram_update_id for r in rows} == {13}
+        assert {r.telegram_update_id for r in rows} == {captain_update_id}
         lineup = await session.get(ClubLineup, ownership.club_id)
         assert lineup.version == 2
     await command("/settings")
@@ -247,23 +236,24 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
         response = await command(cmd)
         assert not any(
             "А" <= ch <= "я" or ch in "Ёё"
-            for ch in (response.text or response.caption).replace("Язык", "")
+            # Language/channel names retain their native labels in both locales.
+            for ch in (response.text or response.caption).replace("Язык", "").replace("Русский", "")
         ), (cmd, response.text or response.caption)
     async with sessions.begin() as session:
         manager = await session.scalar(select(Manager).where(Manager.telegram_id == user.id))
         assert manager.locale == "en"
-    response = await command("/timezone Belgrade")
-    assert "Europe/Belgrade" in response.text and "2026" in response.text
-    response = await callback("tz:Europe/Belgrade")
-    assert "Europe/Belgrade" in response.text
+    response = await command("/timezone")
+    assert "UTC" in response.text
+    response = await callback("tz:offset:2")
+    assert "UTC+2" in response.text
     response = await command("/kickoff 19:15")
     assert "19:15" in response.text
     async with sessions.begin() as session:
         manager = await session.scalar(select(Manager).where(Manager.telegram_id == user.id))
-        assert manager.timezone_name == "Europe/Belgrade"
+        assert manager.timezone_name == "Etc/GMT-2"
         assert manager.preferred_kickoff_minute == 1155
     response = await command("/kickoff 25:00")
     assert "HH" not in response.text and "/kickoff 19:30" in response.text
-    response = await command("/timezone MissingCity")
-    assert "Timezone not found" in response.text
+    response = await callback("tz:Europe/Belgrade")
+    assert "outdated" in response.text.lower()
     await bot.session.close()

@@ -184,6 +184,8 @@ async def _help(
     text = (
         tr("Нет действующего владения клубом. Откройте /start.")
         if isinstance(error, PermissionDenied)
+        else tr("Игрок дисквалифицирован на следующий матч этого турнира. Выберите другого.")
+        if isinstance(error, LineupInvalid) and error.code == "suspended"
         else tr(
             "Состав не изменён: экран устарел, игрок недоступен или "
             "состав уже заблокирован. Откройте /lineup заново."

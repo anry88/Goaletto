@@ -61,6 +61,10 @@ def demand_io(monkeypatch):
     monkeypatch.setattr("goaletto.application.stadium.crowd_for_fixture", demand)
     monkeypatch.setattr("goaletto.application.stadium.pin_crowd", AsyncMock())
     monkeypatch.setattr("goaletto.application.match_development.pin_development", AsyncMock())
+    monkeypatch.setattr(
+        "goaletto.application.discipline.tournament_scope", AsyncMock(return_value=None)
+    )
+    monkeypatch.setattr("goaletto.application.discipline.apply_discipline", AsyncMock())
 
 
 class Rows:
@@ -272,7 +276,7 @@ async def test_lock_pins_crowd_and_start_never_reads_changed_stadium(monkeypatch
     async def get(model, key):
         return recorder.season
 
-    async def snapshot(session, club, at):
+    async def snapshot(session, club, at, **kwargs):
         snapshot = state.home.snapshot if club.id == home.id else state.away.snapshot
         return replace(snapshot, coach=CoachSnapshot(None))
 

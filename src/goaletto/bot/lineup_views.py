@@ -60,6 +60,10 @@ def _badges(person_id: UUID, slot: str, data: LineupData) -> str:
         marks += " 🔶"
     if member is not None and member.injured:
         marks += " 🤕"
+    if member is not None and member.suspended:
+        marks += " ⛔"
+    if member is not None and member.tournament_yellows:
+        marks += " 🟨1/2"
     if member is not None and slot != member.position:
         marks += " ↔85%" if slot in member.alternatives else " ⚠️60%"
     return marks
@@ -76,6 +80,18 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
     except ValueError:
         mentality = data.mentality
     lines.append(tr("Тактика: {p0} · Настрой: {p1}", p0=escape(tactic), p1=escape(mentality)))
+    if data.discipline_competition:
+        competition = {
+            "league": tr("Лига"),
+            "cup": tr("Кубок"),
+            "champions": tr("Кубок чемпионов"),
+        }[data.discipline_competition]
+        lines.append(
+            tr(
+                "Карточки: {competition}. 🟨1/2 — предупреждение; ⛔ — пропуск матча.",
+                competition=competition,
+            )
+        )
     captain = next((m for m in data.starters if m.person_id == data.captain_id), None)
     lines.append(
         tr(
@@ -251,6 +267,7 @@ def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
             )
         ]
         for member in (*data.bench, *data.reserves)
+        if not member.suspended
     )
     rows.append([_button(tr("← Назад"), f"ln:panel:swap:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -285,6 +302,7 @@ def bench_choices_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
             )
         ]
         for m in data.reserves
+        if not m.suspended
     ]
     if slot < 12 + len(data.bench):
         rows.append([_button(tr("Оставить вне заявки"), f"ln:br:{slot}:{version}")])

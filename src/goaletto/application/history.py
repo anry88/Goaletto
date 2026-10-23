@@ -152,6 +152,7 @@ class MatchReport:
     penalties: tuple[int, int] | None = None
     aggregate: tuple[int, int] | None = None
     neutral_venue: tuple[str, int, int, int, int] | None = None
+    discipline: tuple[tuple[str, UUID, int, bool, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -536,6 +537,21 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
             goal_counts[key] = goal_counts.get(key, 0) + 1
 
     development = await session.get(MatchDevelopment, match.id)
+    from goaletto.infrastructure.models import DisciplineReceipt, MatchDiscipline
+
+    discipline_header = await session.get(MatchDiscipline, match.id)
+    discipline = (
+        tuple(
+            (r.name, r.club_id, r.awarded, r.served, r.carried_after)
+            for r in await session.scalars(
+                select(DisciplineReceipt)
+                .where(DisciplineReceipt.match_id == match.id)
+                .order_by(DisciplineReceipt.club_id, DisciplineReceipt.person_id)
+            )
+        )
+        if discipline_header and discipline_header.applied_at
+        else ()
+    )
     growth_rows = (
         {r["person_id"]: r for r in development.results}
         if development and development.applied_at
@@ -671,6 +687,7 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         penalties,
         aggregate,
         neutral_venue,
+        discipline,
     )
 
 

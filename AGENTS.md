@@ -41,6 +41,15 @@
   or unseeded random generators in domain modules.
 - Match ticks are 60 seconds. Regulation: 30 ticks, 3 game minutes each, 3-minute
   halftime. Wall-clock duration is 33 minutes.
+- User update 2026-10-23: every two yellows in different matches of one tournament
+  edition give one match suspension in that same tournament. A direct red or
+  second-yellow dismissal also gives one suspension, without double punishment.
+  League/cup/each champions tournament have independent balances; a cup ban
+  never blocks league play or gets served there. Friendlies neither accumulate
+  nor serve official bans. Automatically replace a selected suspended player
+  before kickoff using existing eligible club reserves, for humans and bots;
+  preserve the saved template and do not spend in-match substitutions.
+  See docs/tournament-discipline.md (AND-164).
 - Each league set has 5 leagues of exactly 10 clubs. New managers enter only tier 5.
   User update 2026-10-14: promotion/relegation happens simultaneously across
   compatible completed seasons, with two clubs each way between adjacent tiers.

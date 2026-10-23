@@ -993,6 +993,63 @@ class Match(Base):
     paused_seconds: Mapped[int] = mapped_column(Integer, server_default="0")
 
 
+class PlayerDiscipline(Base):
+    """Current balance for a person in exactly one tournament edition."""
+
+    __tablename__ = "player_discipline"
+    __table_args__ = (
+        CheckConstraint("yellows IN (0,1) AND bans >= 0", name="ck_discipline_balance"),
+    )
+    scope: Mapped[str] = mapped_column(String(120), primary_key=True)
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
+    yellows: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
+    bans: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+
+class MatchDiscipline(Base):
+    """Opt-in at lineup lock; old snapshots/results are never backfilled."""
+
+    __tablename__ = "match_discipline"
+    __table_args__ = (
+        CheckConstraint("jsonb_typeof(excluded) = 'array'", name="ck_discipline_excluded"),
+        CheckConstraint(
+            "(applied_at IS NULL) = (state_hash IS NULL) AND "
+            "(applied_at IS NULL OR applied_at >= locked_at)",
+            name="ck_discipline_applied",
+        ),
+    )
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    scope: Mapped[str] = mapped_column(String(120), nullable=False)
+    excluded: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    state_hash: Mapped[str | None] = mapped_column(String(64))
+
+
+class DisciplineReceipt(Base):
+    __tablename__ = "discipline_receipts"
+    __table_args__ = (
+        CheckConstraint(
+            "yellows BETWEEN 0 AND 2 AND carried_after IN (0,1) AND awarded IN (0,1) "
+            "AND bans_after >= 0 AND (yellows <> 2 OR dismissed) "
+            "AND (NOT served OR (yellows=0 AND NOT dismissed AND awarded=0))",
+            name="ck_discipline_receipt",
+        ),
+    )
+    match_id: Mapped[UUID] = mapped_column(
+        ForeignKey("match_discipline.match_id"), primary_key=True
+    )
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    yellows: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    dismissed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    served: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    awarded: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    carried_after: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    bans_after: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class MatchRecovery(Base):
     __tablename__ = "match_recoveries"
     __table_args__ = (

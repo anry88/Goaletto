@@ -96,6 +96,7 @@ def validate_lineup(
     captain_id: UUID,
     tactic: Tactic | str,
     mentality: Mentality | str,
+    allow_emergency_goalkeeper: bool = False,
 ) -> ValidatedLineup:
     """Validate a pre-match XI/bench/captain/tactics pick against a fresh roster.
 
@@ -142,7 +143,7 @@ def validate_lineup(
     for pick in starters:
         player = eligible[pick.person_id]
         if pick.slot_position == "GK":
-            if player.position != "GK":
+            if player.position != "GK" and not allow_emergency_goalkeeper:
                 raise LineupInvalid(
                     "goalkeeper_assignment", "Only a goalkeeper plays the goalkeeper slot"
                 )

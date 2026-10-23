@@ -227,7 +227,9 @@ async def activate_season(session: AsyncSession, season_id: UUID, at: datetime) 
     )
 
 
-async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> TeamSnapshot:
+async def team_snapshot(
+    session: AsyncSession, club: Club, at: datetime, *, suspended: frozenset[UUID] = frozenset()
+) -> TeamSnapshot:
     lineup = await session.get(ClubLineup, club.id)
     if lineup is None:
         raise ValueError("Club has no saved lineup")
@@ -265,7 +267,8 @@ async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> Team
             experience=player.experience,
             morale=player.morale,
             alternatives=tuple(player.alternative_positions),
-            available=player.injured_until is None or player.injured_until <= at,
+            available=(player.injured_until is None or player.injured_until <= at)
+            and person.id not in suspended,
             last_season=player.status == "last_season",
             appearance_identity_id=person.appearance_identity_id,
             appearance_variant_id=person.appearance_variant_id,
@@ -283,10 +286,16 @@ async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> Team
     if len(players) > 25:
         raise ValueError("Club roster exceeds twenty-five players")
     by_id = {p.id: p for p in players}
+    suspended = suspended.intersection(by_id)
     if not {s.person_id for s in slots}.issubset(by_id):
         raise ValueError("Lineup contains a different roster")
     starters = [FieldSlot(s.person_id, s.position) for s in slots[:11]]
     bench = [s.person_id for s in slots[11:]]
+    # Bring an existing unselected reserve into consideration for a suspension.
+    # Stable saved-bench order first; no quality sorting or generated replacements.
+    if suspended:
+        selected = {s.person_id for s in slots}
+        bench.extend(p.id for p in players if p.id not in selected and p.available)
     for index, slot in enumerate(starters):
         if by_id[slot.player_id].available:
             continue
@@ -304,10 +313,24 @@ async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> Team
                 None,
             )
         if replacement is None:
-            raise ValueError("Not enough healthy players in the saved lineup")
+            replacement = (
+                next(
+                    (pid for pid in bench if by_id[pid].available and by_id[pid].position != "GK"),
+                    None,
+                )
+                if suspended
+                and (slot.position != "GK" or any(by_id[pid].position == "GK" for pid in suspended))
+                else None
+            )
+        if replacement is None:
+            raise ValueError("Not enough eligible players in the saved lineup")
         bench.remove(replacement)
         bench.append(slot.player_id)
         starters[index] = FieldSlot(replacement, slot.position)
+    # Suspensions exclude both starters and substitutes. Injured bench handling
+    # retains its existing behavior. Keep the saved lineup itself untouched.
+    bench = [pid for pid in bench if pid not in suspended][:9]
+    selected_ids = {s.player_id for s in starters} | set(bench)
     tactics = lineup.tactics
     if set(tactics) - {"tactic", "mentality", "pressing", "counterattack"}:
         raise ValueError("Unknown saved tactics field")
@@ -331,7 +354,7 @@ async def team_snapshot(session: AsyncSession, club: Club, at: datetime) -> Team
     return TeamSnapshot(
         club.id,
         club.name,
-        tuple(p for p in players if p.id in {s.person_id for s in slots}),
+        tuple(p for p in players if p.id in selected_ids),
         tuple(starters),
         tuple(bench),
         tactic=tactic if tactic in coach.abilities.tactics else coach.abilities.tactics[0],
@@ -760,10 +783,33 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             demand = await pin_final_venue(
                 session, fixture, home, away, seed, at, competition=fixture.competition or "league"
             )
+        from goaletto.application.discipline import exclusions, tournament_scope
         from goaletto.application.recovery import lock_energy, recover_player
 
-        home_snapshot = await team_snapshot(session, home, fixture.scheduled_start_at)
-        away_snapshot = await team_snapshot(session, away, fixture.scheduled_start_at)
+        scope = await tournament_scope(session, fixture)
+        if scope is not None:
+            earlier = await session.scalar(
+                select(Fixture.id)
+                .where(
+                    Fixture.season_id == fixture.season_id,
+                    Fixture.competition == fixture.competition,
+                    Fixture.status.in_(("scheduled", "live", "paused")),
+                    Fixture.scheduled_start_at < fixture.scheduled_start_at,
+                    (Fixture.home_club_id.in_((home.id, away.id)))
+                    | (Fixture.away_club_id.in_((home.id, away.id))),
+                )
+                .limit(1)
+            )
+            if earlier is not None:
+                raise NotReady("An earlier tournament match has not finished")
+        excluded = await exclusions(session, scope, fixture)
+        suspended = frozenset(UUID(r["person_id"]) for r in excluded)
+        home_snapshot = await team_snapshot(
+            session, home, fixture.scheduled_start_at, suspended=suspended
+        )
+        away_snapshot = await team_snapshot(
+            session, away, fixture.scheduled_start_at, suspended=suspended
+        )
         energies = {}
         for person in (*home_snapshot.players, *away_snapshot.players):
             energies[person.id] = (await recover_player(session, person.id, at)).energy_bps
@@ -796,6 +842,13 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         )
         session.add(match)
         await session.flush()
+        if scope is not None:
+            from goaletto.infrastructure.models import MatchDiscipline
+
+            session.add(
+                MatchDiscipline(match_id=match.id, scope=scope, excluded=excluded, locked_at=at)
+            )
+            await session.flush()
         from goaletto.application.match_development import pin_development
 
         await pin_development(session, fixture, state, at)
@@ -948,6 +1001,10 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         stage = "abandoned" if abandoned else "finished"
         await stage_receipt(session, match, stage, at, due)
         await lifecycle_event(session, fixture, f"fixture_{stage}", stage, at)
+        if abandoned:
+            from goaletto.application.discipline import apply_discipline
+
+            await apply_discipline(session, new, at)
         if not abandoned and await finalize_result(session, fixture.id, at):
             await lifecycle_event(session, fixture, "result_finalized", "result", at)
         await queue_notification(session, fixture, "match_result", stage, at, new)

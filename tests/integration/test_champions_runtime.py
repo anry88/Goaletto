@@ -24,6 +24,7 @@ from goaletto.infrastructure.models import (
     LedgerEntry,
     Match,
     MatchDevelopment,
+    MatchDiscipline,
     MatchResult,
     Season,
     Standing,
@@ -219,6 +220,15 @@ async def test_first_season_has_no_champions_then_full_second_season(sessions):
             )
         ).all()
         assert len(results) == 65 and all(r.league_id is None for r in results)
+        discipline = list(
+            await session.scalars(
+                select(MatchDiscipline).where(
+                    MatchDiscipline.match_id.in_([r.match_id for r in results])
+                )
+            )
+        )
+        assert len(discipline) == 65 and all(r.applied_at for r in discipline)
+        assert {r.scope for r in discipline} == {f"champions:{t.id}" for t in tournaments}
         devs = (
             await session.scalars(
                 select(MatchDevelopment).where(
