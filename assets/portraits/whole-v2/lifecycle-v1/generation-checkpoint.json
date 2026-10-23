@@ -1,8 +1,11 @@
 {
-  "status": "partial-generation",
-  "saved_atlases": 308,
+  "status": "illustrated-lifecycle-complete",
+  "saved_atlases": 362,
   "target_atlases": 362,
-  "remaining_atlases": [
+  "remaining_atlases": [],
+  "resume_policy": "All planned atlases are present. Preserve source images, published variants and per-person identities.",
+  "last_batch_date": "2026-10-22",
+  "last_batch_atlases": [
     "players-40-staff-early",
     "players-40-staff-middle",
     "players-40-staff-senior",
@@ -58,29 +61,9 @@
     "players-50-staff-middle",
     "players-50-staff-senior"
   ],
-  "resume_policy": "Generate only missing atlas names with the saved prompts and original base source. Native imagegen; no automatic API fallback.",
-  "last_quota_check_utc": "2026-10-13T09:08:41Z",
-  "last_quota_check_result": "usage_limit_reached",
-  "last_batch_date": "2026-10-22",
-  "last_batch_atlases": [
-    "players-41-player-adult",
-    "players-41-player-mature",
-    "players-41-player-veteran",
-    "players-41-player-youth",
-    "players-42-player-adult",
-    "players-42-player-mature",
-    "players-43-player-youth",
-    "players-44-player-adult",
-    "players-45-player-adult",
-    "players-45-player-veteran",
-    "players-45-player-youth",
-    "players-46-player-youth",
-    "players-47-player-adult",
-    "players-47-player-veteran",
-    "players-48-player-adult",
-    "players-48-player-mature",
-    "players-48-player-veteran",
-    "players-49-player-veteran",
-    "players-50-player-adult"
-  ]
+  "historical_quota_check": {
+    "utc": "2026-10-13T09:08:41Z",
+    "result": "usage_limit_reached"
+  },
+  "acceptance_date": "2026-10-23"
 }

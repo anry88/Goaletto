@@ -1,0 +1,457 @@
+{
+  "atlases": [
+    {
+      "atlas": "players-40-staff-early",
+      "source_sha256": "e32b99b5374e235ca76e497ef1465bb067978a2135a6f8811e3335e2c9a9260a",
+      "original_sha256": "5d62361fa9a575b5bbe6d7b5e70da2013d44bf43b4f0f9c16e033300ac33c02a",
+      "prompt_sha256": "56ffa9874a6f8cd1d65018d34690417eab6110d9e700b8bd4ce8336138355a85",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-87624e8f-f04c-401b-b8c5-9d254bf378ee.png"
+    },
+    {
+      "atlas": "players-40-staff-middle",
+      "source_sha256": "72b357a8107e0614cd278bdfa2dae69bc8d1f0e51c3537da2fb28ba1cfe737b4",
+      "original_sha256": "5d62361fa9a575b5bbe6d7b5e70da2013d44bf43b4f0f9c16e033300ac33c02a",
+      "prompt_sha256": "059ecd846684412b5fbc8ab7ff20b0168aff000502ea76122fbbc1f4f1f16af0",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-161b8331-efb3-4165-94f8-049f3c5c5f85.png"
+    },
+    {
+      "atlas": "players-40-staff-senior",
+      "source_sha256": "7597a20987ec72d1dbbc0b665cb0c0a2c5394e6258ae8f6486611836c8983e74",
+      "original_sha256": "5d62361fa9a575b5bbe6d7b5e70da2013d44bf43b4f0f9c16e033300ac33c02a",
+      "prompt_sha256": "3f372c63d4bb26147c6f5e87c78302e4064a7cec5b04e5a28d09cda6e6f0b7f3",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-dc9bbba9-d1f1-434e-99c7-919be44df861.png"
+    },
+    {
+      "atlas": "players-41-staff-early",
+      "source_sha256": "f6c2378271121679f4b66d8beaba77703f15341410ccd0bb4d498685dfca07c1",
+      "original_sha256": "22b7241f184d9ca79c2c5c26c699e1617dda35ca1e8bae42be6b4828d009ad8c",
+      "prompt_sha256": "e7751ce50a94714cb3579962edf1b6cb9047cb4597d34d14bba0dee0f56a93bd",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-4581d5f5-7331-4203-859f-8fb6151c92e2.png"
+    },
+    {
+      "atlas": "players-41-staff-middle",
+      "source_sha256": "27af840bc45cbe1e0c83a13a0dfee3f7735c6755f3e6f03751f2d2f7be9ec631",
+      "original_sha256": "22b7241f184d9ca79c2c5c26c699e1617dda35ca1e8bae42be6b4828d009ad8c",
+      "prompt_sha256": "13ee5ed58eff314aadd6797511ff624b4dbba0f162e64263c850d612c8e40068",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-85a3a171-a86f-4cc6-9045-a4c81c88f527.png"
+    },
+    {
+      "atlas": "players-41-staff-senior",
+      "source_sha256": "ef8772f92f465052da9085833358c50d911fa994c93489f2930b10fb58b2b694",
+      "original_sha256": "22b7241f184d9ca79c2c5c26c699e1617dda35ca1e8bae42be6b4828d009ad8c",
+      "prompt_sha256": "4d9868671077e4e5b9624b4c10dc5d9362be1a39a0b5c9f576139c1e16319373",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-236a7d56-b6ac-4d37-95ab-b3c21d85d06e.png"
+    },
+    {
+      "atlas": "players-42-player-youth",
+      "source_sha256": "6d6195448f1fbdd2f6fc1f26010477ddc6464ddf016b9e1194c21f263b36c970",
+      "original_sha256": "4ab11be2991355957ac96aad30b516e5f18203e903cadd212c51c371313410b6",
+      "prompt_sha256": "277e9e610f0efaa0974ea74549e898950a0268621cb9febfeeca4295488d2efc",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-3d7d5f3b-33cc-4407-94fe-162c88eebe1a.png"
+    },
+    {
+      "atlas": "players-42-player-veteran",
+      "source_sha256": "e5cb254c7294ec93f7df99d4b07a338073c9e45ce10ef17e7c62a4ac53191e4a",
+      "original_sha256": "4ab11be2991355957ac96aad30b516e5f18203e903cadd212c51c371313410b6",
+      "prompt_sha256": "f0eb661c120e90707ba8406cbca6babc8b76b69796705327f6eac00eca3bba5b",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-aa297f5a-87e3-4c61-b2b8-a6481530e7a3.png"
+    },
+    {
+      "atlas": "players-42-staff-early",
+      "source_sha256": "eca2e1fbb1fecca15e359db4d4eed4afe6b60339fa56184c1c4b0f2021a3eb32",
+      "original_sha256": "4ab11be2991355957ac96aad30b516e5f18203e903cadd212c51c371313410b6",
+      "prompt_sha256": "65dbf5ec78648439d0aff5e4fdaac569b3c14341ad45e693f147abcb9501d69f",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-7a43411a-09c4-4091-87a1-82326d3a47ef.png"
+    },
+    {
+      "atlas": "players-42-staff-middle",
+      "source_sha256": "506bbd0cf2da5dafc44a4d890a5b03f4d3b95c6471c8a1e27a2e452e3cba764f",
+      "original_sha256": "4ab11be2991355957ac96aad30b516e5f18203e903cadd212c51c371313410b6",
+      "prompt_sha256": "e78dc4cf78ae6b246a9fe5bb691f37567dd7e039d5845f3ed9bd36f6bf32566b",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-6aaba634-b173-46cc-ba56-290e87c21041.png"
+    },
+    {
+      "atlas": "players-42-staff-senior",
+      "source_sha256": "fd1cffe997617a0c8c3e88b28190c0f049ce9ae028b9a10dee4228f3910bb725",
+      "original_sha256": "4ab11be2991355957ac96aad30b516e5f18203e903cadd212c51c371313410b6",
+      "prompt_sha256": "2c13d52f5e6e3f3680040e7fd668bc74a4cead78a03b85376f91b22ea14ee5b4",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-39544dc8-1384-4832-a6d2-1ee901a2b42f.png"
+    },
+    {
+      "atlas": "players-43-player-adult",
+      "source_sha256": "5c422ffaff60b1231bf591b6f35b30238c5337c7cf7ace1e60c064bcc75e43b9",
+      "original_sha256": "9636765d83673373c36bf07f4c3bed0d822c62f6b7abb98a66dcd750b5f4cc0b",
+      "prompt_sha256": "02fa66d5d81ec76a3d37f782c69296980891eb8b8073d8cab5076d84657f61ab",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-4e178c26-dd17-47b7-b882-6f81740c61f6.png"
+    },
+    {
+      "atlas": "players-43-player-mature",
+      "source_sha256": "a17e776949afaedbdb1a56fac4254c822edb4c19360d167c8c2a8d323a35bc4e",
+      "original_sha256": "9636765d83673373c36bf07f4c3bed0d822c62f6b7abb98a66dcd750b5f4cc0b",
+      "prompt_sha256": "22e825c254d36d4c7d5a4f6071d2ced31f61dc38c94a9b42de815e4c8c5c3a63",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-a78e99cb-f4a9-4037-a883-5fbf51a296ae.png"
+    },
+    {
+      "atlas": "players-43-player-veteran",
+      "source_sha256": "61f3d96ac7b6d07fa9f8b521677c071defcda58e3bc5f39cd4e1ac35b50e2f82",
+      "original_sha256": "9636765d83673373c36bf07f4c3bed0d822c62f6b7abb98a66dcd750b5f4cc0b",
+      "prompt_sha256": "3a5374c3e0a526174250a4e6d88d131f8650400623a3e9868644e921481d9ee7",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-0d93422d-4919-4411-a83c-ff2574884e39.png"
+    },
+    {
+      "atlas": "players-43-staff-early",
+      "source_sha256": "843eaa4a823f8febe5ff1f0d75d3dbed3dee9d9ad669e7f7cbefa1b72af31517",
+      "original_sha256": "9636765d83673373c36bf07f4c3bed0d822c62f6b7abb98a66dcd750b5f4cc0b",
+      "prompt_sha256": "38c0be51a21e6e455b659571440dc88d26283c31f16c44d047f308ad68a45e30",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-1cb3bb9c-956e-46a1-b018-b6f32cc70c7d.png"
+    },
+    {
+      "atlas": "players-43-staff-middle",
+      "source_sha256": "e52b7f097d3865be6a8a27aac809b8ec739ee7b0bf8b261cc262cb7c2d089388",
+      "original_sha256": "9636765d83673373c36bf07f4c3bed0d822c62f6b7abb98a66dcd750b5f4cc0b",
+      "prompt_sha256": "120d53cd0acba0f9f9fcaa83dad8c0155421dd47de1c51624838c4ddab9aad6e",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-c48c5a54-ca7d-47ff-a5b1-e219c2befd07.png"
+    },
+    {
+      "atlas": "players-43-staff-senior",
+      "source_sha256": "3609397324bfd4b56cc575d35b85929b3f2cf122a62721f1210fa7e3e5e31a5f",
+      "original_sha256": "9636765d83673373c36bf07f4c3bed0d822c62f6b7abb98a66dcd750b5f4cc0b",
+      "prompt_sha256": "fdade19a686ae4a3675bc9a0f73cd927bae0782fc2e945251672d034e8f66bea",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-d5d63020-1969-4f6e-81f7-6e89c9f81358.png"
+    },
+    {
+      "atlas": "players-44-player-youth",
+      "source_sha256": "c03ece5551fca0228e42256820296d8bbc462b0c50d90deb2b3811d9dcb4f560",
+      "original_sha256": "5a916a970c8e2361729ba2af2517031602e55cb279450d356c8efd36dfdf9226",
+      "prompt_sha256": "54132e98968d2ab394044f2f63e4b742ef6862e3977448eea22f452f36186abf",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-5f5cc41f-1fb7-483a-a584-6997d0e9634b.png"
+    },
+    {
+      "atlas": "players-44-player-mature",
+      "source_sha256": "3d37b5c2e66772f57a1f8e230e3db01bd6f7d30c9e173723d46bc8f806ea7772",
+      "original_sha256": "5a916a970c8e2361729ba2af2517031602e55cb279450d356c8efd36dfdf9226",
+      "prompt_sha256": "e1a1b4677073747dfadd62e5c74f8e59d1d82b461af67712f086d1e10f963a2e",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-fc12e62e-c910-4ef4-a798-4a3b8cc99f38.png"
+    },
+    {
+      "atlas": "players-44-player-veteran",
+      "source_sha256": "65805e756620204f92f658a4a20a152b52fdc878a8835c38a36d755416fb4330",
+      "original_sha256": "5a916a970c8e2361729ba2af2517031602e55cb279450d356c8efd36dfdf9226",
+      "prompt_sha256": "6dbb42e389e65e0e2b383f8ae52d92f2fa360f5b68c51e666b0d263f6df60347",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-3f1a10e3-8e2b-414f-a970-d2ce99a76351.png"
+    },
+    {
+      "atlas": "players-44-staff-early",
+      "source_sha256": "34afd8e0b3c19d3503355bbafc2cfcd69172f31a63546e89317386b5534fcb96",
+      "original_sha256": "5a916a970c8e2361729ba2af2517031602e55cb279450d356c8efd36dfdf9226",
+      "prompt_sha256": "987581daba4c7b0ff9e84a901d1ef43aeb189ef7d04838704bd843d496e29325",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-cf02d643-4cbb-40e1-9358-f4dcdf9fa0d0.png"
+    },
+    {
+      "atlas": "players-44-staff-middle",
+      "source_sha256": "49f10a6660de6ac81758457d2ab97977f3627db71b3b66658a7eaccedbfd255e",
+      "original_sha256": "5a916a970c8e2361729ba2af2517031602e55cb279450d356c8efd36dfdf9226",
+      "prompt_sha256": "d5b6e4cffe9c1a54dd23787c35977446d21deb22995e86cea05090b6b8126fa6",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-e3c15326-feb9-48f2-9022-7288b7da21fd.png"
+    },
+    {
+      "atlas": "players-44-staff-senior",
+      "source_sha256": "e64c5a2154eae837e91a39337f7f8a1ce7b93e994241fc429914464c933e4f25",
+      "original_sha256": "5a916a970c8e2361729ba2af2517031602e55cb279450d356c8efd36dfdf9226",
+      "prompt_sha256": "34f2edf25c7bab65d18987d53a6df4a14ee47c2d80d6788bdc6c3a7e0c8a0c71",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-884164e5-d6e0-40f8-aade-143caa40c713.png"
+    },
+    {
+      "atlas": "players-45-player-mature",
+      "source_sha256": "099d8d4e1388198de52b4ced519a4d741a2bcbf268ed518d23c47d2df43b82a7",
+      "original_sha256": "b44168160ad12bdf82d963fa6a2128f75ef8838dcd2d9e247d24dcd4faece270",
+      "prompt_sha256": "8e45711f60823d8c8a8ddf6f02d8b8b128bfc79f9e812e62588ca304a123c82e",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-ba1f941d-455d-4a51-b58e-7d7f8d93b979.png"
+    },
+    {
+      "atlas": "players-45-staff-early",
+      "source_sha256": "3d48253081f1711617b1434958b0c267281477b9ae756cc3e6bc1cf7d319ef52",
+      "original_sha256": "b44168160ad12bdf82d963fa6a2128f75ef8838dcd2d9e247d24dcd4faece270",
+      "prompt_sha256": "2395ba39aef790b8da3c7b9d3a3a09b0c9a994047471b55ff467bf7568c129fb",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-e3364434-2f52-4cf2-aa58-692e005c8914.png"
+    },
+    {
+      "atlas": "players-45-staff-middle",
+      "source_sha256": "60a531c6fd1465329f24ab5470e86e6a71bf2690b80746f3fcb18da7f88d802b",
+      "original_sha256": "b44168160ad12bdf82d963fa6a2128f75ef8838dcd2d9e247d24dcd4faece270",
+      "prompt_sha256": "732ac7b68745e44b725fcbf33e7661290d73def4fed167eeb02a9ed46587526e",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-67c645b3-6405-41e7-a41e-da84de90d889.png"
+    },
+    {
+      "atlas": "players-45-staff-senior",
+      "source_sha256": "82d5774a34209d4f8640a9fc21c6c7a2fea8ecb88370be642ebf4e0eba052331",
+      "original_sha256": "b44168160ad12bdf82d963fa6a2128f75ef8838dcd2d9e247d24dcd4faece270",
+      "prompt_sha256": "b1e7efdeb64bdb1190fee354104690aeeaf99a726253135f143a36b7d77effce",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-1b64977c-fb21-4355-afe1-a2b93adc21c1.png"
+    },
+    {
+      "atlas": "players-46-player-adult",
+      "source_sha256": "5cde2cfe8490a3b31574111bd2bbd888524f4b0452c9c7e6aa6f406f7384e3e2",
+      "original_sha256": "4d723db1e40c5582ecd8f9e3c26ade51a6d351f11544213a2f32d99bb3781760",
+      "prompt_sha256": "78727df0cdc02f1b57a2fc3b75c7e8136a4c7aed2ba6873a3951b71ea68b36ee",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-667814fa-bd0e-4cad-b24a-88ec4691b1cc.png"
+    },
+    {
+      "atlas": "players-46-player-mature",
+      "source_sha256": "ce1e88fff4303778f494666b16f6e00557302807b504ce3f7f6638e57f310cb7",
+      "original_sha256": "4d723db1e40c5582ecd8f9e3c26ade51a6d351f11544213a2f32d99bb3781760",
+      "prompt_sha256": "54ae2361bd308aac383090bd99a9531c2024accc3c10767c8b587d42e2e20af4",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-4bd2e0a8-6bd3-439e-8b6e-669af0d3007d.png"
+    },
+    {
+      "atlas": "players-46-player-veteran",
+      "source_sha256": "95ebfbc8fcf8bfa94b7500fd1db38490da804931199db9dde6ff10f27a7dc657",
+      "original_sha256": "4d723db1e40c5582ecd8f9e3c26ade51a6d351f11544213a2f32d99bb3781760",
+      "prompt_sha256": "1bd99f7540a24f2a088cb38916e8a37642b9a6f249718842164728bb154b5f0f",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-ec3ef7a6-2b07-4b1b-82dd-a41448606eeb.png"
+    },
+    {
+      "atlas": "players-46-staff-early",
+      "source_sha256": "7cc32761dd1a6e5b3fa015aae215d2798b5548f0475868e02046cf524b613737",
+      "original_sha256": "4d723db1e40c5582ecd8f9e3c26ade51a6d351f11544213a2f32d99bb3781760",
+      "prompt_sha256": "70007b67b3fe65a62b86c3cc9b790d21dcfbaa8a5b2c1ab851314ac8e70dedef",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-7d94690c-b4bd-4725-be2f-4a7e3eecb486.png"
+    },
+    {
+      "atlas": "players-46-staff-middle",
+      "source_sha256": "9d13f817a095b6c67ad26452f7adf61cb2d27bb85fb3fe4b08a3973e3ca3cd66",
+      "original_sha256": "4d723db1e40c5582ecd8f9e3c26ade51a6d351f11544213a2f32d99bb3781760",
+      "prompt_sha256": "8886f1b79bcf122b9cf9d143043ac010350f28becd7e18b2aaa96396bbc6076f",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-cf43907e-2d21-4af8-8ec8-77f61b769816.png"
+    },
+    {
+      "atlas": "players-46-staff-senior",
+      "source_sha256": "8d2698b7e285c5ed793bd5438cc3f83709b3f316ab5f1eb5b616935a1d3622a2",
+      "original_sha256": "4d723db1e40c5582ecd8f9e3c26ade51a6d351f11544213a2f32d99bb3781760",
+      "prompt_sha256": "eebf54b959944fc93d48c7b42b25ee4245387a27726d2abdb18885bf5408ffce",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-5187b9c8-3d8d-4f22-ac90-e8f6a4d9e548.png"
+    },
+    {
+      "atlas": "players-47-player-youth",
+      "source_sha256": "14baf2a3a2a6f0b9e6e98406a5003a6f23267db7552463062aef5298a295d771",
+      "original_sha256": "fe086f530ba5a9e5bbaadf014af1b54ccf2d7b46600f7e4a55da0af3e4782a63",
+      "prompt_sha256": "c1970e813a1cc3ca46e9249b7896eb048d98498763be75fb6b2f2ccb881067b0",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-7a5277f6-be1c-4919-a8f4-e4f132942b04.png"
+    },
+    {
+      "atlas": "players-47-player-mature",
+      "source_sha256": "7209acec20b34dc49972a94cc47b63635ba9e5befb4d9a1c232bf359c9b815bc",
+      "original_sha256": "fe086f530ba5a9e5bbaadf014af1b54ccf2d7b46600f7e4a55da0af3e4782a63",
+      "prompt_sha256": "942344a7f6758793eb44a14682e5eab8bc4b3108b324e6725890ca0a705d49eb",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-a1b3bed9-7f98-41fd-aad3-e071fbe52c00.png"
+    },
+    {
+      "atlas": "players-47-staff-early",
+      "source_sha256": "871bf4b86d15ced868a8c4c0429f66fa78a2e350fc1bfc0e63dbfeb83c62cddc",
+      "original_sha256": "fe086f530ba5a9e5bbaadf014af1b54ccf2d7b46600f7e4a55da0af3e4782a63",
+      "prompt_sha256": "5213e5393925e2786738a945647abec7db303171908a5fb9d0e279975326cbb4",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-5f711756-09ab-43b4-b28f-5acd590282d2.png"
+    },
+    {
+      "atlas": "players-47-staff-middle",
+      "source_sha256": "c935da64879678140f6e8e02ebbbe3f79de727ce72b7590d495df74b10c8b2f0",
+      "original_sha256": "fe086f530ba5a9e5bbaadf014af1b54ccf2d7b46600f7e4a55da0af3e4782a63",
+      "prompt_sha256": "fd0b66f0ab57311d9cdf128630b3e4cab100d12122b4c5f1d40a745c56ff59a0",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-c785a74a-64c3-4bd9-a157-87bda2af3555.png"
+    },
+    {
+      "atlas": "players-47-staff-senior",
+      "source_sha256": "88150bb766b57e18afaa57381c7320ee11b1d5d73a039c7f5a47cae06f0a072a",
+      "original_sha256": "fe086f530ba5a9e5bbaadf014af1b54ccf2d7b46600f7e4a55da0af3e4782a63",
+      "prompt_sha256": "ae96b0f36dba69644f392fe9833a6e34de06e76637deab7a6500ac2dcb69a70b",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-f3247c6c-e128-4054-8b16-5bf309be7b5c.png"
+    },
+    {
+      "atlas": "players-48-player-youth",
+      "source_sha256": "f5627238dc37527ed9a1ff90a876641922cfa65c7c765455867998be9394768c",
+      "original_sha256": "26d771b3f6de419b062041610b73cfbcee5500137a050e47705fe80350587626",
+      "prompt_sha256": "e49c87b81898df901c1101456358eb396a67e0209f59743b152bf6673a698290",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-efd2e525-affb-4df6-83a8-2701a46eae1c.png"
+    },
+    {
+      "atlas": "players-48-staff-early",
+      "source_sha256": "9fe5032b6cbf8d86a8dd0500efd085327c45056b95ebdb742a4b04a55bcff809",
+      "original_sha256": "26d771b3f6de419b062041610b73cfbcee5500137a050e47705fe80350587626",
+      "prompt_sha256": "a30cf86964825af46c1d899e69e9a776d5b9d48ff12fe8d28c2899bccbd74b09",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-c46cd6f5-cdd9-4c59-8dcb-35c8d29178e0.png"
+    },
+    {
+      "atlas": "players-48-staff-middle",
+      "source_sha256": "8c7daded1fef292eea494a06e384e0c45ef7aed75848186a1119d248fba709c1",
+      "original_sha256": "26d771b3f6de419b062041610b73cfbcee5500137a050e47705fe80350587626",
+      "prompt_sha256": "c5b931b5cb758c003efc98a27964a7b411f50774387e3b8fb3b878cd433867a5",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-1ddb3ef3-13fa-48a0-a97c-7ddea88b6227.png"
+    },
+    {
+      "atlas": "players-48-staff-senior",
+      "source_sha256": "0985ff0bf7cd0f8b7cae69956ed1335de6f248773233b47d98eae56ab0347537",
+      "original_sha256": "26d771b3f6de419b062041610b73cfbcee5500137a050e47705fe80350587626",
+      "prompt_sha256": "9cb587ffc5af373a8b971f1d8722fc1dbcdedffe3cd0e9dd5502eeac3263b9c6",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-9da4a4e3-6abe-4c80-aee4-0fa11b54f737.png"
+    },
+    {
+      "atlas": "players-49-player-youth",
+      "source_sha256": "f9a3645982d732a0a23fc8aa53a9ce182b20f237538a0b25cc5f13a63431c0e2",
+      "original_sha256": "52f66febea1f67442acc741495a8b628f9247a908f40208e15d852f61f3c2f10",
+      "prompt_sha256": "c05b54a8e036f2c3310766543253e023dc8853b6ae696cf2f07c3dadd265f38f",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-0cca8d4e-c10c-45b9-a6f4-c8b1d67fc069.png"
+    },
+    {
+      "atlas": "players-49-player-adult",
+      "source_sha256": "6541a3c4dc37b02bc12e4ca1107c20e2d21c297ff422135d6131f09617a2a418",
+      "original_sha256": "52f66febea1f67442acc741495a8b628f9247a908f40208e15d852f61f3c2f10",
+      "prompt_sha256": "9971daafe6ea5bed69fa22e8ea22249cf29debb7faa565539eb3dce96770aa5d",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-09c2ade3-84b8-44d5-9dba-40ab82dcd414.png"
+    },
+    {
+      "atlas": "players-49-player-mature",
+      "source_sha256": "d048e5ca4b0f755f4495657fc2f9ee9d9d34f4e47a01be6e5d4dd453942ea82f",
+      "original_sha256": "52f66febea1f67442acc741495a8b628f9247a908f40208e15d852f61f3c2f10",
+      "prompt_sha256": "5a19ae29c21316f1358e6ae9a3f27067237337109987579323f489e3a18f44eb",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-fdce49ba-4a98-456a-9904-74650390636e.png"
+    },
+    {
+      "atlas": "players-49-staff-early",
+      "source_sha256": "faaa787feffbe773006df3acd4ae5b98d5a18bcb939f3e0c91844ce45d69ea47",
+      "original_sha256": "52f66febea1f67442acc741495a8b628f9247a908f40208e15d852f61f3c2f10",
+      "prompt_sha256": "e0b4c1168d01b51f1a7367bedd991dd8258f6117d8473f8dd414e1a5de430eae",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-ecfc8ee1-2fb7-4c71-a65a-58bc9dfdb873.png"
+    },
+    {
+      "atlas": "players-49-staff-middle",
+      "source_sha256": "12a1366b7623991225d5da2c6c3affb00f1dd9e074f9d13315ed4a975ff2ee36",
+      "original_sha256": "52f66febea1f67442acc741495a8b628f9247a908f40208e15d852f61f3c2f10",
+      "prompt_sha256": "6d7b92282874a247639f25fd76e90ea33671d5b7207d7ef87d470f6d95e13189",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-44a853f3-255c-4d33-b30f-9da1f46791a1.png"
+    },
+    {
+      "atlas": "players-49-staff-senior",
+      "source_sha256": "c09e385ca09641a778b2206e999dac735733c4fe45768e7e4acb1aadbb044929",
+      "original_sha256": "52f66febea1f67442acc741495a8b628f9247a908f40208e15d852f61f3c2f10",
+      "prompt_sha256": "d09586895c5126951ea151bd8d8f052fdac671c84ad25904d9e9462d347fd4b4",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-afb18e33-f759-45e4-b7dd-09672dc917a8.png"
+    },
+    {
+      "atlas": "players-50-player-youth",
+      "source_sha256": "94f5578743c0434b013d0e4deb8b69b9c8e7e43ebac70578654e46773b0f202e",
+      "original_sha256": "97657064b4af5643da60460b691504750acb81844f7155beee9a6b8dafa40afb",
+      "prompt_sha256": "509a9b2c6e7e716bb5dce414848be5e958b97c5e200144cf10b7bb0b14ce3bf2",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-aee001bb-9ee6-4e8e-8e70-7122d7b7a6ba.png"
+    },
+    {
+      "atlas": "players-50-player-mature",
+      "source_sha256": "f056cccd1c95e8bb251b709e80433d21cdbf0ccd345484d9164864135a5e63db",
+      "original_sha256": "97657064b4af5643da60460b691504750acb81844f7155beee9a6b8dafa40afb",
+      "prompt_sha256": "da837199827d44a255e6a90b3b1a6972a089e7b4121eb9823f286df43643c330",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-f39475e6-3150-46bb-8c93-dd94ec3dcbae.png"
+    },
+    {
+      "atlas": "players-50-player-veteran",
+      "source_sha256": "fa805c8d747314a2926d1ca19f3ea4b0f1d7286a5cff748f87a28d5d84a6f928",
+      "original_sha256": "97657064b4af5643da60460b691504750acb81844f7155beee9a6b8dafa40afb",
+      "prompt_sha256": "d7952154bb3435be84ee6f66ef3d4dc558d6a96180251b651aa690c1493b0aa5",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-4966dec1-bcb3-4358-9759-3757316b0362.png"
+    },
+    {
+      "atlas": "players-50-staff-early",
+      "source_sha256": "10afd169611e98a7848998ab90ed04bf3085196e035bbf6db4c7376945350c05",
+      "original_sha256": "97657064b4af5643da60460b691504750acb81844f7155beee9a6b8dafa40afb",
+      "prompt_sha256": "d977d18cd3b166b6910bbe7902aca88a31c68cc98979e19acd47d5c3fbcee74f",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-8bc7069e-c2c6-4eaf-a3fc-417856613a7e.png"
+    },
+    {
+      "atlas": "players-50-staff-middle",
+      "source_sha256": "25c2747a959af4abdb8d7da9aa5973141a95f88c0fd8572f478bbbc23af05f76",
+      "original_sha256": "97657064b4af5643da60460b691504750acb81844f7155beee9a6b8dafa40afb",
+      "prompt_sha256": "a4814309364910a14c63b9aba12ea8d440f7b586c0c658f8a0f9f284d6347cf7",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-d92ffc36-9f7c-40a6-86af-af7f5c9a6eb4.png"
+    },
+    {
+      "atlas": "players-50-staff-senior",
+      "source_sha256": "5eba4ff02def0081d1d291910a1d609e950dd7313eab82b190cada2ba724997d",
+      "original_sha256": "97657064b4af5643da60460b691504750acb81844f7155beee9a6b8dafa40afb",
+      "prompt_sha256": "412803fae9842a45deaf990b5d4f19dcecc59616881b34f1213574100ffa4bd6",
+      "generator": "built-in imagegen",
+      "generated_filename": "exec-9f0aff97-a2c6-4cfc-8fbd-295e52a89253.png"
+    }
+  ],
+  "added_atlases": 54,
+  "added_variants": 1080,
+  "mode": "identity-preserving edits of original whole-person atlases; no API/CLI fallback",
+  "visual_review": {
+    "source_atlases_reviewed": 54,
+    "comparison_sheets": [
+      "players-40-aging.webp",
+      "players-41-aging.webp",
+      "players-42-aging.webp",
+      "players-43-aging.webp",
+      "players-44-aging.webp",
+      "players-45-aging.webp",
+      "players-46-aging.webp",
+      "players-47-aging.webp",
+      "players-48-aging.webp",
+      "players-49-aging.webp",
+      "players-50-aging.webp"
+    ],
+    "finding": "No obvious face/slot swaps or unrelated identities found in source atlases and 11 complete age/career comparison sheets. Technical checks are separate.",
+    "review_completed_local_date": "2026-10-23"
+  }
+}

@@ -1,10 +1,11 @@
 # Dugout · whole-person age and career variants
 
-An offline extension of whole-v2. The production plan targets 1,000 player
-identities with seven illustrated stages each, plus 80 separate staff identities
-with three stages each: 7,240 additional variants, not additional people.
-Actual progress is recorded in import-report.json; a partial manifest explicitly
-uses `partial-generation`. Do not treat the production plan as proof of completion.
+The complete extension contains **362 source atlases / 7,240 additional variants**:
+1,000 player identities with seven stages each and 80 original staff identities
+with three stages each. Together with the 1,080 original portraits, the runtime
+catalog has **8,320 variants**. These are stages of existing faces, not new people.
+Actual import/technical audit results live in manifest.json, import-report.json
+and quality-report.json; the complete status is illustrated-lifecycle-complete.
 
 | Stage ID | Visual age range | Representative depiction |
 | --- | --- | --- |
@@ -18,18 +19,20 @@ uses `partial-generation`. Do not treat the production plan as proof of completi
 
 These bounds select an illustration, not hiring eligibility or retirement outcomes.
 The game adds one age year per season; a portrait changes only at a stage boundary.
-The announced last-season badge is separate text, never burned into the face.
+The last-season badge stays separate text. All current banks are male-only.
 
 All atlases are identity-preserving edits of the original twenty complete people,
-using the built-in Imagegen tool. No CLI/API fallback, modular face assembly,
-anatomy stretching, or network call at render time. Original source atlases and IDs
-remain unchanged. Slight likeness between different faces was accepted by the user;
-different people must still receive distinct appearance identities without reuse.
+using one built-in Imagegen call per atlas. Original source atlases, appearance IDs
+and historical variants remain unchanged. There is no API/CLI fallback, modular
+face assembly, anatomy stretching or network call at render time. Per the user
+instruction of 2026-10-13, base faces may be reused across different people; every
+person keeps their assigned identity and independent history. Career stages of a
+player are not new base staff identities available for unrelated hires.
 
-Sources are retained in sources/, all prompts in prompts/. Production PNGs are
+Sources are retained in sources/, prompts in prompts/. Production PNGs are
 256×256 RGBA with real alpha, clothing masks are grayscale, thumbnails are 96×96.
-Gallery WebP exports are already colored burgundy/ivory for inspection. Runtime
-uses the technical magenta/cyan PNGs and masks to apply current club colors.
+Gallery exports use burgundy/ivory for inspection. Runtime recolors only the
+technical magenta/cyan garment material to match the current club.
 
 ```bash
 python scripts/pack_portrait_lifecycle.py
@@ -39,62 +42,24 @@ python scripts/render_whole_portrait.py --variant p0001-player18 \
   --size 96 --output work/p0001-staff52.png
 ```
 
-Default import/review refuse an incomplete set. `--allow-partial` is an explicit
-development option, not completion certification. Review index.html and the
-per-atlas comparison pages: each row represents one person across ages/careers.
-Technical audit checks sizes, pixels, alpha, masks, recoloring and missing files;
-visual same-person continuity needs review of the illustrated rows.
+Import/review run without --allow-partial for completion acceptance. Inspect
+index.html and per-atlas comparisons: each row is one person across ages/careers.
+Technical checks cover count, sizes, alpha, hashes, missing files, recoloring and
+pixels outside the clothing mask. Similarity ranking is only a review aid; it
+cannot certify visual identity. No random fallback to a different face is allowed.
+Historical recipes render their pinned original variant.
 
-`recipe_for_age` preserves catalog version and identity, selecting only that
-person's matching stage. Missing or out-of-range stages raise an error instead of
-borrowing another face. Historical recipes still render their original version.
-Career variants are not added to the available staff allocation bank: they cannot
-be assigned to a new unrelated employee. Retired identities stay reserved.
+## Production history
 
-This extension does not implement PostgreSQL reservations, people/club seeding,
-season aging, retirement, recruitment, Telegram delivery or Telegram file caching.
+- 2026-10-12/13: 289 atlases / 5,780 variants, then a native generation quota limit.
+- First batch 2026-10-22: 19 atlases / 380 variants, covering the 22 missing current
+  portraits found in human-owned HDC squads. Total 308/362 atlases.
+- Completion 2026-10-22: the remaining 54 atlases / 1,080 variants, following only
+  missing saved prompts and original references. generation-completion-2026-10-22.json
+  records original/prompt/generated-source SHA-256 and native output filenames.
 
-Current saved batch (2026-10-12): 289 atlases / 5,780 age-career variants.
-This session added 202 atlases / 4,040 variants to the previous 87 atlases.
-780 player identities (p0001..p0780) have all seven stages; another 20
-(p0781..p0800) have all four football stages but still lack their staff stages.
-All 80 initial staff identities have all three staff stages. The other 200 player
-identities retain their base portraits, with lifecycle stages still missing.
-Built-in Imagegen reached usage_limit_reached. 73 atlases / 1,460 variants remain;
-generation-checkpoint.json lists them. Resume with players-40-staff-early, then
-players-40-staff-middle/senior, then all seven stages for players-41..50.
-Reset reported by tool: 2026-10-13 11:57:51 UTC (13:57 Belgrade).
-No scheduled continuation or API generation has been enabled.
-
-Review: all 44 available atlas comparison pages have been inspected (40 player
-atlases and four staff atlases). No obvious identity swaps were found; similarity
-ranking remains a review aid, not proof of same-person continuity. The technical
-audit passed for all 5,780 available variants: zero exact pixel duplicates, valid
-alpha/masks, preserved pixels outside clothing, and no neighbor garment/baseline
-fragments above hair. These checks do not certify the missing part of the plan.
-
-The importer now removes a sloping neighboring jersey hem that previously escaped
-the gutter boundary check. The p0487-staff-early-l1 and p0489-staff-senior-l1 crops from this session
-are regression fixtures for this case. Original source atlases, base portraits
-and appearance identities remain unchanged; lifecycle exports were reimported.
-Ruff check/format and mypy passed; 213 non-integration tests passed, two integration
-tests were deselected. The final expanded catalog also passed all 24 portrait
-lifecycle tests. No database was used for these checks.
-
-## Дополнение 2026-10-22
-
-Встроенным Imagegen продолжены сохранённые identity-preserving prompts исходных
-листов. Добавлены 19 листов / 380 вариантов: все четыре футбольных возраста
-players-41, adult/mature для 42, youth для 43, adult для 44, adult/veteran/youth
-для 45, youth для 46, adult/veteran для 47, adult/mature/veteran для 48, veteran
-для 49 и adult для 50. Это приоритетный набор по read-only аудиту HDC: 22 действующих
-футболиста в клубах менеджеров не имели иллюстрации своего текущего диапазона.
-Лица, person IDs и исторические рецепты не переназначаются.
-
-Итог: 308 из 362 листов / 6 160 из 7 240 дополнительных возрастных и карьерных
-вариантов. Каталог остаётся `partial-generation`; 54 листа ещё отсутствуют
-(21 футбольный и 33 кадровых). Точный остаток — `generation-checkpoint.json`.
-Историческая ошибка квоты от 13 октября больше не описывает состояние генерации.
-Исходники и исходные prompts сохранены; runtime использует локальные PNG 256 px,
-маски материала формы и миниатюры 96 px. Новые иллюстрации просмотрены рядом с
-исходными двадцатью лицами каждого листа; технический аудит проверяется отдельно.
+The original base bank and all previously published lifecycle records stay intact.
+The importer removes neighboring jersey fragments at atlas gutters while retaining
+whole face/neck/clothing proportions. The p0487/p0489 staff regressions remain in
+portrait tests. Gameplay aging, staff conversion, allocation and Telegram caching
+are implemented separately; this offline extension never changes game history.
