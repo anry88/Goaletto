@@ -212,13 +212,12 @@ def formation_view(data: LineupData) -> str:
             (tr("Атакующие"), ATT_POSITIONS),
         ):
             lines.append(label + ": " + " · ".join(p for p in slots if p in allowed))
-        lines.append(tr("Есть место DM.") if "DM" in slots else tr("Отдельного места DM нет."))
     lines.extend(
         (
             "",
             tr("<b>Позиции</b>"),
             tr("GK — вратарь; DL/DC/DR — левый/центральный/правый защитник."),
-            tr("DM — опорный; MC — центральный; ML/MR — левый/правый полузащитник."),
+            tr("MC — центральный; ML/MR — левый/правый полузащитник."),
             tr("AMC — атакующий полузащитник; AML/AMR — левый/правый вингер; FC — нападающий."),
             tr(
                 "В каждой схеме нужен один GK. Дополнительная позиция даёт 85% навыков, "
