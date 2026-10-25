@@ -43,11 +43,12 @@ SPECIALISTS = {
     Focus.GOALKEEPING: "goalkeeping_coach",
     Focus.DEFENDING: "defence_coach",
     Focus.ATTACKING: "attack_coach",
-    Focus.PLAYMAKING: "attack_coach",
-    Focus.WINGER: "attack_coach",
+    Focus.PLAYMAKING: "midfield_coach",
+    Focus.WINGER: "wing_coach",
     Focus.SET_PIECES: "attack_coach",
     Focus.PHYSICAL: "fitness_coach",
 }
+LEGACY_SPECIALISTS = {**SPECIALISTS, Focus.PLAYMAKING: "attack_coach", Focus.WINGER: "attack_coach"}
 
 
 def initial_caps(person_id: UUID, skills: dict[str, int]) -> dict[str, int]:
@@ -84,12 +85,15 @@ def age_multiplier(age: int) -> int:
     return 3000
 
 
-def available_focus(focus: Focus, qualifications: dict[str, int]) -> bool:
+def available_focus(focus: Focus, qualifications: dict[str, int], *, legacy: bool = False) -> bool:
     if not isinstance(focus, Focus) or any(
         type(v) is not int or not 1 <= v <= 20 for v in qualifications.values()
     ):
         raise ValueError("Invalid training staff")
-    return focus == Focus.TEAM or SPECIALISTS[focus] in qualifications
+    return (
+        focus == Focus.TEAM
+        or (LEGACY_SPECIALISTS if legacy else SPECIALISTS)[focus] in qualifications
+    )
 
 
 PRIMARY_SKILLS = {
@@ -184,6 +188,7 @@ def train_player(
     physio_skill: int = 0,
     executor_id: UUID | None = None,
     budget: GrowthBudget | None = None,
+    active_form: bool = False,
 ) -> TrainingResult:
     if not isinstance(focus, Focus) or not isinstance(intensity, Intensity):
         raise ValueError("Invalid training choice")
@@ -256,7 +261,11 @@ def train_player(
             mentoring.budget,
         )
         if seeded_draw(seed, player.id, "form", policy=SESSION_POLICY) < (
-            200 if intensity == Intensity.LOW else 100
+            (800 if intensity == Intensity.LOW else 600 if intensity == Intensity.MEDIUM else 400)
+            if active_form
+            else 200
+            if intensity == Intensity.LOW
+            else 100
         ):
             form = min(10, form + 1)
     injury_rate = (

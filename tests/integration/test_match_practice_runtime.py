@@ -23,7 +23,7 @@ from goaletto.infrastructure.models import (
     Player,
     PlayerDevelopment,
 )
-from tests.integration.test_agent_wave import start_fixture
+from tests.integration.test_agent_wave import KICKOFF, start_fixture
 from tests.integration.test_candidates import action, funded
 
 pytestmark = pytest.mark.integration
@@ -48,6 +48,7 @@ async def test_concurrent_finalize_persists_practice_once_and_history_is_frozen(
         players = (await session.scalars(select(Player))).all()
         for player in players:
             player.form = 10
+            player.form_activity_at = KICKOFF
     fixture, at = await start_fixture(sessions, club)
     final = await completed_checkpoint(sessions, fixture, at)
     async with sessions.begin() as session:
@@ -90,15 +91,19 @@ async def test_concurrent_finalize_persists_practice_once_and_history_is_frozen(
                 dev = await session.get(PlayerDevelopment, player.person_id)
                 assert dev.season_gains["match"] == row["gain_bps"]
         report = await get_match_report(session, action(actor), fixture)
+        own = "home" if report.home_club_id == club else "away"
         for member in (*report.home_lineup, *report.away_lineup):
             row = rows.get(str(member.person_id))
-            assert member.form_after == (row["form_after"] if row else None)
-        frozen = report_view(report, section="home")[0]
-        changed = await session.get(Player, report.home_lineup[0].person_id)
+            assert member.form_after == (
+                row["form_after"] if row and row["club_id"] == str(club) else None
+            )
+        frozen = report_view(report, section=own)[0]
+        members = report.home_lineup if own == "home" else report.away_lineup
+        changed = await session.get(Player, members[0].person_id)
         changed.form = 2
         await session.flush()
         reread = await get_match_report(session, action(actor), fixture)
-        assert report_view(reread, section="home")[0] == frozen
+        assert report_view(reread, section=own)[0] == frozen
         await apply_development(session, final, at + timedelta(hours=2))
         assert changed.form == 2  # Direct retry never applies or rerolls again.
     for assignment in ("terms_snapshot='{}'::jsonb", "results='[]'::jsonb"):
@@ -124,7 +129,7 @@ async def test_unfinished_game_cannot_apply_practice_and_pin_is_immutable(sessio
             await session.execute(
                 text(
                     "UPDATE match_development SET terms_snapshot="
-                    "jsonb_set(terms_snapshot,'{friendly_skill_factor}','7500') WHERE match_id=:id"
+                    "jsonb_set(terms_snapshot,'{friendly_skill_factor}','2500') WHERE match_id=:id"
                 ),
                 {"id": state.match_id},
             )

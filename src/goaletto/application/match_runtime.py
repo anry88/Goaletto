@@ -21,8 +21,7 @@ from goaletto.domain.knockout_match import BREAK_PHASES, advance_penalty, start_
 from goaletto.domain.match_codec import restore_state, state_document, state_hash
 from goaletto.domain.match_engine import advance_tick, start_match, start_second_half
 from goaletto.domain.match_types import (
-    COACH_ENGINE_VERSION,
-    KNOCKOUT_ENGINE_VERSION,
+    POSITION_ENGINE_VERSION,
     CommandKind,
     EnginePolicy,
     FieldSlot,
@@ -242,6 +241,10 @@ async def team_snapshot(
             .order_by(Player.person_id)
         )
     ).all()
+    from goaletto.application.forms import settle_form
+
+    for player, _, _ in rows:
+        await settle_form(session, player, at)
     players = tuple(
         PlayerSnapshot(
             person.id,
@@ -265,6 +268,13 @@ async def team_snapshot(
             age=person.age,
             form=player.form,
             experience=player.experience,
+            position_experience=tuple(
+                sorted(
+                    (
+                        player.position_experience or {player.position: player.experience * 10000}
+                    ).items()
+                )
+            ),
             morale=player.morale,
             alternatives=tuple(player.alternative_positions),
             available=(player.injured_until is None or player.injured_until <= at)
@@ -365,6 +375,9 @@ async def team_snapshot(
 
 def event_documents(events: tuple[MatchEvent, ...]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = json.loads(json.dumps([asdict(e) for e in events], default=str))
+    for event in result:
+        if event["assist_player_id"] is None:
+            del event["assist_player_id"]
     return result
 
 
@@ -471,6 +484,16 @@ async def queue_notification(
                 shots=[state.home.stats.shots, state.away.stats.shots],
                 on_target=[state.home.stats.on_target, state.away.stats.on_target],
             )
+            from goaletto.domain.match_performance import player_of_match
+
+            best = player_of_match(state)
+            if best:
+                payload["player_of_match_name"] = next(
+                    p.name
+                    for team in (state.home, state.away)
+                    for p in team.snapshot.players
+                    if p.id == best
+                )
             if state.knockout and state.knockout.shootout:
                 from goaletto.domain.knockout import decide_shootout
 
@@ -819,8 +842,8 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             home_snapshot,
             away_snapshot,
             initial_energy=energies,
-            policy=EnginePolicy(version="match-policy-v4" if context else "match-policy-v3"),
-            engine_version=KNOCKOUT_ENGINE_VERSION if context else COACH_ENGINE_VERSION,
+            policy=EnginePolicy(version="match-policy-v5"),
+            engine_version=POSITION_ENGINE_VERSION,
             crowd=HomeCrowd(demand.capacity, demand.fans),
             knockout=context,
         )
@@ -829,7 +852,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             fixture_id=fixture.id,
             seed=seed,
             engine_version=state.engine_version,
-            state_version=4 if context else 3,
+            state_version=5,
             state=state_document(state),
             starting_snapshot=state_document(state),
             completed_tick=0,

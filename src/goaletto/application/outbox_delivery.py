@@ -353,6 +353,11 @@ def valid_payload(payload: dict[str, Any]) -> bool:
         or not 1 <= len(payload["tie_winner_name"]) <= 80
     ):
         return False
+    if "player_of_match_name" in payload and (
+        not isinstance(payload["player_of_match_name"], str)
+        or not 1 <= len(payload["player_of_match_name"]) <= 120
+    ):
+        return False
     for key in ("shots", "on_target", "penalties", "aggregate"):
         if key in payload and (
             not isinstance(payload[key], list)
@@ -552,6 +557,11 @@ def render_text(payload: dict[str, Any], *, timezone_name: str = "UTC") -> str:
         if kind == "match_result":
             if payload["phase"] == "abandoned":
                 return tr("Матч остановлен: {p0}. Итоговый результат не присуждён.", p0=score)
+            if payload.get("player_of_match_name"):
+                stats += "\n" + tr(
+                    "⭐ Игрок матча: {player}",
+                    player=escape(latin_name(payload["player_of_match_name"])),
+                )
             return tr(
                 "🏁 Финальный свисток: {p0}.{p1}{p2}\n\n/match — итог и отчёт о матче",
                 p0=score,

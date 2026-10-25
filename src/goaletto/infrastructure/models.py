@@ -494,7 +494,7 @@ class Person(Base):
 POSITIONS_SQL = "'GK','DL','DC','DR','DM','ML','MC','MR','AMC','AML','AMR','FC'"
 STAFF_ROLES_SQL = (
     "'head_coach','goalkeeping_coach','defence_coach','attack_coach',"
-    "'fitness_coach','physiotherapist','scout'"
+    "'fitness_coach','physiotherapist','scout','midfield_coach','wing_coach'"
 )
 
 
@@ -528,7 +528,11 @@ class Player(Base):
             )
         ),
         CheckConstraint("form BETWEEN 1 AND 10", name="ck_player_form"),
+        CheckConstraint("form_idle_steps >= 0", name="ck_player_form_idle_steps"),
         CheckConstraint("experience >= 0", name="ck_player_experience"),
+        CheckConstraint(
+            "valid_position_experience(position_experience)", name="ck_player_position_experience"
+        ),
         CheckConstraint("morale BETWEEN 0 AND 100", name="ck_player_morale"),
         CheckConstraint("status IN ('active', 'last_season', 'retired')", name="ck_player_status"),
         CheckConstraint(
@@ -558,7 +562,12 @@ class Player(Base):
     leadership: Mapped[int] = mapped_column(SmallInteger)
     loyalty: Mapped[int] = mapped_column(SmallInteger)
     form: Mapped[int] = mapped_column(SmallInteger)
+    form_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    form_idle_steps: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     experience: Mapped[int] = mapped_column(Integer, default=0)
+    position_experience: Mapped[dict[str, int]] = mapped_column(
+        JSONB, default=dict, server_default="{}"
+    )
     morale: Mapped[int] = mapped_column(SmallInteger)
     status: Mapped[str] = mapped_column(String(16), default="active")
     last_season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
@@ -2214,7 +2223,8 @@ class MatchDevelopment(Base):
     __tablename__ = "match_development"
     __table_args__ = (
         CheckConstraint(
-            "policy_version IN ('match-development-v1','match-practice-v2','match-practice-v3')",
+            "policy_version IN ('match-development-v1','match-practice-v2',"
+            "'match-practice-v3','match-practice-v4')",
             name="ck_match_development_policy",
         ),
         CheckConstraint(
@@ -2252,7 +2262,10 @@ class StaffCareer(Base):
             f"role IN ({STAFF_ROLES_SQL}) AND skill BETWEEN 1 AND 20",
             name="ck_staff_career_qualification",
         ),
-        CheckConstraint("policy_version = 'retired-staff-v1'", name="ck_staff_career_policy"),
+        CheckConstraint(
+            "policy_version IN ('retired-staff-v1','retired-staff-v2')",
+            name="ck_staff_career_policy",
+        ),
         CheckConstraint("status IN ('pending','public','accepted')", name="ck_staff_career_status"),
         CheckConstraint(
             "expires_at > created_at AND ((status = 'pending') = (resolved_at IS NULL))",

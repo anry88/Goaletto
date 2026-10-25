@@ -30,7 +30,7 @@ from goaletto.domain.knockout import KNOCKOUT_POLICY, KnockoutTie, MatchResult
 from goaletto.domain.knockout_match import KnockoutContext, decision
 from goaletto.domain.league_allocation import LeagueSnapshot
 from goaletto.domain.match_codec import restore_state, state_hash
-from goaletto.domain.match_types import KNOCKOUT_ENGINE_VERSION
+from goaletto.domain.match_types import KNOCKOUT_ENGINE_VERSION, POSITION_ENGINE_VERSION
 from goaletto.domain.stadium import Attendance
 from goaletto.domain.standings import LeagueStanding as StandingRow
 from goaletto.domain.world import stable_seed
@@ -487,7 +487,7 @@ async def record_champions_match_result(
     result = await session.get(ResultReceipt, match.id)
     if (
         k is None
-        or state.engine_version != KNOCKOUT_ENGINE_VERSION
+        or state.engine_version not in {KNOCKOUT_ENGINE_VERSION, POSITION_ENGINE_VERSION}
         or result is None
         or result.state_hash != state_hash(state)
     ):

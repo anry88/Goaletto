@@ -113,6 +113,7 @@ class PlayerCard:
     energy_full_at: datetime | None = None
     country_code: str | None = None
     ownership_id: UUID | None = None
+    position_experience: tuple[tuple[str, int], ...] = ()
 
 
 async def actor_for_callback(
@@ -224,6 +225,9 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
         raise ValueError("Invalid squad page")
     members: list[SquadMember] = []
     for row in ordered[(page - 1) * SQUAD_PAGE_SIZE : page * SQUAD_PAGE_SIZE]:
+        from goaletto.application.forms import settle_form
+
+        await settle_form(session, row, actor.at)
         member_person = persons.get(row.person_id)
         if member_person is None:
             raise ValueError("Squad person is missing")
@@ -337,6 +341,11 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
         loyalty=player.loyalty,
         form=player.form,
         experience=player.experience,
+        position_experience=tuple(
+            sorted(
+                (player.position_experience or {player.position: player.experience * 10000}).items()
+            )
+        ),
         morale=player.morale,
         status=player.status,
         injured=player.injured_until is not None and player.injured_until > actor.at,

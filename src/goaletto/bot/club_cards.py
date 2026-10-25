@@ -325,12 +325,15 @@ def player_view(
     lines.append(tr("<b>Навыки (1–20)</b>\n{p0}", p0=skill_text))
     lines.append(
         tr(
-            "Форма: {p0}/10 · Опыт: {p1} · Мораль: {p2}",
+            "Форма: {p0}/10 · Мораль: {p2}",
             p0=card.form,
-            p1=card.experience,
             p2=card.morale,
         )
     )
+    experience = " · ".join(
+        f"{position} {value / 10000:.2f}" for position, value in card.position_experience if value
+    )
+    lines.append(tr("Опыт: {positions}", positions=experience or "—"))
     if card.status != "retired":
         lines.append(tr("⚡ Энергия: {energy}%", energy=f"{card.energy_bps / 100:.1f}"))
         if card.energy_bps < 10000 and card.energy_full_at is not None:

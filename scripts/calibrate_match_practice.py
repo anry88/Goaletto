@@ -1,9 +1,9 @@
 """Bounded AND-130 calibration: official scale, friendly factors, form, seasons.
 
 Pure forecast with the real domain functions only (no DB, engine copy or
-network). Compares friendly 25/50/75% proposals and two 80-day calendars
+network). Compares friendly 25/50/75% factors and two 80-day calendars
 with training on free UTC dates only. Results are implementation
-prototype coefficients, not approved balance or measurements of live players.
+forecasts, not measurements of live players. The current 75% is user-approved.
 
 Reproduce: ``.venv/bin/python scripts/calibrate_match_practice.py --seed 7``
 """
@@ -17,6 +17,7 @@ from goaletto.domain.development import GrowthBudget
 from goaletto.domain.match_development import develop_appearance
 from goaletto.domain.match_practice import (
     CURRENT_POLICY,
+    V3_POLICY,
     Competition,
     develop_match_practice,
     form_chances,
@@ -32,7 +33,7 @@ from goaletto.domain.training import (
 )
 
 PERSON = UUID(int=1)
-STAFF = {"attack_coach": 10}
+STAFF = {"midfield_coach": 10}
 
 
 def player(age: int, form: int = 6) -> TrainingPlayer:
@@ -49,17 +50,17 @@ def player(age: int, form: int = 6) -> TrainingPlayer:
 
 
 def official_parity() -> list[str]:
-    lines = ["== official 90 equals match-development-v1 =="]
+    lines = ["== frozen V3 official 90 equals match-development-v1 =="]
     for age in (18, 22, 30):
-        old = develop_appearance(player(age), 90, STAFF, GrowthBudget(age))
+        old = develop_appearance(player(age), 90, {"attack_coach": 10}, GrowthBudget(age))
         new = develop_match_practice(
             player(age),
             "league",
             90,
-            STAFF,
+            {"attack_coach": 10},
             GrowthBudget(age),
             match_seed="parity",
-            policy=CURRENT_POLICY,
+            policy=V3_POLICY,
         )
         parity = (
             new.growth == old.growth
@@ -77,7 +78,7 @@ def official_parity() -> list[str]:
 
 
 def factor_table() -> list[str]:
-    lines = ["== friendly factor proposal (90 min, staff 10, free budget) =="]
+    lines = ["== friendly factor comparison (90 min, staff 10, free budget) =="]
     lines.append("age | official skill | 25% | 50% | 75% | official exp | 25% | 50% | 75%")
     for age in (18, 21, 26, 30, 34):
         official = develop_match_practice(
@@ -106,12 +107,7 @@ def factor_table() -> list[str]:
             row.append(f" {sum(friendly.granted.values())} |")
             exps.append(f" {friendly.experience_gain} |")
         lines.append("".join(row) + " " + "".join(exps))
-    lines.append(
-        "Choice proposal: 50% (5000 bps). 25% makes friendlies near-noise for "
-        "veterans (30y: 30 vs 120 official); 75% is closer to official "
-        "development. 50% is an intermediate proposal keeping friendlies positive "
-        "but clearly below official at every age."
-    )
+    lines.append("User-approved friendly factor: 75% (2026-10-25).")
     return lines
 
 
@@ -155,14 +151,14 @@ def form_table(seed: int) -> list[str]:
                 f"{minutes} min/form {form}: {up}/{down} -> {changes[1]}/{changes[0]}/{changes[-1]}"
             )
     lines.append(
-        "Reading: current V2 permits both rises and falls; more actual minutes "
+        "Reading: current V4 permits both rises and falls; more actual minutes "
         "scale exposure, not the size of the step. This is a seeded sample, not live data."
     )
     return lines
 
 
 def form_long_run(seed: int) -> list[str]:
-    """Exercise the exact V2 form function, including existing training boosts."""
+    """Baseline V4 form without scoring/awards or fatigue, plus training boosts."""
     lines = [f"== {CURRENT_POLICY}: 128 players, 400 matches, starting form 8 =="]
     for training_days in (0, 1, 3):
         counts: Counter[int] = Counter()
@@ -192,6 +188,7 @@ def form_long_run(seed: int) -> list[str]:
                         trainer_skill=10,
                         head_skill=10,
                         budget=budget,
+                        active_form=True,
                     )
                     current = replace(
                         current,
@@ -276,6 +273,7 @@ def simulate_season(seed: int, dense: bool, friendly_factor: int) -> dict[str, i
                 trainer_skill=10,
                 head_skill=10,
                 budget=budget,
+                active_form=True,
             )
             training_bps += outcome.gain_bps
             budget = outcome.budget
@@ -305,7 +303,7 @@ def season_table(seed: int) -> list[str]:
     lines = [f"== 80-day seasons, training only on free UTC dates (seed {seed}) =="]
     lines.append("calendar | factor | matches/trainings | training | match | form | exp")
     for dense in (False, True):
-        factors = (5000,) if not dense else (2500, 5000, 7500)
+        factors = (7500,) if not dense else (2500, 5000, 7500)
         for factor in factors:
             row = simulate_season(seed, dense, factor)
             lines.append(

@@ -11,6 +11,7 @@ from goaletto.domain.match_types import (
     Tactic,
     TeamState,
 )
+from goaletto.domain.position_experience import experience_bonus
 
 
 @dataclass(frozen=True)
@@ -37,9 +38,12 @@ def effective_skill(
     position: str,
     skill: str,
     support_morale_points: int = 0,
+    *,
+    positional: bool = False,
 ) -> int:
     value: int = getattr(player.skills, skill)
     morale_factor = 7500 + min(100, player.morale + support_morale_points) * 50
+    bonus = experience_bonus(dict(player.position_experience).get(position, 0)) if positional else 0
     return (
         value
         * 1000
@@ -47,7 +51,8 @@ def effective_skill(
         * condition.energy_bps
         * position_factor(player, position)
         * morale_factor
-        // (8 * 10000 * 10000 * 10000)
+        * (10000 + bonus)
+        // (8 * 10000 * 10000 * 10000 * 10000)
     )
 
 
@@ -69,7 +74,12 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
             assigned_position: str = slot.position,
         ) -> int:
             return effective_skill(
-                player, condition, assigned_position, name, team.support_morale_points
+                player,
+                condition,
+                assigned_position,
+                name,
+                team.support_morale_points,
+                positional=policy.version == "match-policy-v5",
             )
 
         position = slot.position
@@ -85,7 +95,7 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
         if position in {"MR", "AMR"}:
             right += (skill("winger") * 7 + skill("pace") * 3) // 10
             center += skill("winger") // 10
-        experience = min(p.experience, 100) * 10
+        experience = 0 if policy.version == "match-policy-v5" else min(p.experience, 100) * 10
         if position == "DC":
             dc += skill("defending") + experience
             dl += skill("defending") // 5

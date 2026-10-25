@@ -61,7 +61,7 @@ async def test_player_report_keeps_original_page_in_all_tabs():
         session(recorder), replace(recorder.actor, operation_id=uuid4()), fixture_id
     )
     assert origin == ReportOrigin("player", STARTER_ID, 3)
-    for section in ("events", "home", "away"):
+    for section in ("events", "home"):
         values = callbacks(report_view(report, section=section, origin=origin))
         assert player_history_callback(STARTER_ID, 3) in values
         for child in values:

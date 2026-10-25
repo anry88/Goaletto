@@ -138,10 +138,10 @@ async def test_friendly_schedule_materialize_play_and_reduced_growth(sessions):
         )
         assert dev is not None and dev.eligible and dev.applied_at is not None
         assert dev.terms_snapshot["competition"] == "friendly"
-        assert dev.terms_snapshot["friendly_skill_factor"] == 5000
+        assert dev.terms_snapshot["friendly_skill_factor"] == 7500
         assert dev.results, "friendly minutes must grant reduced practice, not only fatigue"
         assert all(
-            r["skill_factor"] == 5000 and r["competition"] == "friendly" for r in dev.results
+            r["skill_factor"] == 7500 and r["competition"] == "friendly" for r in dev.results
         )
         tickets = (
             await session.scalars(
@@ -284,7 +284,7 @@ async def test_human_challenge_accept_and_full_match(sessions):
             select(MatchDevelopment).where(MatchDevelopment.match_id == receipt.match_id)
         )
         assert dev is not None and dev.eligible and dev.results
-        assert all(r["skill_factor"] == 5000 for r in dev.results)
+        assert all(r["skill_factor"] == 7500 for r in dev.results)
 
 
 async def test_human_decline_cancel_and_stranger_rejections(sessions):

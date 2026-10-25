@@ -247,6 +247,8 @@ async def initialize_world(
                 "alternative_positions": [],
                 **dict(zip(SKILL_NAMES, p.skills, strict=True)),
                 "form": 6,
+                "form_activity_at": simulation_start,
+                "form_idle_steps": 0,
                 "experience": 0,
                 "morale": 50,
                 "status": "last_season" if p.retirement.is_last_season else "active",

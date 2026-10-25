@@ -15,6 +15,7 @@ ENGINE_VERSION = "regulation-v1"
 LIVE_ENGINE_VERSION = "regulation-v2"
 COACH_ENGINE_VERSION = "regulation-v3"
 KNOCKOUT_ENGINE_VERSION = "regulation-v4"
+POSITION_ENGINE_VERSION = "regulation-v5"
 POSITIONS = frozenset({"GK", "DL", "DC", "DR", "DM", "ML", "MC", "MR", "AMC", "AML", "AMR", "FC"})
 
 
@@ -97,7 +98,14 @@ class PlayerSnapshot:
     catalog_version: int | None = None
     morale: int = 50
 
+    position_experience: tuple[tuple[str, int], ...] = ()
+
     def __post_init__(self) -> None:
+        if len(dict(self.position_experience)) != len(self.position_experience) or any(
+            position not in POSITIONS or type(value) is not int or value < 0
+            for position, value in self.position_experience
+        ):
+            raise ValueError("Invalid positional experience snapshot")
         if not isinstance(self.id, UUID) or not self.name.strip():
             raise ValueError("Player needs stable identity and name")
         if self.position not in POSITIONS or any(p not in POSITIONS for p in self.alternatives):
@@ -229,6 +237,7 @@ class EnginePolicy:
             "match-policy-v2",
             "match-policy-v3",
             "match-policy-v4",
+            "match-policy-v5",
         }:
             raise ValueError("Unsupported policy")
         if self.version == "match-policy-v1" and (
@@ -283,6 +292,10 @@ class PlayerCondition:
     yellows: int = 0
     dismissed: bool = False
     injured: bool = False
+    position_minutes: tuple[tuple[str, int], ...] = ()
+    goals: int = 0
+    assists: int = 0
+    saves: int = 0
 
 
 @dataclass(frozen=True)
@@ -355,6 +368,7 @@ class MatchEvent:
     player_id: UUID | None = None
     other_player_id: UUID | None = None
     detail: str | None = None
+    assist_player_id: UUID | None = None
 
 
 class CommandKind(StrEnum):

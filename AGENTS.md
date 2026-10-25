@@ -1,5 +1,16 @@
 # Working on Goaletto
 
+- User update 2026-10-25 (AND-174/176): new matches use regulation-v5 and
+  match-practice-v4. Experience is separate for each actually played position
+  and helps on that position. Growth uses actual position minutes, age and the
+  matching frozen specialist; midfield and wing coaches are separate professions.
+  New friendlies give 75% skills/experience. Preserve frozen older matches and
+  pending training contracts. Form responds to minutes, goals, assists, saves,
+  player of match, exhaustion and cards; inactivity without games/training lowers
+  it by elapsed time, never view count. Persist genuine assists from goal events.
+  Keep player-facing posts short: no formulas/internal mechanics, form once,
+  only own progress behind “📈 Прогресс игроков”. See docs/position-development-and-form.md.
+
 - User update 2026-10-25 (AND-173): show a persisted upcoming academy cohort
   during the playing season; signing opens in the following offseason for the
   same people. Academy upgrades immediately raise the current unsigned cohort's

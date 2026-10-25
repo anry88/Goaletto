@@ -463,6 +463,7 @@ async def _materialize(
             alternative_positions=list(row.alternative_positions),
             **skills,
             form=6,
+            form_activity_at=at,
             experience=0,
             morale=50,
             status="active",

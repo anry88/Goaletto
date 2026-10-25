@@ -7,9 +7,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from goaletto.domain.staff_effects import POLICY
-from goaletto.domain.training import SPECIALISTS, Focus
+from goaletto.domain.staff_effects import POLICY as LEGACY_POLICY
+from goaletto.domain.training import LEGACY_SPECIALISTS, SPECIALISTS, Focus
 from goaletto.infrastructure.models import SalaryContract, Staff, StaffQualification
+
+POLICY = "staff-session-v2"
 
 
 async def staff_roster(
@@ -44,11 +46,15 @@ async def staff_roster(
     }
 
 
-def training_staff(roster: dict[str, dict[str, Any]], focus: Focus) -> dict[str, Any]:
+def training_staff(
+    roster: dict[str, dict[str, Any]], focus: Focus, *, policy: str = POLICY
+) -> dict[str, Any]:
+    if policy not in (LEGACY_POLICY, POLICY):
+        raise ValueError("Unknown training staff policy")
     roles = {"head_coach", "physiotherapist"}
     if focus != Focus.TEAM:
-        roles.add(SPECIALISTS[focus])
-    return {"policy": POLICY, "roles": {role: roster.get(role) for role in sorted(roles)}}
+        roles.add((LEGACY_SPECIALISTS if policy == LEGACY_POLICY else SPECIALISTS)[focus])
+    return {"policy": policy, "roles": {role: roster.get(role) for role in sorted(roles)}}
 
 
 def qualifications(roster: dict[str, dict[str, Any]]) -> dict[str, int]:

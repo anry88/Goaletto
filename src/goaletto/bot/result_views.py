@@ -99,30 +99,46 @@ def result_view(state: MatchState) -> str:
     )
     total = h.stats.possession_units + a.stats.possession_units
     share = round(h.stats.possession_units * 100 / total) if total else 50
-    return tr(
-        "⚽ <b>{p0} · {p1}′</b>\n<b>{p2} {p3}:{p4} {p5}</b>\n\nВладение: "
-        "{p6}% / {p7}%\nУдары: {p8} / {p9}\nВ створ: {p10} / "
-        "{p11}\nУгловые: {p12} / {p13}\nТрибуны: {p14:,} / {p15:,}",
-        p0=heading,
-        p1=state.game_minute,
-        p2=escape(latin_name(h.snapshot.name)),
-        p3=h.stats.goals,
-        p4=a.stats.goals,
-        p5=escape(latin_name(a.snapshot.name)),
-        p6=share,
-        p7=100 - share,
-        p8=h.stats.shots,
-        p9=a.stats.shots,
-        p10=h.stats.on_target,
-        p11=a.stats.on_target,
-        p12=h.stats.corners,
-        p13=a.stats.corners,
-        p14=state.crowd.home_fans,
-        p15=state.crowd.stadium_capacity,
-    ) + (
-        tr("\nОфициальный результат ещё не назначен.")
-        if state.phase == MatchPhase.ABANDONED
-        else ""
+    from goaletto.domain.match_performance import player_of_match
+
+    best = player_of_match(state)
+    name = next(
+        (
+            p.name
+            for team in (state.home, state.away)
+            for p in team.snapshot.players
+            if p.id == best
+        ),
+        None,
+    )
+    return (
+        tr(
+            "⚽ <b>{p0} · {p1}′</b>\n<b>{p2} {p3}:{p4} {p5}</b>\n\nВладение: "
+            "{p6}% / {p7}%\nУдары: {p8} / {p9}\nВ створ: {p10} / "
+            "{p11}\nУгловые: {p12} / {p13}\nТрибуны: {p14:,} / {p15:,}",
+            p0=heading,
+            p1=state.game_minute,
+            p2=escape(latin_name(h.snapshot.name)),
+            p3=h.stats.goals,
+            p4=a.stats.goals,
+            p5=escape(latin_name(a.snapshot.name)),
+            p6=share,
+            p7=100 - share,
+            p8=h.stats.shots,
+            p9=a.stats.shots,
+            p10=h.stats.on_target,
+            p11=a.stats.on_target,
+            p12=h.stats.corners,
+            p13=a.stats.corners,
+            p14=state.crowd.home_fans,
+            p15=state.crowd.stadium_capacity,
+        )
+        + (tr("\n⭐ Игрок матча: {player}", player=escape(latin_name(name))) if name else "")
+        + (
+            tr("\nОфициальный результат ещё не назначен.")
+            if state.phase == MatchPhase.ABANDONED
+            else ""
+        )
     )
 
 

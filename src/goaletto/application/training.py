@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import Surface, require_utc
-from goaletto.application.development import growth_budget, save_budget
+from goaletto.application.development import growth_budget, position_experience, save_budget
 from goaletto.application.game_actions import (
     Actor,
     PermissionDenied,
@@ -23,7 +23,9 @@ from goaletto.application.recovery import recover_player
 from goaletto.application.training_staff import qualifications, staff_roster, training_staff
 from goaletto.domain.game_cycle import HORIZON_DAYS, midnight
 from goaletto.domain.kickoff import BASELINE_MINUTE, KickoffPreference, preference_utc
+from goaletto.domain.staff_effects import POLICY as LEGACY_STAFF_POLICY
 from goaletto.domain.training import (
+    LEGACY_SPECIALISTS,
     POLICY_VERSION,
     PROGRESS_KEYS,
     SESSION_POLICY,
@@ -256,7 +258,8 @@ async def load_training(
     changed = bool(
         plan
         and plan.status == "scheduled"
-        and plan.staff_snapshot != training_staff(roster, Focus(plan.focus))
+        and plan.staff_snapshot
+        != training_staff(roster, Focus(plan.focus), policy=plan.staff_snapshot["policy"])
     )
     if record:
         await user_effect(
@@ -475,9 +478,10 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
     roster = await staff_roster(session, club.id, at)
     staff_skills = qualifications(roster)
     focus, intensity = Focus(plan.focus), Intensity(plan.intensity)
-    if not available_focus(focus, staff_skills) or plan.staff_snapshot != training_staff(
-        roster, focus
-    ):
+    legacy_staff = plan.staff_snapshot["policy"] == LEGACY_STAFF_POLICY
+    if not available_focus(
+        focus, staff_skills, legacy=legacy_staff
+    ) or plan.staff_snapshot != training_staff(roster, focus, policy=plan.staff_snapshot["policy"]):
         plan.status = "cancelled"
         plan.results = [{"reason": "staff_changed"}]
         return
@@ -537,11 +541,13 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             session.add(dev)
         if dev.policy_version != POLICY_VERSION:
             raise ValueError("Unsupported development policy")
+        old_position_experience = position_experience(player, dev)
+        trained_position = positions.get(person.id, player.position)
         trained = train_player(
             TrainingPlayer(
                 person.id,
                 person.age,
-                positions.get(person.id, player.position),
+                trained_position,
                 values,
                 dev.caps,
                 dev.progress,
@@ -556,18 +562,35 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             intensity,
             seed=str(plan.id),
             trainer_skill=staff_skills.get(
-                "head_coach" if focus == Focus.TEAM else SPECIALISTS[focus], 0
+                "head_coach"
+                if focus == Focus.TEAM
+                else (LEGACY_SPECIALISTS if legacy_staff else SPECIALISTS)[focus],
+                0,
             ),
             head_skill=staff_skills.get("head_coach", 0),
             physio_skill=staff_skills.get("physiotherapist", 0),
             budget=growth_budget(dev, person.age),
             executor_id=plan.executor_id,
+            active_form=not legacy_staff,
         )
         if not trained.trained:
             continue
+        from goaletto.application.forms import form_activity
+
+        form_activity(player, at)
         form_before, experience_before = player.form, player.experience
         morale_before, leadership_before = player.morale, player.leadership
         progress_before = dict(dev.progress)
+        from goaletto.domain.position_experience import credit_experience
+
+        experience_gain = (
+            (trained.experience - experience_before) * 10000
+            + trained.progress["experience"]
+            - dev.progress["experience"]
+        )
+        player.position_experience = credit_experience(
+            old_position_experience, {trained_position: experience_gain}
+        )
         changes = {
             key: {"before": values[key], "after": trained.skills[key]}
             for key in SKILLS

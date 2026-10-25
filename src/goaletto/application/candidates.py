@@ -268,6 +268,7 @@ async def replenish_pool(
                     alternative_positions=list(market_player(person.id, selected).alternatives),
                     **dict(zip(SKILL_NAMES, skills, strict=True)),
                     form=6,
+                    form_activity_at=at,
                     experience=0,
                     morale=50,
                     status="active",

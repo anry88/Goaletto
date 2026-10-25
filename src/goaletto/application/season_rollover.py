@@ -514,6 +514,7 @@ async def _rollover_one(
                     alternative_positions=list(player.alternative_positions),
                     **dict(zip(SKILL_NAMES, skills, strict=True)),
                     form=6,
+                    form_activity_at=at,
                     experience=0,
                     morale=50,
                     status="active",

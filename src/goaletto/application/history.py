@@ -5,7 +5,7 @@ documents, match checkpoints (frozen names/ages/forms in starting snapshots)
 and historical SeasonClub memberships with stored Standing counters. Points
 are never recomputed or awarded here; league ordering reuses the pure
 ``rank_league`` over stored counters, exactly like the result finalizer.
-No MVP or other derived ratings: new indicators need an approved formula.
+V5 awards and assists come only from the frozen terminal state/events.
 
 Pagination is bounded: club results use COUNT plus LIMIT/OFFSET with stable
 ordering (scheduled_start_at DESC, fixture id), matches/receipts/ticks load
@@ -100,6 +100,7 @@ class ReportEvent:
     player_name: str | None  # frozen snapshot name at match time
     other_name: str | None
     detail: str | None
+    assist_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,13 @@ class ReportLineupPlayer:
     form_after: int | None = None
     skill_gains: tuple[tuple[str, int], ...] = ()
     country_code: str | None = None
+    position_minutes: tuple[tuple[str, int], ...] = ()
+    position_experience: tuple[tuple[str, int, int], ...] = ()
+    skill_progress: tuple[tuple[str, int, int, int], ...] = ()
+    growth_limited: bool = False
+    assists: int = 0
+    saves: int = 0
+    player_of_match: bool = False
 
 
 @dataclass(frozen=True)
@@ -153,6 +161,8 @@ class MatchReport:
     aggregate: tuple[int, int] | None = None
     neutral_venue: tuple[str, int, int, int, int] | None = None
     discipline: tuple[tuple[str, UUID, int, bool, int], ...] = ()
+    owned_club_id: UUID | None = None
+    player_of_match_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -257,6 +267,7 @@ def _decode_event(raw: object, names: dict[UUID, str]) -> ReportEvent | None:
         _name("player_id"),
         _name("other_player_id"),
         detail if isinstance(detail, str) else None,
+        _name("assist_player_id"),
     )
 
 
@@ -507,6 +518,9 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         raise ValueError("Finished fixture has no immutable result receipt")
     terminal = restore_state(match.state)
     initial = restore_state(match.starting_snapshot)
+    from goaletto.domain.match_performance import player_of_match
+
+    best_player = player_of_match(terminal)
     names = {
         p.id: p.name
         for team in (initial.home.snapshot, initial.away.snapshot)
@@ -553,7 +567,7 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         else ()
     )
     growth_rows = (
-        {r["person_id"]: r for r in development.results}
+        {r["person_id"]: r for r in development.results if r["club_id"] == str(club.id)}
         if development and development.applied_at
         else {}
     )
@@ -575,7 +589,9 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     starters.get(snapshot_player.id, snapshot_player.position),
                     snapshot_player.id in starters,
                     condition.minutes_played if condition else 0,
-                    goal_counts.get((side, snapshot_player.id), 0),
+                    condition.goals
+                    if terminal.engine_version == "regulation-v5" and condition
+                    else goal_counts.get((side, snapshot_player.id), 0),
                     condition.yellows if condition else 0,
                     condition.dismissed if condition else False,
                     condition.injured if condition else False,
@@ -600,6 +616,30 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                         if value
                     ),
                     country_code=countries.get(snapshot_player.id),
+                    position_minutes=tuple(
+                        (r["position"], r["minutes"])
+                        for r in growth_rows.get(str(snapshot_player.id), {}).get(
+                            "position_terms", []
+                        )
+                    ),
+                    position_experience=tuple(
+                        (position, values["before"], values["after"])
+                        for position, values in growth_rows.get(str(snapshot_player.id), {})
+                        .get("position_experience", {})
+                        .items()
+                    ),
+                    skill_progress=tuple(
+                        (skill, values["before_value"], values["after_value"], values["after"])
+                        for skill, values in growth_rows.get(str(snapshot_player.id), {})
+                        .get("skill_progress", {})
+                        .items()
+                    ),
+                    growth_limited=growth_rows.get(str(snapshot_player.id), {}).get(
+                        "growth_limited", False
+                    ),
+                    assists=condition.assists if condition else 0,
+                    saves=condition.saves if condition else 0,
+                    player_of_match=snapshot_player.id == best_player,
                 )
             )
         rows_out.sort(key=lambda r: (not r.started, not r.appeared, r.name, str(r.person_id)))
@@ -688,6 +728,8 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         aggregate,
         neutral_venue,
         discipline,
+        club.id,
+        names.get(best_player) if best_player else None,
     )
 
 

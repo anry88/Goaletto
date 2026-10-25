@@ -149,6 +149,17 @@ def render(
         if screen.commentary:
             lines.extend((tr("\nПоследние события:"), commentary_html(screen.commentary)))
         if state.phase.value in {"full_time", "abandoned"}:
+            from goaletto.domain.match_performance import player_of_match
+
+            best = player_of_match(state)
+            if best:
+                name = next(
+                    p.name
+                    for team in (state.home, state.away)
+                    for p in team.snapshot.players
+                    if p.id == best
+                )
+                lines.append(tr("⭐ Игрок матча: {player}", player=escape(latin_name(name))))
             lines.append(
                 tr("🏁 Матч завершён.")
                 if state.phase.value == "full_time"

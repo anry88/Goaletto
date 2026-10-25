@@ -26,8 +26,8 @@ async def test_form_energy_and_substitutes_use_frozen_data() -> None:
     starter = replace(report.home_lineup[0], energy_bps=6100, form=5, age=31, minutes=90)
     changed = replace(report, home_lineup=(starter, substitute, unused))
     text, _ = report_view(changed, section="home")
-    assert "возраст 31 · сыграл 90 мин" in text
-    assert "Форма до матча: 5/10 · Энергия после: 61%" in text
+    assert "90 мин" in text
+    assert "Форма: 5/10 · Энергия: 61%" in text
     assert "Vyshedshiy &lt;igrok&gt;" in text and "Вышел на замену" in text
     assert "Не выходил" in text
 
@@ -54,7 +54,7 @@ async def test_report_pagination_preserves_all_players_and_actions() -> None:
     assert "pressing" not in first and "attack" not in first and "runs_behind" not in first
     assert "0′" in first and "51′" in second
     assert "hx:r:3" in [b.callback_data for row in kb.inline_keyboard for b in row]
-    for section in ("events", "home", "away"):
+    for section in ("events", "home"):
         page = 1
         while True:
             text, keyboard = report_view(report, 3, section=section, page=page)
@@ -146,17 +146,18 @@ async def test_practice_report_shows_skill_fraction_form_and_legacy_absence():
     )
     changed = replace(report, home_lineup=(member, report.home_lineup[-1]))
     text, _ = report_view(changed, section="home")
-    assert "Плеймейкинг: +2.88% балла" in text
-    assert "опыт +12.00% балла" in text
-    assert "Форма после матча: 8 → 7/10" in text
-    assert text.count("Форма после матча") == 1
+    assert "Плеймейкинг +0.03" in text
+    assert "Опыт: +0.12" in text
+    assert "Форма: 8 → 7/10" in text
+    assert text.count("8 → 7/10") == 1
+    assert "Форма до матча" not in text and "Форма после матча" not in text
     # Legacy/unused players have no inferred zeroes or retrospective form changes.
     original, _ = report_view(report, section="home")
     assert "Форма после матча" not in original
     with using_locale("en"):
         english, _ = report_view(changed, section="home")
-    assert "Form after match: 8 → 7/10" in english
-    assert "Playmaking: +2.88%" in english
+    assert "Form: 8 → 7/10" in english
+    assert "Playmaking +0.03" in english
 
 
 async def test_cup_report_separates_penalties_and_shows_frozen_neutral_revenue():

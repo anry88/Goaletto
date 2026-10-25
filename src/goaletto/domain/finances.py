@@ -14,6 +14,8 @@ STAFF_RATES = {
     "fitness_coach": (4_000, 8_000, 14_000, 24_000, 40_000),
     "physiotherapist": (6_000, 10_000, 18_000, 30_000, 50_000),
     "scout": (800, 1_200, 1_800, 2_600, 4_000),
+    "midfield_coach": (4_000, 8_000, 14_000, 24_000, 40_000),
+    "wing_coach": (4_000, 8_000, 14_000, 24_000, 40_000),
 }
 STAFF_WAGES = {role: rates[0] for role, rates in STAFF_RATES.items()}
 PRIMARY = {

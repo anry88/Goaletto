@@ -14,6 +14,7 @@ from goaletto.application.history import (
     ClubResultsPage,
     MatchReport,
     PlayerHistoryPage,
+    ReportLineupPlayer,
     SeasonArchive,
     SeasonSummary,
 )
@@ -157,12 +158,15 @@ def _event_line(
     home_name: str,
     away_name: str,
     side: str | None,
+    assist: str | None = None,
 ) -> str | None:
     club = home_name if side == "home" else away_name if side == "away" else None
     who = f"<b>{escape(latin_name(player))}</b>" if player else "—"
     if kind == "goal":
         extra = tr(" (угловой)") if detail == "corner" else ""
-        return f"⚽ {minute}′ {who} ({escape(club or '?')}){extra}"
+        return f"⚽ {minute}′ {who} ({escape(club or '?')}){extra}" + (
+            tr(" · пас {player}", player=escape(latin_name(assist))) if assist else ""
+        )
     if kind == "substitution" and other:
         return f"🔄 {minute}′ {who} → <b>{escape(latin_name(other))}</b>"
     if kind == "automatic_substitution" and other:
@@ -214,6 +218,68 @@ def _event_line(
     return None
 
 
+def _points(value: int) -> str:
+    if value >= 100:
+        whole, fraction = divmod((value + 50) // 100, 100)
+        return f"{whole}.{fraction:02d}".rstrip("0").rstrip(".")
+    whole, fraction = divmod(value, 10000)
+    if fraction == 0:
+        return str(whole)
+    return f"{whole}.{fraction:04d}".rstrip("0")
+
+
+def _player_progress(member: ReportLineupPlayer) -> str:
+    name = escape(
+        flag_name(
+            latin_name(member.name), member.country_code or legacy_nationality(member.person_id)
+        )
+    )
+    extra = f" · ⚽ {member.goals}" if member.goals else ""
+    extra += tr(" · пас {count}", count=member.assists) if member.assists else ""
+    extra += tr(" · сейвы {count}", count=member.saves) if member.saves else ""
+    extra += " · ⭐" if member.player_of_match else ""
+    extra += " · 🟨" * min(member.yellows, 2) + (" · 🟥" if member.sent_off else "")
+    extra += " · 🤕" if member.injured else ""
+    exposure = " · ".join(
+        tr("{position} {minutes} мин", position=position, minutes=minutes)
+        for position, minutes in (member.position_minutes or ((member.position, member.minutes),))
+    )
+    lines = [f"<b>{name}</b>{extra}", exposure]
+    if not member.started:
+        lines[-1] += " · " + (
+            tr("Вышел на замену") if member.appeared or member.minutes else tr("Не выходил")
+        )
+    if member.growth_bps is not None:
+        skills = " · ".join(
+            f"{tr(dict(SKILL_LABELS)[key])} +{_points(gain)}"
+            for key, gain in member.skill_gains
+            if key in dict(SKILL_LABELS) and gain
+        )
+        lines.append(
+            tr("Навыки: {skills}", skills=skills) if skills else tr("Навыки: без изменений.")
+        )
+    if member.position_experience:
+        lines.append(
+            tr(
+                "Опыт: {positions}",
+                positions=" · ".join(
+                    f"{position} +{_points(after - before)}"
+                    for position, before, after in member.position_experience
+                ),
+            )
+        )
+    elif member.experience_gain:
+        lines.append(tr("Опыт: +{gain}", gain=_points(member.experience_gain)))
+    form = (
+        f"{member.form_before} → {member.form_after}"
+        if member.form_before is not None and member.form_after is not None
+        else str(member.form)
+    )
+    energy = f"{member.energy_bps // 100}%" if member.energy_bps is not None else tr("нет данных")
+    lines.append(tr("Форма: {form}/10 · Энергия: {energy}", form=form, energy=energy))
+    return "\n".join(lines)
+
+
 def report_view(
     report: MatchReport,
     return_page: int = 1,
@@ -224,6 +290,15 @@ def report_view(
 ) -> tuple[str, InlineKeyboardMarkup]:
     if section not in REPORT_SECTIONS or type(page) is not int or page < 1:
         raise ValueError("Invalid report view")
+    own_section = (
+        "home"
+        if report.owned_club_id == report.home_club_id
+        else "away"
+        if report.owned_club_id == report.away_club_id
+        else None
+    )
+    if section != "events" and section != own_section:
+        raise ValueError("Only own player progress is available")
     date = report.scheduled_start_at.strftime("%d.%m.%Y")
     lines = [
         f"⚽ <b>{escape(latin_name(report.home_name))} {report.home_goals}:{report.away_goals} "
@@ -276,6 +351,12 @@ def report_view(
         lines.append(
             tr("Пенальти: {home}:{away}", home=report.penalties[0], away=report.penalties[1])
         )
+    if section != "events":
+        lines = lines[:3]
+    if report.player_of_match_name and section == "events":
+        lines.append(
+            tr("⭐ Игрок матча: {player}", player=escape(latin_name(report.player_of_match_name)))
+        )
     if section == "events":
         for name, club_id, awarded, served, carried in report.discipline:
             club = report.home_name if club_id == report.home_club_id else report.away_name
@@ -298,6 +379,7 @@ def report_view(
                 latin_name(report.home_name),
                 latin_name(report.away_name),
                 event.side,
+                event.assist_name,
             )
             if line is not None:
                 entries.append(line)
@@ -305,77 +387,12 @@ def report_view(
         per_page = 10
     else:
         lineup = report.home_lineup if section == "home" else report.away_lineup
-        title = tr("Игроки: ") + (
+        title = tr("Прогресс игроков · ") + (
             latin_name(report.home_name) if section == "home" else latin_name(report.away_name)
         )
         per_page = 5
         for member in lineup:
-            role = (
-                tr("Старт")
-                if member.started
-                else tr("Вышел на замену")
-                if member.appeared or member.minutes
-                else tr("Не выходил")
-            )
-            extra = f" · ⚽ {member.goals}" if member.goals else ""
-            extra += " · 🟨" * min(member.yellows, 2) + (" · 🟥" if member.sent_off else "")
-            extra += " · 🤕" if member.injured else ""
-            energy = (
-                f"{member.energy_bps // 100}%"
-                if member.energy_bps is not None
-                else tr("нет данных")
-            )
-            entries.append(
-                tr(
-                    "<b>{p0}</b> · {p1}{p2}\n{p3} · возраст {p4} · сыграл {p5} "
-                    "мин\nФорма до матча: {p6}/10 · Энергия после: {p7}",
-                    p0=escape(
-                        flag_name(
-                            latin_name(member.name),
-                            member.country_code or legacy_nationality(member.person_id),
-                        )
-                    ),
-                    p1=escape(member.position),
-                    p2=extra,
-                    p3=role,
-                    p4=member.age,
-                    p5=member.minutes,
-                    p6=member.form,
-                    p7=energy,
-                )
-                + (
-                    tr(
-                        "\nРазвитие за матч: +{gain}% балла · опыт +{experience}% балла",
-                        gain=f"{member.growth_bps / 100:.2f}",
-                        experience=f"{(member.experience_gain or 0) / 100:.2f}",
-                    )
-                    if member.growth_bps is not None
-                    else ""
-                )
-                + (
-                    "\n"
-                    + " · ".join(
-                        tr(
-                            "{skill}: +{gain}% балла",
-                            skill=tr(dict(SKILL_LABELS)[key]),
-                            gain=f"{gain / 100:.2f}",
-                        )
-                        for key, gain in member.skill_gains
-                        if key in dict(SKILL_LABELS)
-                    )
-                    if member.skill_gains
-                    else ""
-                )
-                + (
-                    tr(
-                        "\nФорма после матча: {before} → {after}/10",
-                        before=member.form_before,
-                        after=member.form_after,
-                    )
-                    if member.form_before is not None and member.form_after is not None
-                    else ""
-                )
-            )
+            entries.append(_player_progress(member))
     # Bound whole entries by Telegram's UTF-16 text budget even for long names.
     chunks: list[list[str]] = [[]]
     used = len("\n".join(lines).encode("utf-16-le")) // 2 + len(escape(title)) + 80
@@ -405,10 +422,9 @@ def report_view(
             )
             for tab, label in (
                 ("events", tr("⚽ События")),
-                ("home", tr("🏠 Хозяева")),
-                ("away", tr("✈️ Гости")),
+                (own_section, tr("📈 Прогресс игроков")),
             )
-            if tab != section
+            if tab is not None and tab != section
         ]
     ]
     nav: list[InlineKeyboardButton] = []

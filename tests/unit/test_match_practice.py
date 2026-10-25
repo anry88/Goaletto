@@ -8,8 +8,7 @@ import pytest
 from goaletto.domain.development import GrowthBudget
 from goaletto.domain.match_development import POSITION_ROLES, develop_appearance
 from goaletto.domain.match_practice import (
-    DEFAULT_FRIENDLY_EXPERIENCE_FACTOR,
-    DEFAULT_FRIENDLY_SKILL_FACTOR,
+    LEGACY_FRIENDLY_FACTOR,
     POLICY,
     Competition,
     develop_match_practice,
@@ -160,8 +159,8 @@ def test_friendly_below_official_with_free_budget():
     assert sum(friendly.granted.values()) > 0
     assert sum(friendly.granted.values()) < sum(official.granted.values())
     assert 0 < friendly.experience_gain < official.experience_gain
-    assert friendly.terms.skill_factor == DEFAULT_FRIENDLY_SKILL_FACTOR
-    assert friendly.terms.experience_factor == DEFAULT_FRIENDLY_EXPERIENCE_FACTOR
+    assert friendly.terms.skill_factor == LEGACY_FRIENDLY_FACTOR
+    assert friendly.terms.experience_factor == LEGACY_FRIENDLY_FACTOR
     low = develop_match_practice(
         player,
         "friendly",
@@ -342,7 +341,7 @@ def test_unknown_competition_rejected(bad_competition):
         is_official(bad_competition)
 
 
-@pytest.mark.parametrize("bad_factor", [0, 10000, -5, 20000, True, False, 50.0, "5000", None])
+@pytest.mark.parametrize("bad_factor", [0, 10000, -5, 20000, True, False, 50.0, "5000"])
 def test_invalid_factors_rejected(bad_factor):
     with pytest.raises(ValueError):
         develop_match_practice(

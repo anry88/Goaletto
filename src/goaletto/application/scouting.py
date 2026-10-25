@@ -353,6 +353,7 @@ async def complete_search(session: AsyncSession, job: Job, at: datetime) -> None
                 alternative_positions=list(profile.alternatives),
                 **dict(zip(SKILL_NAMES, profile.skills, strict=True)),
                 form=6,
+                form_activity_at=at,
                 experience=0,
                 morale=50,
                 status="active",

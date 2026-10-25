@@ -29,6 +29,9 @@ async def recover_player(session: AsyncSession, person_id: UUID, at: datetime) -
     person = await session.get(Person, person_id)
     if player is None or person is None:
         raise ValueError("Missing recovery player")
+    from goaletto.application.forms import settle_form
+
+    await settle_form(session, player, at)
     row = await session.get(PlayerRecovery, person_id, with_for_update=True)
     if row is None:
         row = PlayerRecovery(

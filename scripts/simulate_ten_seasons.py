@@ -169,7 +169,7 @@ def pick_lineup(
 
 def weak_player_stress(seasons: int = 10) -> list[dict]:
     from goaletto.domain.development import GrowthBudget
-    from goaletto.domain.match_practice import CURRENT_POLICY, Competition, develop_match_practice
+    from goaletto.domain.match_practice import Competition, develop_position_practice
     from goaletto.domain.training import PROGRESS_KEYS, TrainingPlayer, train_player
 
     player = TrainingPlayer(
@@ -193,14 +193,13 @@ def weak_player_stress(seasons: int = 10) -> list[dict]:
                     (day - 8) % 4
                 ]
                 assert competition is not None
-                result = develop_match_practice(
+                result = develop_position_practice(
                     player,
                     competition,
-                    120,
+                    {player.position: 120},
                     {"defence_coach": 20},
                     budget,
                     match_seed=f"weak-stress:{year}:{day}",
-                    policy=CURRENT_POLICY,
                 )
                 player = replace(
                     player,
@@ -220,6 +219,7 @@ def weak_player_stress(seasons: int = 10) -> list[dict]:
                     head_skill=20,
                     physio_skill=20,
                     budget=budget,
+                    active_form=True,
                 )
                 player = replace(
                     player,

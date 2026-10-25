@@ -72,10 +72,12 @@ def football_line(state: MatchState, event: dict[str, Any]) -> str | None:
     names = {str(p.id): latin_name(p.name).replace("\n", " ")[:40] for p in team.snapshot.players}
     who = names.get(str(event.get("player_id")), tr("Игрок"))
     other = names.get(str(event.get("other_player_id")), tr("Игрок"))
+    assist = names.get(str(event.get("assist_player_id")))
     club = latin_name(team.snapshot.name).replace("\n", " ")[:40]
     detail = str(event.get("detail", ""))
     descriptions = {
         "goal": tr("⚽ Гол! {p0} ({p1})", p0=who, p1=club)
+        + (tr(" · пас {player}", player=assist) if assist else "")
         + (tr(" — после углового") if detail == "corner" else ""),
         "save": tr("🧤 Опасный момент: удар {p0} ({p1}) — вратарь спасает", p0=who, p1=club),
         "wide": tr("🎯 Опасный момент: {p0} ({p1}) бьёт мимо", p0=who, p1=club),

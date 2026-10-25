@@ -28,6 +28,10 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
     sql = normalized(output.getvalue())
     old = {"league_sets", "leagues", "clubs", "jobs", "outbox_messages"}
     altered = {
+        "candidate_pools",
+        "staff",
+        "staff_changes",
+        "staff_careers",
         "academy_candidates",
         "players",
         "finance_accounts",
@@ -97,6 +101,15 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 "ck_recovery_tick",
                 "ck_command_target_tick",
                 "ck_crowd_policy",
+                "ck_player_position_experience",
+                "ck_player_form_idle_steps",
+                "ck_candidate_pool_scope",
+                "ck_staff_role",
+                "ck_qualification_role",
+                "ck_staff_change_role",
+                "ck_salary_role",
+                "ck_staff_career_qualification",
+                "ck_staff_career_policy",
             }:
                 assert (
                     normalized(

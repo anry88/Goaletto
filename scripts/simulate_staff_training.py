@@ -7,9 +7,8 @@ from uuid import UUID
 
 from goaletto.domain.development import GrowthBudget
 from goaletto.domain.match_practice import (
-    CURRENT_POLICY,
     Competition,
-    develop_match_practice,
+    develop_position_practice,
 )
 from goaletto.domain.recovery import daily_recovery, ready_in, recover
 from goaletto.domain.training import (
@@ -70,14 +69,13 @@ def simulate(
             )
             minutes = 120 if extra_time else 90
             minutes_played += minutes
-            appearance = develop_match_practice(
+            appearance = develop_position_practice(
                 player,
                 competition,
-                minutes,
-                {"attack_coach": skill},
+                {player.position: minutes},
+                {"midfield_coach": skill},
                 budget,
                 match_seed=f"calibration:{competition}:{day}",
-                policy=CURRENT_POLICY,
             )
             player, budget = (
                 replace(
@@ -101,6 +99,7 @@ def simulate(
                 head_skill=skill,
                 physio_skill=skill,
                 budget=budget,
+                active_form=True,
             )
             budget = result.budget
             player = replace(
@@ -180,8 +179,9 @@ def main() -> None:
         "Энергия — иллюстрация 24-часового recovery-v1 с типовой нагрузкой 2680/3574 bps; "
         "это не прогноз травм или матчевых результатов.",
         "",
-        "Все матчи используют текущую match-practice-v3: официальные — полный прогресс, "
-        "товарищеские — рабочие 50% навыков/опыта, с обычной динамикой формы. "
+        "Все матчи используют текущую match-practice-v4 и сыгранную позицию MC: "
+        "официальные — полный прогресс, товарищеские — утверждённые 75% навыков/опыта. "
+        "Результативность/награды в этой верхней оценке роста не моделируются. "
         "Для вторых кубковых/чемпионских встреч и финала взяты 120 минут, остальных — 90; "
         "пенальти минут не добавляют. Опыт начисляется отдельно от навыков.",
         "",

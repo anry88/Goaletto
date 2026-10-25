@@ -6,20 +6,26 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
-from goaletto.application.development import growth_budget, save_budget
+from goaletto.application.development import growth_budget, position_experience, save_budget
 from goaletto.application.training_staff import qualifications, staff_roster
 from goaletto.domain.clock import MatchPhase
 from goaletto.domain.match_codec import state_hash
 from goaletto.domain.match_development import POLICY, AppearanceGrowth, develop_appearance
+from goaletto.domain.match_performance import player_of_match
 from goaletto.domain.match_practice import (
     CURRENT_POLICY,
     DEFAULT_FRIENDLY_EXPERIENCE_FACTOR,
     DEFAULT_FRIENDLY_SKILL_FACTOR,
+    LEGACY_FRIENDLY_FACTOR,
     V2_POLICY,
+    V3_POLICY,
     MatchPracticeResult,
     develop_match_practice,
+    develop_position_practice,
 )
-from goaletto.domain.match_types import MatchState
+from goaletto.domain.match_types import POSITION_ENGINE_VERSION, MatchState
+from goaletto.domain.player_form import MatchPerformance
+from goaletto.domain.position_experience import credit_experience
 from goaletto.domain.training import (
     POLICY_VERSION,
     PROGRESS_KEYS,
@@ -87,7 +93,9 @@ async def pin_development(
     session.add(
         MatchDevelopment(
             match_id=state.match_id,
-            policy_version=CURRENT_POLICY,
+            policy_version=CURRENT_POLICY
+            if state.engine_version == POSITION_ENGINE_VERSION
+            else V3_POLICY,
             eligible=eligible,
             staff_snapshot=staff,
             terms_snapshot={
@@ -96,8 +104,12 @@ async def pin_development(
                 "season_id": str(fixture.season_id),
                 "plan_revision": plan.revision if plan else None,
                 "match_seed": f"{state.match_id}:{state.seed}",
-                "friendly_skill_factor": DEFAULT_FRIENDLY_SKILL_FACTOR,
-                "friendly_experience_factor": DEFAULT_FRIENDLY_EXPERIENCE_FACTOR,
+                "friendly_skill_factor": DEFAULT_FRIENDLY_SKILL_FACTOR
+                if state.engine_version == POSITION_ENGINE_VERSION
+                else LEGACY_FRIENDLY_FACTOR,
+                "friendly_experience_factor": DEFAULT_FRIENDLY_EXPERIENCE_FACTOR
+                if state.engine_version == POSITION_ENGINE_VERSION
+                else LEGACY_FRIENDLY_FACTOR,
                 "players": {
                     str(p.id): {
                         "age": p.age,
@@ -129,11 +141,13 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
     )
     if receipt is None or receipt.applied_at is not None:
         return  # Old matches without a pinned policy never receive retroactive rewards.
-    if receipt.policy_version not in (POLICY, V2_POLICY, CURRENT_POLICY):
+    if receipt.policy_version not in (POLICY, V2_POLICY, V3_POLICY, CURRENT_POLICY):
         raise ValueError("Unknown match development policy")
-    practice = receipt.policy_version in (V2_POLICY, CURRENT_POLICY)
+    practice = receipt.policy_version in (V2_POLICY, V3_POLICY, CURRENT_POLICY)
     results = []
+    best_player = player_of_match(state)
     if receipt.eligible:
+        activity_at = at
         if practice:
             final = await session.get(MatchResult, state.match_id)
             if (
@@ -147,6 +161,7 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                 or receipt.terms_snapshot["competition"] != final.competition
             ):
                 raise ValueError("Practice needs its finalized gameplay result")
+            activity_at = final.actual_finish_at
         for team in (state.home, state.away):
             staff = qualifications(receipt.staff_snapshot[str(team.snapshot.club_id)])
             conditions = {c.player_id: c for c in team.conditions}
@@ -192,6 +207,8 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                 if dev.policy_version != POLICY_VERSION:
                     raise ValueError("Unknown potential policy")
                 before_form = player.form
+                old_experience = position_experience(player, dev)
+                old_progress = dict(dev.progress)
                 participant = TrainingPlayer(
                     person.id,
                     snapshot.age,
@@ -205,19 +222,48 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                 budget = growth_budget(dev, person.age)
                 trained: AppearanceGrowth | MatchPracticeResult
                 if practice:
-                    practiced = develop_match_practice(
-                        participant,
-                        receipt.terms_snapshot["competition"],
-                        minutes,
-                        staff,
-                        budget,
-                        match_seed=receipt.terms_snapshot["match_seed"],
-                        friendly_skill_factor=receipt.terms_snapshot["friendly_skill_factor"],
-                        friendly_experience_factor=receipt.terms_snapshot[
-                            "friendly_experience_factor"
-                        ],
-                        policy=receipt.policy_version,
-                    )
+                    if receipt.policy_version == CURRENT_POLICY:
+                        if state.engine_version != POSITION_ENGINE_VERSION:
+                            raise ValueError("Positional development needs a V5 match")
+                        exposure = dict(conditions[snapshot.id].position_minutes)
+                        if sum(exposure.values()) != minutes:
+                            raise ValueError("Positional minutes do not reconcile")
+                        practiced = develop_position_practice(
+                            participant,
+                            receipt.terms_snapshot["competition"],
+                            exposure,
+                            staff,
+                            budget,
+                            match_seed=receipt.terms_snapshot["match_seed"],
+                            friendly_skill_factor=receipt.terms_snapshot["friendly_skill_factor"],
+                            friendly_experience_factor=receipt.terms_snapshot[
+                                "friendly_experience_factor"
+                            ],
+                            performance=MatchPerformance(
+                                minutes,
+                                conditions[snapshot.id].energy_bps,
+                                conditions[snapshot.id].goals,
+                                conditions[snapshot.id].assists,
+                                conditions[snapshot.id].saves,
+                                conditions[snapshot.id].yellows,
+                                conditions[snapshot.id].dismissed,
+                                snapshot.id == best_player,
+                            ),
+                        )
+                    else:
+                        practiced = develop_match_practice(
+                            participant,
+                            receipt.terms_snapshot["competition"],
+                            minutes,
+                            staff,
+                            budget,
+                            match_seed=receipt.terms_snapshot["match_seed"],
+                            friendly_skill_factor=receipt.terms_snapshot["friendly_skill_factor"],
+                            friendly_experience_factor=receipt.terms_snapshot[
+                                "friendly_experience_factor"
+                            ],
+                            policy=receipt.policy_version,
+                        )
                     player.form = practiced.form
                     trained = practiced
                 else:
@@ -227,6 +273,15 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                 for key, value in growth.skills.items():
                     setattr(player, key, value)
                 player.experience = trained.experience
+                experience_grants = (
+                    practiced.experience_by_position
+                    if receipt.policy_version == CURRENT_POLICY
+                    else {snapshot.position: trained.experience_gain}
+                )
+                player.position_experience = credit_experience(old_experience, experience_grants)
+                from goaletto.application.forms import form_activity
+
+                form_activity(player, activity_at)
                 dev.progress = growth.progress
                 save_budget(dev, growth.budget)
                 results.append(
@@ -259,5 +314,35 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                         competition=practiced.terms.competition,
                         skill_factor=practiced.terms.skill_factor,
                         experience_factor=practiced.terms.experience_factor,
+                    )
+                if receipt.policy_version == CURRENT_POLICY:
+                    results[-1].update(
+                        goals=conditions[snapshot.id].goals,
+                        assists=conditions[snapshot.id].assists,
+                        saves=conditions[snapshot.id].saves,
+                        player_of_match=snapshot.id == best_player,
+                        position_terms=list(practiced.position_terms),
+                        position_experience={
+                            position: {
+                                "before": old_experience.get(position, 0),
+                                "after": player.position_experience[position],
+                                "gain": gain,
+                            }
+                            for position, gain in experience_grants.items()
+                        },
+                        skill_progress={
+                            skill: {
+                                "before_value": values[skill],
+                                "after_value": growth.skills[skill],
+                                "before": old_progress[skill],
+                                "after": growth.progress[skill],
+                            }
+                            for skill, gain in growth.granted.items()
+                            if gain
+                        },
+                        growth_limited=sum(
+                            int(term["requested_gain"]) for term in practiced.position_terms
+                        )
+                        > sum(growth.granted.values()),
                     )
     receipt.results, receipt.applied_at = results, at
