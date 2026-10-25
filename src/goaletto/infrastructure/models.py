@@ -1905,12 +1905,52 @@ class MatchCrowd(Base):
     __tablename__ = "match_crowds"
     __table_args__ = (
         CheckConstraint(
-            "policy_version IN ('stadium-demand-v1','neutral-final-v1')", name="ck_crowd_policy"
+            "policy_version IN ('stadium-demand-v1','neutral-final-v1',"
+            "'stadium-demand-v2','neutral-final-v2')",
+            name="ck_crowd_policy",
         ),
     )
     match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
     policy_version: Mapped[str] = mapped_column(String(32))
     locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    basis: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+class SupporterChange(Base):
+    """Immutable audience change, committed with its sporting result."""
+
+    __tablename__ = "supporter_changes"
+    __table_args__ = (
+        UniqueConstraint("club_id", "match_id", name="uq_supporter_match"),
+        Index(
+            "uq_supporter_season",
+            "club_id",
+            "season_id",
+            unique=True,
+            postgresql_where=text("kind = 'season'"),
+        ),
+        Index("ix_supporter_club_time", "club_id", "effective_at", "id"),
+        CheckConstraint("policy_version = 'supporters-v1'", name="ck_supporter_policy"),
+        CheckConstraint(
+            "before_count >= 0 AND after_count >= before_count", name="ck_supporter_counts"
+        ),
+        CheckConstraint(
+            "(kind = 'match' AND match_id IS NOT NULL) OR (kind = 'season' AND match_id IS NULL)",
+            name="ck_supporter_source",
+        ),
+        CheckConstraint("recorded_at >= effective_at", name="ck_supporter_dates"),
+        CheckConstraint("jsonb_typeof(basis) = 'object'", name="ck_supporter_basis"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    match_id: Mapped[UUID | None] = mapped_column(ForeignKey("matches.id"))
+    kind: Mapped[str] = mapped_column(String(16))
+    policy_version: Mapped[str] = mapped_column(String(32))
+    before_count: Mapped[int] = mapped_column(Integer)
+    after_count: Mapped[int] = mapped_column(Integer)
+    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     basis: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 

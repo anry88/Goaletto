@@ -163,7 +163,7 @@ async def test_crowd_is_pinned_across_capacity_change_and_old_invoice_uses_histo
         original = state_hash(restore_state(match.starting_snapshot))
         crowd = await session.get(MatchCrowd, match.id)
         assert (
-            crowd.policy_version == "stadium-demand-v1"
+            crowd.policy_version == "stadium-demand-v2"
             and crowd.basis["fans"] == restore_state(match.state).crowd.home_fans
         )
         work = await session.scalar(select(Job).where(Job.kind == "stadium.complete"))

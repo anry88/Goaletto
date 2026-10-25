@@ -163,6 +163,7 @@ class MatchReport:
     discipline: tuple[tuple[str, UUID, int, bool, int], ...] = ()
     owned_club_id: UUID | None = None
     player_of_match_name: str | None = None
+    supporters_gain: int | None = None
 
 
 @dataclass(frozen=True)
@@ -701,6 +702,13 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                 if direct
                 else (outcome.penalty_b, outcome.penalty_a)
             )
+    from goaletto.infrastructure.models import SupporterChange
+
+    supporters_change = await session.scalar(
+        select(SupporterChange).where(
+            SupporterChange.club_id == club.id, SupporterChange.match_id == match.id
+        )
+    )
     return MatchReport(
         fixture.id,
         fixture.season_id,
@@ -730,6 +738,9 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         discipline,
         club.id,
         names.get(best_player) if best_player else None,
+        supporters_change.after_count - supporters_change.before_count
+        if supporters_change
+        else None,
     )
 
 

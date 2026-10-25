@@ -1,5 +1,8 @@
 """Pure neutral-final ticket split (AND-125 computational subpackage).
 
+V2 additionally pins an explicit demand_bps based on both finalists and the event.
+result_document preserves V1's original saved shape; the V1 contract below stays frozen.
+
 This module is a deterministic calculator only.  It does not touch the ORM,
 migrations, bot/application/worker, match runtime, ledger, portraits or ``en.json``.
 It does not assign kickoff times, book a venue in the database, run extra time
@@ -79,13 +82,15 @@ Integration note for Codex (durable wiring lives outside this pure module)
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any
 from uuid import UUID
 
 from goaletto.domain.finances import MAX_MONEY, money
 from goaletto.domain.world import stable_seed
 
 NEUTRAL_FINAL_POLICY = "neutral-final-v1"
+CURRENT_NEUTRAL_POLICY = "neutral-final-v2"
 NEUTRAL_DEMAND_BPS = 8000
 HOME_ADVANTAGE = 0
 
@@ -123,10 +128,12 @@ class NeutralFinalSnapshot:
     supporters_b: int
     seed: int
     neutral: bool
+    demand_bps: int = NEUTRAL_DEMAND_BPS
 
     def __post_init__(self) -> None:
-        if self.policy_version != NEUTRAL_FINAL_POLICY:
+        if self.policy_version not in {NEUTRAL_FINAL_POLICY, CURRENT_NEUTRAL_POLICY}:
             raise ValueError("Invalid neutral-final policy")
+        _check_demand(self.policy_version, self.demand_bps)
         _check_club_id(self.venue_id, "Venue id")
         _check_club_id(self.club_a_id, "Club A id")
         _check_club_id(self.club_b_id, "Club B id")
@@ -161,10 +168,12 @@ class NeutralFinalResult:
     payout_a: int
     payout_b: int
     odd_recipient: UUID | None
+    demand_bps: int = NEUTRAL_DEMAND_BPS
 
     def __post_init__(self) -> None:
-        if self.policy_version != NEUTRAL_FINAL_POLICY:
+        if self.policy_version not in {NEUTRAL_FINAL_POLICY, CURRENT_NEUTRAL_POLICY}:
             raise ValueError("Invalid neutral-final policy")
+        _check_demand(self.policy_version, self.demand_bps)
         _check_club_id(self.venue_id, "Venue id")
         _check_club_id(self.club_a_id, "Club A id")
         _check_club_id(self.club_b_id, "Club B id")
@@ -186,7 +195,7 @@ class NeutralFinalResult:
         if self.crowd > self.capacity:
             raise ValueError("Crowd exceeds venue capacity")
         expected_crowd = min(
-            self.capacity, (self.supporters_a + self.supporters_b) * NEUTRAL_DEMAND_BPS // 10_000
+            self.capacity, (self.supporters_a + self.supporters_b) * self.demand_bps // 10_000
         )
         if self.crowd != expected_crowd:
             raise ValueError("Crowd differs from frozen demand policy")
@@ -244,7 +253,7 @@ def settle_neutral_final(snapshot: NeutralFinalSnapshot) -> NeutralFinalResult:
         raise ValueError("Snapshot must be a NeutralFinalSnapshot")
     # Dataclass validation already ran in __post_init__; recompute purely.
     total_supporters = snapshot.supporters_a + snapshot.supporters_b
-    crowd = min(snapshot.capacity, total_supporters * NEUTRAL_DEMAND_BPS // 10_000)
+    crowd = min(snapshot.capacity, total_supporters * snapshot.demand_bps // 10_000)
     money(crowd)
     gross = money(crowd * snapshot.ticket_price)
     half, remainder = divmod(gross, 2)
@@ -277,4 +286,22 @@ def settle_neutral_final(snapshot: NeutralFinalSnapshot) -> NeutralFinalResult:
         payout_a=payout_a,
         payout_b=payout_b,
         odd_recipient=recipient,
+        demand_bps=snapshot.demand_bps,
     )
+
+
+def _check_demand(policy: str, value: int) -> None:
+    if (
+        type(value) is not int
+        or not 0 < value <= 30000
+        or (policy == NEUTRAL_FINAL_POLICY and value != NEUTRAL_DEMAND_BPS)
+    ):
+        raise ValueError("Invalid frozen neutral demand")
+
+
+def result_document(result: NeutralFinalResult) -> dict[str, Any]:
+    """V1 keeps its original saved shape; V2 explicitly pins its demand."""
+    data = asdict(result)
+    if result.policy_version == NEUTRAL_FINAL_POLICY:
+        del data["demand_bps"]
+    return data

@@ -907,5 +907,11 @@
   " · пас {count}": " · assists {count}",
   " · сейвы {count}": " · saves {count}",
   "⭐ Игрок матча: {player}": "⭐ Player of the match: {player}",
-  "\n⭐ Игрок матча: {player}": "\n⭐ Player of the match: {player}"
+  "\n⭐ Игрок матча: {player}": "\n⭐ Player of the match: {player}",
+  "Болельщики: {supporters} · содержание: {upkeep}/период клуба": "Supporters: {supporters} · upkeep: {upkeep}/club pay period",
+  " (+{count} недавно)": " (+{count} recently)",
+  "👥 Болельщики: +{count}": "👥 Supporters: +{count}",
+  "Отбор": "Qualifying",
+  "1/32 финала": "Round of 64",
+  "1/16 финала": "Round of 32"
 }

@@ -582,6 +582,15 @@ async def test_actual_runtime_producer_writes_result_priority_without_live_board
         def __init__(self):
             self.statements = []
 
+        async def scalar(self, statement):
+            from types import SimpleNamespace
+
+            from goaletto.infrastructure.models import SupporterChange
+
+            assert statement.column_descriptions[0]["entity"] is SupporterChange
+            assert store.ownership.club_id in statement.compile().params.values()
+            return SimpleNamespace(before_count=2500, after_count=2517)
+
         async def scalars(self, statement):
             return Rows([])
 
@@ -608,6 +617,9 @@ async def test_actual_runtime_producer_writes_result_priority_without_live_board
     assert sender.valid_payload(params["payload"])
     text = sender.render_text(params["payload"])
     assert "Финальный свисток" in text
+    assert params["payload"]["supporters_gain"] == 17
+    assert "👥 Болельщики: +17" in text
+    assert not sender.valid_payload(dict(params["payload"], supporters_gain=True))
 
 
 def test_render_escapes_html_and_uses_game_minutes_and_abandoned_status(store):

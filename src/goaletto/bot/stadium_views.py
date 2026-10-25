@@ -17,8 +17,28 @@ from goaletto.domain.finances import (
     ticket_income,
 )
 from goaletto.domain.names import latin_name
-from goaletto.domain.stadium import EXPANSION_DAYS, stadium_level
-from goaletto.presentation.i18n import tr
+from goaletto.domain.stadium import EXPANSION_DAYS, match_stage, stadium_level
+from goaletto.presentation.i18n import LabelMap, tr
+
+COMPETITIONS = LabelMap(
+    {
+        "league": "Лига",
+        "cup": "Кубок",
+        "champions": "Кубок чемпионов",
+        "friendly": "Товарищеский матч",
+    }
+)
+STAGES = LabelMap(
+    {
+        "qualification": "Отбор",
+        "round_of_64": "1/32 финала",
+        "round_of_32": "1/16 финала",
+        "round_of_16": "1/8 финала",
+        "quarterfinal": "Четвертьфинал",
+        "semifinal": "Полуфинал",
+        "final": "Финал",
+    }
+)
 
 
 def parse_stadium(data: str) -> tuple[str, UUID, int | None]:
@@ -51,8 +71,13 @@ def stadium_view(screen: StadiumScreen, notice: str | None = None) -> tuple[str,
             capacity=amount(screen.capacity),
         ),
         tr(
-            "Фанбаза: {supporters} · содержание: {upkeep}/период клуба",
-            supporters=amount(screen.supporters),
+            "Болельщики: {supporters} · содержание: {upkeep}/период клуба",
+            supporters=amount(screen.supporters)
+            + (
+                tr(" (+{count} недавно)", count=amount(screen.recent_gain))
+                if screen.recent_gain
+                else ""
+            ),
             upkeep=amount(stadium_upkeep(screen.capacity)),
         ),
         tr(
@@ -66,6 +91,11 @@ def stadium_view(screen: StadiumScreen, notice: str | None = None) -> tuple[str,
     if screen.next_home_at:
         lines.extend(
             ("", tr("Домашний матч: {date} UTC", date=screen.next_home_at.strftime("%d.%m %H:%M")))
+        )
+        stage = match_stage(screen.next_competition, screen.next_stage)
+        lines.append(
+            COMPETITIONS[screen.next_competition]
+            + (" · " + STAGES[stage] if stage in STAGES else "")
         )
         crowd = screen.locked
         if crowd:
@@ -82,7 +112,6 @@ def stadium_view(screen: StadiumScreen, notice: str | None = None) -> tuple[str,
             lines.append(
                 tr("Ожидается: {fans}/{capacity} зрителей", fans=amount(fans), capacity=amount(cap))
             )
-            lines.append(tr("Спрос зависит от лиги, места и последних пяти результатов."))
         else:
             raise ValueError("Home fixture lacks an attendance projection")
         lines.append(
@@ -92,8 +121,6 @@ def stadium_view(screen: StadiumScreen, notice: str | None = None) -> tuple[str,
                 fill=0 if cap == 0 else fans * 100 // cap,
             )
         )
-        if fans < cap:
-            lines.append(tr("Свободные места уже есть. Для роста дохода нужен больший спрос."))
     rows = []
     if screen.expansion:
         expansion = screen.expansion

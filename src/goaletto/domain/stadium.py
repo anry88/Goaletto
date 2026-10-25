@@ -1,4 +1,4 @@
-"""Deterministic attendance demand and integer facility costs, stadium-demand-v1."""
+"""Versioned deterministic attendance demand and integer facility costs."""
 
 import math
 from dataclasses import dataclass
@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from goaletto.domain.finances import STADIUM_CAPACITIES, accrued_wage, money, stadium_upkeep
 from goaletto.domain.game_cycle import CYCLE_SECONDS
 
-DEMAND_POLICY = "stadium-demand-v1"
+LEGACY_DEMAND_POLICY = "stadium-demand-v1"
+DEMAND_POLICY = "stadium-demand-v2"
 EXPANSION_DAYS = 7
 
 
@@ -20,11 +21,76 @@ class Attendance:
     recent_points: tuple[int, ...]
     demand_bps: int
     fans: int
+    competition: str = "league"
+    stage: str = "league"
+
+
+STAGE_FACTORS = {
+    "qualification": 9000,
+    "round_of_64": 10000,
+    "round_of_32": 11000,
+    "round_of_16": 12000,
+    "quarterfinal": 13500,
+    "semifinal": 15000,
+    "final": 18000,
+}
+
+
+def match_stage(competition: str, stage: str | None) -> str:
+    if competition in {"league", "friendly"}:
+        return competition
+    if competition not in {"cup", "champions"}:
+        raise ValueError("Unknown attendance competition")
+    if stage in {"prelim", "entry-16", "entry-8", "entry-4"}:
+        return "qualification"
+    mapped = {
+        "round-32": "round_of_32",
+        "round-16": "round_of_16",
+        "quarter": "quarterfinal",
+        "semi": "semifinal",
+    }.get(stage or "", stage)
+    if mapped not in STAGE_FACTORS:
+        raise ValueError("Unknown attendance tournament stage")
+    return mapped
+
+
+def match_attendance(
+    supporters: int,
+    capacity: int,
+    tier: int,
+    place: int,
+    recent_points: tuple[int, ...],
+    *,
+    competition: str,
+    stage: str | None = None,
+) -> Attendance:
+    base = attendance(supporters, capacity, tier, place, recent_points)
+    normalized = match_stage(competition, stage)
+    factor = (
+        10000
+        if competition == "league"
+        else 5500
+        if competition == "friendly"
+        else STAGE_FACTORS[normalized] + (2000 if competition == "champions" else 0)
+    )
+    bps = min(30000, base.demand_bps * factor // 10000)
+    return Attendance(
+        supporters,
+        capacity,
+        tier,
+        place,
+        recent_points,
+        bps,
+        min(capacity, supporters * bps // 10000),
+        competition,
+        normalized,
+    )
 
 
 def attendance(
     supporters: int, capacity: int, tier: int, place: int, recent_points: tuple[int, ...]
 ) -> Attendance:
+    """Frozen V1 formula; new gameplay matches use match_attendance."""
     money(supporters)
     money(capacity)
     if (

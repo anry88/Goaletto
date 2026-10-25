@@ -357,6 +357,8 @@ def report_view(
         lines.append(
             tr("⭐ Игрок матча: {player}", player=escape(latin_name(report.player_of_match_name)))
         )
+    if report.supporters_gain and section == "events":
+        lines.append(tr("👥 Болельщики: +{count}", count=report.supporters_gain))
     if section == "events":
         for name, club_id, awarded, served, carried in report.discipline:
             club = report.home_name if club_id == report.home_club_id else report.away_name

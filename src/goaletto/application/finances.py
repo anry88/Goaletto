@@ -316,14 +316,15 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
 
         sponsor, sponsor_periods = await sponsor_for_period(session, club_id, start, week)
         from goaletto.application.academy import upkeep_for_period as academy_upkeep_for_period
+        from goaletto.application.supporters import merchandise_for_period
+
+        merchandise, supporter_periods = await merchandise_for_period(
+            session, account.club, start, week
+        )
 
         amounts = {
             "sponsor": sponsor,
-            "merchandise": accrued_wage(
-                merchandise_income(account.club.supporters),
-                int((week - start).total_seconds()),
-                period_seconds,
-            ),
+            "merchandise": merchandise,
             **wages,
             "stadium_upkeep": upkeep,
             "academy_upkeep": await academy_upkeep_for_period(session, club_id, start, week),
@@ -367,7 +368,8 @@ async def cycle_finances(session: AsyncSession, job: Job, at: datetime) -> None:
                     "season_id": str(season_id),
                     "tier": tier,
                     "place": place,
-                    "supporters": account.club.supporters,
+                    "supporters": supporter_periods[-1]["supporters"],
+                    "supporter_periods": supporter_periods,
                     "capacity": capacity_periods[-1]["capacity"]
                     if capacity_periods
                     else account.club.stadium_capacity,

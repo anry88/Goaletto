@@ -25,9 +25,9 @@ from goaletto.domain.knockout_match import KnockoutContext, decision
 from goaletto.domain.match_codec import restore_state, state_hash
 from goaletto.domain.match_types import KNOCKOUT_ENGINE_VERSION, POSITION_ENGINE_VERSION
 from goaletto.domain.neutral_final import (
-    NEUTRAL_DEMAND_BPS,
-    NEUTRAL_FINAL_POLICY,
+    CURRENT_NEUTRAL_POLICY,
     NeutralFinalSnapshot,
+    result_document,
     settle_neutral_final,
 )
 from goaletto.domain.stadium import Attendance
@@ -504,17 +504,27 @@ async def pin_final_venue(
     )
     if venue is None:
         raise ValueError("No free neutral stadium")
+    from goaletto.application.stadium import crowd_for_fixture
+
+    demands = [await crowd_for_fixture(session, fixture, club, at) for club in (home, away)]
+    supporters = sum(d.supporters for d in demands)
+    demand_bps = (
+        sum(d.supporters * d.demand_bps for d in demands) // supporters
+        if supporters
+        else max(d.demand_bps for d in demands)
+    )
     snapshot = NeutralFinalSnapshot(
-        NEUTRAL_FINAL_POLICY,
+        CURRENT_NEUTRAL_POLICY,
         venue.id,
         venue.stadium_capacity,
         CUP_FINAL_TICKET_PRICE,
         home.id,
         away.id,
-        home.supporters,
-        away.supporters,
+        demands[0].supporters,
+        demands[1].supporters,
         seed,
         True,
+        demand_bps,
     )
     frozen = settle_neutral_final(snapshot)
     session.add(
@@ -524,7 +534,7 @@ async def pin_final_venue(
             venue_name=venue.name,
             assigned_day=day,
             locked_at=at,
-            basis=_dump(asdict(frozen)),
+            basis=_dump(result_document(frozen)),
         )
     )
     return Attendance(
@@ -533,8 +543,10 @@ async def pin_final_venue(
         1,
         1,
         (),
-        NEUTRAL_DEMAND_BPS,
+        demand_bps,
         frozen.crowd,
+        competition,
+        "final",
     )
 
 
@@ -549,7 +561,7 @@ async def settle_final_revenue(
     basis = booking.basis
     frozen = settle_neutral_final(
         NeutralFinalSnapshot(
-            NEUTRAL_FINAL_POLICY,
+            basis["policy_version"],
             UUID(basis["venue_id"]),
             basis["capacity"],
             basis["ticket_price"],
@@ -559,9 +571,10 @@ async def settle_final_revenue(
             basis["supporters_b"],
             basis["seed"],
             True,
+            basis.get("demand_bps", 8000),
         )
     )
-    if _dump(asdict(frozen)) != basis or {frozen.club_a_id, frozen.club_b_id} != {
+    if _dump(result_document(frozen)) != basis or {frozen.club_a_id, frozen.club_b_id} != {
         fixture.home_club_id,
         fixture.away_club_id,
     }:

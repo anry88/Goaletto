@@ -1,5 +1,14 @@
 # Working on Goaletto
 
+- User update 2026-10-25 (AND-177): attendance depends on the club's supporter
+  base, league tier, competition prestige, knockout stage and recent results.
+  Actual official successes, advancement and season achievements grow supporters;
+  expanding the arena alone never creates fans. New matches pin stadium-demand-v2
+  / neutral-final-v2 and supporters-v1 terms. Preserve old crowds, financial receipts
+  and sponsor contracts. Keep messages short; show only the owner's audience gain.
+  Merchandise must use effective supporter intervals even for late invoices.
+  See docs/supporters-and-attendance.md.
+
 - User update 2026-10-25 (AND-174/176): new matches use regulation-v5 and
   match-practice-v4. Experience is separate for each actually played position
   and helps on that position. Growth uses actual position minutes, age and the

@@ -62,6 +62,7 @@ def money_io(monkeypatch):
     monkeypatch.setattr("goaletto.application.finances.match_income", AsyncMock())
     monkeypatch.setattr("goaletto.application.match_development.apply_development", AsyncMock())
     monkeypatch.setattr("goaletto.application.discipline.apply_discipline", AsyncMock())
+    monkeypatch.setattr("goaletto.application.supporters.apply_match", AsyncMock())
 
 
 class Rows:

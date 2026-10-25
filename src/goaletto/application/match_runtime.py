@@ -494,6 +494,17 @@ async def queue_notification(
                     for p in team.snapshot.players
                     if p.id == best
                 )
+            if kind == "match_result":
+                from goaletto.infrastructure.models import SupporterChange
+
+                audience = await session.scalar(
+                    select(SupporterChange).where(
+                        SupporterChange.match_id == state.match_id,
+                        SupporterChange.club_id == ownership.club_id,
+                    )
+                )
+                if audience and audience.after_count > audience.before_count:
+                    payload["supporters_gain"] = audience.after_count - audience.before_count
             if state.knockout and state.knockout.shootout:
                 from goaletto.domain.knockout import decide_shootout
 

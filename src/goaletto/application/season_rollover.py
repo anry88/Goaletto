@@ -629,7 +629,20 @@ async def _rollover_one(
     from goaletto.application.sponsorship import sign_sponsor
 
     tiers_by_league = {league.id: league.tier for league in leagues}
+    from goaletto.application.supporters import apply_season
+
+    assignments = {a.club_id: a for a in allocation.assignments}
     for club in clubs:
+        assignment = assignments[club.id]
+        await apply_season(
+            session,
+            club,
+            origins[club.id],
+            assignment.source_tier,
+            assignment.source_place,
+            assignment.destination_tier,
+            at,
+        )
         await sign_sponsor(
             session,
             club,

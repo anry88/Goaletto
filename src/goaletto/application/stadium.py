@@ -27,7 +27,7 @@ from goaletto.domain.stadium import (
     DEMAND_POLICY,
     EXPANSION_DAYS,
     Attendance,
-    attendance,
+    match_attendance,
     period_upkeep,
     stadium_level,
 )
@@ -77,7 +77,17 @@ async def crowd_for_fixture(
             else (result.away_goals, result.home_goals)
         )
         points.append(3 if own > other else 1 if own == other else 0)
-    return attendance(home.supporters, home.stadium_capacity, tier, place, tuple(points))
+    from goaletto.application.supporters import supporters_at
+
+    return match_attendance(
+        await supporters_at(session, home, at),
+        home.stadium_capacity,
+        tier,
+        place,
+        tuple(points),
+        competition=fixture.competition or "league",
+        stage=fixture.stage,
+    )
 
 
 async def pin_crowd(
@@ -88,12 +98,20 @@ async def pin_crowd(
     *,
     neutral_basis: dict[str, Any] | None = None,
 ) -> None:
+    from goaletto.application.supporters import frozen_terms
+
+    basis = dict(neutral_basis) if neutral_basis is not None else asdict(demand)
+    terms = await frozen_terms(session, match.id, at)
+    if terms is not None:
+        basis["supporter_terms"] = terms
     session.add(
         MatchCrowd(
             match_id=match.id,
-            policy_version="neutral-final-v1" if neutral_basis is not None else DEMAND_POLICY,
+            policy_version=neutral_basis["policy_version"]
+            if neutral_basis is not None
+            else DEMAND_POLICY,
             locked_at=at,
-            basis=neutral_basis if neutral_basis is not None else asdict(demand),
+            basis=basis,
         )
     )
     await session.flush()
@@ -111,6 +129,9 @@ class StadiumScreen:
     next_home_at: datetime | None
     projected: Attendance | None
     locked: HomeCrowd | None
+    next_competition: str = "league"
+    next_stage: str | None = None
+    recent_gain: int = 0
 
 
 async def load_stadium(
@@ -128,7 +149,7 @@ async def load_stadium(
         .where(
             Fixture.home_club_id == club.id,
             Fixture.neutral.is_(False),
-            Fixture.status.in_(("scheduled", "locked", "live", "paused")),
+            Fixture.status.in_(("scheduled", "lineup_locked", "live", "paused")),
         )
         .order_by(Fixture.scheduled_start_at, Fixture.id)
         .limit(1)
@@ -146,6 +167,20 @@ async def load_stadium(
         await user_effect(
             session, actor, "stadium_opened", Surface.CLUB, ownership=ownership, club_id=club.id
         )
+    from goaletto.infrastructure.models import SupporterChange
+
+    changes = (
+        await session.scalars(
+            select(SupporterChange)
+            .where(SupporterChange.club_id == club.id)
+            .order_by(
+                SupporterChange.effective_at.desc(),
+                SupporterChange.after_count.desc(),
+                SupporterChange.id.desc(),
+            )
+            .limit(5)
+        )
+    ).all()
     return StadiumScreen(
         club.name,
         ownership.id,
@@ -157,6 +192,9 @@ async def load_stadium(
         fixture.scheduled_start_at if fixture else None,
         projected,
         locked,
+        fixture.competition or "league" if fixture else "league",
+        projected.stage if projected else fixture.stage if fixture else None,
+        sum(c.after_count - c.before_count for c in changes),
     )
 
 

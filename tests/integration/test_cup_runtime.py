@@ -208,6 +208,18 @@ async def test_full_cup_97_real_games_neutral_final_retry_and_frozen_history(ses
             )
             == 97
         )
+        from goaletto.infrastructure.models import SupporterChange
+
+        assert booking.basis["policy_version"] == "neutral-final-v2"
+        assert booking.basis["demand_bps"] > 8000
+        assert await session.scalar(select(func.count()).select_from(SupporterChange)) == 194
+        audience = await session.scalar(
+            select(SupporterChange).where(
+                SupporterChange.match_id == match.id,
+                SupporterChange.club_id == final.winner_club_id,
+            )
+        )
+        assert audience.after_count > audience.before_count
         # Conditional branches have all resolved without invented entrants.
         assert not await session.scalar(
             select(FixturePlan.id)

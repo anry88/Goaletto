@@ -158,6 +158,9 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
         from goaletto.application.champions import record_champions_match_result
 
         await record_champions_match_result(session, fixture, match, at)
+    from goaletto.application.supporters import apply_match
+
+    await apply_match(session, state, at)
     return True
 
 
