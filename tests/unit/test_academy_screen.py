@@ -1,6 +1,7 @@
 """Youth decisions must keep hidden potential and season/price callback scope."""
 
 from dataclasses import replace
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -45,3 +46,22 @@ def test_callbacks_pin_season_and_price_without_revealing_caps():
     for legacy in (f"ac:g:{compact_id(owner)}:1", f"ac:u:{compact_id(owner)}"):
         with pytest.raises(ValueError):
             parse_academy(legacy)
+    prospect = replace(
+        screen,
+        intake_open=False,
+        signing_opens_at=datetime(2027, 1, 1, tzinfo=UTC),
+        candidates=tuple(replace(view, status="prospect") for view in screen.candidates),
+    )
+    text, closed = academy_view(prospect)
+    assert "Перспективные игроки академии" in text
+    assert "01.01.2027" in text and "после окончания сезона" in text
+    assert "следующем межсезонье можно подписать: 1" in text
+    assert "подписано в этом сезоне" not in text
+    assert not any(
+        (b.callback_data or "").startswith("ac:g:") for row in closed.inline_keyboard for b in row
+    )
+    from goaletto.presentation.i18n import using_locale
+
+    with using_locale("en"):
+        english, _ = academy_view(prospect)
+    assert "Academy prospects" in english and "after the season ends" in english

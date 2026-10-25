@@ -9,6 +9,7 @@ from goaletto.domain.academy import (
     academy_upkeep,
     candidate,
     candidate_count,
+    improve_profile,
     sign_limit,
     skill_band,
     skill_snapshot,
@@ -82,3 +83,26 @@ def test_skill_snapshot_rejects_wrong_shapes() -> None:
         skill_snapshot(tuple(0 for _ in SKILL_NAMES))
     with pytest.raises(ValueError):
         skill_snapshot((*([5] * (len(SKILL_NAMES) - 1)), True))
+
+
+def test_upgrades_raise_profiles_monotonically_without_rerolling() -> None:
+    club, season = uuid4(), uuid4()
+    for slot in range(1, 4):
+        profile = candidate(club, season, slot, 1)
+        skills, caps = skill_snapshot(profile.skills), profile.caps
+        initial = skills.copy()
+        for level in range(2, 6):
+            updated, potential = improve_profile(skills, caps, profile.position, level - 1, level)
+            assert all(updated[name] >= value for name, value in skills.items())
+            assert all(value <= 20 and value >= updated[name] for name, value in potential.items())
+            assert all(potential[name] >= value for name, value in caps.items())
+            assert improve_profile(updated, potential, profile.position, level, level) == (
+                updated,
+                potential,
+            )
+            skills, caps = updated, potential
+        assert skills != initial
+        if profile.position != "GK":
+            assert skills["goalkeeping"] == initial["goalkeeping"]
+        with pytest.raises(ValueError, match="only improve"):
+            improve_profile(skills, caps, profile.position, 5, 4)

@@ -1,5 +1,13 @@
 # Working on Goaletto
 
+- User update 2026-10-25 (AND-173): show a persisted upcoming academy cohort
+  during the playing season; signing opens in the following offseason for the
+  same people. Academy upgrades immediately raise the current unsigned cohort's
+  skills/potential, candidate count and signing limit without rerolling identity.
+  Carry prospects through the actual destination season at cross-set rollover.
+  Preserve signed/expired graduates and all existing player/history records.
+  See docs/academy-runtime.md; this supersedes the old frozen-level intake rule.
+
 - User clarification 2026-10-20: retain the original HDC → Mac backup schedule
   (hourly checks, login and 03:30; a new archive only without a verified copy
   younger than 20 hours). Automatically prune owned backup archive/manifest pairs

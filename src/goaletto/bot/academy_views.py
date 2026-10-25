@@ -74,16 +74,27 @@ def academy_view(screen: AcademyScreen, notice: str | None = None) -> tuple[str,
             available=amount(screen.available),
             arrears=amount(screen.arrears),
         ),
-        tr(
-            "Состав: {roster}/{limit} · подписано в этом сезоне: {signed}/{cap}",
-            roster=screen.roster_size,
-            limit=ROSTER_LIMIT,
-            signed=screen.signed,
-            cap=screen.sign_limit,
-        ),
+        tr("Состав: {roster}/{limit}", roster=screen.roster_size, limit=ROSTER_LIMIT),
     ]
-    if not screen.intake_open:
-        lines.append(tr("Выпуск академии доступен в межсезонье."))
+    if screen.intake_open:
+        lines.append(
+            tr(
+                "Подписано в этом выпуске: {signed}/{cap}",
+                signed=screen.signed,
+                cap=screen.sign_limit,
+            )
+        )
+        lines.append(tr("Подписание открыто до начала игрового сезона."))
+    else:
+        lines.append(tr("В следующем межсезонье можно подписать: {cap}", cap=screen.sign_limit))
+        lines.append(tr("Этих воспитанников можно будет подписать после окончания сезона."))
+        if screen.signing_opens_at is not None:
+            lines.append(
+                tr(
+                    "Плановое начало подписания: {date} (UTC), после завершения сезона.",
+                    date=screen.signing_opens_at.strftime("%d.%m.%Y"),
+                )
+            )
     if notice:
         lines.extend(("", notice))
     if screen.next_upgrade_cost is not None:
@@ -96,14 +107,22 @@ def academy_view(screen: AcademyScreen, notice: str | None = None) -> tuple[str,
         )
     else:
         lines.append(tr("Достигнут максимальный уровень академии."))
-    lines.extend(("", tr("<b>Кандидаты сезона (возраст 17)</b>")))
+    lines.extend(
+        (
+            "",
+            tr("<b>Выпуск академии · 17 лет</b>")
+            if screen.intake_open
+            else tr("<b>Перспективные игроки академии · выпуск в 17 лет</b>"),
+        )
+    )
     for view in screen.candidates:
         lines.extend(_candidate_lines(view))
     lines.append("")
     lines.append(
         tr(
-            "Набор фиксируется раз за сезон по текущему уровню. Подписанные юноши "
-            "приходят с потенциалом уровня; лимит подписаний и размер состава указаны выше."
+            "Улучшение академии повышает навыки и потенциал неподписанных воспитанников, "
+            "обновляет число кандидатов и лимит подписаний. Подписание бесплатно, "
+            "далее выплачивается зарплата."
         )
     )
     rows = []

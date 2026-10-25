@@ -125,3 +125,34 @@ def skill_snapshot(skills: tuple[int, ...]) -> dict[str, int]:
     ):
         raise ValueError("Invalid academy skills")
     return dict(zip(SKILL_NAMES, skills, strict=True))
+
+
+def improve_profile(
+    skills: dict[str, int],
+    caps: dict[str, int],
+    position: str,
+    from_level: int,
+    to_level: int,
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Raise an unsigned youth's profile without redrawing identity or losing skills."""
+    _check_level(from_level)
+    _check_level(to_level)
+    if to_level < from_level or position not in POSITIONS:
+        raise ValueError("Academy profiles only improve")
+    if set(skills) != set(SKILL_NAMES):
+        raise ValueError("Invalid academy skills")
+    skill_snapshot(tuple(skills[name] for name in SKILL_NAMES))
+    if set(caps) != set(SKILLS) or any(
+        type(value) is not int or not skills[name] <= value <= 20 for name, value in caps.items()
+    ):
+        raise ValueError("Invalid academy potential")
+    gain = skill_band(to_level)[1] - skill_band(from_level)[1]
+    updated = {
+        name: min(20, value + (0 if name == "goalkeeping" and position != "GK" else gain))
+        for name, value in skills.items()
+    }
+    potential = {
+        name: min(20, max(updated[name], value + gain + to_level - from_level))
+        for name, value in caps.items()
+    }
+    return updated, potential

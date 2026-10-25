@@ -13,6 +13,7 @@ from goaletto.application.money import InsufficientFunds, debit_locked, locked_a
 from goaletto.domain.academy import candidate_count, sign_limit, skill_band
 from goaletto.infrastructure.models import (
     AcademyCandidate,
+    AcademyProspect,
     Job,
     LedgerEntry,
     Person,
@@ -264,7 +265,7 @@ async def test_telegram_router_opens_signs_and_upgrades(sessions, monkeypatch):
     await bot.session.close()
 
 
-async def test_frozen_intake_free_signing_and_stale_upgrade_quotes(sessions):
+async def test_upgrade_improves_unsigned_intake_preserves_signed_and_stale_quotes(sessions):
     from goaletto.infrastructure.models import AcademyIntake
 
     _, actor, club_id = await funded(sessions)
@@ -277,15 +278,22 @@ async def test_frozen_intake_free_signing_and_stale_upgrade_quotes(sessions):
         assert (await locked_accounts(session, club_id))[club_id].available == before
         person = await session.get(Person, person_id)
         assert person.age == 17 and person.age_applied_for_season_id == screen.season_id
+        original = (await session.get(AcademyCandidate, person_id)).skills.copy()
+        unsigned = screen.candidates[1]
         assert (
             await upgrade_academy(session, action(actor), screen.ownership_id, expected_level=1)
             == 2
         )
-        frozen = await session.get(AcademyIntake, (club_id, screen.season_id))
-        assert frozen.level == 1
+        intake = await session.get(AcademyIntake, (club_id, screen.season_id))
+        assert intake.level == 2
         refreshed = await load_academy(session, action(actor))
-        assert refreshed.level == 2 and refreshed.sign_limit == 1
-        assert len(refreshed.candidates) == 3
+        assert refreshed.level == 2 and refreshed.sign_limit == 2
+        assert len(refreshed.candidates) == 4
+        assert refreshed.candidates[0].skills == original
+        assert refreshed.candidates[1].name == unsigned.name
+        assert all(refreshed.candidates[1].skills[k] >= v for k, v in unsigned.skills.items())
+        assert refreshed.candidates[1].skills != unsigned.skills
+        await sign_candidate(session, action(actor), screen.ownership_id, 2)
     with pytest.raises(ValueError, match="price changed"):
         async with sessions.begin() as session:
             await upgrade_academy(session, action(actor), screen.ownership_id, expected_level=1)
@@ -294,7 +302,7 @@ async def test_frozen_intake_free_signing_and_stale_upgrade_quotes(sessions):
             await sign_candidate(session, action(actor), screen.ownership_id, 2, season_id=uuid4())
     with pytest.raises(ValueError, match="limit"):
         async with sessions.begin() as session:
-            await sign_candidate(session, action(actor), screen.ownership_id, 2)
+            await sign_candidate(session, action(actor), screen.ownership_id, 3)
 
 
 async def test_season_open_releases_unsigned_graduates_once(sessions):
@@ -315,6 +323,9 @@ async def test_season_open_releases_unsigned_graduates_once(sessions):
     async with sessions.begin() as session:
         screen = await load_academy(session, late)
         assert not screen.intake_open
+        assert len(screen.candidates) == 3
+        assert all(row.status == "prospect" for row in screen.candidates)
+        assert {row.name for row in screen.candidates}.isdisjoint({row.name for row in rows})
         assert await session.scalar(select(func.count()).select_from(AcademyIntake)) == 1
         rows = (await session.scalars(select(AcademyCandidate))).all()
         assert {r.id for r in rows} == ids
@@ -341,6 +352,139 @@ async def test_season_open_releases_unsigned_graduates_once(sessions):
     with pytest.raises(ValueError, match="offseason"):
         async with sessions.begin() as session:
             await sign_candidate(session, late, screen.ownership_id, rows[1].slot)
+
+
+async def test_active_season_prospects_without_prior_intake_and_upgrade_retry(sessions):
+    from dataclasses import replace
+
+    from tests.integration.test_agent_wave import job
+
+    _, actor, club_id = await funded(sessions)
+    at = await job(sessions, "season.open")
+    actor = replace(action(actor), at=at)
+    async with sessions.begin() as session:
+        screen = await load_academy(session, action(actor))
+        assert not screen.intake_open and screen.signed == 0 and len(screen.candidates) == 3
+        original = (
+            await session.scalars(select(AcademyProspect).order_by(AcademyProspect.slot))
+        ).all()
+        ids = [row.id for row in original]
+        skills = [row.skills.copy() for row in original]
+        names = [row.name for row in original]
+        assert all(row.status == "prospect" for row in screen.candidates)
+        assert all([await session.get(Person, row.id) is None for row in original])
+    with pytest.raises(ValueError, match="offseason"):
+        async with sessions.begin() as session:
+            await sign_candidate(session, action(actor), screen.ownership_id, 1)
+    request = action(actor)
+    async with sessions.begin() as session:
+        await upgrade_academy(session, request, screen.ownership_id, expected_level=1)
+        upgraded = await load_academy(session, action(actor))
+        assert upgraded.sign_limit == 2 and len(upgraded.candidates) == 4
+        rows = (await session.scalars(select(AcademyProspect).order_by(AcademyProspect.slot))).all()
+        assert [row.id for row in rows[:3]] == ids
+        assert [row.name for row in rows[:3]] == names
+        assert all(row.skills != old for row, old in zip(rows, skills, strict=False))
+        snapshots = [(row.id, row.skills.copy(), row.caps.copy()) for row in rows]
+        await upgrade_academy(session, request, screen.ownership_id, expected_level=1)
+        again = await load_academy(session, action(actor))
+        assert again.candidates == upgraded.candidates
+    async with sessions.begin() as session:
+        await load_academy(session, action(actor))
+        rows = (await session.scalars(select(AcademyProspect).order_by(AcademyProspect.slot))).all()
+        assert [(row.id, row.skills, row.caps) for row in rows] == snapshots
+        assert await session.scalar(select(func.count()).select_from(AcademyCandidate)) == 0
+        assert (await locked_accounts(session, club_id))[
+            club_id
+        ].available == screen.available - 200000
+    with pytest.raises(DBAPIError):
+        async with sessions.begin() as session:
+            await session.execute(
+                text("UPDATE academy_prospects SET name='changed' WHERE id=:id"), {"id": ids[0]}
+            )
+    with pytest.raises(DBAPIError):
+        async with sessions.begin() as session:
+            await session.execute(
+                text(
+                    "UPDATE academy_prospects SET skills=jsonb_set(skills,'{pace}','1') "
+                    "WHERE id=:id"
+                ),
+                {"id": ids[0]},
+            )
+
+
+async def test_prospects_graduate_into_actual_destination_season_once(sessions):
+    from dataclasses import replace
+    from datetime import timedelta
+
+    from goaletto.application.academy import graduate_prospects
+    from goaletto.infrastructure.models import Season, SeasonClub
+    from tests.integration.test_agent_wave import job
+
+    result, actor, club_id = await funded(sessions)
+    at = await job(sessions, "season.open")
+    actor = replace(action(actor), at=at)
+    async with sessions.begin() as session:
+        screen = await load_academy(session, action(actor))
+        rows = (await session.scalars(select(AcademyProspect).order_by(AcademyProspect.slot))).all()
+        profiles = {
+            r.id: (r.name, r.position, r.country_code, r.skills.copy(), r.caps.copy()) for r in rows
+        }
+        season = await session.get(Season, result.season_id)
+        next_id = uuid4()
+        session.add(
+            Season(
+                id=next_id,
+                league_set_id=season.league_set_id,
+                number=2,
+                status="scheduled",
+                seed=1,
+                starts_at=season.ends_at + timedelta(days=11),
+                ends_at=season.ends_at + timedelta(days=80),
+                cycle_epoch=(season.ends_at + timedelta(days=8)).date(),
+            )
+        )
+        await session.flush()
+        member = await session.scalar(
+            select(SeasonClub).where(
+                SeasonClub.season_id == result.season_id, SeasonClub.club_id == club_id
+            )
+        )
+        session.add(
+            SeasonClub(
+                season_id=next_id,
+                club_id=club_id,
+                league_id=member.league_id,
+                league_set_id=member.league_set_id,
+                tie_break_order=member.tie_break_order,
+            )
+        )
+        await session.flush()
+        await graduate_prospects(session, [result.season_id], {club_id: next_id})
+        await graduate_prospects(session, [result.season_id], {club_id: next_id})
+        offseason = replace(action(actor), at=season.ends_at)
+        opened = await load_academy(session, offseason)
+        assert opened.intake_open and opened.season_id == next_id
+        assert opened.candidates == tuple(replace(v, status="available") for v in screen.candidates)
+        candidates = (await session.scalars(select(AcademyCandidate))).all()
+        assert {
+            r.id: (r.name, r.position, r.country_code, r.skills, r.caps) for r in candidates
+        } == profiles
+        person_id = await sign_candidate(
+            session, action(offseason), screen.ownership_id, 1, season_id=next_id
+        )
+        person = await session.get(Person, person_id)
+        assert person.age == 17 and person.age_applied_for_season_id == next_id
+    with pytest.raises(ValueError, match="another season"):
+        async with sessions.begin() as session:
+            await sign_candidate(
+                session, offseason, screen.ownership_id, 2, season_id=screen.season_id
+            )
+    with pytest.raises(DBAPIError):
+        async with sessions.begin() as session:
+            await session.execute(
+                text("UPDATE academy_prospects SET level=3 WHERE id=:id"), {"id": rows[0].id}
+            )
 
 
 async def test_delayed_upkeep_uses_historical_levels(sessions):

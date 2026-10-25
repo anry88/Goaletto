@@ -137,11 +137,18 @@ async def complete_season(sessions, season_id):
 
 
 async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(sessions):
+    from goaletto.application.academy import ensure_prospects
+    from goaletto.infrastructure.models import AcademyCandidate, AcademyProspect
+
     people, auction_id, person_id = await market_world(sessions)
     seller, seller_club, _ = people[0]
     async with sessions.begin() as session:
         auction = await session.get(Auction, auction_id)
         season_id = auction.season_id
+        prospects = await ensure_prospects(
+            session, await session.get(Club, seller_club), await session.get(Season, season_id)
+        )
+        academy_profiles = {p.id: (p.name, p.skills.copy(), p.caps.copy()) for p in prospects}
         person = await session.get(Person, person_id)
         face = person.appearance_identity_id
         await place_bid(
@@ -175,6 +182,13 @@ async def test_full_rollover_concurrent_worker_refunds_aging_calendar_history(se
         next_season = await session.get(Season, receipt.next_season_id)
         assert next_season.number == 2 and next_season.status == "scheduled"
         assert next_season.starts_at >= at + timedelta(days=8)
+        graduates = (await session.scalars(select(AcademyCandidate))).all()
+        assert {p.id: (p.name, p.skills, p.caps) for p in graduates} == academy_profiles
+        assert all(p.season_id == next_season.id for p in graduates)
+        assert all(
+            p.graduation_season_id == next_season.id
+            for p in (await session.scalars(select(AcademyProspect))).all()
+        )
         replay = await rollover_season(session, season_id, at + timedelta(hours=1))
         assert not replay.created and replay.next_season_id == next_season.id
         assert replay.aged + replay.retired == 1000

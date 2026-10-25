@@ -2569,13 +2569,46 @@ class SeasonContestant(Base):
 
 
 class AcademyIntake(Base):
-    """Frozen academy terms, unaffected by later upgrades or owner changes."""
+    """Offseason graduates; unsigned profiles and limits follow academy upgrades."""
 
     __tablename__ = "academy_intakes"
     __table_args__ = (CheckConstraint("level BETWEEN 1 AND 5", name="ck_academy_intake_level"),)
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
     season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
     level: Mapped[int] = mapped_column(SmallInteger)
+
+
+class AcademyProspect(Base):
+    """Persistent youth pipeline, promoted into the next offseason's candidates."""
+
+    __tablename__ = "academy_prospects"
+    __table_args__ = (
+        UniqueConstraint("club_id", "season_id", "slot", name="uq_academy_prospect_slot"),
+        CheckConstraint("level BETWEEN 1 AND 5", name="ck_academy_prospect_level"),
+        CheckConstraint("slot BETWEEN 1 AND 5", name="ck_academy_prospect_slot"),
+        CheckConstraint("country_code ~ '^[A-Z]{2}$'", name="ck_academy_prospect_country"),
+        CheckConstraint(f"position IN ({POSITIONS_SQL})", name="ck_academy_prospect_position"),
+        CheckConstraint(
+            "jsonb_typeof(skills) = 'object' AND jsonb_typeof(caps) = 'object'",
+            name="ck_academy_prospect_profiles",
+        ),
+        CheckConstraint(
+            "graduation_season_id IS NULL OR graduation_season_id <> season_id",
+            name="ck_academy_prospect_graduation",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), index=True)
+    slot: Mapped[int] = mapped_column(SmallInteger)
+    level: Mapped[int] = mapped_column(SmallInteger)
+    name: Mapped[str] = mapped_column(String(120))
+    country_code: Mapped[str] = mapped_column(String(2))
+    position: Mapped[str] = mapped_column(String(3))
+    alternative_positions: Mapped[list[str]] = mapped_column(ARRAY(String(3)))
+    skills: Mapped[dict[str, int]] = mapped_column(JSONB)
+    caps: Mapped[dict[str, int]] = mapped_column(JSONB)
+    graduation_season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
 
 
 class ClubNameChoice(Base):

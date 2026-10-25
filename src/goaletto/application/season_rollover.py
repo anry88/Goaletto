@@ -261,6 +261,9 @@ async def rollover_season(session: AsyncSession, season_id: UUID, at: datetime) 
         )
         outcomes[item.season.id] = outcome
         new_careers.extend((person, item.season.id, origin) for person, origin in retirees)
+    from goaletto.application.academy import graduate_prospects
+
+    await graduate_prospects(session, season_ids, player_seasons)
     # Create global newcomers only after every source calendar has finished aging.
     # Otherwise an unprocessed set can see next-season people in its free pool.
     from goaletto.application.staff_career import assign_career

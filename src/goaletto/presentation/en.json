@@ -877,5 +877,14 @@
   "Игрок дисквалифицирован на следующий матч этого турнира. Выберите другого.": "This player is suspended for the next match of this tournament. Choose another player.",
   "⛔ {player}: пропуск следующего матча этого турнира.": "⛔ {player}: suspended for the next match of this tournament.",
   "✅ {player}: дисквалификация отбыта.": "✅ {player}: suspension served.",
-  "🟨 {player}: 1/2 предупреждений в турнире.": "🟨 {player}: 1/2 cautions in this tournament."
+  "🟨 {player}: 1/2 предупреждений в турнире.": "🟨 {player}: 1/2 cautions in this tournament.",
+  "Состав: {roster}/{limit}": "Squad: {roster}/{limit}",
+  "Подписано в этом выпуске: {signed}/{cap}": "Signed from this intake: {signed}/{cap}",
+  "Подписание открыто до начала игрового сезона.": "Signing is open until the playing season begins.",
+  "В следующем межсезонье можно подписать: {cap}": "Next offseason signing limit: {cap}",
+  "Этих воспитанников можно будет подписать после окончания сезона.": "These academy prospects can be signed after the season ends.",
+  "Плановое начало подписания: {date} (UTC), после завершения сезона.": "Planned signing window: {date} (UTC), once the season is complete.",
+  "<b>Выпуск академии · 17 лет</b>": "<b>Academy graduates · age 17</b>",
+  "<b>Перспективные игроки академии · выпуск в 17 лет</b>": "<b>Academy prospects · graduate at age 17</b>",
+  "Улучшение академии повышает навыки и потенциал неподписанных воспитанников, обновляет число кандидатов и лимит подписаний. Подписание бесплатно, далее выплачивается зарплата.": "Academy upgrades improve unsigned youths’ skills and potential, and update the shortlist size and signing limit. Signing is free; wages apply afterwards."
 }

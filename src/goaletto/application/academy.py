@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,7 @@ from goaletto.domain.academy import (
     POLICY,
     academy_upkeep,
     candidate_count,
+    improve_profile,
     sign_limit,
     skill_snapshot,
     upgrade_cost,
@@ -36,6 +37,7 @@ from goaletto.domain.world import SKILL_NAMES
 from goaletto.infrastructure.models import (
     AcademyCandidate,
     AcademyIntake,
+    AcademyProspect,
     AppearanceIdentity,
     AppearanceVariant,
     Club,
@@ -79,6 +81,7 @@ class AcademyScreen:
     roster_size: int
     candidates: tuple[CandidateView, ...]
     intake_open: bool = True
+    signing_opens_at: datetime | None = None
 
 
 async def current_season(session: AsyncSession, club_id: UUID) -> Season:
@@ -97,14 +100,13 @@ async def current_season(session: AsyncSession, club_id: UUID) -> Season:
 async def ensure_intake(
     session: AsyncSession, club_id: UUID, season_id: UUID, level: int
 ) -> list[AcademyCandidate]:
-    """Create the season shortlist once; retries reuse the persisted people."""
+    """Keep the same graduates; upgrades improve only unsigned, private profiles."""
     await allocation_lock(session)
     intake = await session.get(AcademyIntake, (club_id, season_id))
     if intake is None:
-        session.add(AcademyIntake(club_id=club_id, season_id=season_id, level=level))
+        intake = AcademyIntake(club_id=club_id, season_id=season_id, level=level)
+        session.add(intake)
         await session.flush()
-    else:
-        level = intake.level
     rows = list(
         (
             await session.scalars(
@@ -117,13 +119,23 @@ async def ensure_intake(
             )
         ).all()
     )
-    if rows:
-        return rows
     club = await session.get(Club, club_id)
     if club is None:
         raise ValueError("Unknown academy club")
+    if level > intake.level:
+        for row in rows:
+            if row.status == "available":
+                row.skills, row.caps = improve_profile(
+                    row.skills, row.caps, row.position, intake.level, level
+                )
+        intake.level = level
+    level = intake.level
+    country = rows[0].country_code if rows else club.country_code
+    occupied = {row.slot for row in rows}
     for slot in range(1, candidate_count(level) + 1):
-        profile = build_candidate(club_id, season_id, slot, level, country=club.country_code)
+        if slot in occupied:
+            continue
+        profile = build_candidate(club_id, season_id, slot, level, country=country)
         session.add(
             AcademyCandidate(
                 id=profile.person_id,
@@ -157,6 +169,102 @@ async def ensure_intake(
     )
 
 
+async def ensure_prospects(
+    session: AsyncSession, club: Club, season: Season
+) -> list[AcademyProspect]:
+    """Prepare a distinct, stable next-offseason cohort during the playing season."""
+    await allocation_lock(session)
+    rows = list(
+        (
+            await session.scalars(
+                select(AcademyProspect)
+                .where(AcademyProspect.club_id == club.id, AcademyProspect.season_id == season.id)
+                .order_by(AcademyProspect.slot)
+            )
+        ).all()
+    )
+    if any(row.graduation_season_id is not None for row in rows):
+        raise ValueError("Academy prospects have already graduated")
+    for row in rows:
+        if row.level < club.academy_level:
+            row.skills, row.caps = improve_profile(
+                row.skills, row.caps, row.position, row.level, club.academy_level
+            )
+            row.level = club.academy_level
+    country = rows[0].country_code if rows else club.country_code
+    occupied = {row.slot for row in rows}
+    scope = uuid5(season.id, "academy-prospects-v1")
+    for slot in range(1, candidate_count(club.academy_level) + 1):
+        if slot in occupied:
+            continue
+        profile = build_candidate(club.id, scope, slot, club.academy_level, country=country)
+        row = AcademyProspect(
+            id=profile.person_id,
+            club_id=club.id,
+            season_id=season.id,
+            slot=slot,
+            level=club.academy_level,
+            name=profile.name,
+            country_code=profile.country_code,
+            position=profile.position,
+            alternative_positions=list(profile.alternatives),
+            skills=skill_snapshot(profile.skills),
+            caps=profile.caps,
+            graduation_season_id=None,
+        )
+        session.add(row)
+        rows.append(row)
+    await session.flush()
+    return rows
+
+
+async def graduate_prospects(
+    session: AsyncSession, source_seasons: list[UUID], destinations: dict[UUID, UUID]
+) -> None:
+    """Carry the exact people to each club's actual destination season at rollover."""
+    await allocation_lock(session)
+    rows = (
+        await session.scalars(
+            select(AcademyProspect).where(
+                AcademyProspect.season_id.in_(source_seasons),
+                AcademyProspect.graduation_season_id.is_(None),
+            )
+        )
+    ).all()
+    intakes: dict[tuple[UUID, UUID], AcademyIntake] = {}
+    for row in rows:
+        destination = destinations[row.club_id]
+        key = (row.club_id, destination)
+        if key not in intakes:
+            if await session.get(AcademyIntake, key) is not None:
+                raise ValueError("Destination academy intake already exists")
+            intake = AcademyIntake(club_id=row.club_id, season_id=destination, level=row.level)
+            session.add(intake)
+            intakes[key] = intake
+        if intakes[key].level != row.level:
+            raise ValueError("Academy prospect levels disagree")
+        session.add(
+            AcademyCandidate(
+                id=row.id,
+                club_id=row.club_id,
+                season_id=destination,
+                slot=row.slot,
+                policy_version=POLICY,
+                name=row.name,
+                country_code=row.country_code,
+                age=CANDIDATE_AGE,
+                position=row.position,
+                alternative_positions=list(row.alternative_positions),
+                skills=dict(row.skills),
+                caps=dict(row.caps),
+                status="available",
+                signed_at=None,
+            )
+        )
+        row.graduation_season_id = destination
+    await session.flush()
+
+
 async def _roster_size(session: AsyncSession, club_id: UUID) -> int:
     return int(
         await session.scalar(
@@ -166,17 +274,17 @@ async def _roster_size(session: AsyncSession, club_id: UUID) -> int:
     )
 
 
-def _view(row: AcademyCandidate) -> CandidateView:
+def _view(row: AcademyCandidate | AcademyProspect) -> CandidateView:
     return CandidateView(
         slot=row.slot,
         name=row.name,
         country_code=row.country_code,
-        age=row.age,
+        age=row.age if isinstance(row, AcademyCandidate) else CANDIDATE_AGE,
         position=row.position,
         alternatives=tuple(row.alternative_positions),
         skills=dict(row.skills),
         caps=dict(row.caps),
-        status=row.status,
+        status=row.status if isinstance(row, AcademyCandidate) else "prospect",
     )
 
 
@@ -193,21 +301,11 @@ async def load_academy(
     )
     if intake_open:
         rows = await ensure_intake(session, club.id, season.id, club.academy_level)
+        views = tuple(_view(row) for row in rows)
+        signed = sum(1 for row in rows if row.status == "signed")
     else:
-        rows = list(
-            (
-                await session.scalars(
-                    select(AcademyCandidate)
-                    .where(
-                        AcademyCandidate.club_id == club.id,
-                        AcademyCandidate.season_id == season.id,
-                    )
-                    .order_by(AcademyCandidate.slot)
-                )
-            ).all()
-        )
-    intake = await session.get(AcademyIntake, (club.id, season.id))
-    signed = sum(1 for row in rows if row.status == "signed")
+        views = tuple(_view(row) for row in await ensure_prospects(session, club, season))
+        signed = 0
     roster = await _roster_size(session, club.id)
     if record:
         await user_effect(
@@ -224,11 +322,12 @@ async def load_academy(
         next_upgrade_cost=(
             upgrade_cost(club.academy_level) if club.academy_level < MAX_LEVEL else None
         ),
-        sign_limit=sign_limit(intake.level if intake else club.academy_level),
+        sign_limit=sign_limit(club.academy_level),
         signed=signed,
         roster_size=roster,
-        candidates=tuple(_view(row) for row in rows),
+        candidates=views,
         intake_open=intake_open,
+        signing_opens_at=None if intake_open else season.ends_at,
     )
 
 
@@ -269,6 +368,15 @@ async def upgrade_academy(
     )
     club.academy_level += 1
     await session.flush()
+    season = await current_season(session, club.id)
+    if (
+        season.status == "scheduled"
+        and season.cycle_epoch is not None
+        and actor.at < midnight(season.cycle_epoch)
+    ):
+        await ensure_intake(session, club.id, season.id, club.academy_level)
+    else:
+        await ensure_prospects(session, club, season)
     await user_effect(
         session, actor, "academy_upgraded", Surface.CLUB, ownership=ownership, club_id=club.id
     )
