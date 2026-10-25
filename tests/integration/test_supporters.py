@@ -208,7 +208,7 @@ async def test_final_notification_contains_only_owners_actual_audience_gain(sess
         )
         message = await session.scalar(
             select(OutboxMessage).where(
-                OutboxMessage.fixture_id == fixture_id,
+                OutboxMessage.payload["fixture_id"].astext == str(fixture_id),
                 OutboxMessage.payload["kind"].astext == "match_result",
             )
         )
