@@ -66,6 +66,7 @@ class SquadMember:
     country_code: str | None = None
     slot_position: str | None = None
     alternatives: tuple[str, ...] = ()
+    energy_bps: int = 10000
 
 
 @dataclass(frozen=True)
@@ -114,6 +115,7 @@ class PlayerCard:
     country_code: str | None = None
     ownership_id: UUID | None = None
     position_experience: tuple[tuple[str, int], ...] = ()
+    injured_until: datetime | None = None
 
 
 async def actor_for_callback(
@@ -225,9 +227,9 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
         raise ValueError("Invalid squad page")
     members: list[SquadMember] = []
     for row in ordered[(page - 1) * SQUAD_PAGE_SIZE : page * SQUAD_PAGE_SIZE]:
-        from goaletto.application.forms import settle_form
+        from goaletto.application.recovery import energy_status
 
-        await settle_form(session, row, actor.at)
+        energy = await energy_status(session, row.person_id, actor.at)
         member_person = persons.get(row.person_id)
         if member_person is None:
             raise ValueError("Squad person is missing")
@@ -243,6 +245,7 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
                 slot=slots.get(row.person_id),
                 slot_position=slot_positions.get(row.person_id),
                 alternatives=tuple(row.alternative_positions or ()),
+                energy_bps=energy.bps,
             )
         )
     await user_effect(
@@ -349,6 +352,7 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
         morale=player.morale,
         status=player.status,
         injured=player.injured_until is not None and player.injured_until > actor.at,
+        injured_until=player.injured_until,
         club_id=club_id,
         club_name=club_name,
         appearance_identity_id=person.appearance_identity_id,

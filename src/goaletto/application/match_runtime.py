@@ -227,7 +227,12 @@ async def activate_season(session: AsyncSession, season_id: UUID, at: datetime) 
 
 
 async def team_snapshot(
-    session: AsyncSession, club: Club, at: datetime, *, suspended: frozenset[UUID] = frozenset()
+    session: AsyncSession,
+    club: Club,
+    at: datetime,
+    *,
+    suspended: frozenset[UUID] = frozenset(),
+    form_at: datetime | None = None,
 ) -> TeamSnapshot:
     lineup = await session.get(ClubLineup, club.id)
     if lineup is None:
@@ -244,7 +249,7 @@ async def team_snapshot(
     from goaletto.application.forms import settle_form
 
     for player, _, _ in rows:
-        await settle_form(session, player, at)
+        await settle_form(session, player, form_at if form_at is not None else at)
     players = tuple(
         PlayerSnapshot(
             person.id,
@@ -303,7 +308,8 @@ async def team_snapshot(
     bench = [s.person_id for s in slots[11:]]
     # Bring an existing unselected reserve into consideration for a suspension.
     # Stable saved-bench order first; no quality sorting or generated replacements.
-    if suspended:
+    unavailable = frozenset(p.id for p in players if not p.available)
+    if unavailable:
         selected = {s.person_id for s in slots}
         bench.extend(p.id for p in players if p.id not in selected and p.available)
     for index, slot in enumerate(starters):
@@ -328,8 +334,10 @@ async def team_snapshot(
                     (pid for pid in bench if by_id[pid].available and by_id[pid].position != "GK"),
                     None,
                 )
-                if suspended
-                and (slot.position != "GK" or any(by_id[pid].position == "GK" for pid in suspended))
+                if unavailable
+                and (
+                    slot.position != "GK" or any(by_id[pid].position == "GK" for pid in unavailable)
+                )
                 else None
             )
         if replacement is None:
@@ -756,6 +764,20 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         raise NotReady("Explicitly paused")
     if job.kind == "match.remind":
         if at < fixture.scheduled_start_at:
+            from goaletto.application.recovery import recover_player
+
+            owned_clubs = select(Club.id).where(
+                Club.owner_telegram_id.is_not(None),
+                Club.id.in_((fixture.home_club_id, fixture.away_club_id)),
+            )
+            for pid in await session.scalars(
+                select(Player.person_id)
+                .where(
+                    Player.club_id.in_(owned_clubs), Player.status.in_(("active", "last_season"))
+                )
+                .order_by(Player.person_id)
+            ):
+                await recover_player(session, pid, at)
             await queue_notification(session, fixture, "fixture_reminder", "reminder", at)
         return None
     match = await session.scalar(
@@ -839,10 +861,10 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         excluded = await exclusions(session, scope, fixture)
         suspended = frozenset(UUID(r["person_id"]) for r in excluded)
         home_snapshot = await team_snapshot(
-            session, home, fixture.scheduled_start_at, suspended=suspended
+            session, home, fixture.scheduled_start_at, suspended=suspended, form_at=at
         )
         away_snapshot = await team_snapshot(
-            session, away, fixture.scheduled_start_at, suspended=suspended
+            session, away, fixture.scheduled_start_at, suspended=suspended, form_at=at
         )
         energies = {}
         for person in (*home_snapshot.players, *away_snapshot.players):
@@ -1037,7 +1059,11 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
         await lifecycle_event(session, fixture, f"fixture_{stage}", stage, at)
         if abandoned:
             from goaletto.application.discipline import apply_discipline
+            from goaletto.application.injuries import apply_match_injuries
+            from goaletto.application.recovery import finish_energy
 
+            await finish_energy(session, new, at)
+            await apply_match_injuries(session, new, at)
             await apply_discipline(session, new, at)
         if not abandoned and await finalize_result(session, fixture.id, at):
             await lifecycle_event(session, fixture, "result_finalized", "result", at)

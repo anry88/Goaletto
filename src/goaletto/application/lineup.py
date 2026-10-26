@@ -69,6 +69,7 @@ class SquadMember:
     country_code: str | None = None
     suspended: bool = False
     tournament_yellows: int = 0
+    form: int = 6
 
 
 @dataclass(frozen=True)
@@ -266,11 +267,18 @@ async def _assemble(
     scope = await tournament_scope(session, upcoming) if upcoming is not None else None
     accounts = await balances(session, scope, [p.person_id for p in players])
     suspended = frozenset(pid for pid, row in accounts.items() if row.bans)
-    if suspended and upcoming is not None:
+    injured_starters = {
+        p.person_id
+        for p in players
+        if p.injured_until is not None
+        and upcoming is not None
+        and p.injured_until > upcoming.scheduled_start_at
+    }.intersection(s.person_id for s in slots if s.slot <= 11)
+    if (suspended or injured_starters) and upcoming is not None:
         from goaletto.application.match_runtime import team_snapshot
 
         preview = await team_snapshot(
-            session, club, upcoming.scheduled_start_at, suspended=suspended
+            session, club, upcoming.scheduled_start_at, suspended=suspended, form_at=actor.at
         )
         slots = [
             LineupSlot(club_id=club.id, slot=i, person_id=s.player_id, position=s.position)
@@ -307,6 +315,7 @@ async def _assemble(
             player.injured_until is not None and player.injured_until > actor.at,
             energies[player.person_id],
             person.country_code,
+            form=player.form,
             suspended=player.person_id in suspended,
             tournament_yellows=accounts[player.person_id].yellows
             if player.person_id in accounts
@@ -328,6 +337,7 @@ async def _assemble(
             p.injured_until is not None and p.injured_until > actor.at,
             energies[p.person_id],
             persons[p.person_id].country_code,
+            form=p.form,
             suspended=p.person_id in suspended,
             tournament_yellows=accounts[p.person_id].yellows if p.person_id in accounts else 0,
         )

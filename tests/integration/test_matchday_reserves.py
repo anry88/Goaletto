@@ -119,7 +119,12 @@ async def test_25_players_choose_reserve_and_full_match_keeps_only_selected_peop
         assert match.phase == "full_time" and match.completed_tick == 30
 
 
-async def test_owned_bench_callbacks_drop_replace_add_without_overflow(sessions):
+async def test_owned_bench_callbacks_drop_replace_add_without_overflow(sessions, monkeypatch):
+    # Callback saves recheck the real clock; this scenario owns an explicit past clock.
+    async def save_at_scenario_time(*args, **kwargs):
+        return await save_lineup(*args, **kwargs, clock=lambda: NOW)
+
+    monkeypatch.setattr("goaletto.bot.lineup_handlers.save_lineup", save_at_scenario_time)
     _, actor, club_id = await setup_world(sessions)
     async with sessions.begin() as session:
         await roster25(session, club_id)

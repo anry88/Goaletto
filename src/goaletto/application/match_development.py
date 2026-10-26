@@ -99,6 +99,8 @@ async def pin_development(
             eligible=eligible,
             staff_snapshot=staff,
             terms_snapshot={
+                "injury_policy": "match-injury-v1",
+                "injury_days": 7,
                 "competition": plan.competition if plan else "league",
                 "fixture_id": str(fixture.id),
                 "season_id": str(fixture.season_id),

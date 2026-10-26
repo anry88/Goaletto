@@ -248,6 +248,7 @@ def squad_view(page: SquadPage) -> tuple[str, InlineKeyboardMarkup]:
                 member.form,
                 member.status,
             )
+            + f" · ⚡ {member.energy_bps / 100:.0f}%"
         )
         buttons.append(
             [
@@ -315,7 +316,11 @@ def player_view(
     if card.status == "retired":
         lines.append(tr(RETIRED_NOTE))
     if card.injured:
-        lines.append(tr("🤕 Травмирован — недоступен для выбора."))
+        lines.append(
+            tr("🤕 Травмирован до {date} UTC", date=card.injured_until.strftime("%d.%m %H:%M"))
+            if card.injured_until
+            else tr("🤕 Травмирован — недоступен для выбора.")
+        )
     if card.alternative_positions:
         lines.append(tr("Также: {p0}", p0=escape("/".join(card.alternative_positions))))
     lines.append("")

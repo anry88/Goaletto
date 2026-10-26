@@ -5,7 +5,7 @@ from uuid import UUID
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from goaletto.application.lineup import LineupData
+from goaletto.application.lineup import LineupData, SquadMember
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.lineup import (
     ATT_POSITIONS,
@@ -117,7 +117,11 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
                 if member.alternatives
                 else ""
             )
-            + f" · ⚡ {member.energy_bps / 100:.0f}%"
+            + tr(
+                " · форма {form}/10 · ⚡ {energy}%",
+                form=member.form,
+                energy=f"{member.energy_bps / 100:.0f}",
+            )
         )
     lines.append("")
     lines.append(tr("<b>Запас:</b>"))
@@ -126,7 +130,11 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
             f"{index}. {escape(person_name(member))} "
             f"({escape('/'.join((member.position, *member.alternatives)))})"
             f"{_badges(member.person_id, member.position, data)}"
-            f" · ⚡ {member.energy_bps / 100:.0f}%"
+            + tr(
+                " · форма {form}/10 · ⚡ {energy}%",
+                form=member.form,
+                energy=f"{member.energy_bps / 100:.0f}",
+            )
         )
     lines.append("")
     if data.reserves:
@@ -136,7 +144,11 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
                 f"{escape(person_name(member))} "
                 f"({escape('/'.join((member.position, *member.alternatives)))})"
                 f"{_badges(member.person_id, member.position, data)}"
-                f" · ⚡ {member.energy_bps / 100:.0f}%"
+                + tr(
+                    " · форма {form}/10 · ⚡ {energy}%",
+                    form=member.form,
+                    energy=f"{member.energy_bps / 100:.0f}",
+                )
             )
     lines.append(
         tr(
@@ -261,12 +273,12 @@ def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
     rows.extend(
         [
             _button(
-                f"⇄ {person_name(member)}",
+                "⇄ " + condition_label(member),
                 f"ln:s:{slot}:{compact_id(member.person_id)}:{version}",
             )
         ]
         for member in (*data.bench, *data.reserves)
-        if not member.suspended
+        if not member.suspended and not member.injured
     )
     rows.append([_button(tr("← Назад"), f"ln:panel:swap:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -277,7 +289,7 @@ def bench_slots_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     rows = [
         [
             _button(
-                f"{index}. {person_name(member)}",
+                f"{index}. " + condition_label(member),
                 f"ln:bsel:{index}:{version}",
             )
         ]
@@ -296,12 +308,12 @@ def bench_choices_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
     rows = [
         [
             _button(
-                person_name(m),
+                condition_label(m),
                 f"ln:b:{slot}:{compact_id(m.person_id)}:{version}",
             )
         ]
         for m in data.reserves
-        if not m.suspended
+        if not m.suspended and not m.injured
     ]
     if slot < 12 + len(data.bench):
         rows.append([_button(tr("Оставить вне заявки"), f"ln:br:{slot}:{version}")])
@@ -314,7 +326,7 @@ def starter_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     rows = [
         [
             _button(
-                f"{index}. {person_name(member)}",
+                f"{index}. " + condition_label(member),
                 f"ln:sel:{index}:{version}",
             )
         ]
@@ -394,3 +406,32 @@ def parse_callback(value: str) -> tuple[str, tuple[str, ...]]:
         expand_id(values[0])
         return action, args
     raise ValueError("Invalid lineup callback")
+
+
+def condition_label(member: SquadMember) -> str:
+    return tr(
+        "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
+        name=person_name(member),
+        position=member.slot_position,
+        form=member.form,
+        energy=f"{member.energy_bps / 100:.0f}",
+    )
+
+
+def replacement_view(data: LineupData, slot: int) -> str:
+    players = (*data.starters, *data.bench)
+    if not 1 <= slot <= len(players) + 1:
+        raise ValueError("Invalid replacement slot")
+    if slot > len(players):
+        return tr("Выберите игрока на замену.")
+    player = players[slot - 1]
+    return (
+        tr(
+            "Заменяем: <b>{name}</b> · форма {form}/10 · ⚡ {energy}%",
+            name=escape(person_name(player)),
+            form=player.form,
+            energy=f"{player.energy_bps / 100:.0f}",
+        )
+        + "\n"
+        + tr("Выберите игрока на замену.")
+    )

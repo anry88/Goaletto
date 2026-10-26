@@ -144,6 +144,9 @@ async def finalize_result(session: AsyncSession, fixture_id: UUID, at: datetime)
     from goaletto.application.recovery import finish_energy
 
     await finish_energy(session, state, fixture.actual_finish_at)
+    from goaletto.application.injuries import apply_match_injuries
+
+    await apply_match_injuries(session, state, at)
     await apply_discipline(session, state, at)
     if not fixture.neutral:
         await match_income(session, fixture, state, at)

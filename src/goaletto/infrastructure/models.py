@@ -1901,6 +1901,33 @@ class StadiumExpansion(Base):
     status: Mapped[str] = mapped_column(String(16))
 
 
+class MatchInjury(Base):
+    __tablename__ = "match_injuries"
+    __table_args__ = (
+        CheckConstraint(
+            "policy_version = 'match-injury-v1' AND days = 7", name="ck_match_injury_policy"
+        ),
+        CheckConstraint("minutes_played BETWEEN 1 AND 120", name="ck_match_injury_minutes"),
+        CheckConstraint("source IN ('runtime','repair')", name="ck_match_injury_source"),
+        CheckConstraint(
+            "unavailable_until = started_at + days * interval '1 day' AND applied_at >= started_at",
+            name="ck_match_injury_dates",
+        ),
+    )
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("persons.id"), primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
+    policy_version: Mapped[str] = mapped_column(String(32))
+    days: Mapped[int] = mapped_column(SmallInteger)
+    minutes_played: Mapped[int] = mapped_column(SmallInteger)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    unavailable_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    previous_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source: Mapped[str] = mapped_column(String(16))
+    state_hash: Mapped[str] = mapped_column(String(64))
+
+
 class MatchCrowd(Base):
     __tablename__ = "match_crowds"
     __table_args__ = (

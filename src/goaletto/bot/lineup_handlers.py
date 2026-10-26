@@ -97,9 +97,11 @@ async def build_callback_response(
             return views.formation_view(data), views.formation_keyboard(data)
         return views.render_main(data), _panel_keyboard(args[0], data)
     if action == "bsel":
-        return views.render_main(data), views.bench_choices_keyboard(data, int(args[0]))
+        return views.replacement_view(data, int(args[0])), views.bench_choices_keyboard(
+            data, int(args[0])
+        )
     if action == "sel":
-        return views.render_main(data), views.swap_keyboard(data, int(args[0]))
+        return views.replacement_view(data, int(args[0])), views.swap_keyboard(data, int(args[0]))
     return views.render_main(data), views.main_keyboard(data)
 
 

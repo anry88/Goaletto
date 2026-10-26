@@ -1,5 +1,14 @@
 # Working on Goaletto
 
+- User update 2026-10-26 (AND-178/179): persist match injury unavailability;
+  match-injury-v1 uses the existing seven-day training baseline from actual finish.
+  Keep immutable per-match/person receipts, old checkpoints and pinned terms.
+  Refresh form/energy on roster reads and before reminders; next-fixture previews
+  must never settle current form at a future kickoff. Show both metrics for both
+  outgoing/incoming substitutes. Live uses frozen match energy. Addressed historical
+  repairs require exact checkpoint/person evidence and must reject active/later
+  appearances, expired periods or changed club/career. See docs/match-injuries-and-condition-views.md.
+
 - User update 2026-10-25 (AND-177): attendance depends on the club's supporter
   base, league tier, competition prestige, knockout stage and recent results.
   Actual official successes, advancement and season achievements grow supporters;

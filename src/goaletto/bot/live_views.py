@@ -222,8 +222,13 @@ def render(
                 rows = [
                     [
                         _button(
-                            f"{names[s.player_id]} · {s.position} · "
-                            f"{conditions[s.player_id].energy_bps // 100}%",
+                            tr(
+                                "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
+                                name=names[s.player_id],
+                                position=s.position,
+                                form=players[index_by_id[s.player_id] - 1].form,
+                                energy=conditions[s.player_id].energy_bps // 100,
+                            ),
                             callback(screen, "o", index_by_id[s.player_id]),
                         )
                     ]
@@ -263,10 +268,11 @@ def render(
                     [
                         _button(
                             tr(
-                                "{p0} · {p1} · форма {p2}",
-                                p0=names[p],
-                                p1=players[index_by_id[p] - 1].position,
-                                p2=players[index_by_id[p] - 1].form,
+                                "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
+                                name=names[p],
+                                position=players[index_by_id[p] - 1].position,
+                                form=players[index_by_id[p] - 1].form,
+                                energy=conditions[p].energy_bps // 100,
                             ),
                             callback(screen, "s", selected, index_by_id[p]),
                         )
@@ -274,6 +280,14 @@ def render(
                     for p in team.bench
                     if not conditions[p].injured and not conditions[p].dismissed
                 ]
+                lines.append(
+                    tr(
+                        "Заменяем: <b>{name}</b> · форма {form}/10 · ⚡ {energy}%",
+                        name=escape(names[outgoing]),
+                        form=players[selected - 1].form,
+                        energy=conditions[outgoing].energy_bps // 100,
+                    )
+                )
                 lines.append(tr("Выберите игрока на замену."))
             elif panel == 6:
                 player = players[selected - 1] if 1 <= selected <= len(players) else None

@@ -65,6 +65,8 @@ def demand_io(monkeypatch):
         "goaletto.application.discipline.tournament_scope", AsyncMock(return_value=None)
     )
     monkeypatch.setattr("goaletto.application.discipline.apply_discipline", AsyncMock())
+    monkeypatch.setattr("goaletto.application.recovery.finish_energy", AsyncMock())
+    monkeypatch.setattr("goaletto.application.injuries.apply_match_injuries", AsyncMock())
 
 
 class Rows:

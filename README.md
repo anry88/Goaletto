@@ -118,6 +118,8 @@ checkpoint/replay и события. Durable [live-worker](docs/match-runtime.md
 [настройки часового пояса/времени](docs/kickoff-preferences.md) доступны в Telegram.
 [Расписание на 10 суток](docs/schedule-screen.md) — `/calendar`;
 [межматчевая энергия](docs/player-recovery.md) сохраняется и восстанавливается по реальному времени.
+[Матчевые травмы и актуальное состояние](docs/match-injuries-and-condition-views.md):
+срок недоступности сохраняется после финала; форма и энергия видны у обеих сторон замены.
 [Свободные агенты и персонал](docs/candidate-pools.md) — общие ограниченные пулы, `/freeagents` и `/staff`. [Outbox sender](docs/outbox-delivery.md) подключён отдельным
 циклом worker; по умолчанию выключен (`GOALETTO_OUTBOX_ENABLED=false`).
 В табло и `/match` добавлена компактная [лента событий](docs/live-commentary.md)
