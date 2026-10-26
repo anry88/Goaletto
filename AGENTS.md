@@ -1,5 +1,13 @@
 # Working on Goaletto
 
+- User clarification 2026-10-26 (AND-180): match injuries must have varied
+  severity/duration. New match-injury-v2 uses light 1–3 days, moderate 4–7,
+  severe 8–14, with light injuries most common. Freeze policy at lineup lock;
+  derive the individual result deterministically without advancing engine RNG,
+  then persist severity/deadline once at finalization. Preserve old v1 terms,
+  existing seven-day receipts and match hashes. Cards show severity/deadline
+  briefly, without probabilities. See docs/match-injuries-and-condition-views.md.
+
 - User update 2026-10-26 (AND-178/179): persist match injury unavailability;
   match-injury-v1 uses the existing seven-day training baseline from actual finish.
   Keep immutable per-match/person receipts, old checkpoints and pinned terms.

@@ -9,6 +9,9 @@ from goaletto.application.analytics import require_utc
 from goaletto.application.development import growth_budget, position_experience, save_budget
 from goaletto.application.training_staff import qualifications, staff_roster
 from goaletto.domain.clock import MatchPhase
+from goaletto.domain.injuries import DAYS as INJURY_DAYS
+from goaletto.domain.injuries import LEGACY_POLICY as LEGACY_INJURY_POLICY
+from goaletto.domain.injuries import POLICY as INJURY_POLICY
 from goaletto.domain.match_codec import state_hash
 from goaletto.domain.match_development import POLICY, AppearanceGrowth, develop_appearance
 from goaletto.domain.match_performance import player_of_match
@@ -99,8 +102,8 @@ async def pin_development(
             eligible=eligible,
             staff_snapshot=staff,
             terms_snapshot={
-                "injury_policy": "match-injury-v1",
-                "injury_days": 7,
+                "injury_policy": INJURY_POLICY,
+                **({"injury_days": INJURY_DAYS} if INJURY_POLICY == LEGACY_INJURY_POLICY else {}),
                 "competition": plan.competition if plan else "league",
                 "fixture_id": str(fixture.id),
                 "season_id": str(fixture.season_id),

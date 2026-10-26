@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from goaletto.application.analytics import require_utc
 from goaletto.application.game_actions import allocation_lock
 from goaletto.domain.clock import MatchPhase
-from goaletto.domain.injuries import DAYS, POLICY, unavailable_until
+from goaletto.domain.injuries import DAYS, LEGACY_POLICY, POLICY, match_injury, unavailable_until
 from goaletto.domain.match_codec import restore_state, state_hash
 from goaletto.domain.match_types import MatchState
 from goaletto.infrastructure.models import (
@@ -71,9 +71,9 @@ async def _apply(
     ids: set[UUID],
     at: datetime,
     source: str,
+    policy: str = LEGACY_POLICY,
 ) -> list[MatchInjury]:
     assert fixture.actual_finish_at is not None
-    until = unavailable_until(fixture.actual_finish_at)
     injured = injured_players(state)
     rows = []
     for person_id in sorted(ids):
@@ -83,6 +83,8 @@ async def _apply(
                 raise ValueError("Injury source changed")
             rows.append(prior)
             continue
+        injury = match_injury(state.match_id, state.seed, person_id, policy=policy)
+        until = unavailable_until(fixture.actual_finish_at, injury.days)
         club_id, minutes = injured[person_id]
         player = await session.get(Player, person_id, with_for_update=True)
         if (
@@ -97,8 +99,9 @@ async def _apply(
             match_id=state.match_id,
             person_id=person_id,
             club_id=club_id,
-            policy_version=POLICY,
-            days=DAYS,
+            policy_version=injury.policy,
+            severity=injury.severity,
+            days=injury.days,
             minutes_played=minutes,
             started_at=fixture.actual_finish_at,
             unavailable_until=until,
@@ -118,13 +121,13 @@ async def apply_match_injuries(session: AsyncSession, state: MatchState, at: dat
     terms = await session.get(MatchDevelopment, state.match_id)
     if terms is None or not terms.eligible or terms.terms_snapshot.get("injury_policy") is None:
         return
-    if (
-        terms.terms_snapshot["injury_policy"] != POLICY
-        or terms.terms_snapshot.get("injury_days") != DAYS
+    policy = terms.terms_snapshot["injury_policy"]
+    if policy not in {LEGACY_POLICY, POLICY} or (
+        policy == LEGACY_POLICY and terms.terms_snapshot.get("injury_days") != DAYS
     ):
         raise ValueError("Unknown frozen injury terms")
     fixture = await _terminal(session, state, at)
-    await _apply(session, state, fixture, set(injured_players(state)), at, "runtime")
+    await _apply(session, state, fixture, set(injured_players(state)), at, "runtime", policy)
 
 
 async def repair_match_injuries(
@@ -148,10 +151,25 @@ async def repair_match_injuries(
     expected = {pid for pid, (club, _) in injured_players(state).items() if club == club_id}
     if person_ids != expected:
         raise ValueError("Repair must name exactly the proven club injuries")
+    terms = await session.get(MatchDevelopment, match_id)
+    policy = terms.terms_snapshot.get("injury_policy", LEGACY_POLICY) if terms else LEGACY_POLICY
+    if policy not in {LEGACY_POLICY, POLICY} or (
+        policy == LEGACY_POLICY
+        and terms is not None
+        and terms.terms_snapshot.get("injury_days", DAYS) != DAYS
+    ):
+        raise ValueError("Unknown frozen injury terms")
     pending = {pid for pid in person_ids if await session.get(MatchInjury, (match_id, pid)) is None}
     if pending:
         assert fixture.actual_finish_at is not None
-        if unavailable_until(fixture.actual_finish_at) <= at:
+        if any(
+            unavailable_until(
+                fixture.actual_finish_at,
+                match_injury(state.match_id, state.seed, pid, policy=policy).days,
+            )
+            <= at
+            for pid in pending
+        ):
             raise ValueError("Reported injury already expired")
         for pid in pending:
             recovery = await session.get(PlayerRecovery, pid)
@@ -164,7 +182,6 @@ async def repair_match_injuries(
                 .where(
                     Fixture.actual_finish_at > fixture.actual_finish_at,
                     Fixture.status.in_(("finished", "abandoned")),
-                    (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id),
                 )
             )
         ).all()
@@ -175,4 +192,4 @@ async def repair_match_injuries(
             for c in t.conditions
         ):
             raise ValueError("Repair player has a later appearance")
-    return await _apply(session, state, fixture, person_ids, at, "repair")
+    return await _apply(session, state, fixture, person_ids, at, "repair", policy)

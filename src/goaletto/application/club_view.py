@@ -27,6 +27,7 @@ from goaletto.infrastructure.models import (
     League,
     LineupSlot,
     Manager,
+    MatchInjury,
     Person,
     Player,
 )
@@ -116,6 +117,7 @@ class PlayerCard:
     ownership_id: UUID | None = None
     position_experience: tuple[tuple[str, int], ...] = ()
     injured_until: datetime | None = None
+    injury_severity: str | None = None
 
 
 async def actor_for_callback(
@@ -324,6 +326,19 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
         if player.status != "retired"
         else EnergyStatus(10000, None)
     )
+    severity = (
+        await session.scalar(
+            select(MatchInjury.severity)
+            .where(
+                MatchInjury.person_id == person.id,
+                MatchInjury.unavailable_until == player.injured_until,
+            )
+            .order_by(MatchInjury.started_at.desc(), MatchInjury.match_id)
+            .limit(1)
+        )
+        if player.injured_until is not None and player.injured_until > actor.at
+        else None
+    )
     return PlayerCard(
         person_id=person.id,
         ownership_id=ownership.id,
@@ -353,6 +368,7 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
         status=player.status,
         injured=player.injured_until is not None and player.injured_until > actor.at,
         injured_until=player.injured_until,
+        injury_severity=severity,
         club_id=club_id,
         club_name=club_name,
         appearance_identity_id=person.appearance_identity_id,

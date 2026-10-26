@@ -316,8 +316,13 @@ def player_view(
     if card.status == "retired":
         lines.append(tr(RETIRED_NOTE))
     if card.injured:
+        injury_label = {
+            "light": "🤕 Лёгкая травма до {date} UTC",
+            "moderate": "🤕 Травма средней тяжести до {date} UTC",
+            "severe": "🤕 Тяжёлая травма до {date} UTC",
+        }.get(card.injury_severity or "", "🤕 Травмирован до {date} UTC")
         lines.append(
-            tr("🤕 Травмирован до {date} UTC", date=card.injured_until.strftime("%d.%m %H:%M"))
+            tr(injury_label, date=card.injured_until.strftime("%d.%m %H:%M"))
             if card.injured_until
             else tr("🤕 Травмирован — недоступен для выбора.")
         )

@@ -64,6 +64,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
         "match_stages",
         "match_recoveries",
         "match_crowds",
+        "match_injuries",
     }
     dialect = postgresql.dialect()
     for table in Base.metadata.sorted_tables:
@@ -101,6 +102,7 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 "ck_recovery_tick",
                 "ck_command_target_tick",
                 "ck_crowd_policy",
+                "ck_match_injury_policy",
                 "ck_player_position_experience",
                 "ck_player_form_idle_steps",
                 "ck_candidate_pool_scope",
@@ -120,6 +122,8 @@ def test_frozen_migration_covers_orm_tables_and_indexes_without_connecting(
                 )
     assert "ALTER TABLE clubs ADD COLUMN stadium_capacity INTEGER DEFAULT '5000' NOT NULL" in sql
     assert "ALTER TABLE matches ADD COLUMN paused_at TIMESTAMP WITH TIME ZONE" in sql
+    assert "ALTER TABLE match_injuries ADD COLUMN severity VARCHAR(16)" in sql
+    assert "CREATE TRIGGER match_injury_immutable" in sql
     assert (
         "ALTER TABLE match_development ADD COLUMN terms_snapshot JSONB DEFAULT '{}' NOT NULL" in sql
     )

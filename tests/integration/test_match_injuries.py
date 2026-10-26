@@ -8,7 +8,11 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
 
 from goaletto.application.club_view import get_player_card
-from goaletto.application.injuries import injured_players, repair_match_injuries
+from goaletto.application.injuries import (
+    apply_match_injuries,
+    injured_players,
+    repair_match_injuries,
+)
 from goaletto.application.lineup import load_lineup
 from goaletto.application.recovery import recover_player
 from goaletto.application.results import finalize_result
@@ -41,7 +45,11 @@ def injury_policy(monkeypatch, *, forced=False):
     )
 
 
-async def finished(sessions, monkeypatch):
+async def finished(sessions, monkeypatch, *, legacy=False):
+    if legacy:
+        monkeypatch.setattr(
+            "goaletto.application.match_development.INJURY_POLICY", "match-injury-v1"
+        )
     injury_policy(monkeypatch)
     _, actor, club = await funded(sessions)
     fixture, at = await start_fixture(sessions, club)
@@ -50,10 +58,11 @@ async def finished(sessions, monkeypatch):
     return actor, club, fixture, at, final
 
 
-async def test_match_injury_persists_seven_days_retry_does_not_extend_and_energy_does_not_heal(
-    sessions, monkeypatch
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_match_injury_persists_retry_does_not_extend_and_energy_does_not_heal(
+    sessions, monkeypatch, legacy
 ):
-    actor, club, fixture, at, final = await finished(sessions, monkeypatch)
+    actor, club, fixture, at, final = await finished(sessions, monkeypatch, legacy=legacy)
     async with sessions.begin() as session:
         await finalize_result(session, fixture, at + timedelta(hours=1))
         rows = (await session.scalars(select(MatchInjury))).all()
@@ -62,23 +71,64 @@ async def test_match_injury_persists_seven_days_retry_does_not_extend_and_energy
             player = await session.get(Player, row.person_id)
             assert row.started_at == at + timedelta(minutes=33)
             assert (
-                player.injured_until == row.unavailable_until == row.started_at + timedelta(days=7)
+                player.injured_until
+                == row.unavailable_until
+                == row.started_at + timedelta(days=row.days)
             )
-            await recover_player(session, row.person_id, at + timedelta(days=2))
+            if legacy:
+                assert row.policy_version == "match-injury-v1" and row.days == 7
+                assert row.severity is None
+            else:
+                assert row.policy_version == "match-injury-v2"
+                low, high = {"light": (1, 3), "moderate": (4, 7), "severe": (8, 14)}[row.severity]
+                assert low <= row.days <= high
+            await recover_player(session, row.person_id, at + timedelta(hours=12))
             assert player.injured_until == row.unavailable_until
+        if not legacy:
+            healthy = next(
+                (t.snapshot.club_id, p.id)
+                for t in (final.home, final.away)
+                for p in t.snapshot.players
+                if p.id not in {r.person_id for r in rows}
+            )
+            # SQL rejects both an invalid range and an unknown diagnosis, including NULL.
+            for severity, days in (("light", 8), (None, 7), ("unknown", 4)):
+                with pytest.raises(DBAPIError):
+                    async with session.begin_nested():
+                        session.add(
+                            MatchInjury(
+                                match_id=final.match_id,
+                                person_id=healthy[1],
+                                club_id=healthy[0],
+                                policy_version="match-injury-v2",
+                                severity=severity,
+                                days=days,
+                                minutes_played=1,
+                                started_at=rows[0].started_at,
+                                unavailable_until=rows[0].started_at + timedelta(days=days),
+                                applied_at=at + timedelta(hours=1),
+                                source="runtime",
+                                state_hash=state_hash(final),
+                            )
+                        )
+                        await session.flush()
         own = [r for r in rows if r.club_id == club]
         assert own
         card = await get_player_card(
-            session, replace(action(actor), at=at + timedelta(days=2)), own[0].person_id
+            session, replace(action(actor), at=at + timedelta(hours=12)), own[0].person_id
         )
-        assert card.injured and "Травмирован до" in player_view(card)[0]
-        data = await load_lineup(session, replace(action(actor), at=at + timedelta(days=2)))
+        assert card.injured and card.injury_severity == own[0].severity
+        assert "до " in player_view(card)[0]
+        data = await load_lineup(session, replace(action(actor), at=at + timedelta(hours=12)))
         assert all(
             m.injured
             for m in (*data.starters, *data.bench, *data.reserves)
             if m.person_id in {r.person_id for r in own}
         )
         assert not await finalize_result(session, fixture, at + timedelta(days=3))
+        deadlines = {r.person_id: r.unavailable_until for r in rows}
+        await apply_match_injuries(session, final, at + timedelta(days=3))
+        assert {r.person_id: r.unavailable_until for r in rows} == deadlines
         assert await session.scalar(select(func.count()).select_from(MatchInjury)) == len(rows)
         # Deadline is inclusive for availability; no special healing job is needed.
         card = await get_player_card(
@@ -90,10 +140,13 @@ async def test_match_injury_persists_seven_days_retry_does_not_extend_and_energy
             await session.execute(text("UPDATE match_injuries SET days=8"))
 
 
-async def test_injury_rollback_and_repair_have_same_original_deadline(sessions, monkeypatch):
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_injury_rollback_and_repair_have_same_original_deadline(
+    sessions, monkeypatch, legacy
+):
     import goaletto.application.injuries as runtime
 
-    actor, club, fixture, at, final = await finished(sessions, monkeypatch)
+    actor, club, fixture, at, final = await finished(sessions, monkeypatch, legacy=legacy)
     real_apply = runtime._apply
 
     async def fail(*args, **kw):
@@ -124,7 +177,7 @@ async def test_injury_rollback_and_repair_have_same_original_deadline(sessions, 
         recovery.active_match_id = None
         with pytest.raises(ValueError, match="expired"):
             await repair_match_injuries(
-                session, final.match_id, club, ids, state_hash(final), at + timedelta(days=8)
+                session, final.match_id, club, ids, state_hash(final), at + timedelta(days=15)
             )
         player = await session.get(Player, pid)
         status = player.status
@@ -140,7 +193,7 @@ async def test_injury_rollback_and_repair_have_same_original_deadline(sessions, 
         assert repaired and all(r.source == "repair" for r in repaired)
         for row in repaired:
             assert (await session.get(Player, row.person_id)).injured_until == at + timedelta(
-                minutes=33, days=7
+                minutes=33, days=row.days
             )
         again = await repair_match_injuries(
             session, final.match_id, club, ids, state_hash(final), at + timedelta(days=2)
@@ -183,7 +236,7 @@ async def test_historical_repair_rejects_later_actual_participation(sessions, mo
 
     from tests.integration.test_agent_wave import job
 
-    _, club, fixture, at, final = await finished(sessions, monkeypatch)
+    _, club, fixture, at, final = await finished(sessions, monkeypatch, legacy=True)
     async with sessions.begin() as session:
         with monkeypatch.context() as old:
             old.setattr("goaletto.application.injuries.apply_match_injuries", AsyncMock())

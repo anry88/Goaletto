@@ -1905,7 +1905,12 @@ class MatchInjury(Base):
     __tablename__ = "match_injuries"
     __table_args__ = (
         CheckConstraint(
-            "policy_version = 'match-injury-v1' AND days = 7", name="ck_match_injury_policy"
+            "(policy_version = 'match-injury-v1' AND days = 7 AND severity IS NULL) OR "
+            "(policy_version = 'match-injury-v2' AND severity IS NOT NULL AND "
+            "((severity = 'light' AND days BETWEEN 1 AND 3) OR "
+            "(severity = 'moderate' AND days BETWEEN 4 AND 7) OR "
+            "(severity = 'severe' AND days BETWEEN 8 AND 14)))",
+            name="ck_match_injury_policy",
         ),
         CheckConstraint("minutes_played BETWEEN 1 AND 120", name="ck_match_injury_minutes"),
         CheckConstraint("source IN ('runtime','repair')", name="ck_match_injury_source"),
@@ -1919,6 +1924,7 @@ class MatchInjury(Base):
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
     policy_version: Mapped[str] = mapped_column(String(32))
     days: Mapped[int] = mapped_column(SmallInteger)
+    severity: Mapped[str | None] = mapped_column(String(16))
     minutes_played: Mapped[int] = mapped_column(SmallInteger)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     unavailable_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
