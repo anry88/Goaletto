@@ -46,6 +46,7 @@ def demo_match(seed: int = 7) -> MatchState:
             seed=0,
             first_kickoff=datetime(2000, 1, 1, 18, tzinfo=UTC),
             naming_policy="legacy-v1",
+            club_naming_policy=None,
             starter_policy=LEGACY_STARTER_POLICY,
         )
     )

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
 
-from sqlalchemy import insert, text
+from sqlalchemy import insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.finance_seed import opening_rows
@@ -60,8 +60,9 @@ def prepare_world(
     *,
     root: Path | None = None,
     reserved: frozenset[str] = frozenset(),
+    existing_club_names: tuple[str, ...] = (),
 ) -> PreparedWorld:
-    plan = build_world(options)
+    plan = build_world(options, existing_club_names=existing_club_names)
     portraits = assign_world_portraits(plan, root=root, reserved=reserved)
     fixtures = tuple(
         fixture
@@ -141,6 +142,8 @@ async def initialize_world(
             if "naming_policy" in receipt.config
             else replace(options, naming_policy="legacy-v1")
         )
+        if "club_naming_policy" not in receipt.config:
+            expected = replace(expected, club_naming_policy=None)
         if "starter_policy" not in receipt.config:
             expected = replace(expected, starter_policy=LEGACY_STARTER_POLICY)
         if receipt.config_hash != expected.fingerprint:
@@ -167,7 +170,8 @@ async def initialize_world(
         raise ValueError("World exists without its receipt; reconcile rather than reseed it")
     await register_catalog(session, root=root)
     # The reviewed bank is reusable across people/worlds (user decision 2026-10-13).
-    prepared = prepare_world(options, root=root)
+    existing_names = tuple((await session.scalars(select(Club.name))).all())
+    prepared = prepare_world(options, root=root, existing_club_names=existing_names)
     plan = prepared.plan
 
     async def write(model: type[Base], rows: list[dict[str, Any]]) -> None:
@@ -387,6 +391,11 @@ async def initialize_world(
                     "first_kickoff": options.first_kickoff.isoformat(),
                     "initial_budget": options.initial_budget,
                     "naming_policy": options.naming_policy,
+                    **(
+                        {"club_naming_policy": options.club_naming_policy}
+                        if options.club_naming_policy is not None
+                        else {}
+                    ),
                     "starter_policy": options.starter_policy,
                     "calendar_policy": CYCLE_CALENDAR,
                     "season_number": season_number or 1,

@@ -60,7 +60,11 @@ def receipt() -> WorldSeedReceipt:
         season_id=plan.season_id,
         config_hash=OPTIONS.fingerprint,
         policy_version=WORLD_POLICY,
-        config={"naming_policy": OPTIONS.naming_policy, "starter_policy": OPTIONS.starter_policy},
+        config={
+            "naming_policy": OPTIONS.naming_policy,
+            "starter_policy": OPTIONS.starter_policy,
+            "club_naming_policy": OPTIONS.club_naming_policy,
+        },
         created_at=NOW,
     )
 
@@ -153,7 +157,9 @@ async def test_pre_policy_world_receipt_is_retryable_without_rewriting_history(m
     )
     saved = receipt()
     saved.config = {"naming_policy": OPTIONS.naming_policy}
-    saved.config_hash = replace(OPTIONS, starter_policy=LEGACY_STARTER_POLICY).fingerprint
+    saved.config_hash = replace(
+        OPTIONS, starter_policy=LEGACY_STARTER_POLICY, club_naming_policy=None
+    ).fingerprint
     session = SQLRecorder(saved)
     result = await initialize_world(cast(AsyncSession, session), OPTIONS, initialized_at=NOW)
     assert not result.created and session.writes == []

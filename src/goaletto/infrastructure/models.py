@@ -2697,6 +2697,19 @@ class AcademyProspect(Base):
     graduation_season_id: Mapped[UUID | None] = mapped_column(ForeignKey("seasons.id"))
 
 
+class DefaultClubNameReceipt(Base):
+    __tablename__ = "default_club_name_receipts"
+    __table_args__ = (
+        CheckConstraint("policy_version = 'english-clubs-v1'", name="ck_default_club_name_policy"),
+    )
+
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
+    policy_version: Mapped[str] = mapped_column(String(32))
+    before_name: Mapped[str] = mapped_column(String(80))
+    after_name: Mapped[str] = mapped_column(String(80))
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ClubNameChoice(Base):
     __tablename__ = "club_name_choices"
     __table_args__ = (

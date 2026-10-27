@@ -10,6 +10,7 @@ from random import Random
 from uuid import UUID, uuid5
 
 from goaletto.domain.calendar import validate_kickoff
+from goaletto.domain.club_name_catalog import CLUB_NAMING_POLICY, allocate_names
 from goaletto.domain.names import INTERNATIONAL_CLUBS, NAMING_POLICY, international_catalog
 from goaletto.domain.person_names import PERSON_NAMING_POLICY, generated_name
 from goaletto.domain.retirement import RetirementDecision, player_last_season
@@ -232,6 +233,7 @@ class WorldOptions:
     initial_budget: int = 0
     naming_policy: str = PERSON_NAMING_POLICY
     starter_policy: str = STARTER_POLICY
+    club_naming_policy: str | None = CLUB_NAMING_POLICY
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", self.key):
@@ -242,6 +244,8 @@ class WorldOptions:
             raise ValueError("Budget must be nonnegative integer units")
         if self.naming_policy not in {NAMING_POLICY, PERSON_NAMING_POLICY, "legacy-v1"}:
             raise ValueError("Invalid naming policy")
+        if self.club_naming_policy not in (None, CLUB_NAMING_POLICY):
+            raise ValueError("Invalid club naming policy")
         validate_kickoff(self.first_kickoff)
         if self.starter_policy not in (LEGACY_STARTER_POLICY, STARTER_POLICY):
             raise ValueError("Invalid starter skill policy")
@@ -254,6 +258,8 @@ class WorldOptions:
             data.pop("naming_policy")
         if self.starter_policy == LEGACY_STARTER_POLICY:
             data.pop("starter_policy")
+        if self.club_naming_policy is None:
+            data.pop("club_naming_policy")
         data["policy"] = WORLD_POLICY
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
@@ -309,7 +315,7 @@ def _skills(position: str, rng: Random, policy: str = STARTER_POLICY) -> tuple[i
     return starter_skills(position, rng, policy)
 
 
-def build_world(options: WorldOptions) -> WorldPlan:
+def build_world(options: WorldOptions, *, existing_club_names: tuple[str, ...] = ()) -> WorldPlan:
     set_id = uuid5(WORLD_NAMESPACE, options.key)
     season_id = uuid5(set_id, "season:1")
     rng = Random(options.seed)
@@ -317,6 +323,9 @@ def build_world(options: WorldOptions) -> WorldPlan:
     international_names = international_catalog(options.seed)
     club_names = list(CLUB_NAMES if options.naming_policy == "legacy-v1" else INTERNATIONAL_CLUBS)
     rng.shuffle(club_names)
+    # Consume the frozen 50-name shuffle above to preserve all gameplay draws.
+    if options.club_naming_policy == CLUB_NAMING_POLICY:
+        club_names = list(allocate_names(50, seed=options.key, existing=existing_club_names))
     used_names: set[str] = set()
     leagues: list[StartingLeague] = []
     for tier in range(1, 6):
