@@ -155,3 +155,5 @@ AND-154: [фиксация времени, отмена и приёмка](club-
 на единственной локальной development БД; offline rendering, upgrade head и
 Alembic metadata check. Проверены дроби, реальный потолок/переход 9→10,
 позиция сохранённого слота, retry/rollback, RU/EN, прошедшие события и полночь.
+
+[HDC-релиз и проверка сохранности данных](training-schedule-acceptance-2026-10-31.md).
