@@ -8,9 +8,15 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from goaletto.application.progress_reports import (
+    add_legacy_experience,
+    historical_fraction,
+    people_for,
+    training_experience_gain,
+)
 from goaletto.domain.development import BUDGET_KEYS, GrowthBudget
 from goaletto.domain.training import PRIMARY_SKILLS, SKILLS, Focus
-from goaletto.infrastructure.models import MatchDevelopment, Player, PlayerDevelopment, TrainingPlan
+from goaletto.infrastructure.models import MatchDevelopment, TrainingPlan
 
 
 @dataclass(frozen=True)
@@ -27,21 +33,17 @@ async def report_details(session: AsyncSession, plan: TrainingPlan) -> TrainingR
     """Enrich the authorized report in memory; never modify its immutable JSON."""
     rows = [dict(row) for row in plan.results]
     legacy = [row for row in rows if "person_id" in row and "skill_progress" not in row]
-    ids = [UUID(row["person_id"]) for row in legacy]
-    people = (
-        {
-            str(player.person_id): (player, development)
-            for player, development in (
-                await session.execute(
-                    select(Player, PlayerDevelopment)
-                    .join(PlayerDevelopment, PlayerDevelopment.person_id == Player.person_id)
-                    .where(Player.person_id.in_(ids))
-                )
-            ).all()
-        }
-        if ids
-        else {}
-    )
+    ids = [
+        UUID(row["person_id"])
+        for row in rows
+        if "person_id" in row
+        and (
+            "skill_progress" not in row
+            or "leadership_progress" not in row
+            or "position_experience" not in row
+        )
+    ]
+    people = await people_for(session, ids)
     previous: dict[str, tuple[datetime, int, dict[str, int]]] = {}
     if legacy and plan.focus in (Focus.TEAM, Focus.PHYSICAL) and plan.applied_at:
         # Single-skill focuses already save their exact gain. Multi-skill sessions
@@ -94,6 +96,20 @@ async def report_details(session: AsyncSession, plan: TrainingPlan) -> TrainingR
                 "gain_bps": gain,
             }
         row["skill_progress"] = progress
+    for row in rows:
+        person = people.get(row.get("person_id", ""))
+        if person is None:
+            continue
+        _, development = person
+        if "leadership_progress" not in row and "leadership_gain" in row:
+            row["leadership_progress"] = {
+                "after": _historical_fraction(row, development, "leadership")
+            }
+        experience_gain = training_experience_gain(plan, row)
+        if experience_gain is not None:
+            row["experience_gain"] = experience_gain
+    if plan.applied_at:
+        await add_legacy_experience(session, rows, plan.applied_at, people)
     return TrainingReport(plan.id, plan.week_start, plan.focus, plan.intensity, plan.status, rows)
 
 
@@ -134,25 +150,4 @@ def _session_gains(
     return gained or {PRIMARY_SKILLS[position]: 0}
 
 
-def _historical_fraction(
-    row: dict[str, Any], development: PlayerDevelopment, skill: str
-) -> int | None:
-    age = row.get("development_age")
-    if age != development.growth_age:
-        return None
-    recorded = row.get("season_gains", {})
-    current = development.season_gains
-    try:
-        GrowthBudget(age, recorded)
-        GrowthBudget(age, current)
-    except ValueError:
-        return None
-    if any(current[key] < recorded[key] for key in BUDGET_KEYS):
-        return None
-    # Skills carry fractions through age changes/transfers. Within this age,
-    # cumulative budget differences remove all later match AND training grants.
-    recorded_gain = recorded.get(skill)
-    if not isinstance(recorded_gain, int):
-        return None
-    later_gain = current[skill] - recorded_gain
-    return (development.progress[skill] - later_gain) % 10000
+_historical_fraction = historical_fraction

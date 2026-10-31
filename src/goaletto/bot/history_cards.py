@@ -36,6 +36,7 @@ from goaletto.bot.result_views import table_view
 from goaletto.domain.names import latin_name
 from goaletto.domain.nationalities import flag_name, legacy_nationality
 from goaletto.presentation.i18n import tr
+from goaletto.presentation.progress import experience_line, progress_line
 
 OUTCOME_MARKERS = {"win": "✅", "draw": "➖", "loss": "❌"}
 
@@ -250,30 +251,37 @@ def _player_progress(member: ReportLineupPlayer) -> str:
             tr("Вышел на замену") if member.appeared or member.minutes else tr("Не выходил")
         )
     if member.growth_bps is not None:
-        skills = " · ".join(
-            f"{tr(dict(SKILL_LABELS)[key])} +{_points(gain)}"
-            for key, gain in member.skill_gains
-            if key in dict(SKILL_LABELS) and gain
-        )
-        lines.append(
-            tr("Навыки: {skills}", skills=skills) if skills else tr("Навыки: без изменений.")
-        )
+        progress = {
+            key: (before, after, fraction) for key, before, after, fraction in member.skill_progress
+        }
+        for key, gain in member.skill_gains:
+            if key not in dict(SKILL_LABELS) or not gain:
+                continue
+            before, after, fraction = progress.get(key, (None, None, None))
+            lines.append(progress_line(tr(dict(SKILL_LABELS)[key]), fraction, gain, before, after))
     if member.position_experience:
-        lines.append(
-            tr(
-                "Опыт: {positions}",
-                positions=" · ".join(
-                    f"{position} +{_points(after - before)}"
-                    for position, before, after in member.position_experience
-                ),
-            )
-        )
+        for position, before, after in member.position_experience:
+            if after > before:
+                lines.append(
+                    experience_line(
+                        tr("Опыт {position}", position=position),
+                        before,
+                        after,
+                        after - before,
+                    )
+                )
+    elif member.global_experience:
+        before_total, after_total, gain = member.global_experience
+        if gain:
+            lines.append(experience_line(tr("Опыт"), before_total, after_total, gain))
     elif member.experience_gain:
-        lines.append(tr("Опыт: +{gain}", gain=_points(member.experience_gain)))
+        lines.append(experience_line(tr("Опыт"), None, None, member.experience_gain))
     form = (
         f"{member.form_before} → {member.form_after}"
-        if member.form_before is not None and member.form_after is not None
-        else str(member.form)
+        if member.form_before is not None
+        and member.form_after is not None
+        and member.form_before != member.form_after
+        else str(member.form_after if member.form_after is not None else member.form)
     )
     energy = f"{member.energy_bps // 100}%" if member.energy_bps is not None else tr("нет данных")
     lines.append(tr("Форма: {form}/10 · Энергия: {energy}", form=form, energy=energy))

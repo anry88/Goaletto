@@ -131,7 +131,7 @@ async def test_match_rewards_actual_position_and_report_excludes_opponent(sessio
             other in (b.callback_data or "") for row in keys.inline_keyboard for b in row
         )
         text = "\n".join(report_view(report, section=own, page=page)[0] for page in range(1, 5))
-        assert "Опыт: MC +" in text and "Форма до матча" not in text
+        assert "Опыт MC:" in text and "/100 (+" in text and "Форма до матча" not in text
         assert "staff_skill" not in text and "потенциал" not in text and "множитель" not in text
         with pytest.raises(ValueError, match="own"):
             report_view(report, section=other)

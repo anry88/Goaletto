@@ -483,7 +483,14 @@ async def test_telegram_gates_specialists_then_saves_and_displays_actual_result(
                 {
                     key: value
                     for key, value in row.items()
-                    if key not in ("position", "skill_progress")
+                    if key
+                    not in (
+                        "position",
+                        "skill_progress",
+                        "position_experience",
+                        "experience_gain",
+                        "leadership_progress",
+                    )
                 }
                 for row in plan.results
             ]
@@ -492,6 +499,7 @@ async def test_telegram_gates_specialists_then_saves_and_displays_actual_result(
     report = await send(data=buttons(screen, "tr:r:")[0])
     assert "/100 (+" in report.text and "Выносливость:" in report.text
     assert "Навыки не изменились" not in report.text
+    assert "Лидерство:" in report.text and ("Опыт:" in report.text or "Опыт " in report.text)
     assert "Развитие лидерства" not in report.text and "Прогресс накоплен" not in report.text
     assert transport.source.depth == 0
     await bot.session.close()

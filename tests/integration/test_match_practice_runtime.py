@@ -163,7 +163,7 @@ async def test_renaming_a_league_plan_does_not_create_another_competition_runtim
 async def test_legacy_pin_and_missing_receipts_never_gain_new_form(sessions, monkeypatch, legacy):
     import goaletto.application.match_development as module
 
-    _, _, club = await funded(sessions)
+    _, actor, club = await funded(sessions)
 
     async def legacy_pin(session, fixture, state, at):
         if legacy:
@@ -194,5 +194,9 @@ async def test_legacy_pin_and_missing_receipts_never_gain_new_form(sessions, mon
         if legacy:
             assert receipt.policy_version == LEGACY_POLICY and receipt.terms_snapshot == {}
             assert receipt.results and all("form_after" not in r for r in receipt.results)
+            report = await get_match_report(session, action(actor), fixture)
+            own = "home" if report.home_club_id == club else "away"
+            body = report_view(report, section=own)[0]
+            assert "Опыт:" in body and "/100 (+" in body and "—/100" not in body
         else:
             assert receipt is None

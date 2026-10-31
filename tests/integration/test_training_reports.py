@@ -22,13 +22,33 @@ async def test_old_team_and_physical_reports_remove_later_growth_without_writing
     _, actor, _ = await funded(sessions)
     originals = {}
     expected = {}
+    expected_extras = {}
 
     def freeze_legacy(plan):
         expected[plan.id] = {
             row["person_id"]: deepcopy(row["skill_progress"]) for row in plan.results
         }
+        expected_extras[plan.id] = {
+            row["person_id"]: (
+                row["leadership_progress"]["after"],
+                next(iter(row["position_experience"].values()))["after"],
+                row["experience_gain"],
+            )
+            for row in plan.results
+        }
         plan.results = [
-            {key: value for key, value in row.items() if key not in ("position", "skill_progress")}
+            {
+                key: value
+                for key, value in row.items()
+                if key
+                not in (
+                    "position",
+                    "skill_progress",
+                    "position_experience",
+                    "experience_gain",
+                    "leadership_progress",
+                )
+            }
             for row in plan.results
         ]
         originals[plan.id] = deepcopy(plan.results)
@@ -56,12 +76,20 @@ async def test_old_team_and_physical_reports_remove_later_growth_without_writing
             plan = await session.get(TrainingPlan, plan_id)
             report = await report_details(session, plan)
             for row in report.results:
+                leadership, experience, gain = expected_extras[plan_id][row["person_id"]]
+                assert row["leadership_progress"]["after"] == leadership
+                assert row["experience_progress"] == {
+                    "before": experience - gain,
+                    "after": experience,
+                    "gain": gain,
+                }
                 for skill, values in row["skill_progress"].items():
                     frozen = expected[plan_id][row["person_id"]][skill]
                     assert values["gain_bps"] == frozen["gain_bps"]
                     assert values["progress_after"] == frozen["progress_after"]
             body, _ = training_report(report, "Club")
             assert "/100 (+" in body and "Навыки не изменились" not in body
+            assert "Лидерство:" in body and "Опыт:" in body
             assert plan.results == original
         await session.flush()
     async with sessions.begin() as session:

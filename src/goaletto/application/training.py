@@ -583,6 +583,7 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
         form_before, experience_before = player.form, player.experience
         morale_before, leadership_before = player.morale, player.leadership
         progress_before = dict(dev.progress)
+        leadership_fraction_before = dev.leadership_progress or 0
         from goaletto.domain.position_experience import credit_experience
 
         experience_gain = (
@@ -643,12 +644,23 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
                 "form_after": trained.form,
                 "experience_before": experience_before,
                 "experience_after": trained.experience,
+                "experience_gain": experience_gain,
+                "position_experience": {
+                    trained_position: {
+                        "before": old_position_experience.get(trained_position, 0),
+                        "after": player.position_experience[trained_position],
+                    }
+                },
                 "gain_bps": trained.gain_bps,
                 "morale_before": morale_before,
                 "morale_after": trained.morale,
                 "leadership_before": leadership_before,
                 "leadership_after": trained.leadership,
                 "leadership_gain": trained.leadership_gain,
+                "leadership_progress": {
+                    "before": leadership_fraction_before,
+                    "after": trained.leadership_progress,
+                },
                 "season_gains": dict(trained.budget.used),
                 "development_age": trained.budget.age,
                 "progressed": trained.progress != progress_before

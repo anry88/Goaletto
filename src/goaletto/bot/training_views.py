@@ -16,7 +16,8 @@ from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.names import latin_name
 from goaletto.domain.training import SPECIALISTS, Focus, Intensity
 from goaletto.infrastructure.models import TrainingPlan
-from goaletto.presentation.i18n import LabelMap, locale, tr
+from goaletto.presentation.i18n import LabelMap, tr
+from goaletto.presentation.progress import experience_line, percent, progress_line
 
 FOCUS_LABELS = LabelMap(
     {
@@ -292,25 +293,44 @@ def training_report(
         lines.append(heading)
         if "skill_progress" in row:
             for key, progress in row["skill_progress"].items():
-                fraction = progress["progress_after"]
-                amount = _progress_number(fraction) if fraction is not None else "—"
-                line = f"{labels[key]}: {amount}/100 (+{_progress_number(progress['gain_bps'])}%)"
-                if progress["after"] > progress["before"]:
-                    line += f" · {progress['before']} → {progress['after']}"
-                lines.append(line)
+                lines.append(
+                    progress_line(
+                        labels[key],
+                        progress["progress_after"],
+                        progress["gain_bps"],
+                        progress["before"],
+                        progress["after"],
+                    )
+                )
         else:
             # Old immutable receipts do not contain historical fractions or positions.
             for key, change in row["changes"].items():
                 lines.append(f"{labels[key]}: {change['before']} → {change['after']}")
             if row.get("gain_bps", 0) > 0:
-                lines.append(
-                    tr("Рост навыков: +{gain}% балла", gain=_progress_number(row["gain_bps"]))
-                )
+                lines.append(tr("Рост навыков: +{gain}% балла", gain=percent(row["gain_bps"])))
             elif not row["changes"]:
                 lines.append(tr("Навыки не изменились."))
         if row["form_before"] != row["form_after"]:
             lines.append(tr("Форма: {p0} → {p1}", p0=row["form_before"], p1=row["form_after"]))
-        if row["experience_before"] != row["experience_after"]:
+        if row.get("position_experience"):
+            for position, values in row["position_experience"].items():
+                gain = values["after"] - values["before"]
+                if gain:
+                    lines.append(
+                        experience_line(
+                            tr("Опыт {position}", position=position),
+                            values["before"],
+                            values["after"],
+                            gain,
+                        )
+                    )
+        elif row.get("experience_progress"):
+            values = row["experience_progress"]
+            if values["gain"]:
+                lines.append(
+                    experience_line(tr("Опыт"), values["before"], values["after"], values["gain"])
+                )
+        elif row["experience_before"] != row["experience_after"]:
             lines.append(
                 tr("Опыт: {p0} → {p1}", p0=row["experience_before"], p1=row["experience_after"])
             )
@@ -322,7 +342,17 @@ def training_report(
                     after=row["morale_after"],
                 )
             )
-        if row.get("leadership_before") != row.get("leadership_after"):
+        if row.get("leadership_progress") and row.get("leadership_gain", 0):
+            lines.append(
+                progress_line(
+                    tr("Лидерство"),
+                    row["leadership_progress"]["after"],
+                    row["leadership_gain"],
+                    row["leadership_before"],
+                    row["leadership_after"],
+                )
+            )
+        elif row.get("leadership_before") != row.get("leadership_after"):
             lines.append(
                 tr(
                     "Лидерство: {before} → {after}",
@@ -345,11 +375,6 @@ def training_report(
         rows.append(nav)
     rows.append([_button(tr("← Тренировки"), "tr:open"), _button(tr("🏟 Клуб"), "vc:c")])
     return "\n".join(lines).rstrip(), Keyboard(inline_keyboard=rows)
-
-
-def _progress_number(bps: int) -> str:
-    value = f"{bps / 100:.2f}".rstrip("0").rstrip(".")
-    return value.replace(".", ",") if locale() == "ru" else value
 
 
 def cancellation_reason(plan: TrainingPlan | TrainingReport) -> str:

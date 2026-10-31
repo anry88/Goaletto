@@ -1,5 +1,12 @@
 # Working on Goaletto
 
+- User clarification 2026-11-01 (AND-197): use one progress format for matches
+  AND training, all developed skills, leadership and experience (by position
+  when frozen). Show saved fractional progress /100 and actual event gain in %;
+  only show a whole-point arrow on an actual increase. Keep historical receipts
+  intact; remove later grants when reconstructing older progress. Form, morale
+  and energy keep their own units rather than an invented fractional skill bar.
+
 - User update 2026-10-31 (AND-197): training reports show the frozen trained
   position and each skill's saved progress on a 0–100 scale with actual session
   gain. Show whole-skill increases only when they occur; omit generic accumulated

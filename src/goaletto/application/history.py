@@ -30,6 +30,7 @@ from goaletto.application.game_actions import (
     owned_club,
     user_effect,
 )
+from goaletto.application.progress_reports import match_report_rows
 from goaletto.application.results import standing_snapshot
 from goaletto.domain.match_codec import restore_state
 from goaletto.domain.match_types import MatchState
@@ -126,11 +127,12 @@ class ReportLineupPlayer:
     country_code: str | None = None
     position_minutes: tuple[tuple[str, int], ...] = ()
     position_experience: tuple[tuple[str, int, int], ...] = ()
-    skill_progress: tuple[tuple[str, int, int, int], ...] = ()
+    skill_progress: tuple[tuple[str, int, int, int | None], ...] = ()
     growth_limited: bool = False
     assists: int = 0
     saves: int = 0
     player_of_match: bool = False
+    global_experience: tuple[int | None, int | None, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -568,7 +570,14 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         else ()
     )
     growth_rows = (
-        {r["person_id"]: r for r in development.results if r["club_id"] == str(club.id)}
+        {
+            r["person_id"]: r
+            for r in await match_report_rows(
+                session,
+                [r for r in development.results if r["club_id"] == str(club.id)],
+                development.applied_at,
+            )
+        }
         if development and development.applied_at
         else {}
     )
@@ -641,6 +650,15 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     assists=condition.assists if condition else 0,
                     saves=condition.saves if condition else 0,
                     player_of_match=snapshot_player.id == best_player,
+                    global_experience=(
+                        (
+                            growth_rows[str(snapshot_player.id)]["experience_progress"]["before"],
+                            growth_rows[str(snapshot_player.id)]["experience_progress"]["after"],
+                            growth_rows[str(snapshot_player.id)]["experience_progress"]["gain"],
+                        )
+                        if growth_rows.get(str(snapshot_player.id), {}).get("experience_progress")
+                        else None
+                    ),
                 )
             )
         rows_out.sort(key=lambda r: (not r.started, not r.appeared, r.name, str(r.person_id)))

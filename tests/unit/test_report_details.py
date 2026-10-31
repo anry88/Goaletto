@@ -141,13 +141,15 @@ async def test_practice_report_shows_skill_fraction_form_and_legacy_absence():
         growth_bps=288,
         experience_gain=1200,
         skill_gains=(("playmaking", 288),),
+        skill_progress=(("playmaking", 9, 9, 288),),
+        global_experience=(0, 1200, 1200),
         form_before=8,
         form_after=7,
     )
     changed = replace(report, home_lineup=(member, report.home_lineup[-1]))
     text, _ = report_view(changed, section="home")
-    assert "Плеймейкинг +0.03" in text
-    assert "Опыт: +0.12" in text
+    assert "Плеймейкинг: 2,88/100 (+2,88%)" in text
+    assert "Опыт: 12/100 (+12%)" in text
     assert "Форма: 8 → 7/10" in text
     assert text.count("8 → 7/10") == 1
     assert "Форма до матча" not in text and "Форма после матча" not in text
@@ -157,7 +159,7 @@ async def test_practice_report_shows_skill_fraction_form_and_legacy_absence():
     with using_locale("en"):
         english, _ = report_view(changed, section="home")
     assert "Form: 8 → 7/10" in english
-    assert "Playmaking +0.03" in english
+    assert "Playmaking: 2.88/100 (+2.88%)" in english
 
 
 async def test_cup_report_separates_penalties_and_shows_frozen_neutral_revenue():

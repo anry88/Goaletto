@@ -922,5 +922,7 @@
   " · форма {form}/10 · ⚡ {energy}%": " · form {form}/10 · ⚡ {energy}%",
   "Прогресс до следующего балла: 0–100.": "Progress to the next skill point: 0–100.",
   "✅ Тренировка проведена": "✅ Training completed",
-  "✅ Матч завершён": "✅ Match finished"
+  "✅ Матч завершён": "✅ Match finished",
+  "Опыт": "Experience",
+  "Опыт {position}": "Experience {position}"
 }
