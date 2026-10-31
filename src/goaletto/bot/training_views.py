@@ -15,7 +15,7 @@ from goaletto.domain.kickoff import local_datetime
 from goaletto.domain.names import latin_name
 from goaletto.domain.training import SPECIALISTS, Focus, Intensity
 from goaletto.infrastructure.models import TrainingPlan
-from goaletto.presentation.i18n import LabelMap, tr
+from goaletto.presentation.i18n import LabelMap, locale, tr
 
 FOCUS_LABELS = LabelMap(
     {
@@ -278,27 +278,36 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
         + " · "
         + INTENSITY_LABELS[Intensity(plan.intensity)].lower(),
         tr("Игроки · {p0}/{p1}", p0=page, p1=pages),
+        tr("Прогресс до следующего балла: 0–100."),
         "",
     ]
     labels = LabelMap(dict(SKILL_LABELS))
     for row in plan.results[(page - 1) * 5 : page * 5]:
-        lines.append("<b>" + escape(latin_name(row["name"])) + "</b>")
-        for key, change in row["changes"].items():
-            lines.append(f"{labels[key]}: {change['before']} → {change['after']}")
-        if not row["changes"]:
-            lines.append(
-                tr("Прогресс накоплен; навыки ещё не выросли на целый балл.")
-                if row["progressed"]
-                else tr("Навыки не изменились.")
-            )
+        heading = "<b>" + escape(latin_name(row["name"])) + "</b>"
+        if row.get("position"):
+            heading += " · " + escape(row["position"])
+        lines.append(heading)
+        if "skill_progress" in row:
+            for key, progress in row["skill_progress"].items():
+                line = (
+                    f"{labels[key]}: {_progress_number(progress['progress_after'])}/100 "
+                    f"(+{_progress_number(progress['gain_bps'])}%)"
+                )
+                if progress["after"] > progress["before"]:
+                    line += f" · {progress['before']} → {progress['after']}"
+                lines.append(line)
+        else:
+            # Old immutable receipts do not contain historical fractions or positions.
+            for key, change in row["changes"].items():
+                lines.append(f"{labels[key]}: {change['before']} → {change['after']}")
+            if not row["changes"]:
+                lines.append(tr("Навыки не изменились."))
         if row["form_before"] != row["form_after"]:
             lines.append(tr("Форма: {p0} → {p1}", p0=row["form_before"], p1=row["form_after"]))
         if row["experience_before"] != row["experience_after"]:
             lines.append(
                 tr("Опыт: {p0} → {p1}", p0=row["experience_before"], p1=row["experience_after"])
             )
-        if "gain_bps" in row:
-            lines.append(tr("Рост навыков: +{gain}% балла", gain=f"{row['gain_bps'] / 100:.2f}"))
         if row.get("morale_before") != row.get("morale_after"):
             lines.append(
                 tr(
@@ -315,10 +324,6 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
                     after=row["leadership_after"],
                 )
             )
-        elif row.get("leadership_gain", 0):
-            lines.append(
-                tr("Развитие лидерства: +{gain}% балла", gain=f"{row['leadership_gain'] / 100:.2f}")
-            )
         if row["injured"]:
             lines.append(tr("🤕 Травма на тренировке · восстановление 7 дней."))
         lines.append("")
@@ -334,6 +339,11 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
         rows.append(nav)
     rows.append([_button(tr("← Тренировки"), "tr:open"), _button(tr("🏟 Клуб"), "vc:c")])
     return "\n".join(lines).rstrip(), Keyboard(inline_keyboard=rows)
+
+
+def _progress_number(bps: int) -> str:
+    value = f"{bps / 100:.2f}".rstrip("0").rstrip(".")
+    return value.replace(".", ",") if locale() == "ru" else value
 
 
 def cancellation_reason(plan: TrainingPlan) -> str:

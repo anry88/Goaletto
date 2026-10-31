@@ -81,3 +81,50 @@ def test_schedule_english_conditional_neutral_and_local_day():
         1,
     )
     assert "18.10" in schedule_view(screen)[0]
+
+
+@pytest.mark.parametrize("language", ["ru", "en"])
+def test_schedule_marks_completed_training_and_finished_match(language):
+    day = datetime(2026, 10, 31, tzinfo=UTC)
+    entries = (
+        ScheduleEntry(
+            uuid4(),
+            day.date(),
+            "training",
+            0,
+            None,
+            None,
+            "home",
+            day,
+            False,
+            None,
+            None,
+            "applied",
+            "physical",
+            "medium",
+        ),
+        ScheduleEntry(
+            uuid4(),
+            day.date(),
+            "league",
+            1,
+            "Home",
+            "Away",
+            "home",
+            day,
+            False,
+            None,
+            None,
+            "finished",
+        ),
+    )
+    screen = ScheduleScreen(
+        uuid4(), "Club", "UTC", (ScheduleDay(day.date(), "league", 1, entries),), 1, 1
+    )
+    with using_locale(language):
+        view = schedule_view(screen)
+        if language == "en":
+            assert_english(view)
+            assert "✅ Training completed" in view[0] and "✅ Match finished" in view[0]
+        else:
+            assert "✅ Тренировка проведена" in view[0] and "✅ Матч завершён" in view[0]

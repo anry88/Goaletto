@@ -17,6 +17,7 @@ from goaletto.domain.match_codec import restore_state, state_hash
 from goaletto.domain.training import SPECIALISTS, Focus, Intensity
 from goaletto.infrastructure.models import (
     Job,
+    LineupSlot,
     Match,
     Person,
     Player,
@@ -96,6 +97,45 @@ async def test_weak_coach_allows_only_general_and_forged_specialist_choice_has_n
         ).all()
         assert any(d.season_gains["training"] > 0 for d in devs)
         assert all(d.leadership_progress == 5 for d in devs)
+
+
+async def test_report_freezes_trained_position_fraction_and_actual_capped_gain(sessions):
+    _, actor, club = await funded(sessions)
+    async with sessions.begin() as session:
+        slot = await session.scalar(
+            select(LineupSlot).where(LineupSlot.club_id == club, LineupSlot.slot == 2)
+        )
+        player = await session.get(Player, slot.person_id)
+        assert player.position != "MC"
+        slot.position = "MC"
+        player.playmaking = 9
+        dev = await session.get(PlayerDevelopment, player.person_id)
+        dev.caps = {**dev.caps, "playmaking": 10}
+        dev.progress = {**dev.progress, "playmaking": 9999}
+        plan = await choose(session, actor, Focus.TEAM)
+        await apply_training(session, await training_job(session, plan), plan.due_at)
+        receipt = next(r for r in plan.results if r["person_id"] == str(player.person_id))
+        assert receipt["position"] == "MC"
+        assert receipt["skill_progress"] == {
+            "playmaking": {
+                "before": 9,
+                "after": 10,
+                "progress_before": 9999,
+                "progress_after": 0,
+                "gain_bps": 1,
+            }
+        }
+        assert "Плеймейкинг: 0/100 (+0,01%) · 9 → 10" in training_report(plan, "Club")[0]
+        plan_id, person_id = plan.id, player.person_id
+    async with sessions.begin() as session:
+        plan = await session.get(TrainingPlan, plan_id)
+        frozen = plan.results
+        # Later roster reads or lineup edits cannot change the historical training report.
+        slot = await session.scalar(select(LineupSlot).where(LineupSlot.person_id == person_id))
+        slot.position = "DC"
+        await apply_training(session, await training_job(session, plan), plan.due_at)
+        assert plan.results == frozen
+        assert next(r for r in frozen if r["person_id"] == str(person_id))["position"] == "MC"
 
 
 @pytest.mark.parametrize(
@@ -344,7 +384,7 @@ async def test_telegram_gates_specialists_then_saves_and_displays_actual_result(
     from tests.integration.test_agent_wave import OPTIONS
     from tests.integration.test_game_dispatcher import Source, Telegram
 
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0)
     _, actor, club = await funded(
         sessions,
         options=replace(
@@ -440,7 +480,8 @@ async def test_telegram_gates_specialists_then_saves_and_displays_actual_result(
         current = plan.due_at + timedelta(hours=1)
     screen = await send(command="/train")
     report = await send(data=buttons(screen, "tr:r:")[0])
-    assert "Рост навыков" in report.text and "Развитие лидерства" in report.text
+    assert "/100 (+" in report.text and "Выносливость:" in report.text
+    assert "Развитие лидерства" not in report.text and "Прогресс накоплен" not in report.text
     assert transport.source.depth == 0
     await bot.session.close()
 

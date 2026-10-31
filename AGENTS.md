@@ -1,5 +1,12 @@
 # Working on Goaletto
 
+- User update 2026-10-31 (AND-197): training reports show the frozen trained
+  position and each skill's saved progress on a 0–100 scale with actual session
+  gain. Show whole-skill increases only when they occur; omit generic accumulated
+  experience/progress notices. Preserve old receipts without inventing fractions.
+  Schedule includes completed matches/applied training throughout the current
+  UTC day, with completion labels; retain local event times and the future horizon.
+
 - User clarification 2026-10-26 (AND-180): match injuries must have varied
   severity/duration. New match-injury-v2 uses light 1–3 days, moderate 4–7,
   severe 8–14, with light injuries most common. Freeze policy at lineup lock;

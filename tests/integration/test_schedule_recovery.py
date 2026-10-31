@@ -32,7 +32,7 @@ pytestmark = pytest.mark.integration
 
 
 async def test_real_final_energy_survives_next_read_and_no_recovery_during_outage(sessions):
-    _, _, club = await setup_world(sessions)
+    _, actor, club = await setup_world(sessions)
     async with sessions.begin() as session:
         fixture = await session.scalar(
             select(Fixture)
@@ -87,6 +87,21 @@ async def test_real_final_energy_survives_next_read_and_no_recovery_during_outag
             await energy_status(session, player_id, fixture.actual_finish_at + timedelta(hours=1))
         ).bps == first.bps
         assert state_hash(restore_state(match.starting_snapshot)) == frozen
+        from goaletto.bot.schedule_views import schedule_view
+
+        screen = await load_schedule(
+            session,
+            replace(
+                actor, operation_id=uuid4(), at=fixture.actual_finish_at + timedelta(minutes=5)
+            ),
+        )
+        entry = next(e for day in screen.days for e in day.entries if e.id == fixture_id)
+        assert entry.status == "finished" and "✅ Матч завершён" in schedule_view(screen)[0]
+        next_day = fixture.actual_finish_at.replace(hour=0, minute=0, second=0, microsecond=0)
+        screen = await load_schedule(
+            session, replace(actor, operation_id=uuid4(), at=next_day + timedelta(days=1))
+        )
+        assert all(e.id != fixture_id for day in screen.days for e in day.entries)
 
 
 async def test_physio_qualification_is_pinned_to_employment_not_retroactive(sessions):

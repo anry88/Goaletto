@@ -919,5 +919,8 @@
   "1/16 финала": "Round of 32",
   "{name} · {position} · форма {form}/10 · ⚡ {energy}%": "{name} · {position} · form {form}/10 · ⚡ {energy}%",
   "Заменяем: <b>{name}</b> · форма {form}/10 · ⚡ {energy}%": "Off: <b>{name}</b> · form {form}/10 · ⚡ {energy}%",
-  " · форма {form}/10 · ⚡ {energy}%": " · form {form}/10 · ⚡ {energy}%"
+  " · форма {form}/10 · ⚡ {energy}%": " · form {form}/10 · ⚡ {energy}%",
+  "Прогресс до следующего балла: 0–100.": "Progress to the next skill point: 0–100.",
+  "✅ Тренировка проведена": "✅ Training completed",
+  "✅ Матч завершён": "✅ Match finished"
 }

@@ -106,6 +106,17 @@ async def test_weekly_training_retry_fractional_progress_rollback_and_owner_expi
         await session.flush()
         plan = await session.get(TrainingPlan, plan_id)
         assert plan.status == "applied" and len(plan.results) == 20
+        receipt = plan.results
+        for row in receipt:
+            player = await session.get(Player, row["person_id"])
+            dev = await session.get(PlayerDevelopment, row["person_id"])
+            assert row["position"] == player.position
+            assert set(row["skill_progress"]) == {"stamina", "pace"}
+            for key, progress in row["skill_progress"].items():
+                assert progress["before"] == progress["after"] == getattr(player, key)
+                assert progress["progress_before"] == 0
+                assert progress["progress_after"] == dev.progress[key]
+                assert progress["gain_bps"] == dev.season_gains[key]
         ownership = await session.get(OwnershipPeriod, owner_id)
         last_action = ownership.last_game_action_at
         assert last_action == NOW
@@ -116,11 +127,27 @@ async def test_weekly_training_retry_fractional_progress_rollback_and_owner_expi
         assert any(progress[pid]["pace"] > 0 and progress[pid]["stamina"] > 0 for pid in before)
         await apply_training(session, job, due)
         await session.flush()
+        assert plan.results == receipt
         assert progress == {
             d.person_id: dict(d.progress)
             for d in (await session.scalars(select(PlayerDevelopment))).all()
         }
         assert ownership.last_game_action_at == last_action
+    async with sessions() as session:
+        await session.begin()
+        from goaletto.application.schedule import load_schedule
+
+        schedule = await load_schedule(
+            session, replace(actor, operation_id=uuid4(), at=due + timedelta(hours=1))
+        )
+        entry = next(e for day in schedule.days for e in day.entries if e.id == plan_id)
+        assert entry.status == "applied" and entry.kickoff == due
+        tomorrow = await load_schedule(
+            session,
+            replace(actor, operation_id=uuid4(), at=week_start(due) + timedelta(days=1)),
+        )
+        assert all(e.id != plan_id for day in tomorrow.days for e in day.entries)
+        await session.rollback()
     # The next chosen UTC day is cancelled after ownership expires, without training bots.
     later = due + timedelta(hours=1)
     later_actor = replace(actor, operation_id=uuid4(), at=later)

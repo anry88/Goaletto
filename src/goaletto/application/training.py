@@ -27,6 +27,7 @@ from goaletto.domain.staff_effects import POLICY as LEGACY_STAFF_POLICY
 from goaletto.domain.training import (
     LEGACY_SPECIALISTS,
     POLICY_VERSION,
+    PRIMARY_SKILLS,
     PROGRESS_KEYS,
     SESSION_POLICY,
     SKILLS,
@@ -543,6 +544,7 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             raise ValueError("Unsupported development policy")
         old_position_experience = position_experience(player, dev)
         trained_position = positions.get(person.id, player.position)
+        budget_before = growth_budget(dev, person.age)
         trained = train_player(
             TrainingPlayer(
                 person.id,
@@ -569,7 +571,7 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             ),
             head_skill=staff_skills.get("head_coach", 0),
             physio_skill=staff_skills.get("physiotherapist", 0),
-            budget=growth_budget(dev, person.age),
+            budget=budget_before,
             executor_id=plan.executor_id,
             active_form=not legacy_staff,
         )
@@ -619,6 +621,23 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             {
                 "person_id": str(person.id),
                 "name": person.name,
+                "position": trained_position,
+                "skill_progress": {
+                    key: {
+                        "before": values[key],
+                        "after": trained.skills[key],
+                        "progress_before": progress_before[key],
+                        "progress_after": trained.progress[key],
+                        "gain_bps": trained.budget.used[key] - budget_before.used[key],
+                    }
+                    for key in (
+                        ("stamina", "pace")
+                        if focus == Focus.PHYSICAL
+                        else (PRIMARY_SKILLS[trained_position],)
+                        if focus == Focus.TEAM
+                        else (focus.value,)
+                    )
+                },
                 "changes": changes,
                 "form_before": form_before,
                 "form_after": trained.form,

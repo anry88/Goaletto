@@ -83,6 +83,7 @@ async def load_schedule(
         raise ValueError("Missing club calendar")
     manager = await session.get(Manager, actor.manager_id)
     until = actor.at + timedelta(days=10)
+    today = actor.at.replace(hour=0, minute=0, second=0, microsecond=0)
     from goaletto.application.champions import host_seasons_for
 
     hosts = host_seasons_for(season.id)
@@ -123,7 +124,7 @@ async def load_schedule(
         fixture = fixtures.get(plan.id)
         if fixture and fixture.status in ("cancelled", "abandoned"):
             continue
-        if competition is None and fixture and not actor.at <= fixture.scheduled_start_at < until:
+        if competition is None and fixture and not today <= fixture.scheduled_start_at < until:
             if fixture.status not in ("live", "paused"):
                 continue
         entries.append(
@@ -157,10 +158,10 @@ async def load_schedule(
                 .where(
                     TrainingPlan.club_id == club.id,
                     TrainingPlan.ownership_id == owner.id,
-                    TrainingPlan.status == "scheduled",
-                    TrainingPlan.week_start
-                    >= actor.at.replace(hour=0, minute=0, second=0, microsecond=0),
+                    TrainingPlan.status.in_(("scheduled", "applied")),
+                    TrainingPlan.week_start >= today,
                     TrainingPlan.week_start <= until,
+                    TrainingPlan.due_at < until,
                 )
                 .order_by(TrainingPlan.week_start)
             )

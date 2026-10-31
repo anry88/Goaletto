@@ -77,6 +77,8 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
                 )
                 if entry.kickoff:
                     lines.append("🕒 " + escape(local_datetime(entry.kickoff, screen.zone)))
+                if entry.status == "applied":
+                    lines.append(tr("✅ Тренировка проведена"))
                 continue
             home = escape(latin_name(entry.home)) if entry.home else tr("Соперник определится")
             away = escape(latin_name(entry.away)) if entry.away else tr("Соперник определится")
@@ -104,6 +106,8 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
                 lines.append(
                     tr("Матч идёт") if entry.status == "live" else tr("Матч приостановлен")
                 )
+            elif entry.status == "finished":
+                lines.append(tr("✅ Матч завершён"))
         lines.append("")
     if not screen.days:
         lines.append(tr("Пар пока нет."))

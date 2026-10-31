@@ -170,3 +170,73 @@ def test_training_report_keeps_names_changes_and_pagination_readable():
     assert "Igrok &lt;5&gt;" in training_report(plan, "<Клуб>", 2)[0]
     with pytest.raises(ValueError):
         training_report(plan, "<Клуб>", 3)
+
+
+@pytest.mark.parametrize("language", ["ru", "en"])
+def test_training_report_shows_frozen_position_each_skill_and_only_real_increases(language):
+    from goaletto.bot.training_views import training_report
+    from goaletto.infrastructure.models import TrainingPlan
+    from goaletto.presentation.i18n import using_locale
+    from tests.unit.test_language import assert_english
+
+    row = {
+        "name": "Player <One>",
+        "position": "DC",
+        "changes": {"stamina": {"before": 9, "after": 10}},
+        "skill_progress": {
+            "stamina": {
+                "before": 9,
+                "after": 10,
+                "progress_before": 9750,
+                "progress_after": 0,
+                "gain_bps": 250,
+            },
+            "pace": {
+                "before": 8,
+                "after": 8,
+                "progress_before": 2250,
+                "progress_after": 2500,
+                "gain_bps": 250,
+            },
+            "defending": {
+                "before": 10,
+                "after": 10,
+                "progress_before": 123,
+                "progress_after": 123,
+                "gain_bps": 0,
+            },
+        },
+        "form_before": 6,
+        "form_after": 6,
+        "experience_before": 0,
+        "experience_after": 0,
+        "leadership_before": 10,
+        "leadership_after": 10,
+        "leadership_gain": 50,
+        "gain_bps": 500,
+        "progressed": True,
+        "injured": False,
+    }
+    plan = TrainingPlan(
+        id=uuid4(),
+        week_start=datetime(2026, 10, 31, tzinfo=UTC),
+        focus="physical",
+        intensity="medium",
+        results=[row],
+    )
+    with using_locale(language):
+        view = training_report(plan, "Club")
+        text = view[0]
+        assert "<b>Player &lt;One&gt;</b> · DC" in text
+        assert text.count("9 → 10") == 1 and "8 → 8" not in text
+        assert "Опыт:" not in text and "Experience:" not in text
+        assert "накоплен" not in text and "accumulated" not in text
+        assert "Развитие лидерства" not in text and "Leadership development" not in text
+        if language == "ru":
+            assert "Выносливость: 0/100 (+2,5%) · 9 → 10" in text
+            assert "Скорость: 25/100 (+2,5%)" in text
+            assert "Защита: 1,23/100 (+0%)" in text
+        else:
+            assert_english(view)
+            assert "Stamina: 0/100 (+2.5%) · 9 → 10" in text
+            assert "Pace: 25/100 (+2.5%)" in text
