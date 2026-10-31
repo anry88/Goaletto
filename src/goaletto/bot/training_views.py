@@ -8,6 +8,7 @@ from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup as Keyboard
 
 from goaletto.application.training import TrainingDate, TrainingScreen
+from goaletto.application.training_reports import TrainingReport
 from goaletto.bot.candidate_views import ROLES
 from goaletto.bot.club_cards import SKILL_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
@@ -261,7 +262,9 @@ def training_view(
     return "\n".join(lines), Keyboard(inline_keyboard=rows)
 
 
-def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[str, Keyboard]:
+def training_report(
+    plan: TrainingPlan | TrainingReport, club_name: str, page: int = 1
+) -> tuple[str, Keyboard]:
     if plan.status == "cancelled":
         return cancellation_reason(plan), Keyboard(
             inline_keyboard=[
@@ -289,10 +292,9 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
         lines.append(heading)
         if "skill_progress" in row:
             for key, progress in row["skill_progress"].items():
-                line = (
-                    f"{labels[key]}: {_progress_number(progress['progress_after'])}/100 "
-                    f"(+{_progress_number(progress['gain_bps'])}%)"
-                )
+                fraction = progress["progress_after"]
+                amount = _progress_number(fraction) if fraction is not None else "—"
+                line = f"{labels[key]}: {amount}/100 (+{_progress_number(progress['gain_bps'])}%)"
                 if progress["after"] > progress["before"]:
                     line += f" · {progress['before']} → {progress['after']}"
                 lines.append(line)
@@ -300,7 +302,11 @@ def training_report(plan: TrainingPlan, club_name: str, page: int = 1) -> tuple[
             # Old immutable receipts do not contain historical fractions or positions.
             for key, change in row["changes"].items():
                 lines.append(f"{labels[key]}: {change['before']} → {change['after']}")
-            if not row["changes"]:
+            if row.get("gain_bps", 0) > 0:
+                lines.append(
+                    tr("Рост навыков: +{gain}% балла", gain=_progress_number(row["gain_bps"]))
+                )
+            elif not row["changes"]:
                 lines.append(tr("Навыки не изменились."))
         if row["form_before"] != row["form_after"]:
             lines.append(tr("Форма: {p0} → {p1}", p0=row["form_before"], p1=row["form_after"]))
@@ -346,7 +352,7 @@ def _progress_number(bps: int) -> str:
     return value.replace(".", ",") if locale() == "ru" else value
 
 
-def cancellation_reason(plan: TrainingPlan) -> str:
+def cancellation_reason(plan: TrainingPlan | TrainingReport) -> str:
     if plan.results and plan.results[0].get("reason") == "manager_cancelled":
         return tr("Тренировка отменена менеджером.")
     reason = str(plan.results[0].get("reason", "")) if plan.results else ""

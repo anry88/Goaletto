@@ -10,6 +10,7 @@ from sqlalchemy import select
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied, actor_for, owned_club
 from goaletto.application.training import cancel_training, load_training, select_training
+from goaletto.application.training_reports import report_details
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import expand_id
 from goaletto.bot.training_views import parse_choice, parse_date, training_report, training_view
@@ -79,7 +80,9 @@ async def training_callback(query: CallbackQuery, database: Database, event_upda
                 )
                 if plan is None:
                     raise PermissionDenied("Training report belongs to another owner")
-                text, keyboard = training_report(plan, club.name, int(parts[3]))
+                text, keyboard = training_report(
+                    await report_details(session, plan), club.name, int(parts[3])
+                )
             elif data.startswith("tr:d:"):
                 owner_id, day = parse_date(data)
                 owner, _ = await owned_club(session, actor)

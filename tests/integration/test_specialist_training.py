@@ -370,8 +370,9 @@ async def test_training_after_real_match_does_not_rewrite_snapshot_and_mentoring
             )
 
 
+@pytest.mark.parametrize("legacy", [False, True])
 async def test_telegram_gates_specialists_then_saves_and_displays_actual_result(
-    sessions, monkeypatch
+    sessions, monkeypatch, legacy
 ):
     from datetime import UTC, datetime
 
@@ -477,10 +478,20 @@ async def test_telegram_gates_specialists_then_saves_and_displays_actual_result(
         plan = await session.scalar(select(TrainingPlan))
         assert plan.week_start == tomorrow
         await apply_training(session, await training_job(session, plan), plan.due_at)
+        if legacy:
+            plan.results = [
+                {
+                    key: value
+                    for key, value in row.items()
+                    if key not in ("position", "skill_progress")
+                }
+                for row in plan.results
+            ]
         current = plan.due_at + timedelta(hours=1)
     screen = await send(command="/train")
     report = await send(data=buttons(screen, "tr:r:")[0])
     assert "/100 (+" in report.text and "Выносливость:" in report.text
+    assert "Навыки не изменились" not in report.text
     assert "Развитие лидерства" not in report.text and "Прогресс накоплен" not in report.text
     assert transport.source.depth == 0
     await bot.session.close()

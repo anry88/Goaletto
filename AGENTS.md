@@ -6,6 +6,10 @@
   experience/progress notices. Preserve old receipts without inventing fractions.
   Schedule includes completed matches/applied training throughout the current
   UTC day, with completion labels; retain local event times and the future horizon.
+  Follow-up: this must work for existing reports too, across every trained skill.
+  Never hide a saved fractional gain behind "skills unchanged". Read older
+  cumulative growth budgets to remove later grants from same-age fractions;
+  never rewrite receipts or substitute current progress for a historical result.
 
 - User clarification 2026-10-26 (AND-180): match injuries must have varied
   severity/duration. New match-injury-v2 uses light 1–3 days, moderate 4–7,
