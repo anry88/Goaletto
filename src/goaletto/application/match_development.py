@@ -29,7 +29,7 @@ from goaletto.domain.match_practice import (
     develop_position_practice,
 )
 from goaletto.domain.match_types import (
-    EXPERIENCE_ENGINE_VERSION,
+    PERCENT_EXPERIENCE_ENGINES,
     POSITION_ENGINE_VERSION,
     POSITIONAL_ENGINES,
     MatchState,
@@ -101,7 +101,7 @@ async def pin_development(
 
         await authenticate_fixture(session, fixture)
     experience_roster = {}
-    if eligible and state.engine_version == EXPERIENCE_ENGINE_VERSION:
+    if eligible and state.engine_version in PERCENT_EXPERIENCE_ENGINES:
         club_ids = (state.home.snapshot.club_id, state.away.snapshot.club_id)
         for player, person in (
             await session.execute(
@@ -124,7 +124,7 @@ async def pin_development(
         MatchDevelopment(
             match_id=state.match_id,
             policy_version=PERCENT_POLICY
-            if state.engine_version == EXPERIENCE_ENGINE_VERSION
+            if state.engine_version in PERCENT_EXPERIENCE_ENGINES
             else CURRENT_POLICY
             if state.engine_version == POSITION_ENGINE_VERSION
             else V3_POLICY,
@@ -137,7 +137,7 @@ async def pin_development(
                         "experience_roster": experience_roster,
                         "experience_policy": "position-experience-v2",
                     }
-                    if state.engine_version == EXPERIENCE_ENGINE_VERSION
+                    if state.engine_version in PERCENT_EXPERIENCE_ENGINES
                     else {}
                 ),
                 **({"injury_days": INJURY_DAYS} if INJURY_POLICY == LEGACY_INJURY_POLICY else {}),

@@ -73,3 +73,10 @@ def percent_practice(
                 result[position] -= loss
                 losses[position] = loss
     return result, grants, losses
+
+
+def bounded_experience_factor(experience: int) -> int:
+    """V7: 0..100% earned experience retains 80..100% of the relevant skill."""
+    if type(experience) is not int or not 0 <= experience <= PERCENT_MAX:
+        raise ValueError("Positional experience must be 0..100%")
+    return 800000 + experience // 5

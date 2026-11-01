@@ -11,11 +11,13 @@ from goaletto.domain.knockout_match import KnockoutContext
 from goaletto.domain.match_commands import apply_commands, substitute
 from goaletto.domain.match_ratings import SectorRatings, effective_skill, sector_ratings
 from goaletto.domain.match_types import (
+    BOUNDED_EXPERIENCE_ENGINE_VERSION,
     COACH_ENGINE_VERSION,
     ENGINE_VERSION,
     EXPERIENCE_ENGINE_VERSION,
     KNOCKOUT_ENGINE_VERSION,
     LIVE_ENGINE_VERSION,
+    PERCENT_EXPERIENCE_ENGINES,
     POSITION_ENGINE_VERSION,
     POSITIONAL_ENGINES,
     POSITIONS,
@@ -45,6 +47,7 @@ def validate_state(state: MatchState) -> None:
         KNOCKOUT_ENGINE_VERSION,
         POSITION_ENGINE_VERSION,
         EXPERIENCE_ENGINE_VERSION,
+        BOUNDED_EXPERIENCE_ENGINE_VERSION,
     }:
         raise ValueError("Unsupported engine version; never replay with another implementation")
     expected_policy = "match-policy-" + state.engine_version.removeprefix("regulation-")
@@ -62,8 +65,7 @@ def validate_state(state: MatchState) -> None:
         state.engine_version == KNOCKOUT_ENGINE_VERSION
         and not knockout
         or knockout
-        and state.engine_version
-        not in {KNOCKOUT_ENGINE_VERSION, POSITION_ENGINE_VERSION, EXPERIENCE_ENGINE_VERSION}
+        and state.engine_version not in {KNOCKOUT_ENGINE_VERSION, *POSITIONAL_ENGINES}
     ):
         raise ValueError("Knockout context and engine disagree")
     if type(state.tick) is not int or not 0 <= state.tick <= maximum:
@@ -150,7 +152,7 @@ def validate_state(state: MatchState) -> None:
     ):
         raise ValueError("Support morale must match the pinned crowd and policy")
     for team in (state.home, state.away):
-        if state.engine_version == EXPERIENCE_ENGINE_VERSION:
+        if state.engine_version in PERCENT_EXPERIENCE_ENGINES:
             from goaletto.domain.position_experience import validate_percent_experience
 
             for player in team.snapshot.players:
@@ -161,6 +163,7 @@ def validate_state(state: MatchState) -> None:
             KNOCKOUT_ENGINE_VERSION,
             POSITION_ENGINE_VERSION,
             EXPERIENCE_ENGINE_VERSION,
+            BOUNDED_EXPERIENCE_ENGINE_VERSION,
         }
         if modern != (coach is not None):
             raise ValueError("Coaching snapshot and engine disagree")
@@ -589,7 +592,8 @@ def advance_tick(
                     "set_pieces" if set_piece else "attacking",
                     attacking.support_morale_points,
                     positional=state.engine_version in POSITIONAL_ENGINES,
-                    percentage=state.engine_version == EXPERIENCE_ENGINE_VERSION,
+                    percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
+                    bounded_experience=state.engine_version == BOUNDED_EXPERIENCE_ENGINE_VERSION,
                 ),
             )
             for s in candidates
@@ -615,7 +619,8 @@ def advance_tick(
                 "set_pieces",
                 attacking.support_morale_points,
                 positional=state.engine_version in POSITIONAL_ENGINES,
-                percentage=state.engine_version == EXPERIENCE_ENGINE_VERSION,
+                percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
+                bounded_experience=state.engine_version == BOUNDED_EXPERIENCE_ENGINE_VERSION,
             )
             attack = (attack + taker_rating * 2) // 2
         assister = None
@@ -631,7 +636,9 @@ def advance_tick(
                         "set_pieces" if set_piece else "playmaking",
                         attacking.support_morale_points,
                         positional=True,
-                        percentage=state.engine_version == EXPERIENCE_ENGINE_VERSION,
+                        percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
+                        bounded_experience=state.engine_version
+                        == BOUNDED_EXPERIENCE_ENGINE_VERSION,
                     ),
                 )
                 for slot in creators

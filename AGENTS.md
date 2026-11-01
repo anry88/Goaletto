@@ -1,5 +1,13 @@
 # Working on Goaletto
 
+- User update 2026-11-01 (AND-202): new regulation-v7 / match-policy-v7
+  retain 80..100% of relevant skills according to earned positional experience
+  (0/50/100% XP -> 80/90/100% effectiveness), equally for all positions and
+  clubs, including penalties. Nearby/foreign positions differ through actual
+  relevant skills, not fixed role penalties. Keep earned XP/growth/decay intact.
+  Apply only at new lineup locks. Preserve every existing V1..V6 checkpoint,
+  policy, RNG and result; current Botofarm and Anry's band matches stay as is.
+
 - User update 2026-11-01 (AND-198/200): new training-specialists-v3 develops
   the selected skill across the healthy eligible squad; existing profile groups
   retain full gain, other positions receive 10%, with age/caps/budgets preserved.

@@ -17,7 +17,11 @@ COACH_ENGINE_VERSION = "regulation-v3"
 KNOCKOUT_ENGINE_VERSION = "regulation-v4"
 POSITION_ENGINE_VERSION = "regulation-v5"
 EXPERIENCE_ENGINE_VERSION = "regulation-v6"
-POSITIONAL_ENGINES = frozenset({POSITION_ENGINE_VERSION, EXPERIENCE_ENGINE_VERSION})
+BOUNDED_EXPERIENCE_ENGINE_VERSION = "regulation-v7"
+PERCENT_EXPERIENCE_ENGINES = frozenset(
+    {EXPERIENCE_ENGINE_VERSION, BOUNDED_EXPERIENCE_ENGINE_VERSION}
+)
+POSITIONAL_ENGINES = frozenset({POSITION_ENGINE_VERSION, *PERCENT_EXPERIENCE_ENGINES})
 POSITIONS = frozenset({"GK", "DL", "DC", "DR", "DM", "ML", "MC", "MR", "AMC", "AML", "AMR", "FC"})
 
 
@@ -241,6 +245,7 @@ class EnginePolicy:
             "match-policy-v4",
             "match-policy-v5",
             "match-policy-v6",
+            "match-policy-v7",
         }:
             raise ValueError("Unsupported policy")
         if self.version == "match-policy-v1" and (

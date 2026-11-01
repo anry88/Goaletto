@@ -601,7 +601,9 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     snapshot_player.id in starters,
                     condition.minutes_played if condition else 0,
                     condition.goals
-                    if terminal.engine_version in {"regulation-v5", "regulation-v6"} and condition
+                    if terminal.engine_version
+                    in {"regulation-v5", "regulation-v6", "regulation-v7"}
+                    and condition
                     else goal_counts.get((side, snapshot_player.id), 0),
                     condition.yellows if condition else 0,
                     condition.dismissed if condition else False,

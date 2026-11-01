@@ -150,15 +150,25 @@ def advance_penalty(state: "MatchState", kick_number: int) -> "TickResult":
     # have already left the field. Stable skill order repeats only after a round.
     count = min(len(team.lineup), len(opponent.lineup))
     players = {p.id: p for p in team.snapshot.players}
-    from goaletto.domain.match_types import EXPERIENCE_ENGINE_VERSION
+    from goaletto.domain.match_types import (
+        BOUNDED_EXPERIENCE_ENGINE_VERSION,
+        PERCENT_EXPERIENCE_ENGINES,
+    )
+    from goaletto.domain.position_experience import bounded_experience_factor
 
     positions = {slot.player_id: slot.position for slot in team.lineup}
-    percentage = state.engine_version == EXPERIENCE_ENGINE_VERSION
+    percentage = state.engine_version in PERCENT_EXPERIENCE_ENGINES
 
     def penalty_skill(player: PlayerSnapshot, skill: str, position: str) -> int:
         value = getattr(player.skills, skill) * 10000
         if percentage:
-            value = value * dict(player.position_experience).get(position, 0) // 1_000_000
+            experience = dict(player.position_experience).get(position, 0)
+            factor = (
+                bounded_experience_factor(experience)
+                if state.engine_version == BOUNDED_EXPERIENCE_ENGINE_VERSION
+                else experience
+            )
+            value = value * factor // 1_000_000
         return int(value)
 
     order = sorted(

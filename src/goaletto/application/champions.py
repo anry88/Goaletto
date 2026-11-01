@@ -31,6 +31,7 @@ from goaletto.domain.knockout_match import KnockoutContext, decision
 from goaletto.domain.league_allocation import LeagueSnapshot
 from goaletto.domain.match_codec import restore_state, state_hash
 from goaletto.domain.match_types import (
+    BOUNDED_EXPERIENCE_ENGINE_VERSION,
     EXPERIENCE_ENGINE_VERSION,
     KNOCKOUT_ENGINE_VERSION,
     POSITION_ENGINE_VERSION,
@@ -492,7 +493,12 @@ async def record_champions_match_result(
     if (
         k is None
         or state.engine_version
-        not in {KNOCKOUT_ENGINE_VERSION, POSITION_ENGINE_VERSION, EXPERIENCE_ENGINE_VERSION}
+        not in {
+            KNOCKOUT_ENGINE_VERSION,
+            POSITION_ENGINE_VERSION,
+            EXPERIENCE_ENGINE_VERSION,
+            BOUNDED_EXPERIENCE_ENGINE_VERSION,
+        }
         or result is None
         or result.state_hash != state_hash(state)
     ):

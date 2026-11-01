@@ -159,7 +159,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
             roster=len(data.starters) + len(data.bench) + len(data.reserves),
         )
     )
-    lines.append(tr("🔶 — последний сезон. Опыт показывает эффективность на позиции. 🤕 — травма."))
+    lines.append(tr("🔶 — последний сезон. Опыт позиции даёт 80–100% силы. 🤕 — травма."))
     if notice:
         lines.append("")
         lines.append(escape(notice))
@@ -232,8 +232,8 @@ def formation_view(data: LineupData) -> str:
             tr("MC — центральный; ML/MR — левый/правый полузащитник."),
             tr("AMC — атакующий полузащитник; AML/AMR — левый/правый вингер; FC — нападающий."),
             tr(
-                "В каждой схеме нужен один GK. Эффективность на позиции равна "
-                "накопленному опыту от 0 до 100%."
+                "В каждой схеме нужен один GK. На позиции используются нужные ей навыки "
+                "с коэффициентом опыта 80–100%."
             ),
         )
     )

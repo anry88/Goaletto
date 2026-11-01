@@ -934,5 +934,7 @@
   "План заменён новым выбором тренировки.": "This plan was replaced by a new training selection.",
   " · опыт {value}%": " · XP {value}%",
   "🔶 — последний сезон. Опыт показывает эффективность на позиции. 🤕 — травма.": "🔶 — last season. Experience shows effectiveness in the position. 🤕 — injured.",
-  "В каждой схеме нужен один GK. Эффективность на позиции равна накопленному опыту от 0 до 100%.": "Every formation needs one GK. Effectiveness in a position equals its earned experience from 0 to 100%."
+  "В каждой схеме нужен один GK. Эффективность на позиции равна накопленному опыту от 0 до 100%.": "Every formation needs one GK. Effectiveness in a position equals its earned experience from 0 to 100%.",
+  "🔶 — последний сезон. Опыт позиции даёт 80–100% силы. 🤕 — травма.": "🔶 — last season. Position experience gives 80–100% effectiveness. 🤕 — injured.",
+  "В каждой схеме нужен один GK. На позиции используются нужные ей навыки с коэффициентом опыта 80–100%.": "Every formation needs one GK. Each position uses its relevant skills with an experience multiplier of 80–100%."
 }
