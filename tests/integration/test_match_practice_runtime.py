@@ -14,7 +14,7 @@ from goaletto.application.results import finalize_result
 from goaletto.bot.history_cards import report_view
 from goaletto.domain.match_codec import restore_state, state_document
 from goaletto.domain.match_development import POLICY as LEGACY_POLICY
-from goaletto.domain.match_practice import CURRENT_POLICY
+from goaletto.domain.match_practice import PERCENT_POLICY as CURRENT_POLICY
 from goaletto.infrastructure.models import (
     Fixture,
     FixturePlan,
@@ -80,7 +80,8 @@ async def test_concurrent_finalize_persists_practice_once_and_history_is_frozen(
                 player = await session.get(Player, condition.player_id)
                 row = rows.get(str(condition.player_id))
                 if not condition.minutes_played:
-                    assert row is None and player.form == before[player.person_id]
+                    assert row is not None and row["experience_gain"] == row["gain_bps"] == 0
+                    assert player.form == before[player.person_id]
                     continue
                 assert row["minutes"] == condition.minutes_played
                 assert row["form_before"] == 10 and row["form_after"] == player.form

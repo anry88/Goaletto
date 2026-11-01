@@ -533,6 +533,15 @@ class Player(Base):
         CheckConstraint(
             "valid_position_experience(position_experience)", name="ck_player_position_experience"
         ),
+        CheckConstraint(
+            "position_experience_policy IN ('position-experience-v1','position-experience-v2')",
+            name="ck_player_experience_policy",
+        ),
+        CheckConstraint(
+            "position_experience_policy <> 'position-experience-v2' OR "
+            "valid_percent_position_experience(position_experience)",
+            name="ck_player_experience_percent",
+        ),
         CheckConstraint("morale BETWEEN 0 AND 100", name="ck_player_morale"),
         CheckConstraint("status IN ('active', 'last_season', 'retired')", name="ck_player_status"),
         CheckConstraint(
@@ -567,6 +576,9 @@ class Player(Base):
     experience: Mapped[int] = mapped_column(Integer, default=0)
     position_experience: Mapped[dict[str, int]] = mapped_column(
         JSONB, default=dict, server_default="{}"
+    )
+    position_experience_policy: Mapped[str] = mapped_column(
+        String(32), server_default="position-experience-v2"
     )
     morale: Mapped[int] = mapped_column(SmallInteger)
     status: Mapped[str] = mapped_column(String(16), default="active")
@@ -1638,6 +1650,25 @@ class PlayerDevelopment(Base):
     policy_version: Mapped[str] = mapped_column(String(32))
 
 
+class PositionExperienceTransition(Base):
+    __tablename__ = "position_experience_transitions"
+    __table_args__ = (
+        CheckConstraint(
+            "policy_version='position-experience-v2'", name="ck_position_transition_policy"
+        ),
+        CheckConstraint(
+            "jsonb_typeof(before_values)='object' AND "
+            "valid_percent_position_experience(after_values)",
+            name="ck_position_transition_values",
+        ),
+    )
+    person_id: Mapped[UUID] = mapped_column(ForeignKey("players.person_id"), primary_key=True)
+    policy_version: Mapped[str] = mapped_column(String(32))
+    before_values: Mapped[dict[str, int]] = mapped_column(JSONB)
+    after_values: Mapped[dict[str, int]] = mapped_column(JSONB)
+    migrated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class AcademyCandidate(Base):
     """Durable, season-scoped academy shortlist; person rows appear only on signing."""
 
@@ -1714,7 +1745,8 @@ class TrainingPlan(Base):
             "focus <> 'set_pieces' OR executor_id IS NOT NULL", name="ck_training_executor"
         ),
         CheckConstraint(
-            "policy_version IN ('training-daily-v1','training-specialists-v2')",
+            "policy_version IN ('training-daily-v1','training-specialists-v2',"
+            "'training-specialists-v3')",
             name="ck_training_policy",
         ),
     )
@@ -2297,7 +2329,7 @@ class MatchDevelopment(Base):
     __table_args__ = (
         CheckConstraint(
             "policy_version IN ('match-development-v1','match-practice-v2',"
-            "'match-practice-v3','match-practice-v4')",
+            "'match-practice-v3','match-practice-v4','match-practice-v5')",
             name="ck_match_development_policy",
         ),
         CheckConstraint(

@@ -15,6 +15,8 @@ from goaletto.infrastructure.models import MatchDevelopment, Player, PlayerDevel
 
 
 def training_experience_gain(plan: TrainingPlan, row: dict[str, Any]) -> int | None:
+    if isinstance(row.get("legacy_experience_gain"), int):
+        return int(row["legacy_experience_gain"])
     if isinstance(row.get("experience_gain"), int):
         return int(row["experience_gain"])
     age = row.get("development_age")
@@ -90,7 +92,7 @@ async def add_legacy_experience(
                 gain = (
                     training_experience_gain(receipt, row)
                     if isinstance(receipt, TrainingPlan)
-                    else row.get("experience_gain")
+                    else row.get("legacy_experience_gain", row.get("experience_gain"))
                 )
                 if not isinstance(gain, int) or gain < 0:
                     unknown.add(pid)

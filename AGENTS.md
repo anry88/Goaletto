@@ -1,5 +1,15 @@
 # Working on Goaletto
 
+- User update 2026-11-01 (AND-198/200): new training-specialists-v3 develops
+  the selected skill across the healthy eligible squad; existing profile groups
+  retain full gain, other positions receive 10%, with age/caps/budgets preserved.
+  New regulation-v6 / match-practice-v5 use earned positional experience 0..100%,
+  with no free primary/alternative baseline or fixed 85%/60% effectiveness.
+  Declared positions gain full experience, others 10%. Every unplayed position
+  loses one tenth of normal full-match growth; older players lose less, including
+  unused reserves. Preserve frozen older matches/training and transition audit.
+  See docs/positional-experience-percent.md.
+
 - User clarification 2026-11-01 (AND-197): use one progress format for matches
   AND training, all developed skills, leadership and experience (by position
   when frozen). Show saved fractional progress /100 and actual event gain in %;

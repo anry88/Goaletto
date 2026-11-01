@@ -25,6 +25,7 @@ from goaletto.domain.nationalities import country_label
 from goaletto.presentation.club_status import club_label
 from goaletto.presentation.i18n import LabelMap, locale, tr
 from goaletto.presentation.person_names import person_name
+from goaletto.presentation.progress import position_percent
 
 MENU_CALLBACK = "vc:menu"
 CLUB_CALLBACK = "vc:c"
@@ -237,8 +238,9 @@ def squad_view(page: SquadPage) -> tuple[str, InlineKeyboardMarkup]:
         if member.slot_position is not None:
             position = member.slot_position
             if position != member.position:
-                match = "↔85%" if position in member.alternatives else "⚠️60%"
-                position += f" ← {member.position} {match}"
+                position += f" ← {member.position}"
+            value = dict(member.position_experience).get(member.slot_position, 0)
+            position += tr(" · опыт {value}%", value=position_percent(value))
         lines.append(
             _member_line(
                 offset,
@@ -341,7 +343,8 @@ def player_view(
         )
     )
     experience = " · ".join(
-        f"{position} {value / 10000:.2f}" for position, value in card.position_experience if value
+        f"{position} {position_percent(dict(card.position_experience).get(position, 0))}%"
+        for position in ("GK", "DC", "DL", "DR", "DM", "MC", "ML", "MR", "AMC", "AML", "AMR", "FC")
     )
     lines.append(tr("Опыт: {positions}", positions=experience or "—"))
     if card.status != "retired":

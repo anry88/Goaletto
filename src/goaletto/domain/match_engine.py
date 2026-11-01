@@ -13,9 +13,11 @@ from goaletto.domain.match_ratings import SectorRatings, effective_skill, sector
 from goaletto.domain.match_types import (
     COACH_ENGINE_VERSION,
     ENGINE_VERSION,
+    EXPERIENCE_ENGINE_VERSION,
     KNOCKOUT_ENGINE_VERSION,
     LIVE_ENGINE_VERSION,
     POSITION_ENGINE_VERSION,
+    POSITIONAL_ENGINES,
     POSITIONS,
     EnginePolicy,
     FieldSlot,
@@ -42,6 +44,7 @@ def validate_state(state: MatchState) -> None:
         COACH_ENGINE_VERSION,
         KNOCKOUT_ENGINE_VERSION,
         POSITION_ENGINE_VERSION,
+        EXPERIENCE_ENGINE_VERSION,
     }:
         raise ValueError("Unsupported engine version; never replay with another implementation")
     expected_policy = "match-policy-" + state.engine_version.removeprefix("regulation-")
@@ -59,7 +62,8 @@ def validate_state(state: MatchState) -> None:
         state.engine_version == KNOCKOUT_ENGINE_VERSION
         and not knockout
         or knockout
-        and state.engine_version not in {KNOCKOUT_ENGINE_VERSION, POSITION_ENGINE_VERSION}
+        and state.engine_version
+        not in {KNOCKOUT_ENGINE_VERSION, POSITION_ENGINE_VERSION, EXPERIENCE_ENGINE_VERSION}
     ):
         raise ValueError("Knockout context and engine disagree")
     if type(state.tick) is not int or not 0 <= state.tick <= maximum:
@@ -146,11 +150,17 @@ def validate_state(state: MatchState) -> None:
     ):
         raise ValueError("Support morale must match the pinned crowd and policy")
     for team in (state.home, state.away):
+        if state.engine_version == EXPERIENCE_ENGINE_VERSION:
+            from goaletto.domain.position_experience import validate_percent_experience
+
+            for player in team.snapshot.players:
+                validate_percent_experience(dict(player.position_experience))
         coach = team.snapshot.coach
         modern = state.engine_version in {
             COACH_ENGINE_VERSION,
             KNOCKOUT_ENGINE_VERSION,
             POSITION_ENGINE_VERSION,
+            EXPERIENCE_ENGINE_VERSION,
         }
         if modern != (coach is not None):
             raise ValueError("Coaching snapshot and engine disagree")
@@ -181,7 +191,7 @@ def validate_state(state: MatchState) -> None:
         ):
             raise ValueError("Legacy engine has no individual instructions")
         conditions = {p.player_id: p for p in team.conditions}
-        if state.engine_version == POSITION_ENGINE_VERSION and (
+        if state.engine_version in POSITIONAL_ENGINES and (
             sum(c.goals for c in team.conditions) != team.stats.goals
             or sum(c.saves for c in team.conditions) != team.stats.saves
             or sum(c.assists for c in team.conditions) > team.stats.goals
@@ -219,7 +229,7 @@ def validate_state(state: MatchState) -> None:
                 for value in (condition.goals, condition.assists, condition.saves)
             ):
                 raise ValueError("Invalid player performance")
-            if state.engine_version == POSITION_ENGINE_VERSION:
+            if state.engine_version in POSITIONAL_ENGINES:
                 if (
                     len(positions) != len(condition.position_minutes)
                     or any(
@@ -528,7 +538,7 @@ def advance_tick(
         return team
 
     def performance(team: TeamState, player_id: UUID, key: str) -> TeamState:
-        if state.engine_version != POSITION_ENGINE_VERSION:
+        if state.engine_version not in POSITIONAL_ENGINES:
             return team
         return replace(
             team,
@@ -578,7 +588,8 @@ def advance_tick(
                     s.position,
                     "set_pieces" if set_piece else "attacking",
                     attacking.support_morale_points,
-                    positional=state.engine_version == POSITION_ENGINE_VERSION,
+                    positional=state.engine_version in POSITIONAL_ENGINES,
+                    percentage=state.engine_version == EXPERIENCE_ENGINE_VERSION,
                 ),
             )
             for s in candidates
@@ -603,11 +614,12 @@ def advance_tick(
                 shooter.position,
                 "set_pieces",
                 attacking.support_morale_points,
-                positional=state.engine_version == POSITION_ENGINE_VERSION,
+                positional=state.engine_version in POSITIONAL_ENGINES,
+                percentage=state.engine_version == EXPERIENCE_ENGINE_VERSION,
             )
             attack = (attack + taker_rating * 2) // 2
         assister = None
-        if state.engine_version == POSITION_ENGINE_VERSION and rng.randrange(10000) < 7500:
+        if state.engine_version in POSITIONAL_ENGINES and rng.randrange(10000) < 7500:
             creators = [slot for slot in candidates if slot.player_id != shooter.player_id]
             weights = [
                 max(
@@ -619,6 +631,7 @@ def advance_tick(
                         "set_pieces" if set_piece else "playmaking",
                         attacking.support_morale_points,
                         positional=True,
+                        percentage=state.engine_version == EXPERIENCE_ENGINE_VERSION,
                     ),
                 )
                 for slot in creators
@@ -729,7 +742,7 @@ def advance_tick(
             for c in team.conditions:
                 if c.player_id in active:
                     positional_minutes = dict(c.position_minutes)
-                    if state.engine_version == POSITION_ENGINE_VERSION:
+                    if state.engine_version in POSITIONAL_ENGINES:
                         position = active[c.player_id]
                         positional_minutes[position] = positional_minutes.get(position, 0) + 1
                     loss = max(10, 50 - 2 * players[c.player_id].skills.stamina)

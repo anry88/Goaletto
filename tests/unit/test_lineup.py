@@ -706,4 +706,5 @@ def test_all_formation_descriptions_match_real_slots_and_fit_telegram():
             assert " · ".join(p for p in slots if p in {"DL", "DC", "DR"}) in segment
             if formation in {"4-3-3", "3-5-2"}:
                 assert "DM" in segment
-        assert "85%" in text and "60%" in text and "AMC" in text and "AMR" in text
+        assert "85%" not in text and "60%" not in text and "AMC" in text and "AMR" in text
+        assert "100%" in text

@@ -31,8 +31,8 @@ async def test_old_team_and_physical_reports_remove_later_growth_without_writing
         expected_extras[plan.id] = {
             row["person_id"]: (
                 row["leadership_progress"]["after"],
-                next(iter(row["position_experience"].values()))["after"],
-                row["experience_gain"],
+                next(iter(row["position_experience"].values()))["after"] // 100,
+                row["legacy_experience_gain"],
             )
             for row in plan.results
         }
@@ -46,6 +46,8 @@ async def test_old_team_and_physical_reports_remove_later_growth_without_writing
                     "skill_progress",
                     "position_experience",
                     "experience_gain",
+                    "legacy_experience_gain",
+                    "experience_policy",
                     "leadership_progress",
                 )
             }

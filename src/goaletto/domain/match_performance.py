@@ -3,11 +3,11 @@
 from uuid import UUID
 
 from goaletto.domain.clock import MatchPhase
-from goaletto.domain.match_types import POSITION_ENGINE_VERSION, MatchState
+from goaletto.domain.match_types import POSITIONAL_ENGINES, MatchState
 
 
 def player_of_match(state: MatchState) -> UUID | None:
-    if state.engine_version != POSITION_ENGINE_VERSION or state.phase != MatchPhase.FULL_TIME:
+    if state.engine_version not in POSITIONAL_ENGINES or state.phase != MatchPhase.FULL_TIME:
         return None
     candidates: list[tuple[int, int, int, int, int, UUID]] = []
     for team, opponent in ((state.home, state.away), (state.away, state.home)):

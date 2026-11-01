@@ -20,15 +20,22 @@ from goaletto.domain.match_practice import (
     DEFAULT_FRIENDLY_EXPERIENCE_FACTOR,
     DEFAULT_FRIENDLY_SKILL_FACTOR,
     LEGACY_FRIENDLY_FACTOR,
+    PERCENT_POLICY,
     V2_POLICY,
     V3_POLICY,
     MatchPracticeResult,
     develop_match_practice,
+    develop_percent_practice,
     develop_position_practice,
 )
-from goaletto.domain.match_types import POSITION_ENGINE_VERSION, MatchState
+from goaletto.domain.match_types import (
+    EXPERIENCE_ENGINE_VERSION,
+    POSITION_ENGINE_VERSION,
+    POSITIONAL_ENGINES,
+    MatchState,
+)
 from goaletto.domain.player_form import MatchPerformance
-from goaletto.domain.position_experience import credit_experience
+from goaletto.domain.position_experience import credit_experience, percent_practice
 from goaletto.domain.training import (
     POLICY_VERSION,
     PROGRESS_KEYS,
@@ -93,16 +100,46 @@ async def pin_development(
         from goaletto.application.friendly import authenticate_fixture
 
         await authenticate_fixture(session, fixture)
+    experience_roster = {}
+    if eligible and state.engine_version == EXPERIENCE_ENGINE_VERSION:
+        club_ids = (state.home.snapshot.club_id, state.away.snapshot.club_id)
+        for player, person in (
+            await session.execute(
+                select(Player, Person)
+                .join(Person, Person.id == Player.person_id)
+                .where(Player.club_id.in_(club_ids), Player.status.in_(("active", "last_season")))
+                .order_by(Player.person_id)
+                .with_for_update()
+            )
+        ).all():
+            experience_roster[str(player.person_id)] = {
+                "club_id": str(player.club_id),
+                "age": person.age,
+                "profiles": [player.position, *(player.alternative_positions or [])],
+                "experience": dict(player.position_experience),
+                "name": person.name,
+                "form": player.form,
+            }
     session.add(
         MatchDevelopment(
             match_id=state.match_id,
-            policy_version=CURRENT_POLICY
+            policy_version=PERCENT_POLICY
+            if state.engine_version == EXPERIENCE_ENGINE_VERSION
+            else CURRENT_POLICY
             if state.engine_version == POSITION_ENGINE_VERSION
             else V3_POLICY,
             eligible=eligible,
             staff_snapshot=staff,
             terms_snapshot={
                 "injury_policy": INJURY_POLICY,
+                **(
+                    {
+                        "experience_roster": experience_roster,
+                        "experience_policy": "position-experience-v2",
+                    }
+                    if state.engine_version == EXPERIENCE_ENGINE_VERSION
+                    else {}
+                ),
                 **({"injury_days": INJURY_DAYS} if INJURY_POLICY == LEGACY_INJURY_POLICY else {}),
                 "competition": plan.competition if plan else "league",
                 "fixture_id": str(fixture.id),
@@ -110,10 +147,10 @@ async def pin_development(
                 "plan_revision": plan.revision if plan else None,
                 "match_seed": f"{state.match_id}:{state.seed}",
                 "friendly_skill_factor": DEFAULT_FRIENDLY_SKILL_FACTOR
-                if state.engine_version == POSITION_ENGINE_VERSION
+                if state.engine_version in POSITIONAL_ENGINES
                 else LEGACY_FRIENDLY_FACTOR,
                 "friendly_experience_factor": DEFAULT_FRIENDLY_EXPERIENCE_FACTOR
-                if state.engine_version == POSITION_ENGINE_VERSION
+                if state.engine_version in POSITIONAL_ENGINES
                 else LEGACY_FRIENDLY_FACTOR,
                 "players": {
                     str(p.id): {
@@ -146,9 +183,9 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
     )
     if receipt is None or receipt.applied_at is not None:
         return  # Old matches without a pinned policy never receive retroactive rewards.
-    if receipt.policy_version not in (POLICY, V2_POLICY, V3_POLICY, CURRENT_POLICY):
+    if receipt.policy_version not in (POLICY, V2_POLICY, V3_POLICY, CURRENT_POLICY, PERCENT_POLICY):
         raise ValueError("Unknown match development policy")
-    practice = receipt.policy_version in (V2_POLICY, V3_POLICY, CURRENT_POLICY)
+    practice = receipt.policy_version in (V2_POLICY, V3_POLICY, CURRENT_POLICY, PERCENT_POLICY)
     results = []
     best_player = player_of_match(state)
     if receipt.eligible:
@@ -178,7 +215,7 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                 }:
                     raise ValueError("Practice participant changed after lineup lock")
                 minutes = conditions[snapshot.id].minutes_played
-                if not minutes:
+                if not minutes and receipt.policy_version != PERCENT_POLICY:
                     continue
                 player = await session.scalar(
                     select(Player)
@@ -223,17 +260,24 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                     dev.progress,
                     player.form,
                     player.experience,
+                    profile_positions=(player.position, *(player.alternative_positions or ())),
+                    position_experience=old_experience,
                 )
                 budget = growth_budget(dev, person.age)
                 trained: AppearanceGrowth | MatchPracticeResult
                 if practice:
-                    if receipt.policy_version == CURRENT_POLICY:
-                        if state.engine_version != POSITION_ENGINE_VERSION:
+                    if receipt.policy_version in (CURRENT_POLICY, PERCENT_POLICY):
+                        if state.engine_version not in POSITIONAL_ENGINES:
                             raise ValueError("Positional development needs a V5 match")
                         exposure = dict(conditions[snapshot.id].position_minutes)
                         if sum(exposure.values()) != minutes:
                             raise ValueError("Positional minutes do not reconcile")
-                        practiced = develop_position_practice(
+                        calculator = (
+                            develop_percent_practice
+                            if receipt.policy_version == PERCENT_POLICY
+                            else develop_position_practice
+                        )
+                        practiced = calculator(
                             participant,
                             receipt.terms_snapshot["competition"],
                             exposure,
@@ -280,13 +324,24 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                 player.experience = trained.experience
                 experience_grants = (
                     practiced.experience_by_position
-                    if receipt.policy_version == CURRENT_POLICY
+                    if receipt.policy_version in (CURRENT_POLICY, PERCENT_POLICY)
                     else {snapshot.position: trained.experience_gain}
                 )
-                player.position_experience = credit_experience(old_experience, experience_grants)
+                player.position_experience = (
+                    practiced.position_experience_after
+                    if receipt.policy_version == PERCENT_POLICY
+                    else {
+                        key: min(1_000_000, value)
+                        for key, value in credit_experience(
+                            old_experience,
+                            {key: gain * 100 for key, gain in experience_grants.items()},
+                        ).items()
+                    }
+                )
                 from goaletto.application.forms import form_activity
 
-                form_activity(player, activity_at)
+                if minutes:
+                    form_activity(player, activity_at)
                 dev.progress = growth.progress
                 save_budget(dev, growth.budget)
                 results.append(
@@ -301,6 +356,9 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                         "experience_before": before_experience,
                         "experience_after": player.experience,
                         "experience_gain": trained.experience_gain,
+                        "legacy_experience_gain": practiced.legacy_experience_gain
+                        if receipt.policy_version == PERCENT_POLICY
+                        else trained.experience_gain,
                         "season_gains": dict(growth.budget.used),
                         "changes": {
                             k: {"before": values[k], "after": growth.skills[k]}
@@ -320,8 +378,9 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                         skill_factor=practiced.terms.skill_factor,
                         experience_factor=practiced.terms.experience_factor,
                     )
-                if receipt.policy_version == CURRENT_POLICY:
+                if receipt.policy_version in (CURRENT_POLICY, PERCENT_POLICY):
                     results[-1].update(
+                        experience_policy="position-experience-v2",
                         goals=conditions[snapshot.id].goals,
                         assists=conditions[snapshot.id].assists,
                         saves=conditions[snapshot.id].saves,
@@ -350,4 +409,104 @@ async def apply_development(session: AsyncSession, state: MatchState, at: dateti
                         )
                         > sum(growth.granted.values()),
                     )
+                if receipt.policy_version == PERCENT_POLICY:
+                    frozen = receipt.terms_snapshot["experience_roster"].get(str(person.id))
+                    expected_roster = {
+                        "club_id": str(player.club_id),
+                        "age": person.age,
+                        "profiles": [player.position, *(player.alternative_positions or [])],
+                        "experience": old_experience,
+                        "name": person.name,
+                    }
+                    if not frozen or any(
+                        frozen.get(key) != value for key, value in expected_roster.items()
+                    ):
+                        raise ValueError("Positional experience roster changed during match")
+                    results[-1]["experience_policy"] = "position-experience-v2"
+                    results[-1]["position_experience"] = {
+                        position: {
+                            "before": old_experience.get(position, 0),
+                            "after": player.position_experience.get(position, 0),
+                            "gain": experience_grants.get(position, 0),
+                            "loss": practiced.experience_losses.get(position, 0),
+                        }
+                        for position in (old_experience.keys() | player.position_experience.keys())
+                    }
+    if receipt.eligible and receipt.policy_version == PERCENT_POLICY:
+        processed = {row["person_id"] for row in results}
+        factor = (
+            receipt.terms_snapshot["friendly_experience_factor"]
+            if receipt.terms_snapshot["competition"] == "friendly"
+            else 10000
+        )
+        for person_id, frozen in sorted(receipt.terms_snapshot["experience_roster"].items()):
+            if person_id in processed:
+                continue
+            player = await session.scalar(
+                select(Player)
+                .where(Player.person_id == person_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            person = await session.get(Person, person_id)
+            if (
+                player is None
+                or person is None
+                or str(player.club_id) != frozen["club_id"]
+                or person.age != frozen["age"]
+                or person.career != "player"
+                or player.status not in ("active", "last_season")
+            ):
+                results.append(
+                    {
+                        "person_id": person_id,
+                        "club_id": frozen["club_id"],
+                        "minutes": 0,
+                        "experience_skipped": "roster_changed",
+                        "age": frozen["age"],
+                        "skill_progress": {},
+                        "position_experience": {},
+                    }
+                )
+                continue
+            before = dict(player.position_experience)
+            if before != frozen["experience"]:
+                raise ValueError("Unselected player experience changed during match")
+            after, _, losses = percent_practice(
+                before,
+                {},
+                tuple(frozen["profiles"]),
+                age=frozen["age"],
+                decay=True,
+                experience_factor=factor,
+            )
+            player.position_experience = after
+            results.append(
+                {
+                    "person_id": person_id,
+                    "club_id": frozen["club_id"],
+                    "minutes": 0,
+                    "position": frozen["profiles"][0],
+                    "age": frozen["age"],
+                    "name": frozen["name"],
+                    "form": frozen["form"],
+                    "gain_bps": 0,
+                    "granted": {},
+                    "changes": {},
+                    "skill_progress": {},
+                    "experience_before": player.experience,
+                    "experience_after": player.experience,
+                    "experience_gain": 0,
+                    "experience_policy": "position-experience-v2",
+                    "position_experience": {
+                        position: {
+                            "before": before[position],
+                            "after": after[position],
+                            "gain": 0,
+                            "loss": loss,
+                        }
+                        for position, loss in losses.items()
+                    },
+                }
+            )
     receipt.results, receipt.applied_at = results, at

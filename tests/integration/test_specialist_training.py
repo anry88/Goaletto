@@ -161,22 +161,11 @@ async def test_every_specialist_focus_targets_the_declared_group(sessions, focus
         assert plan.staff_snapshot["roles"][SPECIALISTS[focus]]["person_id"] == str(person_id)
         await apply_training(session, await training_job(session, plan), plan.due_at)
         assert plan.status == "applied" and plan.results
-        if focus == Focus.SET_PIECES:
-            assert len(plan.results) == 1 and plan.results[0]["person_id"] == str(executor)
-        from goaletto.domain.training import POSITIONS
-
         ids = [r["person_id"] for r in plan.results]
         players = (await session.scalars(select(Player).where(Player.club_id == club))).all()
         for player in players:
             trained = str(player.person_id) in ids
-            assert trained == (
-                focus == Focus.PHYSICAL
-                or (
-                    player.person_id == executor
-                    if focus == Focus.SET_PIECES
-                    else player.position in POSITIONS[focus]
-                )
-            )
+            assert trained
             dev = await session.get(PlayerDevelopment, player.person_id)
             if trained:
                 assert 0 <= dev.season_gains["training"] < 600

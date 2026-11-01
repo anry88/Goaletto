@@ -191,7 +191,7 @@ async def test_daily_training_uses_free_date_and_does_not_apply_weekly_growth(se
             intensity=Intensity.MEDIUM,
             clock=lambda: AT,
         )
-        assert plan.policy_version == "training-specialists-v2"
+        assert plan.policy_version == "training-specialists-v3"
         job = await session.scalar(
             select(Job).where(
                 Job.kind == "training.apply", Job.payload["plan_id"].astext == str(plan.id)

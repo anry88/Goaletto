@@ -68,6 +68,7 @@ class SquadMember:
     slot_position: str | None = None
     alternatives: tuple[str, ...] = ()
     energy_bps: int = 10000
+    position_experience: tuple[tuple[str, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -247,6 +248,7 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
                 slot=slots.get(row.person_id),
                 slot_position=slot_positions.get(row.person_id),
                 alternatives=tuple(row.alternative_positions or ()),
+                position_experience=tuple((row.position_experience or {}).items()),
                 energy_bps=energy.bps,
             )
         )
@@ -359,11 +361,7 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
         loyalty=player.loyalty,
         form=player.form,
         experience=player.experience,
-        position_experience=tuple(
-            sorted(
-                (player.position_experience or {player.position: player.experience * 10000}).items()
-            )
-        ),
+        position_experience=tuple(sorted((player.position_experience or {}).items())),
         morale=player.morale,
         status=player.status,
         injured=player.injured_until is not None and player.injured_until > actor.at,

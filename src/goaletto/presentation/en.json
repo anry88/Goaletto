@@ -924,5 +924,15 @@
   "✅ Тренировка проведена": "✅ Training completed",
   "✅ Матч завершён": "✅ Match finished",
   "Опыт": "Experience",
-  "Опыт {position}": "Experience {position}"
+  "Опыт {position}": "Experience {position}",
+  "вся команда · вратарское мастерство; основной эффект у GK": "whole squad · goalkeeping; main effect for GK",
+  "вся команда · защита; основной эффект у DC, DL, DR, DM": "whole squad · defending; main effect for DC, DL, DR, DM",
+  "вся команда · плеймейкинг; основной эффект у DM, MC, AMC": "whole squad · playmaking; main effect for DM, MC, AMC",
+  "вся команда · фланговая игра; основной эффект у фланговых позиций": "whole squad · wing play; main effect for wide positions",
+  "вся команда · атака; основной эффект у FC, AMC, AML, AMR": "whole squad · attacking; main effect for FC, AMC, AML, AMR",
+  "вся команда · стандарты; основной эффект у выбранного исполнителя": "whole squad · set pieces; main effect for the selected taker",
+  "План заменён новым выбором тренировки.": "This plan was replaced by a new training selection.",
+  " · опыт {value}%": " · XP {value}%",
+  "🔶 — последний сезон. Опыт показывает эффективность на позиции. 🤕 — травма.": "🔶 — last season. Experience shows effectiveness in the position. 🤕 — injured.",
+  "В каждой схеме нужен один GK. Эффективность на позиции равна накопленному опыту от 0 до 100%.": "Every formation needs one GK. Effectiveness in a position equals its earned experience from 0 to 100%."
 }

@@ -36,7 +36,7 @@ from goaletto.bot.result_views import table_view
 from goaletto.domain.names import latin_name
 from goaletto.domain.nationalities import flag_name, legacy_nationality
 from goaletto.presentation.i18n import tr
-from goaletto.presentation.progress import experience_line, progress_line
+from goaletto.presentation.progress import experience_line, position_percent_line, progress_line
 
 OUTCOME_MARKERS = {"win": "✅", "draw": "➖", "loss": "❌"}
 
@@ -261,7 +261,17 @@ def _player_progress(member: ReportLineupPlayer) -> str:
             lines.append(progress_line(tr(dict(SKILL_LABELS)[key]), fraction, gain, before, after))
     if member.position_experience:
         for position, before, after in member.position_experience:
-            if after > before:
+            if member.experience_percent:
+                played = dict(member.position_minutes).get(position, 0)
+                if after != before or played:
+                    lines.append(
+                        position_percent_line(
+                            tr("Опыт {position}", position=position),
+                            before,
+                            after,
+                        )
+                    )
+            elif after > before:
                 lines.append(
                     experience_line(
                         tr("Опыт {position}", position=position),

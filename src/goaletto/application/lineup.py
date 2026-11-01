@@ -70,6 +70,7 @@ class SquadMember:
     suspended: bool = False
     tournament_yellows: int = 0
     form: int = 6
+    position_experience: tuple[tuple[str, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -316,6 +317,7 @@ async def _assemble(
             energies[player.person_id],
             person.country_code,
             form=player.form,
+            position_experience=tuple((player.position_experience or {}).items()),
             suspended=player.person_id in suspended,
             tournament_yellows=accounts[player.person_id].yellows
             if player.person_id in accounts
@@ -338,6 +340,7 @@ async def _assemble(
             energies[p.person_id],
             persons[p.person_id].country_code,
             form=p.form,
+            position_experience=tuple((p.position_experience or {}).items()),
             suspended=p.person_id in suspended,
             tournament_yellows=accounts[p.person_id].yellows if p.person_id in accounts else 0,
         )

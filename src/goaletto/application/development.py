@@ -1,11 +1,17 @@
 """Persist a shared growth budget; a transfer or new owner never resets it."""
 
 from goaletto.domain.development import GROWTH_POLICY, GrowthBudget
-from goaletto.domain.position_experience import validate_experience
+from goaletto.domain.position_experience import (
+    PERCENT_POLICY,
+    validate_experience,
+    validate_percent_experience,
+)
 from goaletto.infrastructure.models import Player, PlayerDevelopment
 
 
 def position_experience(player: Player, development: PlayerDevelopment) -> dict[str, int]:
+    if player.position_experience_policy == PERCENT_POLICY:
+        return validate_percent_experience(player.position_experience or {})
     if player.position_experience:
         return validate_experience(player.position_experience)
     # Preserve a fresh/legacy person's prior general points and fractions once.

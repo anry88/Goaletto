@@ -90,3 +90,53 @@ def test_identical_skill_experience_and_leadership_units_across_reports(language
                 if "FC:" not in line:
                     assert line in trained
         assert "10 → 10" not in trained
+
+
+@pytest.mark.parametrize("language", ["ru", "en"])
+def test_percent_position_experience_shows_small_gains_and_inactivity_losses(language):
+    with using_locale(language):
+        member = ReportLineupPlayer(
+            uuid4(),
+            "Player",
+            32,
+            6,
+            "MC",
+            True,
+            90,
+            0,
+            0,
+            False,
+            False,
+            growth_bps=0,
+            position_minutes=(("MC", 90),),
+            position_experience=(("MC", 0, 30), ("FC", 500000, 497000)),
+            experience_percent=True,
+        )
+        body = _player_progress(member)
+        expected = (
+            "Опыт MC: 0,003% (+0,003%)" if language == "ru" else "Experience MC: 0.003% (+0.003%)"
+        )
+        loss = "Опыт FC: 49,7% (-0,3%)" if language == "ru" else "Experience FC: 49.7% (-0.3%)"
+        assert expected in body and loss in body
+        row = {
+            "name": "Player",
+            "position": "MC",
+            "changes": {},
+            "skill_progress": {},
+            "form_before": 6,
+            "form_after": 6,
+            "experience_before": 0,
+            "experience_after": 0,
+            "experience_policy": "position-experience-v2",
+            "position_experience": {"MC": {"before": 0, "after": 30}},
+            "injured": False,
+        }
+        plan = TrainingPlan(
+            id=uuid4(),
+            week_start=datetime(2026, 11, 1, tzinfo=UTC),
+            focus="team",
+            intensity="medium",
+            results=[row],
+        )
+        trained, _ = training_report(plan, "Club")
+        assert expected in trained

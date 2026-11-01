@@ -7,6 +7,7 @@ import pytest
 from goaletto.application.training import TrainingMember, TrainingScreen, week_start
 from goaletto.bot.training_views import choice_callback, parse_choice, training_view
 from goaletto.domain.training import (
+    LEGACY_SESSION_POLICY,
     PROGRESS_KEYS,
     SKILLS,
     Focus,
@@ -66,13 +67,19 @@ def test_age_anchors_coaches_and_fractional_physical_gain():
 
 def test_eligible_positions_executor_and_injury_skip():
     p = player(position="GK")
+    assert train_player(p, Focus.ATTACKING, Intensity.MEDIUM, seed="week", trainer_skill=10).trained
     assert not train_player(
-        p, Focus.ATTACKING, Intensity.MEDIUM, seed="week", trainer_skill=10
+        p,
+        Focus.ATTACKING,
+        Intensity.MEDIUM,
+        seed="week",
+        trainer_skill=10,
+        policy=LEGACY_SESSION_POLICY,
     ).trained
     assert train_player(
         p, Focus.GOALKEEPING, Intensity.MEDIUM, seed="week", trainer_skill=10
     ).trained
-    assert not train_player(
+    assert train_player(
         p, Focus.SET_PIECES, Intensity.MEDIUM, seed="week", trainer_skill=10, executor_id=uuid4()
     ).trained
     assert train_player(

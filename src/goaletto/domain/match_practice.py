@@ -260,6 +260,9 @@ class MatchPracticeResult:
     form_down_chance: int = 0
     position_terms: tuple[dict[str, str | int], ...] = ()
     experience_by_position: dict[str, int] = field(default_factory=dict)
+    position_experience_after: dict[str, int] = field(default_factory=dict)
+    experience_losses: dict[str, int] = field(default_factory=dict)
+    legacy_experience_gain: int = 0
 
 
 def develop_match_practice(
@@ -501,4 +504,54 @@ def develop_position_practice(
         form_down_chance=form.down_chance,
         position_terms=tuple(terms),
         experience_by_position=experience,
+    )
+
+
+PERCENT_POLICY = "match-practice-v5"
+
+
+def develop_percent_practice(
+    player: TrainingPlayer,
+    competition: Competition | str,
+    position_minutes: dict[str, int],
+    staff: dict[str, int],
+    budget: GrowthBudget,
+    *,
+    match_seed: str,
+    friendly_skill_factor: int = DEFAULT_FRIENDLY_SKILL_FACTOR,
+    friendly_experience_factor: int = DEFAULT_FRIENDLY_EXPERIENCE_FACTOR,
+    performance: MatchPerformance | None = None,
+) -> MatchPracticeResult:
+    from dataclasses import replace
+
+    from goaletto.domain.position_experience import percent_practice
+
+    practiced = develop_position_practice(
+        player,
+        competition,
+        position_minutes,
+        staff,
+        budget,
+        match_seed=match_seed,
+        friendly_skill_factor=friendly_skill_factor,
+        friendly_experience_factor=friendly_experience_factor,
+        performance=performance,
+    )
+    values, grants, losses = percent_practice(
+        player.position_experience,
+        practiced.experience_by_position,
+        player.profile_positions or (player.position,),
+        age=player.age,
+        decay=True,
+        experience_factor=practiced.terms.experience_factor,
+    )
+    gained = sum(grants.values())
+    return replace(
+        practiced,
+        experience_gain=gained,
+        legacy_experience_gain=practiced.experience_gain,
+        experience_by_position=grants,
+        position_experience_after=values,
+        experience_losses=losses,
+        terms=replace(practiced.terms, policy=PERCENT_POLICY),
     )

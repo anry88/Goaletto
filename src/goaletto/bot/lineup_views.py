@@ -18,6 +18,7 @@ from goaletto.domain.match_types import Mentality, Tactic
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
 from goaletto.presentation.person_names import person_name
+from goaletto.presentation.progress import position_percent
 
 TACTIC_LABELS = LabelMap(
     {
@@ -64,8 +65,9 @@ def _badges(person_id: UUID, slot: str, data: LineupData) -> str:
         marks += " ⛔"
     if member is not None and member.tournament_yellows:
         marks += " 🟨1/2"
-    if member is not None and slot != member.position:
-        marks += " ↔85%" if slot in member.alternatives else " ⚠️60%"
+    if member is not None:
+        value = dict(member.position_experience).get(slot, 0)
+        marks += tr(" · опыт {value}%", value=position_percent(value))
     return marks
 
 
@@ -157,9 +159,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
             roster=len(data.starters) + len(data.bench) + len(data.reserves),
         )
     )
-    lines.append(
-        tr("🔶 — последний сезон. ↔85% — дополнительная позиция. ⚠️60% — чужая. 🤕 — травма.")
-    )
+    lines.append(tr("🔶 — последний сезон. Опыт показывает эффективность на позиции. 🤕 — травма."))
     if notice:
         lines.append("")
         lines.append(escape(notice))
@@ -232,8 +232,8 @@ def formation_view(data: LineupData) -> str:
             tr("MC — центральный; ML/MR — левый/правый полузащитник."),
             tr("AMC — атакующий полузащитник; AML/AMR — левый/правый вингер; FC — нападающий."),
             tr(
-                "В каждой схеме нужен один GK. Дополнительная позиция даёт 85% навыков, "
-                "незнакомая полевая — 60%."
+                "В каждой схеме нужен один GK. Эффективность на позиции равна "
+                "накопленному опыту от 0 до 100%."
             ),
         )
     )

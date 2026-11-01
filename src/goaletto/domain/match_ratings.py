@@ -40,19 +40,22 @@ def effective_skill(
     support_morale_points: int = 0,
     *,
     positional: bool = False,
+    percentage: bool = False,
 ) -> int:
     value: int = getattr(player.skills, skill)
     morale_factor = 7500 + min(100, player.morale + support_morale_points) * 50
-    bonus = experience_bonus(dict(player.position_experience).get(position, 0)) if positional else 0
+    experience = dict(player.position_experience).get(position, 0)
+    bonus = experience_bonus(experience) if positional and not percentage else 0
+    factor = min(1_000_000, experience) if percentage else position_factor(player, position)
     return (
         value
         * 1000
         * player.form
         * condition.energy_bps
-        * position_factor(player, position)
+        * factor
         * morale_factor
         * (10000 + bonus)
-        // (8 * 10000 * 10000 * 10000 * 10000)
+        // (8 * 10000 * 10000 * 10000 * 10000 * (100 if percentage else 1))
     )
 
 
@@ -79,7 +82,8 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
                 assigned_position,
                 name,
                 team.support_morale_points,
-                positional=policy.version == "match-policy-v5",
+                positional=policy.version in {"match-policy-v5", "match-policy-v6"},
+                percentage=policy.version == "match-policy-v6",
             )
 
         position = slot.position
@@ -95,7 +99,11 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
         if position in {"MR", "AMR"}:
             right += (skill("winger") * 7 + skill("pace") * 3) // 10
             center += skill("winger") // 10
-        experience = 0 if policy.version == "match-policy-v5" else min(p.experience, 100) * 10
+        experience = (
+            0
+            if policy.version in {"match-policy-v5", "match-policy-v6"}
+            else min(p.experience, 100) * 10
+        )
         if position == "DC":
             dc += skill("defending") + experience
             dl += skill("defending") // 5

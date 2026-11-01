@@ -372,10 +372,17 @@ async def test_real_et_penalties_restart_recovery_growth_and_rollback(sessions, 
         assert max(r["minutes"] for r in receipt.results) == 120
         from goaletto.domain.training import age_multiplier
 
-        assert all(
-            r["experience_gain"] == 1000 * age_multiplier(r["age"]) * r["minutes"] // (10000 * 90)
-            for r in receipt.results
-        )
+        assert receipt.policy_version == "match-practice-v5"
+        for row in receipt.results:
+            profiles = receipt.terms_snapshot["experience_roster"][row["person_id"]]["profiles"]
+            expected = 0
+            for term in row["position_terms"]:
+                position = term["position"]
+                nominal = 1000 * age_multiplier(row["age"]) * term["minutes"] // (10000 * 90)
+                gain = nominal * 100 // (1 if position in profiles else 10)
+                previous = row["position_experience"][position]["before"]
+                expected += min(gain, 1000000 - previous)
+            assert row["experience_gain"] == expected
         assert (await session.get(CupTie, tie.id)).shootout_result is not None
         saved = list(receipt.results)
         replay = await session.get(Job, final_job)

@@ -30,3 +30,14 @@ def experience_line(label: str, before: int | None, after: int | None, gain: int
         before // 10000 if before is not None else None,
         after // 10000 if after is not None else None,
     )
+
+
+def position_percent(value: int) -> str:
+    text = f"{value / 10000:.4f}".rstrip("0").rstrip(".")
+    return text.replace(".", ",") if locale() == "ru" else text
+
+
+def position_percent_line(label: str, before: int, after: int) -> str:
+    change = after - before
+    sign = "+" if change >= 0 else ""
+    return f"{label}: {position_percent(after)}% ({sign}{position_percent(change)}%)"

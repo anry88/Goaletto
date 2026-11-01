@@ -21,7 +21,7 @@ from goaletto.domain.knockout_match import BREAK_PHASES, advance_penalty, start_
 from goaletto.domain.match_codec import restore_state, state_document, state_hash
 from goaletto.domain.match_engine import advance_tick, start_match, start_second_half
 from goaletto.domain.match_types import (
-    POSITION_ENGINE_VERSION,
+    EXPERIENCE_ENGINE_VERSION,
     CommandKind,
     EnginePolicy,
     FieldSlot,
@@ -875,8 +875,8 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             home_snapshot,
             away_snapshot,
             initial_energy=energies,
-            policy=EnginePolicy(version="match-policy-v5"),
-            engine_version=POSITION_ENGINE_VERSION,
+            policy=EnginePolicy(version="match-policy-v6"),
+            engine_version=EXPERIENCE_ENGINE_VERSION,
             crowd=HomeCrowd(demand.capacity, demand.fans),
             knockout=context,
         )
@@ -885,7 +885,7 @@ async def handle_calendar_job(session: AsyncSession, job: Job, at: datetime) -> 
             fixture_id=fixture.id,
             seed=seed,
             engine_version=state.engine_version,
-            state_version=5,
+            state_version=int(state.engine_version.removeprefix("regulation-v")),
             state=state_document(state),
             starting_snapshot=state_document(state),
             completed_tick=0,

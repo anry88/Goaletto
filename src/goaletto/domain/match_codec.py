@@ -136,7 +136,7 @@ def state_document(state: MatchState) -> dict[str, Any]:
         raise ValueError("Unsupported checkpoint value")
 
     result: dict[str, Any] = json.loads(json.dumps(asdict(state), default=encode))
-    if state.engine_version != "regulation-v5":
+    if state.engine_version not in {"regulation-v5", "regulation-v6"}:
         for side in ("home", "away"):
             for player in result[side]["snapshot"]["players"]:
                 del player["position_experience"]
@@ -144,9 +144,14 @@ def state_document(state: MatchState) -> dict[str, Any]:
                 del condition["position_minutes"]
                 for key in ("goals", "assists", "saves"):
                     del condition[key]
-    if state.engine_version not in {"regulation-v4", "regulation-v5"}:
+    if state.engine_version not in {"regulation-v4", "regulation-v5", "regulation-v6"}:
         del result["knockout"]
-    if state.engine_version not in {"regulation-v3", "regulation-v4", "regulation-v5"}:
+    if state.engine_version not in {
+        "regulation-v3",
+        "regulation-v4",
+        "regulation-v5",
+        "regulation-v6",
+    }:
         for side in ("home", "away"):
             del result[side]["snapshot"]["coach"]
             del result[side]["mentality_changes"]
@@ -175,13 +180,14 @@ def restore_state(value: str | dict[str, Any]) -> MatchState:
         if isinstance(raw, dict) and raw.get("engine_version") not in {
             "regulation-v4",
             "regulation-v5",
+            "regulation-v6",
         }:
             if "knockout" in raw:
                 raise ValueError("Historic checkpoint contains knockout fields")
             raw = dict(raw, knockout=None)
         data = _record(raw, MatchState)
         if (
-            data["engine_version"] in {"regulation-v4", "regulation-v5"}
+            data["engine_version"] in {"regulation-v4", "regulation-v5", "regulation-v6"}
             and data["knockout"] is not None
         ):
             k = _record(data["knockout"], KnockoutContext)
@@ -210,8 +216,13 @@ def restore_state(value: str | dict[str, Any]) -> MatchState:
             data["knockout"] = KnockoutContext(**k)
         data["match_id"] = _uuid(data["match_id"])
         legacy = data["engine_version"] == "regulation-v1"
-        coaching = data["engine_version"] in {"regulation-v3", "regulation-v4", "regulation-v5"}
-        positional = data["engine_version"] == "regulation-v5"
+        coaching = data["engine_version"] in {
+            "regulation-v3",
+            "regulation-v4",
+            "regulation-v5",
+            "regulation-v6",
+        }
+        positional = data["engine_version"] in {"regulation-v5", "regulation-v6"}
         data["home"], data["away"] = (
             _team(data["home"], legacy=legacy, coaching=coaching, positional=positional),
             _team(data["away"], legacy=legacy, coaching=coaching, positional=positional),

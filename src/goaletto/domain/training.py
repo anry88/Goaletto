@@ -1,7 +1,7 @@
 """Pure specialist sessions with bounded, fractional age-season development."""
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID
 
@@ -12,7 +12,9 @@ from goaletto.domain.staff_effects import mentor_session, seeded_draw
 
 PROGRESS_KEYS = (*SKILLS, "experience")
 POLICY_VERSION = "training-v1"  # Persistent potential/fraction schema, unchanged.
-SESSION_POLICY = "training-specialists-v2"
+LEGACY_SESSION_POLICY = "training-specialists-v2"
+SESSION_POLICY = "training-specialists-v3"
+OFF_POSITION_FACTOR = 1000
 
 
 class Focus(StrEnum):
@@ -126,6 +128,8 @@ class TrainingPlayer:
     morale: int = 50
     leadership: int = 10
     leadership_progress: int = 0
+    profile_positions: tuple[str, ...] = ()
+    position_experience: dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, UUID) or self.position not in VALID_POSITIONS:
@@ -175,6 +179,9 @@ class TrainingResult:
     leadership: int
     leadership_progress: int
     leadership_gain: int
+    experience_gain: int = 0
+    position_experience: dict[str, int] = field(default_factory=dict)
+    legacy_experience_gain: int = 0
 
 
 def train_player(
@@ -189,9 +196,12 @@ def train_player(
     executor_id: UUID | None = None,
     budget: GrowthBudget | None = None,
     active_form: bool = False,
+    policy: str = SESSION_POLICY,
 ) -> TrainingResult:
     if not isinstance(focus, Focus) or not isinstance(intensity, Intensity):
         raise ValueError("Invalid training choice")
+    if policy not in (LEGACY_SESSION_POLICY, SESSION_POLICY):
+        raise ValueError("Unknown training policy")
     if (
         any(
             type(v) is not int or not 0 <= v <= 20
@@ -203,13 +213,15 @@ def train_player(
         raise ValueError("Invalid training staff or seed")
     if focus != Focus.TEAM and trainer_skill == 0:
         raise ValueError("Specialist required")
+    if policy == SESSION_POLICY and focus == Focus.SET_PIECES and not isinstance(executor_id, UUID):
+        raise ValueError("Select a set-piece taker")
     budget = budget or GrowthBudget(player.age)
     if budget.age != player.age:
         raise ValueError("Development budget age differs from player")
     targeted = focus in (Focus.PHYSICAL, Focus.TEAM) or player.position in POSITIONS.get(focus, ())
     if focus == Focus.SET_PIECES:
         targeted = player.id == executor_id
-    trained = targeted and not player.injured
+    trained = (targeted or policy == SESSION_POLICY) and not player.injured
     strength = 5000 + trainer_skill * 500
     gain = (
         (
@@ -222,6 +234,8 @@ def train_player(
         if trained
         else 0
     )
+    if trained and not targeted:
+        gain = gain * OFF_POSITION_FACTOR // 10000
     keys = (
         ("stamina", "pace")
         if focus == Focus.PHYSICAL
@@ -246,9 +260,25 @@ def train_player(
         0,
     )
     budget = growth.budget
+    experience_gain = 0
+    legacy_experience_gain = 0
+    positions_after = dict(player.position_experience)
     if trained:
         experience_gain = (10 + trainer_skill) * age_multiplier(player.age) // 10000
-        whole, progress["experience"] = divmod(progress["experience"] + experience_gain, 10000)
+        legacy_experience_gain = experience_gain
+        if policy == SESSION_POLICY:
+            from goaletto.domain.position_experience import percent_practice
+
+            positions_after, granted_experience, _ = percent_practice(
+                player.position_experience,
+                {player.position: experience_gain},
+                player.profile_positions or (player.position,),
+                age=player.age,
+            )
+            experience_gain = granted_experience[player.position]
+        whole, progress["experience"] = divmod(
+            progress["experience"] + legacy_experience_gain, 10000
+        )
         experience += whole
         mentoring = mentor_session(
             player.id, morale, leadership, fraction, budget, head_skill=head_skill, seed=seed
@@ -260,7 +290,7 @@ def train_player(
             mentoring.leadership_gain,
             mentoring.budget,
         )
-        if seeded_draw(seed, player.id, "form", policy=SESSION_POLICY) < (
+        if seeded_draw(seed, player.id, "form", policy=LEGACY_SESSION_POLICY) < (
             (800 if intensity == Intensity.LOW else 600 if intensity == Intensity.MEDIUM else 400)
             if active_form
             else 200
@@ -272,7 +302,8 @@ def train_player(
         (14 * (10000 - physio_skill * 150) + 9999) // 10000 if intensity == Intensity.HIGH else 0
     )
     injured = (
-        trained and seeded_draw(seed, player.id, "injury", policy=SESSION_POLICY) < injury_rate
+        trained
+        and seeded_draw(seed, player.id, "injury", policy=LEGACY_SESSION_POLICY) < injury_rate
     )
     return TrainingResult(
         growth.skills,
@@ -287,4 +318,7 @@ def train_player(
         leadership,
         fraction,
         leadership_gain,
+        experience_gain,
+        positions_after,
+        legacy_experience_gain,
     )

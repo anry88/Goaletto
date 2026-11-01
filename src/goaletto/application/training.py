@@ -25,6 +25,7 @@ from goaletto.domain.game_cycle import HORIZON_DAYS, midnight
 from goaletto.domain.kickoff import BASELINE_MINUTE, KickoffPreference, preference_utc
 from goaletto.domain.staff_effects import POLICY as LEGACY_STAFF_POLICY
 from goaletto.domain.training import (
+    LEGACY_SESSION_POLICY,
     LEGACY_SPECIALISTS,
     POLICY_VERSION,
     PRIMARY_SKILLS,
@@ -358,6 +359,12 @@ async def select_training(
     )
     if plan is not None and (plan.status != "scheduled" or at >= plan.due_at):
         raise ValueError("Training has already started or been processed for this UTC date")
+    if plan is not None and plan.policy_version != SESSION_POLICY:
+        # A new explicit choice creates a new pin; retain the old identity and
+        # decision/job history rather than modifying its immutable policy.
+        plan.status, plan.results = "cancelled", [{"reason": "reselected"}]
+        await session.flush()
+        plan = None
     if plan is None:
         plan = TrainingPlan(
             id=uuid5(actor.operation_id, f"training:v2:{week.isoformat()}"),
@@ -440,7 +447,7 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
     if plan.status != "scheduled":
         return
     if (
-        plan.policy_version != SESSION_POLICY
+        plan.policy_version not in (LEGACY_SESSION_POLICY, SESSION_POLICY)
         or not (
             plan.schedule_policy == "training-midnight-v1"
             and plan.due_at == plan.week_start + timedelta(days=1)
@@ -559,6 +566,8 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
                 player.morale,
                 player.leadership,
                 dev.leadership_progress or 0,
+                (player.position, *(player.alternative_positions or ())),
+                old_position_experience,
             ),
             focus,
             intensity,
@@ -574,6 +583,7 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             budget=budget_before,
             executor_id=plan.executor_id,
             active_form=not legacy_staff,
+            policy=plan.policy_version,
         )
         if not trained.trained:
             continue
@@ -586,13 +596,20 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
         leadership_fraction_before = dev.leadership_progress or 0
         from goaletto.domain.position_experience import credit_experience
 
-        experience_gain = (
+        legacy_experience_gain = (
             (trained.experience - experience_before) * 10000
             + trained.progress["experience"]
             - dev.progress["experience"]
         )
-        player.position_experience = credit_experience(
-            old_position_experience, {trained_position: experience_gain}
+        player.position_experience = (
+            trained.position_experience
+            if plan.policy_version == SESSION_POLICY
+            else {
+                key: min(1_000_000, value)
+                for key, value in credit_experience(
+                    old_position_experience, {trained_position: legacy_experience_gain * 100}
+                ).items()
+            }
         )
         changes = {
             key: {"before": values[key], "after": trained.skills[key]}
@@ -644,7 +661,10 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
                 "form_after": trained.form,
                 "experience_before": experience_before,
                 "experience_after": trained.experience,
-                "experience_gain": experience_gain,
+                "experience_gain": player.position_experience.get(trained_position, 0)
+                - old_position_experience.get(trained_position, 0),
+                "legacy_experience_gain": legacy_experience_gain,
+                "experience_policy": "position-experience-v2",
                 "position_experience": {
                     trained_position: {
                         "before": old_position_experience.get(trained_position, 0),

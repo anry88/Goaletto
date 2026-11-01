@@ -17,7 +17,12 @@ from goaletto.domain.names import latin_name
 from goaletto.domain.training import SPECIALISTS, Focus, Intensity
 from goaletto.infrastructure.models import TrainingPlan
 from goaletto.presentation.i18n import LabelMap, tr
-from goaletto.presentation.progress import experience_line, percent, progress_line
+from goaletto.presentation.progress import (
+    experience_line,
+    percent,
+    position_percent_line,
+    progress_line,
+)
 
 FOCUS_LABELS = LabelMap(
     {
@@ -36,12 +41,12 @@ INTENSITY_LABELS = LabelMap(
 )
 TARGETS = LabelMap(
     {
-        Focus.GOALKEEPING: "вратари · вратарское мастерство",
-        Focus.DEFENDING: "DC, DL, DR, DM · защита",
-        Focus.PLAYMAKING: "DM, MC, AMC · плеймейкинг",
-        Focus.WINGER: "ML, MR, DL, DR, AML, AMR · фланговая игра",
-        Focus.ATTACKING: "FC, AMC, AML, AMR · атака",
-        Focus.SET_PIECES: "выбранный исполнитель · стандарты",
+        Focus.GOALKEEPING: "вся команда · вратарское мастерство; основной эффект у GK",
+        Focus.DEFENDING: "вся команда · защита; основной эффект у DC, DL, DR, DM",
+        Focus.PLAYMAKING: "вся команда · плеймейкинг; основной эффект у DM, MC, AMC",
+        Focus.WINGER: "вся команда · фланговая игра; основной эффект у фланговых позиций",
+        Focus.ATTACKING: "вся команда · атака; основной эффект у FC, AMC, AML, AMR",
+        Focus.SET_PIECES: "вся команда · стандарты; основной эффект у выбранного исполнителя",
         Focus.PHYSICAL: "вся команда · выносливость и скорость",
         Focus.TEAM: "вся команда · профильный навык, опыт и командная подготовка",
     }
@@ -315,7 +320,15 @@ def training_report(
         if row.get("position_experience"):
             for position, values in row["position_experience"].items():
                 gain = values["after"] - values["before"]
-                if gain:
+                if row.get("experience_policy") == "position-experience-v2":
+                    lines.append(
+                        position_percent_line(
+                            tr("Опыт {position}", position=position),
+                            values["before"],
+                            values["after"],
+                        )
+                    )
+                elif gain:
                     lines.append(
                         experience_line(
                             tr("Опыт {position}", position=position),
@@ -388,6 +401,7 @@ def cancellation_reason(plan: TrainingPlan | TrainingReport) -> str:
         ),
         "match_day": tr("Тренировка не состоялась: в этот день у клуба матч."),
         "ownership_changed": tr("Тренировка отменена после смены или окончания владения клубом."),
+        "reselected": tr("План заменён новым выбором тренировки."),
         "policy_updated": tr(
             "Прежний план отменён. Выберите новое занятие в следующий свободный день."
         ),

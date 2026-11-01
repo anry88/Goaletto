@@ -133,6 +133,7 @@ class ReportLineupPlayer:
     saves: int = 0
     player_of_match: bool = False
     global_experience: tuple[int | None, int | None, int] | None = None
+    experience_percent: bool = False
 
 
 @dataclass(frozen=True)
@@ -600,7 +601,7 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     snapshot_player.id in starters,
                     condition.minutes_played if condition else 0,
                     condition.goals
-                    if terminal.engine_version == "regulation-v5" and condition
+                    if terminal.engine_version in {"regulation-v5", "regulation-v6"} and condition
                     else goal_counts.get((side, snapshot_player.id), 0),
                     condition.yellows if condition else 0,
                     condition.dismissed if condition else False,
@@ -650,6 +651,10 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     assists=condition.assists if condition else 0,
                     saves=condition.saves if condition else 0,
                     player_of_match=snapshot_player.id == best_player,
+                    experience_percent=growth_rows.get(str(snapshot_player.id), {}).get(
+                        "experience_policy"
+                    )
+                    == "position-experience-v2",
                     global_experience=(
                         (
                             growth_rows[str(snapshot_player.id)]["experience_progress"]["before"],
@@ -662,6 +667,36 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                 )
             )
         rows_out.sort(key=lambda r: (not r.started, not r.appeared, r.name, str(r.person_id)))
+        visible = {str(member.person_id) for member in rows_out}
+        for person_id, row in sorted(growth_rows.items()):
+            if (
+                person_id in visible
+                or row.get("club_id") != str(initial_team.snapshot.club_id)
+                or row.get("experience_policy") != "position-experience-v2"
+                or not row.get("name")
+            ):
+                continue
+            rows_out.append(
+                ReportLineupPlayer(
+                    UUID(person_id),
+                    row["name"],
+                    row["age"],
+                    row["form"],
+                    row["position"],
+                    False,
+                    0,
+                    0,
+                    0,
+                    False,
+                    False,
+                    growth_bps=0,
+                    position_experience=tuple(
+                        (position, values["before"], values["after"])
+                        for position, values in row["position_experience"].items()
+                    ),
+                    experience_percent=True,
+                )
+            )
         return tuple(rows_out)
 
     def _stats(side: str) -> TeamReportStats:

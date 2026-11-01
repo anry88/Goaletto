@@ -134,7 +134,7 @@ def start_extra_half(
 def advance_penalty(state: "MatchState", kick_number: int) -> "TickResult":
     """One actual, replayable kick. No limit or coin-toss winner in sudden death."""
     from goaletto.domain.match_engine import _random, validate_state
-    from goaletto.domain.match_types import MatchEvent, Side, TickResult
+    from goaletto.domain.match_types import MatchEvent, PlayerSnapshot, Side, TickResult
 
     validate_state(state)
     k = state.knockout
@@ -150,8 +150,20 @@ def advance_penalty(state: "MatchState", kick_number: int) -> "TickResult":
     # have already left the field. Stable skill order repeats only after a round.
     count = min(len(team.lineup), len(opponent.lineup))
     players = {p.id: p for p in team.snapshot.players}
+    from goaletto.domain.match_types import EXPERIENCE_ENGINE_VERSION
+
+    positions = {slot.player_id: slot.position for slot in team.lineup}
+    percentage = state.engine_version == EXPERIENCE_ENGINE_VERSION
+
+    def penalty_skill(player: PlayerSnapshot, skill: str, position: str) -> int:
+        value = getattr(player.skills, skill) * 10000
+        if percentage:
+            value = value * dict(player.position_experience).get(position, 0) // 1_000_000
+        return int(value)
+
     order = sorted(
-        (s.player_id for s in team.lineup), key=lambda p: (-players[p].skills.set_pieces, str(p))
+        (s.player_id for s in team.lineup),
+        key=lambda p: (-penalty_skill(players[p], "set_pieces", positions[p]), str(p)),
     )
     own_keeper = next(s.player_id for s in team.lineup if s.position == "GK")
     if own_keeper not in order[:count]:
@@ -163,7 +175,17 @@ def advance_penalty(state: "MatchState", kick_number: int) -> "TickResult":
     keeper_id = next(s.player_id for s in opponent.lineup if s.position == "GK")
     keeper = next(p for p in opponent.snapshot.players if p.id == keeper_id)
     chance = max(
-        6000, min(9000, 7500 + 150 * (kicker.skills.set_pieces - keeper.skills.goalkeeping))
+        6000,
+        min(
+            9000,
+            7500
+            + 150
+            * (
+                penalty_skill(kicker, "set_pieces", positions[kicker.id])
+                - penalty_skill(keeper, "goalkeeping", "GK")
+            )
+            // 10000,
+        ),
     )
     scored = _random(state, 40, f"penalty:{kick_number}").randrange(10000) < chance
     shootout = apply_penalty_kick(
