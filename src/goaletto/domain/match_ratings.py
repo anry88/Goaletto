@@ -42,9 +42,12 @@ def effective_skill(
     positional: bool = False,
     percentage: bool = False,
     bounded_experience: bool = False,
+    personal_morale: bool = True,
 ) -> int:
     value: int = getattr(player.skills, skill)
-    morale_factor = 7500 + min(100, player.morale + support_morale_points) * 50
+    # V8 retains the former neutral baseline and the independent crowd bonus.
+    morale = player.morale if personal_morale else 50
+    morale_factor = 7500 + min(100, morale + support_morale_points) * 50
     experience = dict(player.position_experience).get(position, 0)
     bonus = experience_bonus(experience) if positional and not percentage else 0
     factor = min(1_000_000, experience) if percentage else position_factor(player, position)
@@ -88,9 +91,11 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
                 name,
                 team.support_morale_points,
                 positional=policy.version
-                in {"match-policy-v5", "match-policy-v6", "match-policy-v7"},
-                percentage=policy.version in {"match-policy-v6", "match-policy-v7"},
-                bounded_experience=policy.version == "match-policy-v7",
+                in {"match-policy-v5", "match-policy-v6", "match-policy-v7", "match-policy-v8"},
+                percentage=policy.version
+                in {"match-policy-v6", "match-policy-v7", "match-policy-v8"},
+                bounded_experience=policy.version in {"match-policy-v7", "match-policy-v8"},
+                personal_morale=policy.version != "match-policy-v8",
             )
 
         position = slot.position
@@ -108,7 +113,8 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
             center += skill("winger") // 10
         experience = (
             0
-            if policy.version in {"match-policy-v5", "match-policy-v6", "match-policy-v7"}
+            if policy.version
+            in {"match-policy-v5", "match-policy-v6", "match-policy-v7", "match-policy-v8"}
             else min(p.experience, 100) * 10
         )
         if position == "DC":

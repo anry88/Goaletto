@@ -169,6 +169,8 @@ def candidate_list(
                 ),
             )
         )
+        if kind == "staff" and offer.profile == "head_coach":
+            lines.append(coach_capabilities(item.skills[0]))
         if item.loyal:
             lines.append(
                 tr(
@@ -254,6 +256,8 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
             quality=QUALITY_LABELS[quality_tier(item.skills[0])],
             skill=item.skills[0],
         )
+    if offer.kind == "staff" and offer.profile == "head_coach":
+        text += "\n" + coach_capabilities(item.skills[0])
     prefix = "p" if offer.kind == "player" else "h"
     return text, Keyboard(
         inline_keyboard=[
@@ -265,6 +269,36 @@ def candidate_quote(item: CandidateItem, ownership_id: UUID) -> tuple[str, Keybo
             ],
             [button(tr("Назад"), f"cg:{prefix}:0")],
         ]
+    )
+
+
+def coach_capabilities(skill: int) -> str:
+    """Full capabilities for a new match, from the same rules as CoachSnapshot."""
+    from goaletto.bot.lineup_views import TACTIC_LABELS
+    from goaletto.domain.match_types import EnginePolicy
+    from goaletto.domain.staff_quality import staff_abilities
+
+    abilities = staff_abilities("head_coach", skill)
+    policy = EnginePolicy()
+    return "\n".join(
+        (
+            tr(
+                "Тактики ({count}): {tactics}.",
+                count=len(abilities.tactics),
+                tactics=", ".join(TACTIC_LABELS[t] for t in abilities.tactics),
+            ),
+            tr(
+                "Смены за матч: тактика {t}, инструкции {i}, настрой {m}.",
+                t=abilities.tactic_changes,
+                i=abilities.instruction_changes,
+                m=abilities.mentality_changes,
+            ),
+            tr(
+                "Замены: {count} · окон: {windows} + перерыв (у всех тренеров).",
+                count=policy.max_substitutions,
+                windows=policy.max_windows,
+            ),
+        )
     )
 
 
@@ -358,11 +392,7 @@ def staff_change_view(change: StaffChange) -> tuple[str, Keyboard]:
 
 def staff_contribution(role: str, skill: int) -> str:
     if role == "head_coach":
-        return tr(
-            "Общая подготовка, помощь морали до {target}/100 "
-            "и постепенное развитие лидерства на занятиях.",
-            target=50 + skill,
-        )
+        return tr("Развивает лидерство на тренировках.")
     return {
         "goalkeeping_coach": tr("Открывает вратарскую подготовку. Качество определяет прирост."),
         "defence_coach": tr("Открывает оборонительную подготовку, включая опорников."),

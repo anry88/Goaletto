@@ -71,6 +71,10 @@ async def test_all_unused_positions_decay_including_unselected_reserves_and_retr
         side = "home" if report.home_club_id == club else "away"
         members = report.home_lineup if side == "home" else report.away_lineup
         assert len(members) == 21
+        for member in members:
+            # The extra reserve is outside the match snapshot but has a real
+            # persisted nationality, just like the eleven and selected bench.
+            assert member.country_code == (await s.get(Person, member.person_id)).country_code
         body = "\n".join(report_view(report, section=side, page=page)[0] for page in range(1, 6))
         assert "Опыт " in body and "% (-" in body
         assert not await finalize_result(s, fixture, at + timedelta(hours=2))

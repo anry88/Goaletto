@@ -49,7 +49,7 @@ async def test_new_specialists_hire_and_unlock_profiles_with_real_contracts(sess
             )
             assert salary.club_id == club and salary.role == role and salary.weekly_rate > 0
         plan = await choose(session, actor, Focus.PLAYMAKING)
-        assert plan.staff_snapshot["policy"] == "staff-session-v2"
+        assert plan.staff_snapshot["policy"] == "staff-session-v3"
         assert plan.staff_snapshot["roles"]["midfield_coach"]["person_id"] == str(midfield)
         await apply_training(session, await training_job(session, plan), plan.due_at)
         assert plan.status == "applied" and any(row["gain_bps"] > 0 for row in plan.results)
@@ -86,7 +86,7 @@ async def test_pending_old_attack_coach_playmaking_session_keeps_frozen_terms(
         await hired(session, tomorrow, "midfield_coach")
         assert (await choose(session, tomorrow, Focus.PLAYMAKING)).staff_snapshot[
             "policy"
-        ] == "staff-session-v2"
+        ] == "staff-session-v3"
 
 
 async def test_match_rewards_actual_position_and_report_excludes_opponent(sessions):
@@ -108,7 +108,7 @@ async def test_match_rewards_actual_position_and_report_excludes_opponent(sessio
     fixture, at = await start_fixture(sessions, club)
     final = await completed_checkpoint(sessions, fixture, at)
     async with sessions.begin() as session:
-        assert final.engine_version == "regulation-v7"
+        assert final.engine_version == "regulation-v8"
         await finalize_result(session, fixture, at + timedelta(hours=1))
         player = await session.get(Player, person_id)
         receipt = await session.get(MatchDevelopment, final.match_id)

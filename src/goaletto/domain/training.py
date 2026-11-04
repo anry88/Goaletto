@@ -197,6 +197,7 @@ def train_player(
     budget: GrowthBudget | None = None,
     active_form: bool = False,
     policy: str = SESSION_POLICY,
+    personal_morale: bool = True,
 ) -> TrainingResult:
     if not isinstance(focus, Focus) or not isinstance(intensity, Intensity):
         raise ValueError("Invalid training choice")
@@ -281,7 +282,14 @@ def train_player(
         )
         experience += whole
         mentoring = mentor_session(
-            player.id, morale, leadership, fraction, budget, head_skill=head_skill, seed=seed
+            player.id,
+            morale,
+            leadership,
+            fraction,
+            budget,
+            head_skill=head_skill,
+            seed=seed,
+            personal_morale=personal_morale,
         )
         morale, leadership, fraction, leadership_gain, budget = (
             mentoring.morale,

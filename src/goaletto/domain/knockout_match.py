@@ -151,7 +151,7 @@ def advance_penalty(state: "MatchState", kick_number: int) -> "TickResult":
     count = min(len(team.lineup), len(opponent.lineup))
     players = {p.id: p for p in team.snapshot.players}
     from goaletto.domain.match_types import (
-        BOUNDED_EXPERIENCE_ENGINE_VERSION,
+        BOUNDED_EXPERIENCE_ENGINES,
         PERCENT_EXPERIENCE_ENGINES,
     )
     from goaletto.domain.position_experience import bounded_experience_factor
@@ -165,7 +165,7 @@ def advance_penalty(state: "MatchState", kick_number: int) -> "TickResult":
             experience = dict(player.position_experience).get(position, 0)
             factor = (
                 bounded_experience_factor(experience)
-                if state.engine_version == BOUNDED_EXPERIENCE_ENGINE_VERSION
+                if state.engine_version in BOUNDED_EXPERIENCE_ENGINES
                 else experience
             )
             value = value * factor // 1_000_000

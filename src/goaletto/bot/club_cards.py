@@ -337,14 +337,16 @@ def player_view(
     lines.append(tr("<b>Навыки (1–20)</b>\n{p0}", p0=skill_text))
     lines.append(
         tr(
-            "Форма: {p0}/10 · Мораль: {p2}",
+            "Форма: {p0}/10",
             p0=card.form,
-            p2=card.morale,
         )
+    )
+    visible_positions = dict.fromkeys(
+        (card.position, *card.alternative_positions, *card.played_positions)
     )
     experience = " · ".join(
         f"{position} {position_percent(dict(card.position_experience).get(position, 0))}%"
-        for position in ("GK", "DC", "DL", "DR", "DM", "MC", "ML", "MR", "AMC", "AML", "AMR", "FC")
+        for position in visible_positions
     )
     lines.append(tr("Опыт: {positions}", positions=experience or "—"))
     if card.status != "retired":

@@ -36,6 +36,7 @@ def mentor_session(
     *,
     head_skill: int,
     seed: str,
+    personal_morale: bool = True,
 ) -> StaffEffect:
     if any(type(v) is not int for v in (morale, leadership, fraction, head_skill)) or not (
         0 <= morale <= 100
@@ -45,7 +46,13 @@ def mentor_session(
     ):
         raise ValueError("Invalid mentoring input")
     target = 50 + head_skill
-    if morale < target and seeded_draw(seed, person_id, "morale") < 500 + head_skill * 150:
+    if type(personal_morale) is not bool:
+        raise ValueError("Personal morale switch must be a boolean")
+    if (
+        personal_morale
+        and morale < target
+        and seeded_draw(seed, person_id, "morale") < (500 + head_skill * 150)
+    ):
         morale += 1
     gain = max(
         0,

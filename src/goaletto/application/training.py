@@ -584,6 +584,7 @@ async def apply_training(session: AsyncSession, job: Job, at: datetime) -> None:
             executor_id=plan.executor_id,
             active_form=not legacy_staff,
             policy=plan.policy_version,
+            personal_morale=plan.staff_snapshot["policy"] != "staff-session-v3",
         )
         if not trained.trained:
             continue

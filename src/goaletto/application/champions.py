@@ -33,6 +33,7 @@ from goaletto.domain.match_codec import restore_state, state_hash
 from goaletto.domain.match_types import (
     BOUNDED_EXPERIENCE_ENGINE_VERSION,
     EXPERIENCE_ENGINE_VERSION,
+    FORM_ONLY_ENGINE_VERSION,
     KNOCKOUT_ENGINE_VERSION,
     POSITION_ENGINE_VERSION,
 )
@@ -498,6 +499,7 @@ async def record_champions_match_result(
             POSITION_ENGINE_VERSION,
             EXPERIENCE_ENGINE_VERSION,
             BOUNDED_EXPERIENCE_ENGINE_VERSION,
+            FORM_ONLY_ENGINE_VERSION,
         }
         or result is None
         or result.state_hash != state_hash(state)

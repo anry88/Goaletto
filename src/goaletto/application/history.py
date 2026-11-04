@@ -530,11 +530,15 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
         for team in (initial.home.snapshot, initial.away.snapshot)
         for p in team.players
     }
+    development = await session.get(MatchDevelopment, match.id)
+    country_ids = set(names)
+    if development and development.applied_at:
+        country_ids.update(UUID(row["person_id"]) for row in development.results)
     countries = {
         key: code
         for key, code in (
             await session.execute(
-                select(Person.id, Person.country_code).where(Person.id.in_(names))
+                select(Person.id, Person.country_code).where(Person.id.in_(country_ids))
             )
         ).all()
     }
@@ -554,7 +558,6 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
             key = (side, scorer)
             goal_counts[key] = goal_counts.get(key, 0) + 1
 
-    development = await session.get(MatchDevelopment, match.id)
     from goaletto.infrastructure.models import DisciplineReceipt, MatchDiscipline
 
     discipline_header = await session.get(MatchDiscipline, match.id)
@@ -602,7 +605,7 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     condition.minutes_played if condition else 0,
                     condition.goals
                     if terminal.engine_version
-                    in {"regulation-v5", "regulation-v6", "regulation-v7"}
+                    in {"regulation-v5", "regulation-v6", "regulation-v7", "regulation-v8"}
                     and condition
                     else goal_counts.get((side, snapshot_player.id), 0),
                     condition.yellows if condition else 0,
@@ -697,6 +700,7 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                         for position, values in row["position_experience"].items()
                     ),
                     experience_percent=True,
+                    country_code=countries.get(UUID(person_id)),
                 )
             )
         return tuple(rows_out)

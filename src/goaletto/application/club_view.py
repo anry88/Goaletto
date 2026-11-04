@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONPATH
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import Surface, require_utc
@@ -27,6 +28,7 @@ from goaletto.infrastructure.models import (
     League,
     LineupSlot,
     Manager,
+    Match,
     MatchInjury,
     Person,
     Player,
@@ -119,6 +121,44 @@ class PlayerCard:
     position_experience: tuple[tuple[str, int], ...] = ()
     injured_until: datetime | None = None
     injury_severity: str | None = None
+    played_positions: tuple[str, ...] = ()
+
+
+async def played_positions(session: AsyncSession, person_id: UUID) -> tuple[str, ...]:
+    """Read actual positive minutes, independent of current XP, club or training.
+
+    Old checkpoints without positional minutes provide no evidence of extra
+    positions. SQL returns distinct position names rather than whole matches.
+    """
+    from goaletto.domain.match_types import POSITIONS
+
+    person = str(person_id)
+    query = (
+        select(
+            func.jsonb_path_query(
+                Match.state["home"]["conditions"].concat(Match.state["away"]["conditions"]),
+                cast(
+                    "strict $[*] ? (@.player_id == $person && exists(@.position_minutes))"
+                    ".position_minutes[*] ? (@[1] > 0)[0]",
+                    JSONPATH,
+                ),
+                func.jsonb_build_object("person", cast(person, String)),
+            )
+        )
+        .where(
+            Match.completed_tick > 0,
+            or_(
+                *(
+                    Match.starting_snapshot.contains(
+                        {side: {"snapshot": {"players": [{"id": person}]}}}
+                    )
+                    for side in ("home", "away")
+                )
+            ),
+        )
+        .distinct()
+    )
+    return tuple(sorted(p for p in (await session.scalars(query)).all() if p in POSITIONS))
 
 
 async def actor_for_callback(
@@ -367,6 +407,7 @@ async def get_player_card(session: AsyncSession, actor: Actor, person_id: UUID) 
         injured=player.injured_until is not None and player.injured_until > actor.at,
         injured_until=player.injured_until,
         injury_severity=severity,
+        played_positions=await played_positions(session, person.id),
         club_id=club_id,
         club_name=club_name,
         appearance_identity_id=person.appearance_identity_id,

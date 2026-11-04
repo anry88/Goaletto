@@ -24,6 +24,7 @@ def training_experience_gain(plan: TrainingPlan, row: dict[str, Any]) -> int | N
     if not isinstance(age, int) or snapshot.get("policy") not in (
         LEGACY_POLICY,
         "staff-session-v2",
+        "staff-session-v3",
     ):
         return None
     focus = Focus(plan.focus)

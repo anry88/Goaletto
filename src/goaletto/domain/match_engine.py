@@ -12,9 +12,11 @@ from goaletto.domain.match_commands import apply_commands, substitute
 from goaletto.domain.match_ratings import SectorRatings, effective_skill, sector_ratings
 from goaletto.domain.match_types import (
     BOUNDED_EXPERIENCE_ENGINE_VERSION,
+    BOUNDED_EXPERIENCE_ENGINES,
     COACH_ENGINE_VERSION,
     ENGINE_VERSION,
     EXPERIENCE_ENGINE_VERSION,
+    FORM_ONLY_ENGINE_VERSION,
     KNOCKOUT_ENGINE_VERSION,
     LIVE_ENGINE_VERSION,
     PERCENT_EXPERIENCE_ENGINES,
@@ -48,6 +50,7 @@ def validate_state(state: MatchState) -> None:
         POSITION_ENGINE_VERSION,
         EXPERIENCE_ENGINE_VERSION,
         BOUNDED_EXPERIENCE_ENGINE_VERSION,
+        FORM_ONLY_ENGINE_VERSION,
     }:
         raise ValueError("Unsupported engine version; never replay with another implementation")
     expected_policy = "match-policy-" + state.engine_version.removeprefix("regulation-")
@@ -164,6 +167,7 @@ def validate_state(state: MatchState) -> None:
             POSITION_ENGINE_VERSION,
             EXPERIENCE_ENGINE_VERSION,
             BOUNDED_EXPERIENCE_ENGINE_VERSION,
+            FORM_ONLY_ENGINE_VERSION,
         }
         if modern != (coach is not None):
             raise ValueError("Coaching snapshot and engine disagree")
@@ -593,7 +597,8 @@ def advance_tick(
                     attacking.support_morale_points,
                     positional=state.engine_version in POSITIONAL_ENGINES,
                     percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
-                    bounded_experience=state.engine_version == BOUNDED_EXPERIENCE_ENGINE_VERSION,
+                    personal_morale=state.engine_version != FORM_ONLY_ENGINE_VERSION,
+                    bounded_experience=state.engine_version in BOUNDED_EXPERIENCE_ENGINES,
                 ),
             )
             for s in candidates
@@ -620,7 +625,8 @@ def advance_tick(
                 attacking.support_morale_points,
                 positional=state.engine_version in POSITIONAL_ENGINES,
                 percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
-                bounded_experience=state.engine_version == BOUNDED_EXPERIENCE_ENGINE_VERSION,
+                personal_morale=state.engine_version != FORM_ONLY_ENGINE_VERSION,
+                bounded_experience=state.engine_version in BOUNDED_EXPERIENCE_ENGINES,
             )
             attack = (attack + taker_rating * 2) // 2
         assister = None
@@ -637,8 +643,8 @@ def advance_tick(
                         attacking.support_morale_points,
                         positional=True,
                         percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
-                        bounded_experience=state.engine_version
-                        == BOUNDED_EXPERIENCE_ENGINE_VERSION,
+                        personal_morale=state.engine_version != FORM_ONLY_ENGINE_VERSION,
+                        bounded_experience=state.engine_version in BOUNDED_EXPERIENCE_ENGINES,
                     ),
                 )
                 for slot in creators

@@ -5,13 +5,18 @@ from html import escape
 from aiogram.types import InlineKeyboardMarkup as Keyboard
 
 from goaletto.application.staff_cards import StaffCard
-from goaletto.bot.candidate_views import QUALITY_LABELS, ROLES, staff_contribution
+from goaletto.bot.candidate_views import (
+    QUALITY_LABELS,
+    ROLES,
+    coach_capabilities,
+    staff_contribution,
+)
 from goaletto.bot.finance_views import amount
 from goaletto.bot.market_views import button
 from goaletto.bot.result_views import compact_id
 from goaletto.domain.market import encode_price
 from goaletto.domain.names import latin_name
-from goaletto.domain.staff_quality import quality_tier, staff_abilities
+from goaletto.domain.staff_quality import quality_tier
 from goaletto.presentation.i18n import tr
 from goaletto.presentation.person_names import person_name
 
@@ -50,23 +55,8 @@ def staff_card_view(card: StaffCard, page: int = 0) -> tuple[str, Keyboard]:
             )
     lines.extend(("", staff_contribution(card.role, skill)))
     if card.role == "head_coach":
-        from goaletto.bot.lineup_views import TACTIC_LABELS
-
-        abilities = staff_abilities(card.role, skill)
-        lines.append(
-            tr(
-                "Тактики: {tactics}.",
-                tactics=", ".join(TACTIC_LABELS[t] for t in abilities.tactics),
-            )
-        )
-        lines.append(
-            tr(
-                "Смены за матч: тактика {t}, инструкции {i}, настрой {m}.",
-                t=abilities.tactic_changes,
-                i=abilities.instruction_changes,
-                m=abilities.mentality_changes,
-            )
-        )
+        lines.append(coach_capabilities(skill))
+        lines.append(tr("Текущий матч сохраняет закреплённые условия."))
     rows = []
     suffix = f"{compact_id(person.id)}:{compact_id(card.ownership_id)}"
     if card.employed and card.role == "head_coach":

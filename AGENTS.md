@@ -1,5 +1,13 @@
 # Working on Goaletto
 
+- User clarification 2026-11-04 (AND-240): retire personal morale from new
+  matches, newly selected training and current player/staff cards. Keep form,
+  energy and the independent home-support bonus. New lineup locks pin
+  regulation-v8 / match-policy-v8; new training pins staff-session-v3. Preserve
+  V1..V7 checkpoints/RNG/results, pending older staff snapshots and historical
+  receipts. Show positional XP only for declared and proven played positions,
+  including played positions whose current XP has decayed to zero.
+
 - User update 2026-11-01 (AND-202): new regulation-v7 / match-policy-v7
   retain 80..100% of relevant skills according to earned positional experience
   (0/50/100% XP -> 80/90/100% effectiveness), equally for all positions and
