@@ -265,6 +265,25 @@ async def test_first_season_has_no_champions_then_full_second_season(sessions):
         assert len(decided) == 35 and all(t.status == "decided" for t in decided)
         assert len([t for t in decided if t.neutral]) == 5
         assert all(t.winner_club_id in (t.home_club_id, t.away_club_id) for t in decided)
+        for tournament in tournaments:
+            prizes = (
+                await session.scalars(
+                    select(LedgerEntry).where(
+                        LedgerEntry.operation_key == f"champions:prize:{tournament.id}"
+                    )
+                )
+            ).all()
+            assert len({p.club_id for p in prizes}) == 8
+            assert sorted(p.cash_delta for p in prizes) == [
+                12_000,
+                12_000,
+                12_000,
+                12_000,
+                79_000,
+                79_000,
+                280_000,
+                450_000,
+            ]
         played = {
             row.club_id: row.played
             for row in (

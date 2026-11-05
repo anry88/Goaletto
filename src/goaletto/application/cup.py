@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
 from goaletto.application.game_actions import allocation_lock
+from goaletto.application.knockout_prizes import pay_prizes, prizes_for_tie
 from goaletto.application.money import credit_locked, locked_accounts
 from goaletto.application.training import reserve_match_day
 from goaletto.domain.cup_bracket import (
@@ -368,6 +369,7 @@ async def record_cup_match_result(
         await advance_bracket_progression(session, fixture.season_id, target.id, outcome.winner, at)
         if fixture.neutral:
             await settle_final_revenue(session, fixture, at)
+        await pay_prizes(session, await prizes_for_tie(session, target, result), at)
     await session.flush()
     return target
 

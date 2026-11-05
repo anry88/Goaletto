@@ -11,6 +11,7 @@ from sqlalchemy.exc import DBAPIError
 
 from goaletto.application.calendar_planning import plan_horizon
 from goaletto.application.cup import initialize_season_cup
+from goaletto.application.knockout_prizes import backfill_current_prizes, unpaid_current_prizes
 from goaletto.application.match_runtime import NotReady, handle_calendar_job
 from goaletto.application.results import finalize_result
 from goaletto.application.season_rollover import rollover_season
@@ -200,6 +201,20 @@ async def test_full_cup_97_real_games_neutral_final_retry_and_frozen_history(ses
             session, fixture.id, fixture.actual_finish_at + timedelta(hours=1)
         )
         assert final.winner_club_id is not None
+        prizes = (
+            await session.scalars(
+                select(LedgerEntry).where(
+                    LedgerEntry.operation_key == f"cup:prize:{world.season_id}"
+                )
+            )
+        ).all()
+        assert len(prizes) == len({p.club_id for p in prizes}) == 50
+        assert sum(p.cash_delta for p in prizes) == 4_058_000
+        assert next(p.cash_delta for p in prizes if p.club_id == final.winner_club_id) == 500_000
+        assert sorted(p.cash_delta for p in prizes if p.request["details"]["stage"] == "final") == [
+            320_000,
+            500_000,
+        ]
         assert (
             await session.scalar(
                 select(func.count())
@@ -234,6 +249,43 @@ async def test_full_cup_97_real_games_neutral_final_retry_and_frozen_history(ses
         with pytest.raises(DBAPIError):
             async with sessions.begin() as session:
                 await session.execute(text(statement))
+
+
+async def test_cup_backfill_only_pays_confirmed_elimination_once(sessions, monkeypatch):
+    import goaletto.application.cup as cup
+
+    async def previous_release(session, prizes, at):
+        pass
+
+    monkeypatch.setattr(cup, "pay_prizes", previous_release)
+    world, _, _ = await setup_world(sessions)
+    await job(sessions, "season.open")
+    async with sessions.begin() as session:
+        tie = await session.scalar(
+            select(CupTie).where(CupTie.round_key == "prelim").order_by(CupTie.id).limit(1)
+        )
+        legs = [uuid5(world.season_id, f"cup:{tie.id}:{leg}") for leg in (1, 2)]
+        season = await session.get(Season, world.season_id)
+        before = season.ends_at
+    await play_fixture(sessions, legs[0])
+    async with sessions.begin() as session:
+        assert await unpaid_current_prizes(session, before) == []
+    match_id = await play_fixture(sessions, legs[1])
+    async with sessions.begin() as session:
+        tie = await session.get(CupTie, tie.id)
+        receipt = await session.get(MatchResult, match_id)
+        state = (await session.get(Match, match_id)).state
+        prizes = await unpaid_current_prizes(session, before)
+        assert len(prizes) == 1
+        prize = prizes[0]
+        assert {prize.club_id, tie.winner_club_id} == {tie.home_club_id, tie.away_club_id}
+        assert prize.amount == 12_000 and prize.details["state_hash"] == receipt.state_hash
+        assert await backfill_current_prizes(session, before, before) == prizes
+        assert await backfill_current_prizes(session, before, before) == []
+        assert (await session.get(Match, match_id)).state == state
+    async with sessions.begin() as session:
+        rows = (await session.scalars(select(LedgerEntry).where(LedgerEntry.kind == "prize"))).all()
+        assert [(row.club_id, row.cash_delta) for row in rows] == [(prize.club_id, 12_000)]
 
 
 async def test_real_et_penalties_restart_recovery_growth_and_rollback(sessions, monkeypatch):

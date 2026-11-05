@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import require_utc
 from goaletto.application.game_actions import allocation_lock
+from goaletto.application.knockout_prizes import pay_prizes, prizes_for_tie
 from goaletto.domain.champions_bracket import (
     CHAMPIONS_BRACKET_POLICY,
     ChampionsBracket,
@@ -547,6 +548,7 @@ async def record_champions_match_result(
             from goaletto.application.cup import settle_final_revenue
 
             await settle_final_revenue(session, fixture, at, competition=COMPETITION)
+        await pay_prizes(session, await prizes_for_tie(session, target, result), at)
     await session.flush()
     return target
 

@@ -156,6 +156,13 @@ def finance_view(screen: FinanceScreen) -> tuple[str, Keyboard]:
         ("", tr("<b>Операции · {page}/{pages}</b>", page=screen.page + 1, pages=screen.pages))
     )
     for entry in screen.entries:
+        label = KINDS[entry.kind]
+        if entry.kind == "prize":
+            competition = entry.request["details"].get("competition")
+            if competition == "cup":
+                label = tr("Призовые · Кубок")
+            elif competition == "champions":
+                label = tr("Призовые · Кубок чемпионов")
         changes = []
         if entry.cash_delta:
             changes.append(("+" if entry.cash_delta > 0 else "−") + amount(abs(entry.cash_delta)))
@@ -167,9 +174,7 @@ def finance_view(screen: FinanceScreen) -> tuple[str, Keyboard]:
             changes.append(
                 tr("долг {change}", change=f"{entry.arrears_delta:+,}".replace(",", " "))
             )
-        lines.append(
-            f"{entry.occurred_at:%d.%m} · {KINDS[entry.kind]} · {'; '.join(changes) or '0'}"
-        )
+        lines.append(f"{entry.occurred_at:%d.%m} · {label} · {'; '.join(changes) or '0'}")
     pages = []
     for label, page in (("◀️", screen.page - 1), ("▶️", screen.page + 1)):
         if 0 <= page < screen.pages:
