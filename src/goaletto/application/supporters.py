@@ -13,7 +13,7 @@ from goaletto.domain.finances import accrued_wage, merchandise_income
 from goaletto.domain.game_cycle import CYCLE_SECONDS
 from goaletto.domain.knockout_match import decision
 from goaletto.domain.match_codec import state_hash
-from goaletto.domain.match_practice import CURRENT_POLICY
+from goaletto.domain.match_practice import CURRENT_POLICY, PERCENT_POLICY
 from goaletto.domain.match_types import MatchState
 from goaletto.domain.stadium import match_stage
 from goaletto.domain.supporters import POLICY, match_gain, season_gain
@@ -43,7 +43,11 @@ async def frozen_terms(
     session: AsyncSession, match_id: UUID, at: datetime
 ) -> dict[str, Any] | None:
     practice = await session.get(MatchDevelopment, match_id)
-    if practice is None or not practice.eligible or practice.policy_version != CURRENT_POLICY:
+    if (
+        practice is None
+        or not practice.eligible
+        or practice.policy_version not in (CURRENT_POLICY, PERCENT_POLICY)
+    ):
         return None
     fixture = await session.get(Fixture, UUID(practice.terms_snapshot["fixture_id"]))
     if fixture is None:
