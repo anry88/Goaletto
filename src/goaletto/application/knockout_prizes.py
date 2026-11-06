@@ -15,10 +15,12 @@ from goaletto.domain.champions_bracket import rounds_for
 from goaletto.domain.clock import MatchPhase
 from goaletto.domain.knockout_match import decision
 from goaletto.domain.knockout_prizes import (
+    CHAMPIONS_REBALANCED_POLICY,
     CHAMPIONS_TIER_POLICY,
     CHAMPIONS_WINNER_PRIZE,
     CUP_EXIT_PRIZES,
     CUP_WINNER_PRIZE,
+    LEGACY_CHAMPIONS_WINNER_PRIZE,
     POLICY,
     champions_exit_prize,
     champions_prize_multiplier,
@@ -87,7 +89,7 @@ async def prizes_for_tie(
         winner_prize = CHAMPIONS_WINNER_PRIZE * multiplier
         final = tie.round_number == rounds_for(tournament.participant_count)
         details.update(
-            policy=CHAMPIONS_TIER_POLICY,
+            policy=CHAMPIONS_REBALANCED_POLICY,
             round=tie.round_number,
             participants=tournament.participant_count,
             qualifying_tier=tournament.tier,
@@ -111,12 +113,21 @@ def _matches_paid_prize(entry: LedgerEntry, prize: Prize) -> bool:
         "prize", prize.amount, prize.details
     ):
         return True
-    if prize.details["policy"] != CHAMPIONS_TIER_POLICY:
+    if prize.details["policy"] != CHAMPIONS_REBALANCED_POLICY:
         return False
-    # Recognize the original flat prize under the same placement key.
-    details = dict(prize.details, policy=POLICY)
+    # Older Champions receipts keep their original scale and placement key.
+    details = dict(prize.details, policy=CHAMPIONS_TIER_POLICY)
+    base = (
+        LEGACY_CHAMPIONS_WINNER_PRIZE
+        if details["placement"] == "champion"
+        else champions_exit_prize(details["participants"], details["round"], legacy=True)
+    )
+    amount = base * details["tier_multiplier"]
+    if entry.cash_delta == amount and entry.request == request("prize", amount, details):
+        return True
+    details["policy"] = POLICY
     details.pop("qualifying_tier")
-    base = prize.amount // details.pop("tier_multiplier")
+    details.pop("tier_multiplier")
     return entry.cash_delta == base and entry.request == request("prize", base, details)
 
 
