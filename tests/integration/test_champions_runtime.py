@@ -274,16 +274,12 @@ async def test_first_season_has_no_champions_then_full_second_season(sessions):
                 )
             ).all()
             assert len({p.club_id for p in prizes}) == 8
+            multiplier = 6 - tournament.tier
             assert sorted(p.cash_delta for p in prizes) == [
-                12_000,
-                12_000,
-                12_000,
-                12_000,
-                79_000,
-                79_000,
-                280_000,
-                450_000,
+                amount * multiplier for amount in [12_000] * 4 + [79_000] * 2 + [280_000, 450_000]
             ]
+            assert {p.request["details"]["qualifying_tier"] for p in prizes} == {tournament.tier}
+            assert {p.request["details"]["tier_multiplier"] for p in prizes} == {multiplier}
         played = {
             row.club_id: row.played
             for row in (

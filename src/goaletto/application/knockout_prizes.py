@@ -15,11 +15,13 @@ from goaletto.domain.champions_bracket import rounds_for
 from goaletto.domain.clock import MatchPhase
 from goaletto.domain.knockout_match import decision
 from goaletto.domain.knockout_prizes import (
+    CHAMPIONS_TIER_POLICY,
     CHAMPIONS_WINNER_PRIZE,
     CUP_EXIT_PRIZES,
     CUP_WINNER_PRIZE,
     POLICY,
     champions_exit_prize,
+    champions_prize_multiplier,
 )
 from goaletto.domain.match_codec import restore_state, state_hash
 from goaletto.infrastructure.models import (
@@ -78,10 +80,19 @@ async def prizes_for_tie(
         if tournament is None or tournament.season_id != tie.season_id:
             raise ValueError("Prize tie lacks its champions tournament")
         competition, edition = "champions", tournament.id
-        exit_prize = champions_exit_prize(tournament.participant_count, tie.round_number)
-        winner_prize = CHAMPIONS_WINNER_PRIZE
+        multiplier = champions_prize_multiplier(tournament.tier)
+        exit_prize = (
+            champions_exit_prize(tournament.participant_count, tie.round_number) * multiplier
+        )
+        winner_prize = CHAMPIONS_WINNER_PRIZE * multiplier
         final = tie.round_number == rounds_for(tournament.participant_count)
-        details.update(round=tie.round_number, participants=tournament.participant_count)
+        details.update(
+            policy=CHAMPIONS_TIER_POLICY,
+            round=tie.round_number,
+            participants=tournament.participant_count,
+            qualifying_tier=tournament.tier,
+            tier_multiplier=multiplier,
+        )
     if result.competition != competition or final != tie.neutral:
         raise ValueError("Prize competition or final does not reconcile")
     details.update(competition=competition, edition_id=str(edition))
@@ -91,6 +102,22 @@ async def prizes_for_tie(
     if final:
         prizes.append(Prize(winner, key, winner_prize, {**details, "placement": "champion"}))
     return prizes
+
+
+def _matches_paid_prize(entry: LedgerEntry, prize: Prize) -> bool:
+    if entry.kind != "prize":
+        return False
+    if entry.cash_delta == prize.amount and entry.request == request(
+        "prize", prize.amount, prize.details
+    ):
+        return True
+    if prize.details["policy"] != CHAMPIONS_TIER_POLICY:
+        return False
+    # Recognize the original flat prize under the same placement key.
+    details = dict(prize.details, policy=POLICY)
+    details.pop("qualifying_tier")
+    base = prize.amount // details.pop("tier_multiplier")
+    return entry.cash_delta == base and entry.request == request("prize", base, details)
 
 
 async def pay_prizes(session: AsyncSession, prizes: list[Prize], at: datetime) -> None:
@@ -193,10 +220,7 @@ async def unpaid_current_prizes(session: AsyncSession, before: datetime) -> list
     )
     for entry in existing:
         prior_prize = planned.pop((entry.club_id, entry.operation_key), None)
-        if prior_prize is not None and (
-            entry.request != request("prize", prior_prize.amount, prior_prize.details)
-            or entry.cash_delta != prior_prize.amount
-        ):
+        if prior_prize is not None and not _matches_paid_prize(entry, prior_prize):
             raise ValueError("Existing knockout prize differs from the final placement")
     return list(planned.values())
 

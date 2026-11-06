@@ -3,6 +3,7 @@
 from goaletto.domain.champions_bracket import rounds_for
 
 POLICY = "knockout-prizes-v1"
+CHAMPIONS_TIER_POLICY = "knockout-prizes-v2"
 
 CUP_EXIT_PRIZES = {
     "prelim": 12_000,
@@ -17,6 +18,12 @@ CUP_EXIT_PRIZES = {
 }
 CUP_WINNER_PRIZE = 500_000
 CHAMPIONS_WINNER_PRIZE = 450_000
+
+
+def champions_prize_multiplier(tier: int) -> int:
+    if type(tier) is not int or not 1 <= tier <= 5:
+        raise ValueError("Invalid champions qualifying tier")
+    return 6 - tier
 
 
 def champions_exit_prize(participant_count: int, round_number: int) -> int:
