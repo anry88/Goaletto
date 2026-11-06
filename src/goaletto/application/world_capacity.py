@@ -18,6 +18,7 @@ from goaletto.domain.world import WorldOptions, stable_seed
 from goaletto.infrastructure.analytics import start_coverage
 from goaletto.infrastructure.models import (
     Club,
+    Fixture,
     FixturePlan,
     Job,
     League,
@@ -39,6 +40,17 @@ def ready_set_predicate() -> ColumnElement[bool]:
         .where(
             WorldAdmission.league_set_id == League.league_set_id,
             WorldAdmission.ready_at.is_(None),
+        )
+        .exists()
+    )
+
+
+def no_locked_fixture() -> ColumnElement[bool]:
+    return (
+        ~select(Fixture.id)
+        .where(
+            (Fixture.home_club_id == Club.id) | (Fixture.away_club_id == Club.id),
+            Fixture.status.in_(("lineup_locked", "live", "paused")),
         )
         .exists()
     )

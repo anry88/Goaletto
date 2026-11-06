@@ -284,7 +284,7 @@ async def test_upgrade_improves_unsigned_intake_preserves_signed_and_stale_quote
             await upgrade_academy(session, action(actor), screen.ownership_id, expected_level=1)
             == 2
         )
-        intake = await session.get(AcademyIntake, (club_id, screen.season_id))
+        intake = await session.get(AcademyIntake, (club_id, screen.season_id, 0))
         assert intake.level == 2
         refreshed = await load_academy(session, action(actor))
         assert refreshed.level == 2 and refreshed.sign_limit == 2

@@ -9,6 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.acquisition import accept_start, telegram_operation
 from goaletto.application.analytics import Surface, require_utc
+from goaletto.application.claim_reset import (
+    STARTING_CAPACITY,
+    STARTING_SUPPORTERS,
+    reset_for_claim,
+)
 from goaletto.application.game_actions import (
     DEFAULT_LEASE_POLICY,
     Actor,
@@ -23,9 +28,11 @@ from goaletto.application.game_actions import (
 from goaletto.application.world_capacity import (
     LOW_WATER,
     available_clubs,
+    no_locked_fixture,
     ready_set_predicate,
     request_reserve,
 )
+from goaletto.domain.finances import INITIAL_CAPITAL
 from goaletto.domain.ownership import ownership_deadline
 from goaletto.infrastructure.analytics import start_coverage
 from goaletto.infrastructure.models import Club, GameActionReceipt, League, Manager, OwnershipPeriod
@@ -78,13 +85,17 @@ async def offers(session: AsyncSession, page: int = 1) -> tuple[ClubOffer, ...]:
                 Club.bankrupt_at.is_(None),
                 ~active,
                 ready_set_predicate(),
+                no_locked_fixture(),
             )
             .order_by(Club.id)
             .offset((page - 1) * 5)
             .limit(5)
         )
     ).all()
-    return tuple(ClubOffer(c.id, c.name, c.budget, c.stadium_capacity, c.supporters) for c in rows)
+    return tuple(
+        ClubOffer(c.id, c.name, INITIAL_CAPITAL, STARTING_CAPACITY, STARTING_SUPPORTERS)
+        for c in rows
+    )
 
 
 async def ensure_entry_capacity(session: AsyncSession, at: datetime) -> bool:
@@ -214,12 +225,13 @@ async def preview_club(session: AsyncSession, actor: Actor, club_id: UUID) -> Cl
             Club.bankrupt_at.is_(None),
             ~active,
             ready_set_predicate(),
+            no_locked_fixture(),
         )
     )
     if club is None:
         raise ClubUnavailable("Club is no longer available")
     await user_effect(session, actor, "club_preview_opened", Surface.ONBOARDING, club_id=club.id)
-    return ClubOffer(club.id, club.name, club.budget, club.stadium_capacity, club.supporters)
+    return ClubOffer(club.id, club.name, INITIAL_CAPITAL, STARTING_CAPACITY, STARTING_SUPPORTERS)
 
 
 async def claim_club(
@@ -278,6 +290,7 @@ async def claim_club(
             Club.bankrupt_at.is_(None),
             ~active,
             ready_set_predicate(),
+            no_locked_fixture(),
         )
         .with_for_update(of=Club)
         .execution_options(populate_existing=True)
@@ -295,7 +308,10 @@ async def claim_club(
         ended_at=None,
         end_reason=None,
     )
+    reset = await reset_for_claim(session, club, ownership.id, actor.at)
     session.add(ownership)
+    await session.flush()
+    session.add(reset)
     if session.info.get("production") and not manager.is_internal:
         from goaletto.application.data_protection import protect
 

@@ -33,6 +33,7 @@ from goaletto.domain.stadium import (
 )
 from goaletto.infrastructure.models import (
     Club,
+    ClubClaimReset,
     Fixture,
     Job,
     Match,
@@ -297,7 +298,7 @@ async def complete_expansion(session: AsyncSession, job: Job, at: datetime) -> N
     )
     if row is None or job.due_at != row.due_at:
         raise ValueError("Missing expansion or wrong deadline")
-    if row.status == "finished":
+    if row.status != "queued":
         return
     if at < row.due_at:
         raise NotReady("Expansion not finished")
@@ -328,18 +329,20 @@ async def upkeep_for_period(
             .order_by(StadiumExpansion.started_at, StadiumExpansion.id)
         )
     ).all()
-    capacity = rows[0].from_capacity if rows else club.stadium_capacity
-    finished = sorted(
-        (row for row in rows if row.completed_at is not None),
-        key=lambda row: row.completed_at or week,
-    )
+    resets = await session.scalars(select(ClubClaimReset).where(ClubClaimReset.club_id == club.id))
+    events = [
+        (row.completed_at, 0, row.from_capacity, row.to_capacity)
+        for row in rows
+        if row.completed_at is not None
+    ]
+    events.extend((r.claimed_at, 1, r.capacity_before, r.capacity_after) for r in resets)
+    events.sort()
+    capacity = events[0][2] if events else rows[0].from_capacity if rows else club.stadium_capacity
     start = period_start
     changes: list[tuple[datetime, int]] = []
-    for row in finished:
-        if row.completed_at is None:
-            raise ValueError("Missing completed expansion timestamp")
-        if row.completed_at <= start:
-            capacity = row.to_capacity
-        elif row.completed_at < week:
-            changes.append((row.completed_at, row.to_capacity))
+    for effective, _, _, after in events:
+        if effective <= start:
+            capacity = after
+        elif effective < week:
+            changes.append((effective, after))
     return period_upkeep(capacity, start, week, tuple(changes))

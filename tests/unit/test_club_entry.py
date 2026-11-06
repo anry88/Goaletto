@@ -23,6 +23,7 @@ from goaletto.domain.ownership import ownership_deadline
 from goaletto.infrastructure.models import (
     AnalyticsManager,
     Club,
+    ClubClaimReset,
     GameActionReceipt,
     Job,
     Manager,
@@ -116,6 +117,12 @@ def events(monkeypatch):
 
     monkeypatch.setattr("goaletto.application.game_actions.record_event", record)
 
+    async def provision(session, club, ownership_id, at):
+        club.budget = 600_000
+        return ClubClaimReset(ownership_id=ownership_id, club_id=club.id, claimed_at=at)
+
+    monkeypatch.setattr("goaletto.application.onboarding.reset_for_claim", provision)
+
 
 async def claimed():
     recorder = Recorder()
@@ -123,9 +130,9 @@ async def claimed():
     return recorder, owner
 
 
-async def test_claim_keeps_budget_and_one_ownership_on_retry():
+async def test_claim_provisions_one_starting_budget_and_one_ownership_on_retry():
     recorder, owner = await claimed()
-    assert recorder.club.budget == 25000 and recorder.club.owner_telegram_id == 123
+    assert recorder.club.budget == 600_000 and recorder.club.owner_telegram_id == 123
     assert owner.expires_at == datetime(2027, 2, 28, 23, 42, tzinfo=UTC)
     count = len(recorder.added), len(recorder.statements)
     assert await claim_club(cast(AsyncSession, recorder), recorder.actor, recorder.club.id) is owner
@@ -215,7 +222,7 @@ async def test_release_is_idempotent_keeps_club_state_and_return_before_deadline
     expiry = owner.expires_at
     assert await end_expired(cast(AsyncSession, recorder), owner, expiry + timedelta(days=1))
     assert owner.ended_at == expiry and owner.end_reason == "inactive"
-    assert recorder.club.owner_telegram_id is None and recorder.club.budget == 25000
+    assert recorder.club.owner_telegram_id is None and recorder.club.budget == 600_000
     assert not await end_expired(cast(AsyncSession, recorder), owner, expiry + timedelta(days=2))
     assert len(recorder.events) == 1 and recorder.events[0].origin.value == "system"
 

@@ -6,7 +6,6 @@ from html import escape
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
-from sqlalchemy import select
 
 from goaletto.application.analytics import Reason, Surface
 from goaletto.application.club_view import actor_for_callback, get_owned_club
@@ -26,10 +25,8 @@ from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
 from goaletto.infrastructure.database import Database
-from goaletto.infrastructure.models import Person, Player
 from goaletto.presentation.channels import channel_links
 from goaletto.presentation.i18n import tr
-from goaletto.presentation.person_names import person_name
 
 router = Router(name="game-entry")
 
@@ -147,29 +144,12 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                 ):
                     raise ValueError("Invalid page")
                 item = await preview_club(session, actor, club_id)
-                roster = (
-                    await session.execute(
-                        select(Player, Person)
-                        .join(Person, Person.id == Player.person_id)
-                        .where(
-                            Player.club_id == club_id, Player.status.in_(("active", "last_season"))
-                        )
-                        .order_by(Player.person_id)
-                        .limit(25)
-                    )
-                ).all()
                 lines = [
                     tr("🏟 <b>{p0}</b> · Лига 5", p0=escape(latin_name(item.name))),
-                    tr("Бюджет: {p0}", p0=format_money(item.budget)),
+                    tr("Стартовый бюджет: {p0}", p0=format_money(item.budget)),
+                    tr("При получении клуба будет создан новый состав."),
                     tr("Название клуба можно будет изменить позже."),
-                    tr("\nСостав:"),
                 ]
-                for player, person in roster:
-                    badge = tr(" · Последний сезон") if player.status == "last_season" else ""
-                    lines.append(
-                        f"{escape(person_name(person)[:80])} · {person.age} · "
-                        f"{player.position}{badge}"
-                    )
                 text = "\n".join(lines)
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[

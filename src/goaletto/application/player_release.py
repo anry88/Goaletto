@@ -21,6 +21,7 @@ from goaletto.infrastructure.models import (
     CandidateOffer,
     CandidatePool,
     Fixture,
+    Person,
     Player,
     PlayerRelease,
     SalaryContract,
@@ -136,9 +137,6 @@ async def confirm_release(
     player, salary = await eligible_player(session, club.id, row.person_id, actor.at)
     if salary.id != row.salary_id:
         raise ValueError("Salary contract changed")
-    from goaletto.application.candidates import pool_calendar
-    from goaletto.infrastructure.models import Person
-
     person = await session.get(Person, row.person_id)
     assert person is not None
     account = (await locked_accounts(session, club.id))[club.id]
@@ -159,6 +157,20 @@ async def confirm_release(
     if condition.active_match_id is not None:
         raise ValueError("Player still belongs to an unfinished match")
     await close_salary(session, person.id, actor.at)
+    await offer_released_player(session, player, person, actor.at)
+    row.confirmed_at = actor.at
+    await user_effect(
+        session, actor, "player_contract_released", Surface.CLUB, ownership=owner, club_id=club.id
+    )
+    await session.flush()
+    return row
+
+
+async def offer_released_player(
+    session: AsyncSession, player: Player, person: Person, at: datetime
+) -> None:
+    from goaletto.application.candidates import pool_calendar
+
     player.club_id = None
     season = await pool_calendar(session)
     await session.execute(
@@ -189,22 +201,16 @@ async def confirm_release(
             weekly_rate=wage,
             economy_policy=POLICY_VERSION,
             status="available",
-            created_at=actor.at,
+            created_at=at,
         )
         session.add(offer)
     else:
         if offer.kind != "player" or offer.status != "signed":
             raise ValueError("Conflicting player offer")
-        offer.fee, offer.weekly_rate, offer.created_at = fee, wage, actor.at
+        offer.fee, offer.weekly_rate, offer.created_at = fee, wage, at
         offer.status, offer.profile, offer.pool_profile, offer.economy_policy = (
             "available",
             player.position,
             "player",
             POLICY_VERSION,
         )
-    row.confirmed_at = actor.at
-    await user_effect(
-        session, actor, "player_contract_released", Surface.CLUB, ownership=owner, club_id=club.id
-    )
-    await session.flush()
-    return row

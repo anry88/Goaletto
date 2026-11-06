@@ -1,4 +1,4 @@
-"""Pinned match capabilities and once-only starting coaches; no replacement on claim."""
+"""Pinned match capabilities and baseline coaches for seeding and new ownership."""
 
 from datetime import datetime
 from uuid import UUID, uuid5
@@ -37,19 +37,11 @@ async def ensure_starting_coaches(
     session: AsyncSession, at: datetime, *, league_set_id: UUID | None = None
 ) -> int:
     """Init/backfill only. A fired/retired baseline coach is never created again."""
-    from goaletto.application.candidates import lifecycle_event
-    from goaletto.application.finances import salary_contract
-
     await allocation_lock(session)
     query = select(Club, League.league_set_id).join(League).order_by(Club.id)
     if league_set_id is not None:
         query = query.where(League.league_set_id == league_set_id)
-    catalog = load_whole_catalog()
-    eligible = tuple(
-        key
-        for key, entry in catalog["variants"].items()
-        if entry["bank"] == "staff" and entry.get("stage") == "staff-middle"
-    )
+    eligible = _starting_coach_variants()
     count = 0
     for club, set_id in (await session.execute(query)).all():
         person_id = uuid5(club.id, "starting-head-coach:v1")
@@ -66,31 +58,64 @@ async def ensure_starting_coaches(
         )
         if season is None:
             raise ValueError("Missing coach calendar")
-        name, age, _, _, _ = candidate_profile(person_id, "staff", "head_coach")
-        person = await create_person(
+        await install_starting_coach(
             session,
-            NewPerson(
-                id=person_id,
-                creation_key=f"starting-head-coach:v1:{club.id}",
-                name=name,
-                age=age,
-                career="staff",
-                origin_bank="staff",
-                eligible_variant_ids=eligible,
-                home_league_set_id=set_id,
-            ),
+            club.id,
+            season,
+            person_id,
+            f"starting-head-coach:v1:{club.id}",
+            at,
+            eligible=eligible,
         )
-        person.age_applied_for_season_id = season.id
-        session.add(Staff(person_id=person_id, club_id=club.id, role="head_coach", status="active"))
-        await session.flush()
-        session.add(
-            StaffQualification(
-                person_id=person_id, role="head_coach", skill=1, qualified_for_season_id=season.id
-            )
-        )
-        session.add(lifecycle_event(person, season, "age_applied", at, staff=True))
-        session.add(lifecycle_event(person, season, "staff_last_decision", at, staff=True))
-        await session.flush()
-        await salary_contract(session, person_id, club.id, "head_coach", at)
         count += 1
     return count
+
+
+def _starting_coach_variants() -> tuple[str, ...]:
+    catalog = load_whole_catalog()
+    return tuple(
+        key
+        for key, entry in catalog["variants"].items()
+        if entry["bank"] == "staff" and entry.get("stage") == "staff-middle"
+    )
+
+
+async def install_starting_coach(
+    session: AsyncSession,
+    club_id: UUID,
+    season: Season,
+    person_id: UUID,
+    creation_key: str,
+    at: datetime,
+    *,
+    eligible: tuple[str, ...] | None = None,
+) -> None:
+    from goaletto.application.candidates import lifecycle_event
+    from goaletto.application.finances import salary_contract
+
+    name, age, _, _, _ = candidate_profile(person_id, "staff", "head_coach")
+    person = await create_person(
+        session,
+        NewPerson(
+            id=person_id,
+            creation_key=creation_key,
+            name=name,
+            age=age,
+            career="staff",
+            origin_bank="staff",
+            eligible_variant_ids=eligible if eligible is not None else _starting_coach_variants(),
+            home_league_set_id=season.league_set_id,
+        ),
+    )
+    person.age_applied_for_season_id = season.id
+    session.add(Staff(person_id=person_id, club_id=club_id, role="head_coach", status="active"))
+    await session.flush()
+    session.add(
+        StaffQualification(
+            person_id=person_id, role="head_coach", skill=1, qualified_for_season_id=season.id
+        )
+    )
+    session.add(lifecycle_event(person, season, "age_applied", at, staff=True))
+    session.add(lifecycle_event(person, season, "staff_last_decision", at, staff=True))
+    await session.flush()
+    await salary_contract(session, person_id, club_id, "head_coach", at)

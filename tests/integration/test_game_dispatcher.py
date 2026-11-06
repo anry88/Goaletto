@@ -170,6 +170,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     assert "Выберите" in response.text
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
     assert "Получить клуб" in str(response.reply_markup)
+    assert "Стартовый бюджет: 600\u00a0000" in response.text and "Состав:" not in response.text
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
     assert "Страна клуба" in (response.text or response.caption)
     response = await command("/club")
@@ -180,6 +181,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
             select(OwnershipPeriod).where(OwnershipPeriod.manager_id == manager.id)
         )
         assert ownership is not None
+        starting_lineup_version = (await session.get(ClubLineup, ownership.club_id)).version
 
     response = await command("/settings")
     assert "Напоминания" not in response.text
@@ -217,7 +219,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
         assert len(rows) == 1
         assert {r.telegram_update_id for r in rows} == {captain_update_id}
         lineup = await session.get(ClubLineup, ownership.club_id)
-        assert lineup.version == 2
+        assert lineup.version == starting_lineup_version + 1
     await command("/settings")
     response = await callback("lang:en")
     assert "Settings" in response.text

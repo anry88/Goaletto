@@ -5,8 +5,9 @@ from math import ceil
 from typing import Any
 from uuid import UUID, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.selectable import Subquery
 
 from goaletto.application.analytics import require_utc
 from goaletto.domain.finances import accrued_wage, merchandise_income
@@ -19,6 +20,7 @@ from goaletto.domain.stadium import match_stage
 from goaletto.domain.supporters import POLICY, match_gain, season_gain
 from goaletto.infrastructure.models import (
     Club,
+    ClubClaimReset,
     Fixture,
     MatchCrowd,
     MatchDevelopment,
@@ -215,27 +217,38 @@ async def apply_season(
     )
 
 
+def _audience_history(club_id: UUID) -> Subquery:
+    return union_all(
+        select(
+            SupporterChange.effective_at.label("at"),
+            SupporterChange.before_count.label("before"),
+            SupporterChange.after_count.label("after"),
+            literal(0).label("reset"),
+        ).where(SupporterChange.club_id == club_id),
+        select(
+            ClubClaimReset.claimed_at,
+            ClubClaimReset.supporters_before,
+            ClubClaimReset.supporters_after,
+            literal(1),
+        ).where(ClubClaimReset.club_id == club_id),
+    ).subquery()
+
+
 async def supporters_at(session: AsyncSession, club: Club, at: datetime) -> int:
     require_utc(at)
+    history = _audience_history(club.id).c
     previous = await session.scalar(
-        select(SupporterChange)
-        .where(SupporterChange.club_id == club.id, SupporterChange.effective_at <= at)
-        .order_by(
-            SupporterChange.effective_at.desc(),
-            SupporterChange.after_count.desc(),
-            SupporterChange.id.desc(),
-        )
+        select(history.after)
+        .where(history.at <= at)
+        .order_by(history.at.desc(), history.reset.desc(), history.after.desc())
         .limit(1)
     )
     if previous is not None:
-        return previous.after_count
+        return int(previous)
     following = await session.scalar(
-        select(SupporterChange)
-        .where(SupporterChange.club_id == club.id)
-        .order_by(SupporterChange.effective_at, SupporterChange.after_count, SupporterChange.id)
-        .limit(1)
+        select(history.before).order_by(history.at, history.reset, history.after).limit(1)
     )
-    return following.before_count if following else club.supporters
+    return int(following) if following is not None else club.supporters
 
 
 async def merchandise_for_period(
@@ -246,19 +259,20 @@ async def merchandise_for_period(
     if not 0 < (end - start).total_seconds() <= CYCLE_SECONDS:
         raise ValueError("Invalid audience merchandise period")
     fans = await supporters_at(session, club, start)
+    history = _audience_history(club.id).c
     changes = (
-        await session.scalars(
-            select(SupporterChange)
-            .where(
-                SupporterChange.club_id == club.id,
-                SupporterChange.effective_at > start,
-                SupporterChange.effective_at < end,
+        (
+            await session.execute(
+                select(history.at, history.after)
+                .where(history.at > start, history.at < end)
+                .order_by(history.at, history.reset, history.after)
             )
-            .order_by(SupporterChange.effective_at, SupporterChange.after_count, SupporterChange.id)
         )
-    ).all()
+        .tuples()
+        .all()
+    )
     cursor, total, periods = start, 0, []
-    for timestamp, new_fans in [*((r.effective_at, r.after_count) for r in changes), (end, fans)]:
+    for timestamp, new_fans in [*changes, (end, fans)]:
         seconds = (timestamp - cursor).total_seconds()
         if seconds:
             due = accrued_wage(merchandise_income(fans), ceil(seconds), CYCLE_SECONDS)

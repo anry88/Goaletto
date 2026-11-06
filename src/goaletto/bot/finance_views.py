@@ -17,6 +17,7 @@ KINDS = LabelMap(
         "opening": "Начальный баланс",
         "debt_conversion": "Перенос задолженности в баланс",
         "grant": "Стартовый капитал",
+        "claim_balance": "Баланс при получении клуба",
         "tickets": "Билеты",
         "sponsor": "Спонсор",
         "merchandise": "Мерч",

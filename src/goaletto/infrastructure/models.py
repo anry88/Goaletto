@@ -1674,7 +1674,9 @@ class AcademyCandidate(Base):
 
     __tablename__ = "academy_candidates"
     __table_args__ = (
-        UniqueConstraint("club_id", "season_id", "slot", name="uq_academy_club_season_slot"),
+        UniqueConstraint(
+            "club_id", "season_id", "generation", "slot", name="uq_academy_club_season_slot"
+        ),
         CheckConstraint("policy_version = 'academy-v1'", name="ck_academy_policy"),
         CheckConstraint("slot >= 1", name="ck_academy_slot"),
         CheckConstraint("age BETWEEN 17 AND 18", name="ck_academy_age"),
@@ -1700,6 +1702,7 @@ class AcademyCandidate(Base):
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
     season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
     slot: Mapped[int] = mapped_column(SmallInteger)
+    generation: Mapped[int] = mapped_column(Integer, server_default="0")
     policy_version: Mapped[str] = mapped_column(String(32), server_default="academy-v1")
     name: Mapped[str] = mapped_column(String(120))
     country_code: Mapped[str] = mapped_column(String(2), default=_person_country)
@@ -1819,7 +1822,8 @@ class LedgerEntry(Base):
             "kind IN ('opening','grant','tickets','sponsor','merchandise',"
             "'player_salary','staff_salary','stadium_upkeep','prize','reserve','release',"
             "'transfer_in','transfer_out','arrears_paid','stadium_upgrade','signing_fee',"
-            "'scout_search','academy_upkeep','academy_upgrade','debt_conversion','player_release')",
+            "'scout_search','academy_upkeep','academy_upgrade','debt_conversion','player_release',"
+            "'claim_balance')",
             name="ck_ledger_kind",
         ),
         Index("ix_ledger_club_page", "club_id", "sequence"),
@@ -1908,8 +1912,10 @@ class StadiumExpansion(Base):
             name="ck_expansion_dates",
         ),
         CheckConstraint(
-            "status IN ('queued','finished') AND "
-            "(status = 'finished') = (completed_at IS NOT NULL)",
+            "status IN ('queued','finished','cancelled') AND "
+            "((status = 'finished') = (completed_at IS NOT NULL)) AND "
+            "((status = 'cancelled') = (cancelled_at IS NOT NULL)) AND "
+            "(cancelled_at IS NULL OR cancelled_at >= started_at)",
             name="ck_expansion_state",
         ),
         UniqueConstraint("operation_id", name="uq_expansion_operation"),
@@ -1930,7 +1936,24 @@ class StadiumExpansion(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16))
+
+
+class ClubClaimReset(Base):
+    """Immutable starting conditions and pre-claim assets for one new ownership."""
+
+    __tablename__ = "club_claim_resets"
+    ownership_id: Mapped[UUID] = mapped_column(ForeignKey("ownership_periods.id"), primary_key=True)
+    club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), index=True)
+    season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"))
+    claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    supporters_before: Mapped[int] = mapped_column(Integer)
+    supporters_after: Mapped[int] = mapped_column(Integer)
+    capacity_before: Mapped[int] = mapped_column(Integer)
+    capacity_after: Mapped[int] = mapped_column(Integer)
+    academy_level_before: Mapped[int] = mapped_column(SmallInteger)
+    academy_level_after: Mapped[int] = mapped_column(SmallInteger)
 
 
 class MatchInjury(Base):
@@ -2693,6 +2716,7 @@ class AcademyIntake(Base):
     __table_args__ = (CheckConstraint("level BETWEEN 1 AND 5", name="ck_academy_intake_level"),)
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"), primary_key=True)
     season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), primary_key=True)
+    generation: Mapped[int] = mapped_column(Integer, primary_key=True, server_default="0")
     level: Mapped[int] = mapped_column(SmallInteger)
 
 
@@ -2701,7 +2725,9 @@ class AcademyProspect(Base):
 
     __tablename__ = "academy_prospects"
     __table_args__ = (
-        UniqueConstraint("club_id", "season_id", "slot", name="uq_academy_prospect_slot"),
+        UniqueConstraint(
+            "club_id", "season_id", "generation", "slot", name="uq_academy_prospect_slot"
+        ),
         CheckConstraint("level BETWEEN 1 AND 5", name="ck_academy_prospect_level"),
         CheckConstraint("slot BETWEEN 1 AND 5", name="ck_academy_prospect_slot"),
         CheckConstraint("country_code ~ '^[A-Z]{2}$'", name="ck_academy_prospect_country"),
@@ -2719,6 +2745,7 @@ class AcademyProspect(Base):
     club_id: Mapped[UUID] = mapped_column(ForeignKey("clubs.id"))
     season_id: Mapped[UUID] = mapped_column(ForeignKey("seasons.id"), index=True)
     slot: Mapped[int] = mapped_column(SmallInteger)
+    generation: Mapped[int] = mapped_column(Integer, server_default="0")
     level: Mapped[int] = mapped_column(SmallInteger)
     name: Mapped[str] = mapped_column(String(120))
     country_code: Mapped[str] = mapped_column(String(2))

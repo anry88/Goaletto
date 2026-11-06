@@ -4,11 +4,13 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import uuid4, uuid5
 
 import pytest
 from sqlalchemy import func, select
 
+from goaletto.application.analytics import Surface
+from goaletto.application.game_actions import user_effect
 from goaletto.application.history import get_match_report
 from goaletto.application.lineup import (
     LineupInput,
@@ -26,15 +28,18 @@ from goaletto.config import Settings
 from goaletto.diagnostics.checks import collect_report
 from goaletto.diagnostics.queries import collect_snapshot
 from goaletto.domain.lineup import StarterPick
+from goaletto.domain.ownership import ownership_deadline
 from goaletto.domain.world import WorldOptions
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import (
     AcceptedCommand,
+    Club,
     Fixture,
     Job,
     Match,
     MatchResult,
     OutboxBoard,
+    OwnershipPeriod,
     Person,
     Standing,
 )
@@ -58,9 +63,30 @@ async def setup_world(sessions, *, options=OPTIONS, at=NOW):
         await activate_season(session, result.season_id, at)
         entry = await begin_game(session, telegram_id=1001, update_id=1, payload=None, at=at)
         claim_actor = replace(entry.actor, operation_id=uuid4(), update_id=4)
-        owner = await claim_club(session, claim_actor, entry.offers[0].id)
+        owner = await existing_ownership(session, claim_actor, entry.offers[0].id)
         club_id = owner.club_id
     return result, claim_actor, club_id
+
+
+async def existing_ownership(session, actor, club_id):
+    """Seed a pre-upgrade manager for tests of existing clubs and historical records."""
+    club = await session.get(Club, club_id)
+    owner = OwnershipPeriod(
+        id=uuid5(actor.operation_id, "ownership"),
+        operation_key=f"claim:v1:{actor.operation_id}",
+        club_id=club_id,
+        manager_id=actor.manager_id,
+        claimed_at=actor.at,
+        last_game_action_at=actor.at,
+        expires_at=ownership_deadline(actor.at),
+    )
+    session.add(owner)
+    club.owner_telegram_id = actor.telegram_id
+    await session.flush()
+    await user_effect(
+        session, actor, "club_claimed", Surface.ONBOARDING, ownership=owner, club_id=club_id
+    )
+    return owner
 
 
 async def job(sessions, kind, fixture_id=None, tick=None):
