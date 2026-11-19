@@ -1,6 +1,7 @@
 """Native private-chat command menu, refreshed idempotently at bot startup."""
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramForbiddenError
 from aiogram.types import (
     BotCommand,
     BotCommandScopeAllPrivateChats,
@@ -32,6 +33,7 @@ COMMANDS = (
     ("paysupport", "Покупки Stars и возвраты", "Stars purchases and refunds"),
     ("help", "Помощь по игре", "Game help"),
 )
+MENU_REQUEST_TIMEOUT = 12
 
 
 def command_menu(*, game_enabled: bool, language: str = "ru") -> list[BotCommand]:
@@ -50,12 +52,19 @@ async def configure_commands(
             command_menu(game_enabled=game_enabled, language=language),
             scope=scope,
             language_code=language,
+            request_timeout=MENU_REQUEST_TIMEOUT,
         )
     for chat_id, chosen in (saved_locales or {}).items():
         for code in ("", "ru", "en"):
-            await bot.set_my_commands(
-                command_menu(game_enabled=game_enabled, language=chosen),
-                scope=BotCommandScopeChat(chat_id=chat_id),
-                language_code=code,
-            )
-    await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+            try:
+                await bot.set_my_commands(
+                    command_menu(game_enabled=game_enabled, language=chosen),
+                    scope=BotCommandScopeChat(chat_id=chat_id),
+                    language_code=code,
+                    request_timeout=MENU_REQUEST_TIMEOUT,
+                )
+            except TelegramForbiddenError:
+                break
+    await bot.set_chat_menu_button(
+        menu_button=MenuButtonCommands(), request_timeout=MENU_REQUEST_TIMEOUT
+    )

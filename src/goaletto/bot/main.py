@@ -1,15 +1,15 @@
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher, F, Router
+from aiogram import Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from sqlalchemy import select
 
 from goaletto.bot.access import TelegramAccess
-from goaletto.bot.commands import configure_commands
 from goaletto.bot.language import TelegramLanguage
 from goaletto.bot.metrics import TelegramMetrics, UpdateMetrics
+from goaletto.bot.startup import PollingBot, run_polling
 from goaletto.config import Settings
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.metrics_server import serve_metrics
@@ -125,7 +125,7 @@ async def run() -> None:
     token = settings.bot_token.get_secret_value()
     if not token:
         raise SystemExit("Set GOALETTO_BOT_TOKEN in .env before starting the bot")
-    bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = PollingBot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     bot.session.middleware(TelegramMetrics())
     database = (
         Database(settings) if settings.game_enabled or settings.payments_admin_chat_id else None
@@ -154,11 +154,13 @@ async def run() -> None:
                     for uid, locale in rows
                     if not settings.allowed_telegram_ids or uid in settings.allowed_telegram_ids
                 }
-        await configure_commands(
-            bot, game_enabled=settings.game_enabled, saved_locales=saved_locales
-        )
         async with serve_metrics(settings, database, "bot"):
-            await dispatcher.start_polling(bot, close_bot_session=False)
+            await run_polling(
+                bot,
+                dispatcher,
+                game_enabled=settings.game_enabled,
+                saved_locales=saved_locales,
+            )
     finally:
         await bot.session.close()
         if database is not None:
