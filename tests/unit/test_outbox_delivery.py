@@ -390,6 +390,29 @@ async def test_blocked_chat_is_terminal_and_not_user_activity(store, error, code
     assert store.events[0].name == "bot_unavailable" and store.events[0].session_id is None
 
 
+async def test_blocked_recipient_skips_queued_and_new_messages_until_confirmed(store):
+    first = store.message()
+    queued = store.message("ownership_reminder")
+    initial = Transport(store, send=Blocked())
+    await process_one_delivery(store, initial, clock=lambda: store.now)
+    assert first.last_error == "blocked" and len(initial.calls) == 1
+
+    fresh = store.message("ownership_reminder")
+    restarted = Transport(store)
+    for _ in range(2):
+        await process_one_delivery(store, restarted, clock=lambda: store.now)
+    assert not restarted.calls
+    for row in (queued, fresh):
+        assert row.last_error == "skip_unavailable"
+        assert row.attempts == 0
+
+    store.manager.bot_available = True
+    store.manager.bot_confirmed_at = store.now
+    after_return = store.message(tick=4)
+    await process_one_delivery(store, restarted, clock=lambda: store.now)
+    assert after_return.status == "sent" and len(restarted.calls) == 1
+
+
 async def test_invalid_request_does_not_disable_manager(store):
     row = store.message()
     await process_one_delivery(

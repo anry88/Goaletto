@@ -87,6 +87,9 @@ outcome независимо от opt-out/retention journey. Network-start об�
 - bot_available=false подавляет сеть. Blocked/chat unavailable сохраняет отказ;
   более новый вход `/start` подтверждает bot_confirmed_at и не даёт старому
   сетевому ответу снова выключить доступность.
+- Другие ответы Forbidden закрывают конкретную отправку как invalid_request.
+  Личные уведомления о платежах также проверяют доступность менеджера. Статусы
+  платежа, возврата и отправка в чат поддержки имеют собственные правила.
 - result_delivered / bot_unavailable записываются атомарно с finish, origin system,
   без user session. Opt-out/internal и отсутствие coverage не мешают бизнес-дедуп.
 - Sender не обновляет ownership last_game_action_at/expires_at или user session.

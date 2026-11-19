@@ -47,6 +47,8 @@ class BotStub:
     "error,expected",
     [
         (TelegramForbiddenError(METHOD, "bot was blocked by the user"), Blocked),
+        (TelegramForbiddenError(METHOD, "user is deactivated"), ChatUnavailable),
+        (TelegramForbiddenError(METHOD, "not enough rights to send text messages"), InvalidRequest),
         (TelegramBadRequest(METHOD, "chat not found"), ChatUnavailable),
         (TelegramBadRequest(METHOD, "can't parse entities"), InvalidRequest),
         (TelegramNetworkError(METHOD, "network failed"), TransportTimeout),

@@ -650,6 +650,13 @@ async def check_recipient(session: AsyncSession, message: OutboxMessage, now: da
         if paid is None:
             return Decision.SKIP_STALE
         if message.chat_id == paid.payer_id:
+            manager = await session.scalar(
+                select(Manager)
+                .where(Manager.telegram_id == message.chat_id)
+                .execution_options(populate_existing=True)
+            )
+            if manager is not None and not manager.bot_available:
+                return Decision.SKIP_UNAVAILABLE
             return Decision.DELIVER
         request = (
             await session.get(PaySupportRequest, _payload_uuid(payload, "request_id"))

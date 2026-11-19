@@ -37,6 +37,7 @@ from goaletto.infrastructure.models import (
     Club,
     ClubRenameReceipt,
     CosmeticGrant,
+    Manager,
     OutboxMessage,
     PaySupportRequest,
     Season,
@@ -329,6 +330,14 @@ async def test_admin_refund_durable_unknown_retry_and_revocation(sessions, unkno
         for message in messages:
             assert await check_recipient(session, message, NOW) == Decision.DELIVER
             assert render_text(message.payload)
+        assert {m.chat_id for m in messages} >= {paid.payer_id, ADMIN}
+        (await session.get(Manager, actor.manager_id)).bot_available = False
+        await session.flush()
+        for message in messages:
+            decision = (
+                Decision.SKIP_UNAVAILABLE if message.chat_id == paid.payer_id else Decision.DELIVER
+            )
+            assert await check_recipient(session, message, NOW) == decision
     assert not await process_refund(source, bot)
 
 

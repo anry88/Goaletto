@@ -32,9 +32,11 @@ def _classify_error(error: Exception, *, editing: bool = False) -> Exception:
         return RateLimited(float(error.retry_after))
     if isinstance(error, TelegramForbiddenError):
         text = error.message.lower()
-        if "blocked" in text or "deactivated" in text:
+        if "bot was blocked by the user" in text:
             return Blocked()
-        return ChatUnavailable()
+        if "user is deactivated" in text or "bot can't initiate conversation with a user" in text:
+            return ChatUnavailable()
+        return InvalidRequest()
     if isinstance(error, TelegramBadRequest):
         text = error.message.lower()
         if "chat not found" in text or "chat_id is empty" in text:
