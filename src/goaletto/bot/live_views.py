@@ -16,6 +16,7 @@ from goaletto.domain.match_types import Instruction, Mentality, Side, Tactic
 from goaletto.domain.names import latin_name
 from goaletto.presentation.club_status import club_label
 from goaletto.presentation.i18n import LabelMap, tr
+from goaletto.presentation.person_names import short_name
 
 INSTRUCTION_LABELS = LabelMap(
     {
@@ -216,7 +217,7 @@ def render(
                 )
             players = list(team.snapshot.players)
             index_by_id = {p.id: index for index, p in enumerate(players, 1)}
-            names = {p.id: latin_name(p.name) for p in players}
+            names = {p.id: short_name(p.name) for p in players}
             if panel == 1:
                 conditions = {c.player_id: c for c in team.conditions}
                 rows = [
@@ -283,7 +284,7 @@ def render(
                 lines.append(
                     tr(
                         "Заменяем: <b>{name}</b> · форма {form}/10 · ⚡ {energy}%",
-                        name=escape(names[outgoing]),
+                        name=escape(latin_name(players[selected - 1].name)),
                         form=players[selected - 1].form,
                         energy=conditions[outgoing].energy_bps // 100,
                     )

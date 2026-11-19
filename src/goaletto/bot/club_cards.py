@@ -24,7 +24,7 @@ from goaletto.domain.names import latin_name
 from goaletto.domain.nationalities import country_label
 from goaletto.presentation.club_status import club_label
 from goaletto.presentation.i18n import LabelMap, locale, tr
-from goaletto.presentation.person_names import person_name
+from goaletto.presentation.person_names import person_button_name, person_name
 from goaletto.presentation.progress import position_percent
 
 MENU_CALLBACK = "vc:menu"
@@ -255,7 +255,7 @@ def squad_view(page: SquadPage) -> tuple[str, InlineKeyboardMarkup]:
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f"{offset}. {person_name(member)}"[:60],
+                    text=f"{offset}. {person_button_name(member)}"[:60],
                     callback_data=player_callback(member.person_id, page.page),
                 )
             ]

@@ -14,7 +14,7 @@ from goaletto.domain.finances import MAX_MONEY
 from goaletto.domain.market import BID_STEP, decode_price, encode_price, minimum_bid
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
-from goaletto.presentation.person_names import person_name
+from goaletto.presentation.person_names import person_button_name, person_name
 
 STATES = LabelMap(
     {"open": "Открыт", "sold": "Продан", "expired": "Без ставок", "cancelled": "Отменён"}
@@ -120,7 +120,7 @@ def market_view(screen: MarketScreen, notice: str | None = None) -> tuple[str, K
         rows.append(
             [
                 button(
-                    person_name(item.person),
+                    person_button_name(item.person),
                     f"mk:a:{compact_id(auc.id)}",
                 )
             ]
@@ -158,7 +158,7 @@ def seller_view(screen: MarketScreen, page: int) -> tuple[str, Keyboard]:
         rows.append(
             [
                 button(
-                    f"{person_name(person)} · {person.age} · "
+                    f"{person_button_name(person)} · {person.age} · "
                     + "/".join((player.position, *player.alternative_positions)),
                     f"mk:q:{compact_id(person.id)}:{compact_id(screen.ownership_id)}",
                 )

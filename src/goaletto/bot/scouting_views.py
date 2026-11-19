@@ -12,7 +12,7 @@ from goaletto.bot.result_views import compact_id
 from goaletto.domain.finances import SCOUT_SEARCH_DAYS, scout_mission_fee
 from goaletto.domain.player_positions import ADJACENT
 from goaletto.presentation.i18n import tr
-from goaletto.presentation.person_names import person_name
+from goaletto.presentation.person_names import person_button_name, person_name
 
 
 def view(screen: ScoutScreen, notice: str | None = None) -> tuple[str, Keyboard]:
@@ -144,7 +144,7 @@ def report(screen: ScoutScreen, mission_id: UUID) -> tuple[str, Keyboard]:
         rows.append(
             [
                 button(
-                    person_name(item.person),
+                    person_button_name(item.person),
                     f"ss:f:{compact_id(screen.ownership_id)}:{compact_id(item.person.id)}",
                 )
             ]

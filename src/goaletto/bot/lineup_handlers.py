@@ -83,7 +83,7 @@ async def build_callback_response(
         # The original update already saved successfully. Its older revision is
         # expected on redelivery and must not become a new rejected action.
         return views.render_main(data), views.main_keyboard(data)
-    if str(data.version) != version:
+    if action != "refresh" and str(data.version) != version:
         await rejection(session, actor, Surface.SQUAD, Reason.STALE_ACTION)
         return (
             views.render_main(data, tr("Экран устарел — показана актуальная версия.")),
@@ -183,16 +183,20 @@ async def _help(
         else Reason.INVALID_INPUT
     )
     await observe(database, telegram_id, update_id, Surface.SQUAD, reason)
-    text = (
-        tr("Нет действующего владения клубом. Откройте /start.")
-        if isinstance(error, PermissionDenied)
-        else tr("Игрок дисквалифицирован на следующий матч этого турнира. Выберите другого.")
-        if isinstance(error, LineupInvalid) and error.code == "suspended"
-        else tr(
-            "Состав не изменён: экран устарел, игрок недоступен или "
-            "состав уже заблокирован. Откройте /lineup заново."
-        )
-    )
+    if isinstance(error, PermissionDenied):
+        text = tr("Нет действующего владения клубом. Откройте /start.")
+    elif isinstance(error, LineupLocked):
+        text = tr("Состав на этот матч уже заблокирован. Откройте состав после матча.")
+    elif isinstance(error, LineupInvalid) and error.code == "suspended":
+        text = tr("Игрок дисквалифицирован на следующий матч этого турнира. Выберите другого.")
+    elif isinstance(error, LineupInvalid) and error.code == "goalkeeper_assignment":
+        text = tr("Вратарь может заменить только вратаря. Выберите игрока своей линии.")
+    elif isinstance(error, LineupInvalid) and error.code == "injured":
+        text = tr("Травмированный игрок не может выйти в основе. Выберите другого.")
+    elif isinstance(error, LineupInvalid):
+        text = tr("Эта расстановка недоступна. Откройте состав и проверьте выбранных игроков.")
+    else:
+        text = tr("Экран устарел. Откройте актуальный состав.")
     keyboard = recovery_keyboard(lineup=not isinstance(error, PermissionDenied))
     if edit:
         await edit_response(message, text, keyboard)
@@ -224,7 +228,10 @@ async def _dispatch(
         return None
     if action == "f":
         candidates = tuple(
-            SlotCandidate(m.person_id, m.position, m.alternatives) for m in data.starters
+            SlotCandidate(m.person_id, "GK", ())
+            if data.emergency_goalkeeper and m.slot_position == "GK"
+            else SlotCandidate(m.person_id, m.position, m.alternatives)
+            for m in data.starters
         )
         starters = reassign_slots(candidates, args[0])
         new_captain: UUID = data.captain_id or starters[0].person_id

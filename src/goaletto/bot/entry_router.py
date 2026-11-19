@@ -4,10 +4,13 @@ from datetime import UTC, datetime
 from html import escape
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 
 from goaletto.application.analytics import Reason, Surface
+from goaletto.application.club_country import screen as country_screen
+from goaletto.application.club_rename import screen as rename_screen
 from goaletto.application.club_view import actor_for_callback, get_owned_club
 from goaletto.application.game_actions import PermissionDenied
 from goaletto.application.onboarding import (
@@ -20,7 +23,9 @@ from goaletto.application.onboarding import (
 )
 from goaletto.bot.club_cards import club_view, format_money
 from goaletto.bot.club_kit import show_club
+from goaletto.bot.country_router import view as country_view
 from goaletto.bot.onboarding_measurement import observe, recovery_keyboard
+from goaletto.bot.rename_router import view as rename_view
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.names import latin_name
@@ -62,6 +67,23 @@ def offer_view(items: tuple[ClubOffer, ...], page: int = 1) -> tuple[str, Inline
         buttons.append(nav)
     buttons.append([InlineKeyboardButton(text=tr("Обновить"), callback_data=f"en:o:{page}")])
     return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+async def _edit_entry(message: Message, text: str, keyboard: InlineKeyboardMarkup) -> None:
+    # Keep new entry screens as text. Old callbacks can still refer to a
+    # message the previous version converted to a photo, with stale metadata.
+    try:
+        if not message.photo:
+            try:
+                await edit_response(message, text, keyboard)
+                return
+            except TelegramBadRequest as error:
+                if "there is no text in the message to edit" not in error.message.lower():
+                    raise
+        await message.edit_caption(caption=text, reply_markup=keyboard)
+    except TelegramBadRequest as error:
+        if "message is not modified" not in error.message.lower():
+            raise
 
 
 @router.message(CommandStart())
@@ -115,7 +137,6 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
     message = query.message
     if not isinstance(message, Message) or message.chat.type != "private":
         return
-    card = None
     shown_offers: tuple[ClubOffer, ...] = ()
     try:
         parts = (query.data or "").split(":")
@@ -129,7 +150,19 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                 at=datetime.now(UTC),
                 update_id=event_update.update_id,
             )
-            if parts[1] == "o" and len(parts) == 3:
+            try:
+                card = await get_owned_club(session, actor, record=False)
+            except PermissionDenied:
+                card = None
+            if card is not None:
+                # A second callback can arrive while the claim response is in
+                # flight. Route it using committed ownership, not the old menu.
+                text, keyboard = (
+                    country_view(await country_screen(session, actor, record=False), mode="r")
+                    if card.country_code is None
+                    else club_view(card)
+                )
+            elif parts[1] == "o" and len(parts) == 3:
                 if not parts[2].isascii() or not parts[2].isdigit():
                     raise ValueError("Invalid page")
                 page = int(parts[2])
@@ -168,17 +201,11 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
                 )
             elif parts[1] == "c" and len(parts) == 3:
                 await claim_club(session, actor, expand_id(parts[2]))
-                card = await get_owned_club(session, actor, record=False)
-                from goaletto.application.club_country import screen as country_screen
-                from goaletto.application.club_rename import screen
-                from goaletto.bot.country_router import view as country_view
-                from goaletto.bot.rename_router import view
-
                 country = await country_screen(session, actor, record=False)
                 text, keyboard = (
                     country_view(country, mode="r")
                     if country.country_code is None
-                    else view(await screen(session, actor))
+                    else rename_view(await rename_screen(session, actor))
                 )
             else:
                 raise ValueError("Stale entry callback")
@@ -193,21 +220,18 @@ async def entry_callback(query: CallbackQuery, database: Database, event_update:
         await observe(
             database, query.from_user.id, event_update.update_id, Surface.ONBOARDING, reason
         )
-        await edit_response(
+        await _edit_entry(
             message,
             tr("Клуб или кнопка больше недоступны. Откройте /start заново."),
             recovery_keyboard(),
         )
         await observe(database, query.from_user.id, event_update.update_id, Surface.ONBOARDING)
         return
-    if card is not None:
-        await show_club(message, database, card, edit=True, view=(text, keyboard))
-    else:
-        await edit_response(message, text, keyboard)
-        if shown_offers:
-            await observe(
-                database, query.from_user.id, event_update.update_id, Surface.ONBOARDING, offer=True
-            )
+    await _edit_entry(message, text, keyboard)
+    if shown_offers:
+        await observe(
+            database, query.from_user.id, event_update.update_id, Surface.ONBOARDING, offer=True
+        )
 
 
 @router.message(Command("help"))

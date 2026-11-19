@@ -71,6 +71,11 @@ class SquadMember:
     tournament_yellows: int = 0
     form: int = 6
     position_experience: tuple[tuple[str, int], ...] = ()
+    injured_at_kickoff: bool | None = None
+
+    @property
+    def injured_for_lineup(self) -> bool:
+        return self.injured if self.injured_at_kickoff is None else self.injured_at_kickoff
 
 
 @dataclass(frozen=True)
@@ -90,6 +95,7 @@ class LineupData:
     reserves: tuple[SquadMember, ...] = ()
     allowed_tactics: tuple[str, ...] = ()
     discipline_competition: str | None = None
+    emergency_goalkeeper: bool = False
 
 
 @dataclass(frozen=True)
@@ -201,6 +207,14 @@ def _roster(
     return tuple(roster)
 
 
+def _needs_emergency_goalkeeper(
+    roster: tuple[RosterPlayer, ...], suspended: set[UUID] | frozenset[UUID]
+) -> bool:
+    return not any(
+        p.position == "GK" and not p.injured and p.person_id not in suspended for p in roster
+    )
+
+
 async def _latest_captain(session: AsyncSession, club_id: UUID) -> UUID | None:
     row = await session.scalar(
         select(AcceptedCommand)
@@ -268,14 +282,18 @@ async def _assemble(
     scope = await tournament_scope(session, upcoming) if upcoming is not None else None
     accounts = await balances(session, scope, [p.person_id for p in players])
     suspended = frozenset(pid for pid, row in accounts.items() if row.bans)
-    injured_starters = {
-        p.person_id
-        for p in players
-        if p.injured_until is not None
-        and upcoming is not None
-        and p.injured_until > upcoming.scheduled_start_at
-    }.intersection(s.person_id for s in slots if s.slot <= 11)
-    if (suspended or injured_starters) and upcoming is not None:
+    selection_at = upcoming.scheduled_start_at if upcoming is not None else actor.at
+    roster = {p.person_id: p for p in _roster(players, persons, selection_at)}
+    injured_starters = any(
+        p.injured for s in slots if s.slot <= 11 and (p := roster.get(s.person_id)) is not None
+    )
+    emergency_goalkeeper = _needs_emergency_goalkeeper(tuple(roster.values()), suspended)
+    restore_keeper = not emergency_goalkeeper and any(
+        s.position == "GK" and p.position != "GK"
+        for s in slots
+        if s.slot <= 11 and (p := roster.get(s.person_id)) is not None
+    )
+    if (suspended or injured_starters or restore_keeper) and upcoming is not None:
         from goaletto.application.match_runtime import team_snapshot
 
         preview = await team_snapshot(
@@ -317,6 +335,9 @@ async def _assemble(
             energies[player.person_id],
             person.country_code,
             form=player.form,
+            injured_at_kickoff=(
+                player.injured_until is not None and player.injured_until > selection_at
+            ),
             position_experience=tuple((player.position_experience or {}).items()),
             suspended=player.person_id in suspended,
             tournament_yellows=accounts[player.person_id].yellows
@@ -340,6 +361,7 @@ async def _assemble(
             energies[p.person_id],
             persons[p.person_id].country_code,
             form=p.form,
+            injured_at_kickoff=p.injured_until is not None and p.injured_until > selection_at,
             position_experience=tuple((p.position_experience or {}).items()),
             suspended=p.person_id in suspended,
             tournament_yellows=accounts[p.person_id].yellows if p.person_id in accounts else 0,
@@ -376,6 +398,7 @@ async def _assemble(
         reserves=reserves,
         allowed_tactics=tuple(t.value for t in coach.abilities.tactics),
         discipline_competition=upcoming.competition if scope is not None and upcoming else None,
+        emergency_goalkeeper=emergency_goalkeeper,
     )
 
 
@@ -446,20 +469,17 @@ async def save_lineup(
         raise LineupLocked("Lineup lock passed while waiting for player locks")
     if ownership.expires_at <= checked_at:
         raise PermissionDenied("Ownership expired while saving lineup")
-    roster = _roster(players, persons, checked_at)
     from goaletto.application.discipline import balances, tournament_scope
 
     upcoming = await _next_fixture(session, club.id)
+    roster = _roster(
+        players, persons, upcoming.scheduled_start_at if upcoming is not None else checked_at
+    )
     scope = await tournament_scope(session, upcoming) if upcoming else None
     accounts = await balances(session, scope, [p.person_id for p in players])
     banned = {pid for pid, row in accounts.items() if row.bans}
     if banned.intersection(selected):
         raise LineupInvalid("suspended", "A suspended player cannot enter XI or bench")
-    emergency_keeper = any(
-        p.position == "GK" and p.person_id in banned for p in roster
-    ) and not any(
-        p.position == "GK" and p.person_id not in banned and not p.injured for p in roster
-    )
     validated = validate_lineup(
         roster=roster,
         starters=lineup_input.starters,
@@ -468,7 +488,7 @@ async def save_lineup(
         captain_id=lineup_input.captain_id,
         tactic=lineup_input.tactic,
         mentality=lineup_input.mentality,
-        allow_emergency_goalkeeper=emergency_keeper,
+        allow_emergency_goalkeeper=_needs_emergency_goalkeeper(roster, banned),
     )
     from goaletto.application.coaches import coach_snapshot
 

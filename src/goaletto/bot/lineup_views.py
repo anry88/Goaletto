@@ -17,7 +17,7 @@ from goaletto.domain.lineup import (
 from goaletto.domain.match_types import Mentality, Tactic
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
-from goaletto.presentation.person_names import person_name
+from goaletto.presentation.person_names import person_button_name, person_name
 from goaletto.presentation.progress import position_percent
 
 TACTIC_LABELS = LabelMap(
@@ -267,6 +267,7 @@ def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
     version = compact_id(data.ownership_id) + ":" + _version_text(data.version)
     if not 1 <= slot <= len(data.starters):
         raise ValueError("Invalid starter slot")
+    goalkeeper_slot = data.starters[slot - 1].slot_position == "GK"
     rows = [
         [_button(tr("← Основа"), f"ln:panel:main:{version}")],
     ]
@@ -278,7 +279,12 @@ def swap_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
             )
         ]
         for member in (*data.bench, *data.reserves)
-        if not member.suspended and not member.injured
+        if not member.suspended
+        and not member.injured_for_lineup
+        and (
+            (member.position == "GK") == goalkeeper_slot
+            or (goalkeeper_slot and data.emergency_goalkeeper)
+        )
     )
     rows.append([_button(tr("← Назад"), f"ln:panel:swap:{version}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -313,7 +319,7 @@ def bench_choices_keyboard(data: LineupData, slot: int) -> InlineKeyboardMarkup:
             )
         ]
         for m in data.reserves
-        if not m.suspended and not m.injured
+        if not m.suspended and not m.injured_for_lineup
     ]
     if slot < 12 + len(data.bench):
         rows.append([_button(tr("Оставить вне заявки"), f"ln:br:{slot}:{version}")])
@@ -341,7 +347,7 @@ def captain_keyboard(data: LineupData) -> InlineKeyboardMarkup:
     rows = [
         [
             _button(
-                f"{'© ' if member.person_id == data.captain_id else ''}{person_name(member)}",
+                ("© " if member.person_id == data.captain_id else "") + person_button_name(member),
                 f"ln:cap:{compact_id(member.person_id)}:{version}",
             )
         ]
@@ -411,7 +417,7 @@ def parse_callback(value: str) -> tuple[str, tuple[str, ...]]:
 def condition_label(member: SquadMember) -> str:
     return tr(
         "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
-        name=person_name(member),
+        name=person_button_name(member),
         position=member.slot_position,
         form=member.form,
         energy=f"{member.energy_bps / 100:.0f}",

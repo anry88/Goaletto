@@ -12,28 +12,112 @@ from sqlalchemy.exc import DBAPIError
 from goaletto.application.calendar_planning import plan_horizon
 from goaletto.application.cup import initialize_season_cup
 from goaletto.application.knockout_prizes import backfill_current_prizes, unpaid_current_prizes
-from goaletto.application.match_runtime import NotReady, handle_calendar_job
+from goaletto.application.lineup import LineupLocked, load_lineup, save_lineup
+from goaletto.application.match_runtime import NotReady, handle_calendar_job, team_snapshot
+from goaletto.application.onboarding import begin_game
 from goaletto.application.results import finalize_result
 from goaletto.application.season_rollover import rollover_season
+from goaletto.bot.lineup_handlers import build_callback_response
+from goaletto.bot.lineup_views import swap_keyboard
 from goaletto.domain.match_codec import restore_state
 from goaletto.infrastructure.models import (
+    Club,
     CupBracket,
     CupTie,
     Fixture,
     FixturePlan,
     Job,
+    League,
     LedgerEntry,
     Match,
     MatchDevelopment,
     MatchResult,
     MatchTick,
     NeutralFinalBooking,
+    Player,
     Season,
     Standing,
 )
-from tests.integration.test_agent_wave import NOW, job, setup_world
+from tests.integration.test_agent_wave import NOW, existing_ownership, job, setup_world
 
 pytestmark = pytest.mark.integration
+
+
+async def test_outfield_swap_before_cup_with_both_goalkeepers_injured(sessions, monkeypatch):
+    await setup_world(sessions)
+    await job(sessions, "season.open")
+    async with sessions.begin() as session:
+        fixture = await session.scalar(
+            select(Fixture)
+            .join(Club, Club.id == Fixture.home_club_id)
+            .join(League, League.id == Club.league_id)
+            .where(
+                Fixture.competition == "cup",
+                League.tier == 5,
+                Club.owner_telegram_id.is_(None),
+            )
+            .order_by(Fixture.scheduled_start_at)
+            .limit(1)
+        )
+        assert fixture is not None
+        entry = await begin_game(session, telegram_id=1002, update_id=80, payload=None, at=NOW)
+        actor = replace(entry.actor, operation_id=uuid4(), update_id=81)
+        club_id = fixture.home_club_id
+        await existing_ownership(session, actor, club_id)
+        keepers = (
+            await session.scalars(
+                select(Player).where(Player.club_id == club_id, Player.position == "GK")
+            )
+        ).all()
+        assert len(keepers) == 2
+        recovered_at = fixture.scheduled_start_at + timedelta(days=2)
+        for keeper in keepers:
+            keeper.injured_until = recovered_at
+        await session.flush()
+        fixture_id, deadline = fixture.id, fixture.lineup_lock_at
+        draft = await load_lineup(session, actor)
+        assert draft.discipline_competition == "cup"
+        emergency = next(p for p in draft.starters if p.slot_position == "GK")
+        assert emergency.position != "GK"
+        slot = next(i for i, p in enumerate(draft.starters, 1) if p.slot_position != "GK")
+        swap = next(
+            b.callback_data
+            for row in swap_keyboard(draft, slot).inline_keyboard
+            for b in row
+            if b.callback_data.startswith("ln:s:")
+        )
+
+    async def save_at_callback_time(session, actor, draft):
+        return await save_lineup(session, actor, draft, clock=lambda: actor.at)
+
+    monkeypatch.setattr("goaletto.bot.lineup_handlers.save_lineup", save_at_callback_time)
+    async with sessions.begin() as session:
+        await build_callback_response(
+            session, actor.telegram_id, "healthy-outfielder", swap, NOW, update_id=82
+        )
+    async with sessions.begin() as session:
+        saved = await load_lineup(session, actor)
+        assert saved.version == draft.version + 1
+        assert saved.starters[slot - 1].person_id != draft.starters[slot - 1].person_id
+        assert next(p for p in saved.starters if p.slot_position == "GK").person_id == (
+            emergency.person_id
+        )
+        club = await session.get(Club, club_id)
+        snapshot = await team_snapshot(session, club, recovered_at, form_at=NOW)
+        keeper = next(p.player_id for p in snapshot.lineup if p.position == "GK")
+        assert keeper in {p.person_id for p in keepers}
+        locked_swap = next(
+            b.callback_data
+            for row in swap_keyboard(saved, slot).inline_keyboard
+            for b in row
+            if b.callback_data.startswith("ln:s:")
+        )
+        assert (await session.get(Fixture, fixture_id)).status == "scheduled"
+    async with sessions.begin() as session:
+        with pytest.raises(LineupLocked):
+            await build_callback_response(
+                session, actor.telegram_id, "locked-outfielder", locked_swap, deadline, update_id=83
+            )
 
 
 async def next_job(session, fixture_id):

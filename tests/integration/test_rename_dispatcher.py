@@ -2,21 +2,31 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.methods import EditMessageCaption, EditMessageText
 from aiogram.types import CallbackQuery, Chat, Message, Update, User
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from goaletto.application.match_runtime import activate_season
 from goaletto.application.world import initialize_world
 from goaletto.bot.main import build_dispatcher
 from goaletto.domain.world import WorldOptions
-from goaletto.infrastructure.models import Club, ClubNameChoice, OwnershipPeriod, Season
+from goaletto.infrastructure.models import (
+    Club,
+    ClubNameChoice,
+    JourneyEventRow,
+    OwnershipPeriod,
+    Season,
+)
 from tests.integration.test_game_dispatcher import Source, Telegram
 
 pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize("confirm", [True, False])
-async def test_claim_offers_name_then_restart_confirm_or_decline_until_offseason(sessions, confirm):
+async def test_claim_offers_name_then_restart_confirm_or_decline_until_offseason(
+    sessions, confirm, monkeypatch
+):
     now = datetime.now(UTC)
     async with sessions.begin() as session:
         result = await initialize_world(
@@ -38,7 +48,7 @@ async def test_claim_offers_name_then_restart_confirm_or_decline_until_offseason
     user = User(id=1001, is_bot=False, first_name="Manager")
     number = 100
 
-    async def send(text=None, data=None):
+    async def send(text=None, data=None, source_message=None):
         nonlocal number
         number += 1
         update = (
@@ -59,7 +69,7 @@ async def test_claim_offers_name_then_restart_confirm_or_decline_until_offseason
                     id=f"rename-{number}",
                     from_user=user,
                     chat_instance="test",
-                    message=transport.last_message,
+                    message=source_message or transport.last_message,
                     data=data,
                 ),
             )
@@ -76,9 +86,42 @@ async def test_claim_offers_name_then_restart_confirm_or_decline_until_offseason
         )
 
     response = await send("/start")
-    response = await send(data=button(response, "en:p:"))
-    response = await send(data=button(response, "en:c:"))
+    preview = button(response, "en:p:")
+    offer_message = response
+    preview_message = await send(data=preview)
+    claim = button(preview_message, "en:c:")
+    response = await send(data=claim)
     assert "Страна клуба" in (response.text or response.caption)
+    assert response.text is not None
+    # The same inline keyboard may already be queued in Telegram with a fresh
+    # callback/update ID, even though the claim transaction has committed.
+    for stale_button, stale_message in ((claim, preview_message), (preview, offer_message)):
+        response = await send(data=stale_button, source_message=stale_message)
+        assert "Страна клуба" in response.text
+    original_request = transport.make_request
+
+    async def old_photo_request(bot, method, **kwargs):
+        if isinstance(method, EditMessageText):
+            raise TelegramBadRequest(method, "Bad Request: there is no text in the message to edit")
+        return await original_request(bot, method, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(transport, "make_request", old_photo_request)
+        response = await send(data=claim, source_message=preview_message)
+        assert isinstance(transport.calls[-1], EditMessageCaption)
+        assert "Страна клуба" in response.caption
+    response = await send(data="en:o:1", source_message=offer_message)
+    assert "Страна клуба" in response.text
+    async with sessions.begin() as session:
+        assert await session.scalar(select(func.count()).select_from(OwnershipPeriod)) == 1
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(JourneyEventRow)
+                .where(JourneyEventRow.name == "action_rejected")
+            )
+            == 0
+        )
     country = next(
         b.callback_data
         for row in response.reply_markup.inline_keyboard

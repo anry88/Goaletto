@@ -624,6 +624,35 @@ async def test_editor_swap_and_captain_callbacks_save_atomically():
     assert (await load_lineup(session, recorder.actor)).captain_id == captain.person_id
 
 
+async def test_swap_picker_only_offers_compatible_goalkeepers_and_keeps_energy():
+    recorder = Recorder()
+    data = await load_lineup(cast(AsyncSession, recorder), recorder.actor)
+    keeper = replace(data.bench[0], name="Alexander Van der Sar", position="GK", energy_bps=8700)
+    outfielder = replace(data.bench[1], position="MC")
+    data = replace(data, bench=(keeper, outfielder))
+
+    goalie_buttons = [b for row in views.swap_keyboard(data, 1).inline_keyboard for b in row]
+    replacement = [b for b in goalie_buttons if b.callback_data.startswith("ln:s:")]
+    assert len(replacement) == 1 and compact_id(keeper.person_id) in replacement[0].callback_data
+    assert "A. Van der Sar" in replacement[0].text and "⚡ 87%" in replacement[0].text
+    assert "Alexander Van der Sar" in views.render_main(data)
+
+    outfield_buttons = [b for row in views.swap_keyboard(data, 2).inline_keyboard for b in row]
+    assert any(compact_id(outfielder.person_id) in b.callback_data for b in outfield_buttons)
+    assert all(compact_id(keeper.person_id) not in b.callback_data for b in outfield_buttons)
+
+    emergency = replace(
+        data,
+        starters=(replace(data.starters[0], injured=True), *data.starters[1:]),
+        bench=(replace(keeper, injured=True), outfielder),
+        emergency_goalkeeper=True,
+    )
+    emergency_buttons = [
+        b for row in views.swap_keyboard(emergency, 1).inline_keyboard for b in row
+    ]
+    assert any(compact_id(outfielder.person_id) in b.callback_data for b in emergency_buttons)
+
+
 async def test_callback_from_previous_ownership_cannot_change_new_club():
     recorder = Recorder()
     text, _ = await build_callback_response(

@@ -303,11 +303,17 @@ async def team_snapshot(
     # Bring an existing unselected reserve into consideration for a suspension.
     # Stable saved-bench order first; no quality sorting or generated replacements.
     unavailable = frozenset(p.id for p in players if not p.available)
+    restore_keeper = any(p.position == "GK" and p.available for p in players) and any(
+        slot.position == "GK" and by_id[slot.player_id].position != "GK" for slot in starters
+    )
     if unavailable:
         selected = {s.person_id for s in slots}
         bench.extend(p.id for p in players if p.id not in selected and p.available)
+    elif restore_keeper:
+        selected = {s.person_id for s in slots}
+        bench.extend(p.id for p in players if p.id not in selected and p.position == "GK")
     for index, slot in enumerate(starters):
-        if by_id[slot.player_id].available:
+        if by_id[slot.player_id].available and not (slot.position == "GK" and restore_keeper):
             continue
         replacement = next(
             (pid for pid in bench if by_id[pid].available and by_id[pid].position == slot.position),

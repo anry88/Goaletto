@@ -15,7 +15,7 @@ from goaletto.domain.names import latin_name
 from goaletto.domain.staff_quality import QUALITY_NAMES, quality_tier
 from goaletto.infrastructure.models import StaffChange
 from goaletto.presentation.i18n import LabelMap, tr
-from goaletto.presentation.person_names import person_name
+from goaletto.presentation.person_names import person_button_name, person_name
 
 ROLES = LabelMap(
     {
@@ -202,7 +202,7 @@ def candidate_list(
         rows.append(
             [
                 button(
-                    person_name(person),
+                    person_button_name(person) if kind == "player" else person_name(person),
                     f"cg:{action}:{compact_id(person.id)}:{compact_id(screen.ownership_id)}:{encode_price(value)}",
                 )
             ]

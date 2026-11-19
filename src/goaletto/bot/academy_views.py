@@ -13,7 +13,7 @@ from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.academy import academy_upkeep
 from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import tr
-from goaletto.presentation.person_names import person_name
+from goaletto.presentation.person_names import person_button_name, person_name
 
 _LABELS = {name: label for name, label in SKILL_LABELS}
 
@@ -138,7 +138,7 @@ def academy_view(screen: AcademyScreen, notice: str | None = None) -> tuple[str,
                     Button(
                         text=tr(
                             "Подписать: {name}",
-                            name=person_name(view),
+                            name=person_button_name(view),
                         ),
                         callback_data=f"ac:g:{compact_id(screen.ownership_id)}:{compact_id(screen.season_id)}:{view.slot}",
                     )
