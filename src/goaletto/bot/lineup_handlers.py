@@ -4,6 +4,7 @@ Handlers use short database transactions and send/edit only after commit.
 Mutation callbacks carry ownership/revision and use the real Telegram update ID.
 """
 
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -38,9 +39,29 @@ from goaletto.domain.lineup import (
 )
 from goaletto.infrastructure.database import Database
 from goaletto.infrastructure.models import GameActionReceipt
-from goaletto.presentation.i18n import tr
+from goaletto.presentation.i18n import LabelMap, tr
 
 router = Router(name="lineup")
+logger = logging.getLogger(__name__)
+
+_VALIDATION_HINTS = LabelMap(
+    {
+        "captain": "Капитан должен быть в основе. Откройте «Капитан» и выберите игрока.",
+        "count": "В основе должно быть 11 игроков, на скамейке — не больше девяти. "
+        "Проверьте состав.",
+        "coverage": "Состав пока недоступен. Вернитесь в клуб и попробуйте открыть его снова.",
+        "duplicate": "Один игрок не может занимать два места. Выберите другого.",
+        "foreign": "Игрок больше недоступен. Откройте актуальный состав и выберите другого.",
+        "goalkeeper": "В основе должно быть одно место для вратаря. Проверьте расстановку.",
+        "goalkeeper_assignment": "Вратарь может заменить только вратаря. "
+        "Выберите игрока своей линии.",
+        "injured": "Травмированный игрок не может выйти в основе. Выберите другого.",
+        "retired": "Игрок завершил карьеру. Выберите другого.",
+        "shape": "Игроки распределены не по выбранной схеме. Выберите схему заново.",
+        "suspended": "Игрок дисквалифицирован на следующий матч этого турнира. Выберите другого.",
+        "tactic": "Тренер не знает эту тактику. Выберите другую в меню «Тактика».",
+    }
+)
 
 
 async def build_open_response(
@@ -82,7 +103,7 @@ async def build_callback_response(
     if previous is not None and previous.kind == "lineup_saved":
         # The original update already saved successfully. Its older revision is
         # expected on redelivery and must not become a new rejected action.
-        return views.render_main(data), views.main_keyboard(data)
+        return views.render_main(data, tr("✅ Состав сохранён.")), views.main_keyboard(data)
     if action != "refresh" and str(data.version) != version:
         await rejection(session, actor, Surface.SQUAD, Reason.STALE_ACTION)
         return (
@@ -92,6 +113,7 @@ async def build_callback_response(
     result = await _dispatch(session, actor, data, action, args)
     if result is not None:
         data = await load_lineup(session, actor)
+        return views.render_main(data, tr("✅ Состав сохранён.")), views.main_keyboard(data)
     if action == "panel":
         if args[0] == "formation":
             return views.formation_view(data), views.formation_keyboard(data)
@@ -187,14 +209,11 @@ async def _help(
         text = tr("Нет действующего владения клубом. Откройте /start.")
     elif isinstance(error, LineupLocked):
         text = tr("Состав на этот матч уже заблокирован. Откройте состав после матча.")
-    elif isinstance(error, LineupInvalid) and error.code == "suspended":
-        text = tr("Игрок дисквалифицирован на следующий матч этого турнира. Выберите другого.")
-    elif isinstance(error, LineupInvalid) and error.code == "goalkeeper_assignment":
-        text = tr("Вратарь может заменить только вратаря. Выберите игрока своей линии.")
-    elif isinstance(error, LineupInvalid) and error.code == "injured":
-        text = tr("Травмированный игрок не может выйти в основе. Выберите другого.")
     elif isinstance(error, LineupInvalid):
-        text = tr("Эта расстановка недоступна. Откройте состав и проверьте выбранных игроков.")
+        logger.info("Lineup validation rejected (code=%s)", error.code)
+        text = _VALIDATION_HINTS.get(error.code) or tr(
+            "Эта расстановка недоступна. Откройте состав и проверьте выбранных игроков."
+        )
     else:
         text = tr("Экран устарел. Откройте актуальный состав.")
     keyboard = recovery_keyboard(lineup=not isinstance(error, PermissionDenied))
@@ -256,7 +275,7 @@ async def _dispatch(
                 _current_picks(data),
                 tuple(m.person_id for m in data.bench),
                 data.formation,
-                _require_captain(data),
+                _captain_for_save(data),
                 args[0],
                 data.mentality,
                 data.version,
@@ -270,7 +289,7 @@ async def _dispatch(
                 _current_picks(data),
                 tuple(m.person_id for m in data.bench),
                 data.formation,
-                _require_captain(data),
+                _captain_for_save(data),
                 data.tactic,
                 args[0],
                 data.version,
@@ -333,7 +352,7 @@ async def _dispatch(
                 _current_picks(data),
                 tuple(bench_selection),
                 data.formation,
-                data.captain_id or data.starters[0].person_id,
+                _captain_for_save(data),
                 data.tactic,
                 data.mentality,
                 data.version,
@@ -363,10 +382,13 @@ def _current_picks(data: LineupData) -> tuple[StarterPick, ...]:
     return tuple(StarterPick(m.person_id, m.slot_position) for m in data.starters)
 
 
-def _require_captain(data: LineupData) -> UUID:
-    if data.captain_id is None:
-        raise LineupInvalid("captain", "Choose a captain first")
-    return data.captain_id
+def _captain_for_save(data: LineupData) -> UUID:
+    if data.captain_id is not None:
+        return data.captain_id
+    if not data.starters:
+        raise LineupInvalid("count", "No starters to select a captain from")
+    # A fresh club can save its first setting before a captain is chosen.
+    return data.starters[0].person_id
 
 
 __all__ = ["build_callback_response", "build_open_response", "router"]

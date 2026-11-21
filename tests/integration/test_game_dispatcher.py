@@ -196,7 +196,33 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     for cmd in ("/squad", "/history", "/table", "/club", "/lineup"):
         response = await command(cmd)
         assert "недоступ" not in (response.text or response.caption).lower()
-    # Choose a captain; the weak starting coach only permits the existing normal tactic.
+    # A newly claimed club can save its first change before the player picks a captain.
+    panel = next(
+        b.callback_data
+        for row in response.reply_markup.inline_keyboard
+        for b in row
+        if b.text == "Настрой"
+    )
+    response = await callback(panel)
+    attack = next(
+        b.callback_data
+        for row in response.reply_markup.inline_keyboard
+        for b in row
+        if (b.callback_data or "").startswith("ln:mo:attack:")
+    )
+    response = await callback(attack)
+    mentality_update_id = update_id
+    async with sessions.begin() as session:
+        first_save = await session.scalar(select(AcceptedCommand))
+        assert first_save is not None
+        assert first_save.telegram_update_id == mentality_update_id
+        assert first_save.payload["mentality"] == "attack"
+        assert first_save.payload["captain_id"] in {
+            pick["person_id"] for pick in first_save.payload["starters"]
+        }
+    assert "Состав сохранён" in response.text
+
+    # The manager can still choose a captain. The starting coach only knows normal tactics.
     panel = next(
         b.callback_data
         for row in response.reply_markup.inline_keyboard
@@ -204,7 +230,7 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
         if b.text == "Капитан"
     )
     response = await callback(panel)
-    response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
+    response = await callback(response.reply_markup.inline_keyboard[1][0].callback_data)
     captain_update_id = update_id
     panel = next(
         b.callback_data
@@ -214,12 +240,20 @@ async def test_start_claim_lineup_history_and_table_through_dispatcher(sessions)
     )
     response = await callback(panel)
     response = await callback(response.reply_markup.inline_keyboard[0][0].callback_data)
+    scope = f"{compact_id(ownership.id)}:{starting_lineup_version + 2}"
+    response = await callback(f"ln:t:pressing:{scope}")
+    assert "Тренер не знает эту тактику" in response.text
+    assert any(
+        b.callback_data == "ln:open" for row in response.reply_markup.inline_keyboard for b in row
+    )
     async with sessions.begin() as session:
         rows = (await session.scalars(select(AcceptedCommand))).all()
-        assert len(rows) == 1
-        assert {r.telegram_update_id for r in rows} == {captain_update_id}
+        assert len(rows) == 2
+        assert {r.telegram_update_id for r in rows} == {mentality_update_id, captain_update_id}
+        captains = {r.payload["captain_id"] for r in rows}
+        assert len(captains) == 2
         lineup = await session.get(ClubLineup, ownership.club_id)
-        assert lineup.version == starting_lineup_version + 1
+        assert lineup.version == starting_lineup_version + 2
     await command("/settings")
     response = await callback("lang:en")
     assert "Settings" in response.text
