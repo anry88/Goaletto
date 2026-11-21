@@ -12,7 +12,14 @@ from goaletto.bot.history_callbacks import match_callback
 from goaletto.bot.lineup_views import MENTALITY_LABELS, TACTIC_LABELS
 from goaletto.bot.result_views import compact_id, expand_id
 from goaletto.domain.kickoff import local_datetime
-from goaletto.domain.match_types import Instruction, Mentality, Side, Tactic
+from goaletto.domain.match_commands import replacement_candidates
+from goaletto.domain.match_types import (
+    INJURY_COVER_ENGINE_VERSION,
+    Instruction,
+    Mentality,
+    Side,
+    Tactic,
+)
 from goaletto.domain.names import latin_name
 from goaletto.presentation.club_status import club_label
 from goaletto.presentation.i18n import LabelMap, tr
@@ -223,7 +230,8 @@ def render(
                 rows = [
                     [
                         _button(
-                            tr(
+                            ("🤕 " if conditions[s.player_id].injured else "")
+                            + tr(
                                 "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
                                 name=names[s.player_id],
                                 position=s.position,
@@ -233,7 +241,7 @@ def render(
                             callback(screen, "o", index_by_id[s.player_id]),
                         )
                     ]
-                    for s in team.lineup
+                    for s in (*team.injury_vacancies, *team.lineup)
                 ]
             elif panel == 2:
                 rows = [
@@ -262,34 +270,58 @@ def render(
                 ]
             elif panel == 5:
                 outgoing = players[selected - 1].id if 1 <= selected <= len(players) else None
-                if outgoing not in {s.player_id for s in team.lineup}:
-                    raise ValueError("Stale outgoing player")
-                conditions = {c.player_id: c for c in team.conditions}
-                rows = [
-                    [
-                        _button(
-                            tr(
-                                "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
-                                name=names[p],
-                                position=players[index_by_id[p] - 1].position,
-                                form=players[index_by_id[p] - 1].form,
-                                energy=conditions[p].energy_bps // 100,
-                            ),
-                            callback(screen, "s", selected, index_by_id[p]),
-                        )
-                    ]
-                    for p in team.bench
-                    if not conditions[p].injured and not conditions[p].dismissed
-                ]
-                lines.append(
-                    tr(
-                        "Заменяем: <b>{name}</b> · форма {form}/10 · ⚡ {energy}%",
-                        name=escape(latin_name(players[selected - 1].name)),
-                        form=players[selected - 1].form,
-                        energy=conditions[outgoing].energy_bps // 100,
-                    )
+                slot = next(
+                    (s for s in (*team.lineup, *team.injury_vacancies) if s.player_id == outgoing),
+                    None,
                 )
-                lines.append(tr("Выберите игрока на замену."))
+                conditions = {c.player_id: c for c in team.conditions}
+                if slot is None:
+                    lines.append(tr("Этот игрок больше недоступен для замены."))
+                else:
+                    lines.append(
+                        tr(
+                            "Заменяем: <b>{name}</b> · форма {form}/10 · ⚡ {energy}%",
+                            name=escape(latin_name(players[selected - 1].name)),
+                            form=players[selected - 1].form,
+                            energy=conditions[slot.player_id].energy_bps // 100,
+                        )
+                    )
+                    candidates = (
+                        replacement_candidates(team, slot.position)
+                        if state.engine_version == INJURY_COVER_ENGINE_VERSION
+                        else tuple(
+                            p
+                            for p in team.bench
+                            if not conditions[p].injured and not conditions[p].dismissed
+                        )
+                    )
+                    if team.substitutions >= state.policy.max_substitutions:
+                        lines.append(tr("Лимит замен исчерпан."))
+                    elif not candidates:
+                        lines.append(tr("На скамейке нет доступных игроков."))
+                    elif (
+                        not screen.halftime
+                        and screen.target not in team.substitution_windows
+                        and len(team.substitution_windows) >= state.policy.max_windows
+                    ):
+                        lines.append(tr("Окна замен исчерпаны. В перерыв окно не расходуется."))
+                    else:
+                        lines.append(tr("Выберите игрока на замену."))
+                        rows = [
+                            [
+                                _button(
+                                    tr(
+                                        "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
+                                        name=names[p],
+                                        position=players[index_by_id[p] - 1].position,
+                                        form=players[index_by_id[p] - 1].form,
+                                        energy=conditions[p].energy_bps // 100,
+                                    ),
+                                    callback(screen, "s", selected, index_by_id[p]),
+                                )
+                            ]
+                            for p in candidates
+                        ]
             elif panel == 6:
                 player = players[selected - 1] if 1 <= selected <= len(players) else None
                 if player is None or player.id not in {

@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from goaletto.application import match_runtime
 from goaletto.application.game_actions import PermissionDenied
 from goaletto.application.live_commands import (
     CommandUnavailable,
@@ -15,6 +16,7 @@ from goaletto.application.live_commands import (
     load_live_screen,
 )
 from goaletto.domain.match_codec import restore_state
+from goaletto.domain.match_types import EnginePolicy, Side
 from goaletto.infrastructure.models import (
     AcceptedCommand,
     Club,
@@ -258,6 +260,59 @@ async def test_halftime_substitution_applies_in_free_window_and_deadline_after_w
         state = restore_state(match.state)
         team = state.home if screen.side.value == "home" else state.away
         assert team.substitution_windows == ()
+
+
+async def test_injured_vacancy_can_be_filled_by_a_real_live_command(sessions, monkeypatch):
+    original_snapshot = match_runtime.team_snapshot
+
+    async def manual_only(*args, **kwargs):
+        return replace(
+            await original_snapshot(*args, **kwargs), automatic_injury_substitutions=False
+        )
+
+    monkeypatch.setattr(match_runtime, "team_snapshot", manual_only)
+    monkeypatch.setattr(
+        match_runtime,
+        "EnginePolicy",
+        lambda **kwargs: EnginePolicy(
+            **kwargs, injury_bps=10000, direct_red_bps=0, yellow_bps=0, foul_bps=0
+        ),
+    )
+    actor, fixture_id, _, screen = await live(sessions)
+    assert screen.state.engine_version == "regulation-v9"
+    committed_at = await job(sessions, "match.tick", fixture_id, 1)
+    now = committed_at + timedelta(seconds=1)
+    async with sessions.begin() as session:
+        screen = await load_live_screen(
+            session, replace(actor, at=now), record=False, clock=lambda: now
+        )
+    assert screen.open and screen.target == 2
+    team = screen.state.home if screen.side == Side.HOME else screen.state.away
+    (vacancy,) = team.injury_vacancies
+    incoming = team.bench[0]
+    _, receipt = await accept(
+        sessions,
+        actor,
+        screen,
+        "substitution",
+        {"outgoing_id": str(vacancy.player_id), "incoming_id": str(incoming)},
+        at=now,
+    )
+    assert receipt.status == "accepted"
+    await job(sessions, "match.tick", fixture_id, 2)
+    async with sessions.begin() as session:
+        row = await session.get(AcceptedCommand, receipt.id)
+        assert row.status == "applied" and row.applied_tick_number == 2
+        state = restore_state((await session.get(Match, screen.match_id)).state)
+        team = state.home if screen.side == Side.HOME else state.away
+        assert all(slot.player_id != vacancy.player_id for slot in team.injury_vacancies)
+        assert team.removed.count(vacancy.player_id) == 1
+        assert (
+            dict(next(c for c in team.conditions if c.player_id == incoming).position_minutes)[
+                vacancy.position
+            ]
+            > 0
+        )
 
 
 async def test_real_dispatcher_live_controls_ack_before_commit_and_show_applied(

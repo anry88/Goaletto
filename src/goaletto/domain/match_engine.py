@@ -8,19 +8,18 @@ from uuid import UUID, uuid5
 
 from goaletto.domain.clock import MatchPhase
 from goaletto.domain.knockout_match import KnockoutContext
-from goaletto.domain.match_commands import apply_commands, substitute
+from goaletto.domain.match_commands import apply_commands, replacement_candidates, substitute
 from goaletto.domain.match_ratings import SectorRatings, effective_skill, sector_ratings
 from goaletto.domain.match_types import (
-    BOUNDED_EXPERIENCE_ENGINE_VERSION,
     BOUNDED_EXPERIENCE_ENGINES,
-    COACH_ENGINE_VERSION,
+    COACH_ENGINES,
     ENGINE_VERSION,
-    EXPERIENCE_ENGINE_VERSION,
-    FORM_ONLY_ENGINE_VERSION,
+    FORM_ONLY_ENGINES,
+    INJURY_COVER_ENGINE_VERSION,
     KNOCKOUT_ENGINE_VERSION,
+    KNOCKOUT_ENGINES,
     LIVE_ENGINE_VERSION,
     PERCENT_EXPERIENCE_ENGINES,
-    POSITION_ENGINE_VERSION,
     POSITIONAL_ENGINES,
     POSITIONS,
     EnginePolicy,
@@ -45,12 +44,7 @@ def validate_state(state: MatchState) -> None:
     if state.engine_version not in {
         ENGINE_VERSION,
         LIVE_ENGINE_VERSION,
-        COACH_ENGINE_VERSION,
-        KNOCKOUT_ENGINE_VERSION,
-        POSITION_ENGINE_VERSION,
-        EXPERIENCE_ENGINE_VERSION,
-        BOUNDED_EXPERIENCE_ENGINE_VERSION,
-        FORM_ONLY_ENGINE_VERSION,
+        *COACH_ENGINES,
     }:
         raise ValueError("Unsupported engine version; never replay with another implementation")
     expected_policy = "match-policy-" + state.engine_version.removeprefix("regulation-")
@@ -68,7 +62,7 @@ def validate_state(state: MatchState) -> None:
         state.engine_version == KNOCKOUT_ENGINE_VERSION
         and not knockout
         or knockout
-        and state.engine_version not in {KNOCKOUT_ENGINE_VERSION, *POSITIONAL_ENGINES}
+        and state.engine_version not in KNOCKOUT_ENGINES
     ):
         raise ValueError("Knockout context and engine disagree")
     if type(state.tick) is not int or not 0 <= state.tick <= maximum:
@@ -161,14 +155,7 @@ def validate_state(state: MatchState) -> None:
             for player in team.snapshot.players:
                 validate_percent_experience(dict(player.position_experience))
         coach = team.snapshot.coach
-        modern = state.engine_version in {
-            COACH_ENGINE_VERSION,
-            KNOCKOUT_ENGINE_VERSION,
-            POSITION_ENGINE_VERSION,
-            EXPERIENCE_ENGINE_VERSION,
-            BOUNDED_EXPERIENCE_ENGINE_VERSION,
-            FORM_ONLY_ENGINE_VERSION,
-        }
+        modern = state.engine_version in COACH_ENGINES
         if modern != (coach is not None):
             raise ValueError("Coaching snapshot and engine disagree")
         abilities = coach.abilities if coach else None
@@ -209,6 +196,17 @@ def validate_state(state: MatchState) -> None:
             raise ValueError("Player conditions do not match the snapshot")
         if len(set(membership)) != len(membership) or set(membership) != snapshot_ids:
             raise ValueError("Field, unused bench and removed people must partition the roster")
+        if team.injury_vacancies:
+            vacancy_ids = {s.player_id for s in team.injury_vacancies}
+            if (
+                state.engine_version != INJURY_COVER_ENGINE_VERSION
+                or len(vacancy_ids) != len(team.injury_vacancies)
+                or len(team.lineup) + len(vacancy_ids) > 11
+                or (team.lineup and any(s.position == "GK" for s in team.injury_vacancies))
+                or not vacancy_ids.issubset(team.removed)
+                or any(not conditions[p].injured or conditions[p].dismissed for p in vacancy_ids)
+            ):
+                raise ValueError("Invalid injury vacancy")
         if len(team.lineup) > 11 or (
             len(team.lineup) < state.policy.minimum_players and state.phase != MatchPhase.ABANDONED
         ):
@@ -597,7 +595,7 @@ def advance_tick(
                     attacking.support_morale_points,
                     positional=state.engine_version in POSITIONAL_ENGINES,
                     percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
-                    personal_morale=state.engine_version != FORM_ONLY_ENGINE_VERSION,
+                    personal_morale=state.engine_version not in FORM_ONLY_ENGINES,
                     bounded_experience=state.engine_version in BOUNDED_EXPERIENCE_ENGINES,
                 ),
             )
@@ -625,7 +623,7 @@ def advance_tick(
                 attacking.support_morale_points,
                 positional=state.engine_version in POSITIONAL_ENGINES,
                 percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
-                personal_morale=state.engine_version != FORM_ONLY_ENGINE_VERSION,
+                personal_morale=state.engine_version not in FORM_ONLY_ENGINES,
                 bounded_experience=state.engine_version in BOUNDED_EXPERIENCE_ENGINES,
             )
             attack = (attack + taker_rating * 2) // 2
@@ -643,7 +641,7 @@ def advance_tick(
                         attacking.support_morale_points,
                         positional=True,
                         percentage=state.engine_version in PERCENT_EXPERIENCE_ENGINES,
-                        personal_morale=state.engine_version != FORM_ONLY_ENGINE_VERSION,
+                        personal_morale=state.engine_version not in FORM_ONLY_ENGINES,
                         bounded_experience=state.engine_version in BOUNDED_EXPERIENCE_ENGINES,
                     ),
                 )
@@ -794,7 +792,10 @@ def advance_tick(
                     team = _condition(team, player_id, injured=True)
                     emit("injury", side, player_id)
                     replacement = None
-                    if team.snapshot.automatic_injury_substitutions:
+                    injury_cover = state.engine_version == INJURY_COVER_ENGINE_VERSION
+                    if team.snapshot.automatic_injury_substitutions and injury_cover:
+                        replacement = next(iter(replacement_candidates(team, slot.position)), None)
+                    elif team.snapshot.automatic_injury_substitutions:
                         people = {p.id: p for p in team.snapshot.players}
                         available = {
                             c.player_id
@@ -834,7 +835,17 @@ def advance_tick(
                         team = updated
                         emit("automatic_substitution", side, player_id, replacement, "injury")
                     else:
+                        vacancy = slot
+                        if injury_cover and slot.position == "GK":
+                            # The emergency keeper leaves an outfield vacancy.
+                            promoted = next((s for s in team.lineup if s != slot), None)
+                            if promoted is not None:
+                                vacancy = FieldSlot(player_id, promoted.position)
                         team = remove(team, player_id, side)
+                        if injury_cover:
+                            team = replace(
+                                team, injury_vacancies=team.injury_vacancies + (vacancy,)
+                            )
                         emit("replacement_unavailable", side, player_id, detail=reason)
                 else:
                     team = _stat(team, fouls=1)

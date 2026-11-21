@@ -1,5 +1,6 @@
 """Pure next-tick commands. Ownership/deadlines/accepted-command storage are external."""
 
+from collections import deque
 from dataclasses import replace
 from uuid import UUID
 
@@ -9,9 +10,42 @@ from goaletto.domain.match_types import (
     MatchCommand,
     MatchState,
     PlayerInstruction,
+    PlayerSnapshot,
     Side,
     TeamState,
 )
+from goaletto.domain.player_positions import ADJACENT
+
+
+def replacement_candidates(team: TeamState, position: str) -> tuple[UUID, ...]:
+    """Order the healthy bench by suitability, with stable bench order on ties."""
+    people = {p.id: p for p in team.snapshot.players}
+    available = {c.player_id for c in team.conditions if not c.injured and not c.dismissed}
+    distances = {position: 0}
+    unvisited = deque([position])
+    while unvisited:
+        current = unvisited.popleft()
+        for adjacent in ADJACENT[current]:
+            if adjacent not in distances:
+                distances[adjacent] = distances[current] + 1
+                unvisited.append(adjacent)
+
+    def priority(player: PlayerSnapshot) -> tuple[int, int]:
+        if player.position == position:
+            return 0, 0
+        if position == "GK":
+            return 1, -player.skills.goalkeeping
+        if position in player.alternatives:
+            return 1, 0
+        if player.position == "GK":
+            return 3, 0
+        return 2, min(
+            distances.get(role, len(ADJACENT)) for role in (player.position, *player.alternatives)
+        )
+
+    return tuple(
+        sorted((p for p in team.bench if p in available), key=lambda p: priority(people[p]))
+    )
 
 
 def substitute(
@@ -26,7 +60,8 @@ def substitute(
 ) -> tuple[TeamState, str | None]:
     slot = next((s for s in team.lineup if s.player_id == outgoing), None)
     conditions = {c.player_id: c for c in team.conditions}
-    if slot is None or incoming not in team.bench or incoming in team.removed:
+    vacancy = next((s for s in team.injury_vacancies if s.player_id == outgoing), None)
+    if (slot is None and vacancy is None) or incoming not in team.bench or incoming in team.removed:
         return team, "player_unavailable"
     if (
         conditions[outgoing].dismissed
@@ -41,15 +76,19 @@ def substitute(
         if len(windows) >= maximum_windows:
             return team, "window_limit"
         windows += (tick,)
+    lineup = tuple(
+        FieldSlot(incoming, s.position) if s.player_id == outgoing else s for s in team.lineup
+    )
+    if vacancy is not None:
+        lineup += (FieldSlot(incoming, vacancy.position),)
     return replace(
         team,
-        lineup=tuple(
-            FieldSlot(incoming, s.position) if s.player_id == outgoing else s for s in team.lineup
-        ),
+        lineup=lineup,
         bench=tuple(p for p in team.bench if p != incoming),
-        removed=team.removed + (outgoing,),
+        removed=team.removed + (outgoing,) if slot is not None else team.removed,
         substitutions=team.substitutions + 1,
         substitution_windows=windows,
+        injury_vacancies=tuple(s for s in team.injury_vacancies if s.player_id != outgoing),
     ), None
 
 

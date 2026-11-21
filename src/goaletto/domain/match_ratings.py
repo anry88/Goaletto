@@ -3,6 +3,10 @@
 from dataclasses import dataclass
 
 from goaletto.domain.match_types import (
+    BOUNDED_EXPERIENCE_ENGINES,
+    FORM_ONLY_ENGINES,
+    PERCENT_EXPERIENCE_ENGINES,
+    POSITIONAL_ENGINES,
     EnginePolicy,
     Instruction,
     Mentality,
@@ -72,6 +76,7 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
     instructions = {i.player_id: i.instruction for i in team.instructions}
     players = {p.id: p for p in team.snapshot.players}
     conditions = {p.player_id: p for p in team.conditions}
+    engine = "regulation-" + policy.version.removeprefix("match-policy-")
     midfield = center = left = right = dc = dl = dr = keeper = 0
     for slot in team.lineup:
         p, c = players[slot.player_id], conditions[slot.player_id]
@@ -90,12 +95,10 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
                 assigned_position,
                 name,
                 team.support_morale_points,
-                positional=policy.version
-                in {"match-policy-v5", "match-policy-v6", "match-policy-v7", "match-policy-v8"},
-                percentage=policy.version
-                in {"match-policy-v6", "match-policy-v7", "match-policy-v8"},
-                bounded_experience=policy.version in {"match-policy-v7", "match-policy-v8"},
-                personal_morale=policy.version != "match-policy-v8",
+                positional=engine in POSITIONAL_ENGINES,
+                percentage=engine in PERCENT_EXPERIENCE_ENGINES,
+                bounded_experience=engine in BOUNDED_EXPERIENCE_ENGINES,
+                personal_morale=engine not in FORM_ONLY_ENGINES,
             )
 
         position = slot.position
@@ -111,12 +114,7 @@ def sector_ratings(team: TeamState, policy: EnginePolicy | None = None) -> Secto
         if position in {"MR", "AMR"}:
             right += (skill("winger") * 7 + skill("pace") * 3) // 10
             center += skill("winger") // 10
-        experience = (
-            0
-            if policy.version
-            in {"match-policy-v5", "match-policy-v6", "match-policy-v7", "match-policy-v8"}
-            else min(p.experience, 100) * 10
-        )
+        experience = 0 if engine in POSITIONAL_ENGINES else min(p.experience, 100) * 10
         if position == "DC":
             dc += skill("defending") + experience
             dl += skill("defending") // 5

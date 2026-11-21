@@ -108,7 +108,7 @@ async def test_match_rewards_actual_position_and_report_excludes_opponent(sessio
     fixture, at = await start_fixture(sessions, club)
     final = await completed_checkpoint(sessions, fixture, at)
     async with sessions.begin() as session:
-        assert final.engine_version == "regulation-v8"
+        assert final.engine_version == "regulation-v9"
         await finalize_result(session, fixture, at + timedelta(hours=1))
         player = await session.get(Player, person_id)
         receipt = await session.get(MatchDevelopment, final.match_id)

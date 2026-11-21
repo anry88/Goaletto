@@ -11,6 +11,10 @@ from goaletto.domain.knockout import KnockoutTie, MatchResult, PenaltyKick, Pena
 from goaletto.domain.knockout_match import KnockoutContext
 from goaletto.domain.match_engine import validate_state
 from goaletto.domain.match_types import (
+    COACH_ENGINES,
+    INJURY_COVER_ENGINE_VERSION,
+    KNOCKOUT_ENGINES,
+    POSITIONAL_ENGINES,
     CoachSnapshot,
     EnginePolicy,
     FieldSlot,
@@ -86,7 +90,13 @@ def _snapshot(value: Any, *, coaching: bool, positional: bool) -> TeamSnapshot:
     return TeamSnapshot(**data)
 
 
-def _team(value: Any, *, legacy: bool, coaching: bool, positional: bool) -> TeamState:
+def _team(
+    value: Any, *, legacy: bool, coaching: bool, positional: bool, injury_cover: bool
+) -> TeamState:
+    if not injury_cover and isinstance(value, dict):
+        if "injury_vacancies" in value:
+            raise ValueError("Historic checkpoint contains injury vacancies")
+        value = dict(value, injury_vacancies=[])
     if not coaching and isinstance(value, dict):
         if "mentality_changes" in value:
             raise ValueError("Historic checkpoint contains mentality counter")
@@ -98,6 +108,7 @@ def _team(value: Any, *, legacy: bool, coaching: bool, positional: bool) -> Team
     data = _record(value, TeamState)
     data["snapshot"] = _snapshot(data["snapshot"], coaching=coaching, positional=positional)
     data["lineup"] = tuple(_slot(p) for p in data["lineup"])
+    data["injury_vacancies"] = tuple(_slot(p) for p in data["injury_vacancies"])
     data["bench"] = tuple(_uuid(p) for p in data["bench"])
     data["removed"] = tuple(_uuid(p) for p in data["removed"])
     conditions = []
@@ -136,12 +147,10 @@ def state_document(state: MatchState) -> dict[str, Any]:
         raise ValueError("Unsupported checkpoint value")
 
     result: dict[str, Any] = json.loads(json.dumps(asdict(state), default=encode))
-    if state.engine_version not in {
-        "regulation-v5",
-        "regulation-v6",
-        "regulation-v7",
-        "regulation-v8",
-    }:
+    if state.engine_version != INJURY_COVER_ENGINE_VERSION:
+        for side in ("home", "away"):
+            del result[side]["injury_vacancies"]
+    if state.engine_version not in POSITIONAL_ENGINES:
         for side in ("home", "away"):
             for player in result[side]["snapshot"]["players"]:
                 del player["position_experience"]
@@ -149,22 +158,9 @@ def state_document(state: MatchState) -> dict[str, Any]:
                 del condition["position_minutes"]
                 for key in ("goals", "assists", "saves"):
                     del condition[key]
-    if state.engine_version not in {
-        "regulation-v4",
-        "regulation-v5",
-        "regulation-v6",
-        "regulation-v7",
-        "regulation-v8",
-    }:
+    if state.engine_version not in KNOCKOUT_ENGINES:
         del result["knockout"]
-    if state.engine_version not in {
-        "regulation-v3",
-        "regulation-v4",
-        "regulation-v5",
-        "regulation-v6",
-        "regulation-v7",
-        "regulation-v8",
-    }:
+    if state.engine_version not in COACH_ENGINES:
         for side in ("home", "away"):
             del result[side]["snapshot"]["coach"]
             del result[side]["mentality_changes"]
@@ -190,22 +186,12 @@ def state_hash(state: MatchState) -> str:
 def restore_state(value: str | dict[str, Any]) -> MatchState:
     try:
         raw = json.loads(value) if isinstance(value, str) else value
-        if isinstance(raw, dict) and raw.get("engine_version") not in {
-            "regulation-v4",
-            "regulation-v5",
-            "regulation-v6",
-            "regulation-v7",
-            "regulation-v8",
-        }:
+        if isinstance(raw, dict) and raw.get("engine_version") not in KNOCKOUT_ENGINES:
             if "knockout" in raw:
                 raise ValueError("Historic checkpoint contains knockout fields")
             raw = dict(raw, knockout=None)
         data = _record(raw, MatchState)
-        if (
-            data["engine_version"]
-            in {"regulation-v4", "regulation-v5", "regulation-v6", "regulation-v7", "regulation-v8"}
-            and data["knockout"] is not None
-        ):
+        if data["engine_version"] in KNOCKOUT_ENGINES and data["knockout"] is not None:
             k = _record(data["knockout"], KnockoutContext)
             k["tie_id"] = _uuid(k["tie_id"])
             tie = _record(k["tie"], KnockoutTie)
@@ -232,24 +218,17 @@ def restore_state(value: str | dict[str, Any]) -> MatchState:
             data["knockout"] = KnockoutContext(**k)
         data["match_id"] = _uuid(data["match_id"])
         legacy = data["engine_version"] == "regulation-v1"
-        coaching = data["engine_version"] in {
-            "regulation-v3",
-            "regulation-v4",
-            "regulation-v5",
-            "regulation-v6",
-            "regulation-v7",
-            "regulation-v8",
-        }
-        positional = data["engine_version"] in {
-            "regulation-v5",
-            "regulation-v6",
-            "regulation-v7",
-            "regulation-v8",
-        }
-        data["home"], data["away"] = (
-            _team(data["home"], legacy=legacy, coaching=coaching, positional=positional),
-            _team(data["away"], legacy=legacy, coaching=coaching, positional=positional),
-        )
+        coaching = data["engine_version"] in COACH_ENGINES
+        positional = data["engine_version"] in POSITIONAL_ENGINES
+        injury_cover = data["engine_version"] == INJURY_COVER_ENGINE_VERSION
+        for side in ("home", "away"):
+            data[side] = _team(
+                data[side],
+                legacy=legacy,
+                coaching=coaching,
+                positional=positional,
+                injury_cover=injury_cover,
+            )
         if legacy:
             raw_policy = data["policy"]
             extra = {"max_instruction_changes", "instruction_bonus_bps", "long_shot_extra_miss_bps"}

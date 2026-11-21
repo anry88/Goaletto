@@ -24,13 +24,7 @@ from goaletto.domain.cup_bracket import (
 from goaletto.domain.knockout import KNOCKOUT_POLICY, KnockoutTie, MatchResult
 from goaletto.domain.knockout_match import KnockoutContext, decision
 from goaletto.domain.match_codec import restore_state, state_hash
-from goaletto.domain.match_types import (
-    BOUNDED_EXPERIENCE_ENGINE_VERSION,
-    EXPERIENCE_ENGINE_VERSION,
-    FORM_ONLY_ENGINE_VERSION,
-    KNOCKOUT_ENGINE_VERSION,
-    POSITION_ENGINE_VERSION,
-)
+from goaletto.domain.match_types import KNOCKOUT_ENGINES
 from goaletto.domain.neutral_final import (
     CURRENT_NEUTRAL_POLICY,
     NeutralFinalSnapshot,
@@ -319,14 +313,7 @@ async def record_cup_match_result(
     result = await session.get(ResultReceipt, match.id)
     if (
         k is None
-        or state.engine_version
-        not in {
-            KNOCKOUT_ENGINE_VERSION,
-            POSITION_ENGINE_VERSION,
-            EXPERIENCE_ENGINE_VERSION,
-            BOUNDED_EXPERIENCE_ENGINE_VERSION,
-            FORM_ONLY_ENGINE_VERSION,
-        }
+        or state.engine_version not in KNOCKOUT_ENGINES
         or result is None
         or result.state_hash != state_hash(state)
     ):

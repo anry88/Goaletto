@@ -33,7 +33,7 @@ from goaletto.application.game_actions import (
 from goaletto.application.progress_reports import match_report_rows
 from goaletto.application.results import standing_snapshot
 from goaletto.domain.match_codec import restore_state
-from goaletto.domain.match_types import MatchState
+from goaletto.domain.match_types import POSITIONAL_ENGINES, MatchState
 from goaletto.domain.standings import LeagueStanding, rank_league
 from goaletto.infrastructure.models import (
     Club,
@@ -604,9 +604,7 @@ async def get_match_report(session: AsyncSession, actor: Actor, fixture_id: UUID
                     snapshot_player.id in starters,
                     condition.minutes_played if condition else 0,
                     condition.goals
-                    if terminal.engine_version
-                    in {"regulation-v5", "regulation-v6", "regulation-v7", "regulation-v8"}
-                    and condition
+                    if terminal.engine_version in POSITIONAL_ENGINES and condition
                     else goal_counts.get((side, snapshot_player.id), 0),
                     condition.yellows if condition else 0,
                     condition.dismissed if condition else False,

@@ -19,11 +19,13 @@ POSITION_ENGINE_VERSION = "regulation-v5"
 EXPERIENCE_ENGINE_VERSION = "regulation-v6"
 BOUNDED_EXPERIENCE_ENGINE_VERSION = "regulation-v7"
 FORM_ONLY_ENGINE_VERSION = "regulation-v8"
-BOUNDED_EXPERIENCE_ENGINES = frozenset(
-    {BOUNDED_EXPERIENCE_ENGINE_VERSION, FORM_ONLY_ENGINE_VERSION}
-)
+INJURY_COVER_ENGINE_VERSION = "regulation-v9"
+FORM_ONLY_ENGINES = frozenset({FORM_ONLY_ENGINE_VERSION, INJURY_COVER_ENGINE_VERSION})
+BOUNDED_EXPERIENCE_ENGINES = frozenset({BOUNDED_EXPERIENCE_ENGINE_VERSION, *FORM_ONLY_ENGINES})
 PERCENT_EXPERIENCE_ENGINES = frozenset({EXPERIENCE_ENGINE_VERSION, *BOUNDED_EXPERIENCE_ENGINES})
 POSITIONAL_ENGINES = frozenset({POSITION_ENGINE_VERSION, *PERCENT_EXPERIENCE_ENGINES})
+KNOCKOUT_ENGINES = frozenset({KNOCKOUT_ENGINE_VERSION, *POSITIONAL_ENGINES})
+COACH_ENGINES = frozenset({COACH_ENGINE_VERSION, *KNOCKOUT_ENGINES})
 POSITIONS = frozenset({"GK", "DL", "DC", "DR", "DM", "ML", "MC", "MR", "AMC", "AML", "AMR", "FC"})
 
 
@@ -249,6 +251,7 @@ class EnginePolicy:
             "match-policy-v6",
             "match-policy-v7",
             "match-policy-v8",
+            "match-policy-v9",
         }:
             raise ValueError("Unsupported policy")
         if self.version == "match-policy-v1" and (
@@ -350,6 +353,7 @@ class TeamState:
     instructions: tuple[PlayerInstruction, ...] = ()
     instruction_changes: int = 0
     mentality_changes: int = 0
+    injury_vacancies: tuple[FieldSlot, ...] = ()
 
 
 @dataclass(frozen=True)
