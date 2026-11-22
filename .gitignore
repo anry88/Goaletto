@@ -25,3 +25,6 @@ secrets/
 *.token
 *.pem
 *.key
+
+# Private local files
+/.private/

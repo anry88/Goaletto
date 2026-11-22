@@ -32,7 +32,7 @@ checkpoint и import-report не содержат отсутствующих л�
 Ruff check/format614, mypy218, offline rendering миграций до0051 прошли.
 Новых миграций и изменений игровой логики нет; destructive/PG tests не запускались.
 
-## HDC
+## production
 
 Пакет подготовлен отдельно от действующего каталога на D:
 releases/portraits-63dcf2697fe5c282/assets/portraits/whole-v2.
@@ -63,7 +63,7 @@ production environment override bot/worker. Повтор запущен с яв�
 Goaletto. Production guard не снимался, база/PGDATA не пересоздавались.
 
 Штатная backup-проверка сохранила verified пару на Mac:
-goaletto-20261023T093906Z-04dc7c62,2 305 318bytes. Удалено0 пар на Mac/HDC;
+goaletto-20261023T093906Z-04dc7c62,2 305 318bytes. Удалено0 пар на Mac/production;
 расписание hourly/login/03:30 и правило20ч сохранены. Старый asset pack остаётся
 доступным для отката. Исходники/полный каталог сохранены в commit8f7b6f57;
 этот протокол завершения фиксируется следующим коммитом документации.

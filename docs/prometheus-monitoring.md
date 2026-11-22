@@ -69,44 +69,7 @@ GOALETTO_METRICS_PORT=9109
 GOALETTO_METRICS_SNAPSHOT_SECONDS=60
 ```
 
-Bot и worker — разные контейнеры, оба слушают внутренний 9109.
-При запуске обоих процессов непосредственно на Mac задавать разные порты.
-`deploy/compose.monitoring.yaml` подключает только bot/worker к существующей
-`observability_default` (имя задаёт GOALETTO_MONITORING_NETWORK), включает listener
-0.0.0.0 внутри контейнера и задаёт DNS aliases `goaletto-bot-metrics` /
-`goaletto-worker-metrics`. Host ports не публикуются. PostgreSQL остаётся только
-в Goaletto default network; VictoriaMetrics и Grafana не требуют этой сети.
-
-На HDC к четырём release overlay добавляется пятый:
-
-```powershell
-$a=@('-f','compose.yaml','-f','deploy/compose.hdc.yaml',
-     '-f','deploy/compose.release.yaml','-f','deploy/compose.assets.yaml',
-     '-f','deploy/compose.monitoring.yaml')
-docker compose @a config --quiet
-docker compose @a up -d --no-deps bot worker
-```
-
-`deploy/victoriametrics/goaletto-scrape.yaml` — фрагмент двух scrape jobs.
-Добавлять их в существующий vmagent.yml, сохраняя остальные jobs. Reload через
-`/-/reload`, без перезапуска VictoriaMetrics. До/после сверять существующие targets.
-Grafana provisioning требует GOALETTO_GRAFANA_ORG_ID (HDC=1) и
-GOALETTO_VICTORIAMETRICS_URL (приватный `http://hdc-victoria-metrics:8428`).
-Удаляется только прежний datasource Goaletto operator; чужие источники не менять.
-Убрать старый SQL secret из Goaletto provisioning, закрыть login goaletto_grafana
-и удалить ненужное private Goaletto network attachment Grafana. Общая папка
-Goaletto operator остаётся по явному решению пользователя.
-
 ## Приёмка
-
-Нужны настоящий /metrics обоих процессов, оба up=1 в VictoriaMetrics, живой
-/start/help/match или кнопка через единственный HDC polling и рост соответствующих
-counters, все MetricsQL запросы трёх dashboard через VictoriaMetrics и просмотр
-в Grafana. Ошибка БД должна оставлять процессный endpoint доступным, показывать
-snapshot failure/staleness и исчезновение DB gauges, затем восстанавливаться.
-Не выдумывать исторические counters до установки и не reset development-мир
-ради красивых графиков. [Реальная HDC-приёмка 2026-10-20](monitoring-acceptance-2026-10-20.md):
-оба targets up, 50 запросов, настоящие команды, SQL/CLI parity и DB outage/recovery.
 
 Документация библиотек: [Prometheus instrumentation](https://prometheus.io/docs/practices/instrumentation/),
 [Python client](https://prometheus.github.io/client_python/),

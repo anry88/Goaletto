@@ -9,7 +9,7 @@ docs/training.md, docs/staff-training-calibration.md, docs/match-development.md,
 docs/player-recovery.md и docs/tournament-domain.md.
 
 Это воспроизводимый аудит текущих формул и сценариев, часть AND-71, не изменение
-баланса и не нагрузочный тест HDC/PostgreSQL. Разрешены только новые файлы:
+баланса и не нагрузочный тест production/PostgreSQL. Разрешены только новые файлы:
 - scripts/audit_gameplay_balance.py;
 - tests/unit/test_gameplay_balance_audit.py;
 - docs/reports/gameplay-balance-2026-10-15.md;
@@ -95,4 +95,4 @@ Unit-проверки должны подтверждать воспроизво
 Передача: commit SHA/patch, список файлов, команда воспроизведения, Markdown/JSON,
 ruff check/format, mypy приложения и релевантные unit pytest. Отдельно укажи,
 что не проверено: реальный DB throughput/p95, гонки worker/ledger, инфраструктура
-HDC и ещё не подключённые кубковые механики. Родительская AND-71 остаётся открытой.
+production и ещё не подключённые кубковые механики. Родительская AND-71 остаётся открытой.

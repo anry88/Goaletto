@@ -14,11 +14,6 @@
   retention/opportunities/recovery/delivery/feedback. Технические command counters
   не заменяют человеческую активность и retention.
 
-[Метрики, конфигурация и точные ограничения](../prometheus-monitoring.md).
-[Фактическая HDC-приёмка VictoriaMetrics](../monitoring-acceptance-2026-10-20.md).
-Точные исторические срезы и campaign/locale/variant/tier/set пересечения остаются
-в SQL/CLI, не изображаются как произвольная история в Prometheus.
-
 Пользователь явно выбрал существующую общую организацию, а не отдельную приватную.
 Её участники могут читать агрегаты; folder ACL не изолирует datasource от Explore.
 Anonymous/публичные snapshots и приглашение игроков автоматически не включаются.
@@ -35,10 +30,6 @@ Migration 0044 `goaletto_operator.report` остаётся замороженн�
 исторический tier/set и search_path проверены существующей PG-матрицей.
 Репрезентативные прежние SQL queries сохранены в tests/fixtures/operator_queries.json,
 а dashboard JSON теперь содержит только MetricsQL.
-
-Историческая приёмка прямого SQL 2026-10-18/20 описана в
-[HDC-протоколе](../hdc-acceptance-2026-10-20.md); её архитектура заменена новым
-требованием пользователя. Это не разрешение на внешнее привлечение или рассылки.
 
 ## Простые числа игроков и источников ·2026-10-22
 

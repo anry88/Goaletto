@@ -56,12 +56,10 @@ worker закрывает bot session и DB pool до выхода.
 три неудачные проверки и стартовый период 30 секунд. Его наследует release
 override. `restart: unless-stopped` сохранён. Docker healthcheck сам по себе
 не перезапускает зависший живой процесс; состояние unhealthy нужно подключить
-к существующему мониторингу HDC. Отдельный autorestart/watchdog не включался.
+к существующему мониторингу production. Отдельный autorestart/watchdog не включался.
 
 ```bash
-docker compose -f compose.yaml -f deploy/compose.hdc.yaml \
-  -f deploy/compose.release.yaml exec -T worker \
-  python -m goaletto.diagnostics.health_cli
+python -m goaletto.diagnostics.health_cli
 ```
 
 Если unhealthy: проверить DB и файл текущего экземпляра, затем возраст обоих
@@ -71,7 +69,7 @@ docker compose -f compose.yaml -f deploy/compose.hdc.yaml \
 снова подтверждает успешный commit. Технические heartbeat-записи никогда
 не продлевают владение, пользовательскую сессию или retention.
 
-HDC deployment, off-host daily backup и подключение тревог остаются этапами
+production deployment, off-host daily backup и подключение тревог остаются этапами
 AND-69/70/72. Наличие локального healthcheck не подтверждает их выполнение.
 
 Семантика Docker: [HEALTHCHECK](https://docs.docker.com/reference/dockerfile/#healthcheck)

@@ -1106,7 +1106,7 @@ sequenceDiagram
 ### 16.1 Выбранная архитектура
 
 Python 3.12+, aiogram 3; единственный интерфейс — Telegram-бот через long polling.
-Отдельные bot и worker процессы в Docker Compose на существующем Windows HDC.
+Отдельные bot и worker процессы в Docker Compose на существующем Windows production.
 Без Mini App, JavaScript, React и обязательного публичного HTTP API.
 
 | Компонент | Выбор |
@@ -1120,7 +1120,6 @@ Python 3.12+, aiogram 3; единственный интерфейс — Telegra
 | Уведомления | PostgreSQL transactional outbox, отдельный sender |
 | Тесты | pytest, PostgreSQL integration tests |
 | Качество | Ruff, mypy |
-| Хостинг | Docker Compose на Home Data Center |
 | CI | GitHub Actions |
 | Портреты | Отдельные players/staff SVG-банки, deterministic recipes, PNG для Telegram |
 
@@ -1193,7 +1192,7 @@ Runtime выбирает локальный вариант и перекраши
 Тренировки, финансы/ledger, трансферы, персонал/скаутинг, академия, стадион,
 мораль/форма, кубок, косметическая монетизация.
 
-### Веха 5 — Запуск на HDC
+### Веха 5 — Запуск на production
 Outbox/retry, восстановление, backup/мониторинг, нагрузочные и аварийные проверки,
 deployment и smoke. Даты не назначены; последовательность и критерии — в Linear.
 

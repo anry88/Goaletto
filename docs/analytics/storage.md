@@ -50,7 +50,7 @@ Default `journey_export` — security-barrier view только внешних �
 остаться restricted для диагностики матча, но не являются участием человека.
 PUBLIC не получает права. Выдать аналитическому read-only пользователю только
 USAGE schema и SELECT journey_export; не grant tables/all schemas или write privileges.
-Настройка реальных HDC ролей не выполнялась и должна проверяться перед привлечением.
+Настройка реальных production ролей не выполнялась и должна проверяться перед привлечением.
 
 `cleanup_events` использует persisted retention_days (по умолчанию 180), удаляет rows
 с recorded_at раньше границы, пустые истёкшие sessions, acquisition touches
@@ -58,7 +58,7 @@ USAGE schema и SELECT journey_export; не grant tables/all schemas или writ
 сохраняются. Вызывать в отдельной короткой maintenance transaction через
 `python -m goaletto.application.analytics_cleanup_cli --at <UTC ISO> --apply`.
 Без `--apply` подключения нет; используется сохранённый retention.
-Расписание на HDC остаётся частью развёртывания. [Gate/runbook](launch-gate.md).
+Расписание на production остаётся частью развёртывания. [Gate/runbook](launch-gate.md).
 Комментарии/опросы и их сроки — AND-78.
 Внешний экспорт запускается отдельно и не блокирует игровую транзакцию.
 
@@ -68,4 +68,4 @@ Unit SQL-recording выполняет collector и проверяет dedupe, к
 internal/opt-out, отсутствие launch cohort reset, SQL lock/FK/cleanup; offline Alembic
 сопоставляет таблицы/индексы. Это не эмуляция PostgreSQL и не доказательство гонок,
 серверного rollback/GRANT/CASCADE. По указанию пользователя тестовые БД не создаются.
-Production БД/HDC не менялись. UI-инструментирование — AND-76/77, отчёты — AND-79.
+Production БД/production не менялись. UI-инструментирование — AND-76/77, отчёты — AND-79.

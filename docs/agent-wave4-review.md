@@ -68,7 +68,7 @@ feedback journey events для internal account; один тестовый ко�
 На host включены GOALETTO_FEEDBACK_ENABLED=true, COMMENT_RETENTION_DAYS=30,
 COOLDOWN_DAYS=7 без изменения Telegram allowlist. Работает одна pending cleanup
 job. Продления ownership от feedback нет (PG assertion и native settings deadline
-после отзыва совпал с последним /match). HDC rollout не выполнялся: игра всё ещё
+после отзыва совпал с последним /match). production rollout не выполнялся: игра всё ещё
 в закрытом локальном тесте, общая seasonal integration и production gates впереди.
 
 Следующие работы:
@@ -83,7 +83,7 @@ job. Продления ownership от feedback нет (PG assertion и native s
    delivered/unknown, answered/skip/opt-out и кнопочные причины с n/N.
    Свободный текст не экспортировать; внутреннюю тестовую когорту показывать явно.
 4. Затем новый тестовый тур двух аккаунтов с отзывом и контроль новой интеграции
-   rollover отдельно от настоящего недельного календаря. HDC rollout после
+   rollover отдельно от настоящего недельного календаря. production rollout после
    закрытия production gates, backup/off-host/reboot и эксплуатации.
 
 Это рекомендации следующей работы; дополнительные агенты сейчас не запущены.

@@ -17,7 +17,7 @@ from scripts.simulate_ten_seasons import local_target, weak_player_stress
 def test_calibration_refuses_remote_production_and_other_databases():
     for environment, url in (
         ("production", "postgresql+asyncpg://x:x@127.0.0.1:5433/goaletto"),
-        ("development", "postgresql+asyncpg://x:x@hdc:5433/goaletto"),
+        ("development", "postgresql+asyncpg://x:x@remote-db.invalid:5433/goaletto"),
         ("development", "postgresql+asyncpg://x:x@127.0.0.1:5433/riverking"),
     ):
         with pytest.raises(ValueError):

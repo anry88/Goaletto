@@ -77,7 +77,7 @@ CandidateOffer. Если ушёл капитан, экран выбирает п
 
 Миграция 0051 расширяет схему без удаления игровых данных. Downgrade не удаляет
 новые подтверждения/историю; для отката нужен код, понимающий обе политики времени.
-Никаких production reset или тестовых покупок/расторжений на HDC.
+Никаких production reset или тестовых покупок/расторжений на production.
 
 ## Приёмка и статус установки
 
@@ -92,9 +92,9 @@ IO проверено вне database transactions. Ни одного запро
 Полная цепочка миграций от пустой схемы до 0051 и Alembic metadata check выполнены
 на локальной development Goaletto :5433 после проверки target, отсутствия data
 protection и исключительно тестовых аккаунтов 1001/1002. Новая база не создавалась.
-Проверки и сбросы никогда не направлялись на HDC.
+Проверки и сбросы никогда не направлялись на production.
 
-**HDC обновлён 2026-10-22 после завершения работ с Docker.** До этого установка
+**production обновлён 2026-10-22 после завершения работ с Docker.** До этого установка
 была отложена по указанию владельца. Штатная backup-проверка подтвердила свежую
 проверенную копию (prune: 0/0); сохраняются прежнее расписание и все семь overlays.
 Неподдерживаемый `run --no-build` остановил первую попытку до запуска миграции;
@@ -102,7 +102,7 @@ protection и исключительно тестовых аккаунтов 100
 `run --rm --no-deps --pull never` и release overlay без build. Применена 0051,
 обновлены только bot/worker. PostgreSQL/Grafana сохранили container IDs.
 
-Read-only HDC приёмка: revision 0051, protected=true, metadata drift отсутствует,
+Read-only production приёмка: revision 0051, protected=true, metadata drift отсутствует,
 jobs/sender healthy, RU/EN меню и Dispatcher routes подключены, timezone и
 Prometheus snapshot успешны; audience dashboard сохранил 12 panels. Игровых действий
 от имени менеджеров при проверке: 0. Числа истории не уменьшились: managers 8,
@@ -110,14 +110,3 @@ persons 2133, clubs 100, ownership_periods 6, star_orders 1, star_payments 0,
 ledger_entries 714, match_results 8, training_plans 5, candidate_signings 4.
 Три прежних applied-тренировки и две scheduled остались на исходной midnight-политике;
 новые/явно перевыбранные используют предпочтительное время.
-
-Установленный образ: `goaletto:04ef71a2-hdc` (runtime-only, linux/amd64), source
-`04ef71a207cb666ee2a1f5725016dbcd6c45898f`. Config: `sha256:8fa99d77311ddcb74a690bb61438f753c92c596970dda14a791384635d1ee2b9`. Архив
-`goaletto-04ef71a2-hdc.tar`: 75214336 bytes; SHA-256
-`50540a1c41b0b5220bf2131a34a7df06e579d13aa135e04e2f6ba4e459a2902a`. Smoke внутри amd64-образа проверил RU/EN меню, timezone,
-offline-миграцию и сохранность audience dashboard. Архив и config digest проверены на HDC до установки.
-
-По просьбе владельца после приёмки удалены один завершённый `goaletto-migrate-1`
-(Exited 0, не paused) и 13 неиспользуемых старых образов Goaletto. Оставлены
-`04ef71a2-hdc` и `39a022c8-hdc`; чужие образы, контейнеры и volumes не менялись.
-Следующие одноразовые миграции запускаются с `--rm`.

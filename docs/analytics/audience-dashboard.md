@@ -46,14 +46,6 @@
 Сбой публикации ограничен своим timeout и не отменяет game commits или метрики.
 Числа не встраиваются в JSON: названия и оформление отделены от VictoriaMetrics.
 
-HDC добавляет `deploy/compose.audience.yaml` **после** прежних шести Compose-файлов.
-GOALETTO_AUDIENCE_DASHBOARD_DIR указывает на отдельный подкаталог audience в
-существующем Grafana Goaletto provisioning tree. Worker имеет RW только к этому
-новому подкаталогу; соседние dashboards, datasource/секреты и PGDATA не монтируются.
-Для новой папки тому же Docker-пользователю нужен доступ Modify; он не даёт доступ
-к другим файлам или учётным данным. monitoring и data-d overlays сохраняются.
-Локально опция выключена. Никогда не запускать дополнительный poller ради dashboard.
-
 Проверки: ручная SQL-матрица на временных таблицах единственной локальной
 application DB (transaction rollback), регистрация/активность/дедупликация,
 internal/opt-out/system/late exclusions, bounded labels, mapping fingerprint,

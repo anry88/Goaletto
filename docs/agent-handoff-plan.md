@@ -61,7 +61,7 @@ SQL и сверка DDL. Создавать новые тестовые БД л�
 Goaletto DB; пока нет реальных пользователей, на ней разрешены проверки и reset.
 DB-прогоны с reset согласовываются по времени с Codex, чтобы агенты не сбрасывали
 данные друг друга. Никаких паролей/DSN в отчёте. Polling и рассылки для тестов
-заменяй fake transport. HDC/deploy не входят в эти задания.
+заменяй fake transport. production/deploy не входят в эти задания.
 
 ## Статус выдачи · 2026-10-13
 
@@ -150,11 +150,6 @@ receipt/неполный receipt, зависшие held/pending jobs и portrait
 Не удаляй историю и не ставь unknown в sent. Mutating recovery предлагается
 отдельным patch для Codex, который проверит idempotency/locks.
 
-**Файлы:** новый diagnostics module/CLI, tests, runbook. Приёмка: намеренно
-повреждённые synthetic состояния, false positives при нормальном halftime,
-read-only действительно не меняет строки. Не создавать резервную БД, не выполнять
-restore/deploy/HDC операции. docs/match-runtime.md, outbox-delivery.md, deploy-hdc.md.
-
 ## E · Недельные тренировки · AND-58
 
 **После согласования policy, не выдавать как безусловную реализацию сегодня.**
@@ -201,7 +196,7 @@ player identity, C — Dugout, whole portraits, source отдельно, garment
    после этого. UI рынка позже можно вынести отдельно.
 4. Общие models/migrations/dispatcher/worker, review каждой внешней ветки,
    реальные PG race/rollback проверки на единственной DB; AND-76 instrumentation.
-5. Финальная локальная сборка, Telegram smoke и HDC-подготовка отдельным этапом.
+5. Финальная локальная сборка, Telegram smoke и production-подготовка отдельным этапом.
 
 AND-61/83 staff lifecycle не выдавать целиком до утверждения вероятностей пенсии
 60–70, условий career transition и стартового pool. Cup AND-65/Stars AND-67/

@@ -4,7 +4,7 @@
 Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
 match-opportunities подключены к операторскому CLI. Добавлены
 [технические latency](../runtime-observation.md), [внутренние опросы и сводка feedback](../feedback.md).
-Полный [gate HDC](launch-gate.md) ещё требует dashboard/access.
+Полный [gate production](launch-gate.md) ещё требует dashboard/access.
 
 Статус: [контракт v1](contract-v1.md) закреплён, 2026-10-12. Envelope и UTC-границы
 реализованы; менеджерские псевдонимы описаны в миграции. Сбор событий, опросы и отчёты
@@ -159,9 +159,9 @@ Crash после send, до commit означает неизвестный ис�
 Подробный [план первых трёх экспериментов](experiments.md) подготовлен в AND-81:
 следующий шаг после claim, объяснение времени матча и CTA после результата.
 План фиксирует стабильное назначение, delivery exposure, зрелые n/N, guardrails
-и rollback. Runner пока отсутствует; baseline и HDC gate предшествуют запуску.
+и rollback. Runner пока отсутствует; baseline и production gate предшествуют запуску.
 
-Использовать PostgreSQL SQL/views и существующий HDC Grafana; агрегаты Prometheus
+Использовать PostgreSQL SQL/views и существующий production Grafana; агрегаты Prometheus
 только с ограниченной кардинальностью. Нет нового публичного API или интерфейса игры.
 Доступ к деталям менеджеров и текстам — отдельный. Имена, Telegram IDs, campaign
 payload, command_id и fixture_id не используются как Prometheus labels.

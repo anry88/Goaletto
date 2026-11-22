@@ -103,7 +103,7 @@ pause/resume/postpone, applied tick FK order, halftime commands, late command ca
 abandoned, outbox вместо delivery, controlled activation, worker savepoint/attempt outcomes.
 Offline upgrade/downgrade SQL/CREATE/index/ALTER checks; real PostgreSQL locks/rollback/
 triggers/competition не проверены. Тестовые БД/контейнеры по указанию пользователя
-не создаются. Не запускались game seed --apply, runtime --apply, polling или HDC deployment.
+не создаются. Не запускались game seed --apply, runtime --apply, polling или production deployment.
 
 ## Общий gate · 2026-10-13
 

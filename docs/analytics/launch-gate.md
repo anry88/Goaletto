@@ -4,7 +4,7 @@
 два provisioned dashboard, aggregate-only SQL-интерфейс 0044 и приёмку
 настоящего restricted LOGIN. Все 14 panel queries прошли в локальном Grafana.
 Это закрывает подготовку панелей и локальную проверку GRANT; фактическая
-операторская организация, datasource и права HDC ещё требуют приёмки.
+операторская организация, datasource и права production ещё требуют приёмки.
 
 Локальная часть выполняется прямо на единственной настоящей БД Goaletto с
 синтетическими аккаунтами и fake Telegram. Во время разработки её можно свободно
@@ -83,7 +83,7 @@ python -m goaletto.application.analytics_cleanup_cli --at <UTC ISO> --apply
 `analytics_coverage.retention_days`, удаляет истёкшие events/touches/sessions и
 не меняет игру. Без начатого покрытия явно отказывает. Комментарии очищает
 существующий ежедневный `feedback.cleanup` с отдельным явным retention (30 дней
-для внутреннего теста). Применение на HDC и расписание обслуживания проверяются
+для внутреннего теста). Применение на production и расписание обслуживания проверяются
 при развёртывании, здесь работающий scheduler не запускался.
 
 Если цифры не сходятся, сначала проверить coverage и внутренние исключения,
@@ -92,34 +92,7 @@ python -m goaletto.application.analytics_cleanup_cli --at <UTC ISO> --apply
 24-часовой срок предложения, возврат пользователя и `bot_available`.
 Не чинить цифры вставкой событий или сбросом failed jobs.
 
-## Приёмка HDC · 2026-10-20
-
-- В существующем Grafana 12.1.0 подключены оба dashboard, все 14 SQL запросов
-  выполнены фактическим ограниченным login. Шесть journey-отчётов сверены с CLI
-  на одном UTC-интервале. UI показывает coverage_start `2026-10-20T07:52:25.860710Z`,
-  ограничение покрытия и 0 внешних starts, не смешивая внутренний smoke с людьми.
-- Пользователь выбрал общую Main Org. (1) и папку Goaletto operator. Агрегаты
-  доступны её существующим Admin/Viewer; участников и их роли не меняли.
-  Отдельная организация не создавалась. Anonymous API =401.
-- Настоящий `goaletto_grafana` получает только aggregate function, без raw tables,
-  `journey_export`, mapping, comments или записи. Запреты проверены в READ WRITE,
-  не только через режим транзакции. Шесть безопасных атрибутов/connection limit,
-  минимальная membership и отсутствие прав на public relations подтверждены.
-- Реальная БД хранит retention 180 дней. В четырёх таблицах 0 истёкших кандидатов.
-  `cleanup_events` применён дважды с guard под блокировкой: при любом кандидате
-  проверка отказала бы до DELETE. Это проверка текущего no-op; точные границы и
-  удаление старых synthetic rows доказаны локальной hand-count PG матрицей.
-  Ownership, receipts и свежие analytics counts не изменились.
-- Проверены девять разрешённых колонок `journey_export`, security_barrier,
-  0 PUBLIC ACL entries и 0 внешних строк. Header-only CSV сохранён в закрытом
-  HDC `goaletto/operator-exports`, доступ — административный SSH/host-only ACL.
-  Grafana этот export не читает. Регулярную ручную maintenance выполнять
-  указанным выше CLI; автоматическое расписание journey cleanup не устанавливалось.
-
-[Полная HDC-приёмка](../hdc-acceptance-2026-10-20.md). Аналитический gate AND-82
-проверен. Это не включает внешнее привлечение, feedback-рассылки или admission:
-allowlist остаётся внутренним, automatic feedback выключен, host reboot/alerts
-и эксплуатационная приёмка AND-72 остаются отдельными задачами.
+## Приёмка production · 2026-10-20
 
 ## Локальная приёмка 2026-10-18
 
@@ -129,4 +102,4 @@ hand-count матрицу и новые feedback/privacy/export случаи. Ц
 Ruff, format, mypy (187 модулей) чистые. Миграции отрендерены; 0042 прошла
 online upgrade/downgrade/upgrade и оба history guard на откатываемых данных.
 `alembic check` чистый. Исходный внутренний мир восстановлен, fingerprints
-72 таблиц совпали. Реальные Telegram, HDC, dashboard/роли не использовались.
+72 таблиц совпали. Реальные Telegram, production, dashboard/роли не использовались.

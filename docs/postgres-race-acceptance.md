@@ -89,7 +89,7 @@ durable attempt/lease/board и `telegram_message_id`. Rollback не оставл
    `GOALETTO_ALLOW_DEVELOPMENT_RESET=1 python -m pytest -q -m integration -k race_acceptance`.
 3. Ожидать 6 passed при отсутствии флаков; при споре повторить только при
    реальном основании (lock-таймаут/дедлок в логе), а не для накрутки.
-4. Восстановить исходный мир из бэкапа. HDC throughput/p95 этим набором не обещается.
+4. Восстановить исходный мир из бэкапа. production throughput/p95 этим набором не обещается.
 
 ## Статус проверок агентом
 

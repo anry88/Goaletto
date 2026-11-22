@@ -219,7 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--target",
         required=True,
         help="Explicit agreed target/project label, e.g. local-goaletto or "
-        "hdc-goaletto. Never inferred from a port number alone.",
+        "a manually verified production container. Never inferred from a port number alone.",
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5433)

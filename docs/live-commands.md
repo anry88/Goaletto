@@ -88,7 +88,7 @@ halftime free window без future FK, свежий injury guard с UUID hex, н
 Dispatcher с fake Telegram и status refresh. Full match/report/standings также
 проверены в общей PG-сборке; сеть вне транзакции.
 
-Polling, реальный Telegram/HDC smoke, экономика/rollover и recovery after long
+Polling, реальный Telegram/production smoke, экономика/rollover и recovery after long
 downtime не входят в эту приёмку. AND-69 ещё не реализован диагностическим CLI.
 
 Итоговая сборка: Ruff/format214, mypy85;375 unit/offline checks.

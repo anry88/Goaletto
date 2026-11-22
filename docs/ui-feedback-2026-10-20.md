@@ -71,17 +71,6 @@ CI реализации [39402174634](https://github.com/anry88/Goaletto/actions
 rollback, fixed +14/+2 offsets, неизменность назначенных fixtures, reminders и
 language. `alembic upgrade head` / `alembic check` без новых операций; schema 0044.
 
-HDC установлен из чистого `9137a34d3d93f4d63b499988edacb59466d8e8fd`,
-tag `goaletto:9137a34d-hdc`, Linux/amd64. Архив 76 130 304 bytes,
-SHA-256 `2f3d605286801b51c2254c7dec5235e2f9bf4fa0a97e881d9f445fcf04bf2e17`,
-Docker config digest
-`sha256:656967b2d55165021fa86ed7139b445a6223956299c0c48224fbb7e4a77922b6`.
-Проверены архив/образ; перед установкой Goaletto database, 0 внешних менеджеров,
-0 live fixtures. Обновлены только bot/worker, все пять overlay сохранены.
-Остальные 20 контейнеров, включая Goaletto PostgreSQL/Grafana/VictoriaMetrics,
-сохранили ID/StartedAt. PostgreSQL/worker healthy; оба metrics targets up=1,
-публичных портов нет. База и мир не пересоздавались, новый polling на Mac не запускался.
-
 В настоящем Telegram внутреннего аккаунта `/table` показал все десять мест:
 Sakura 3 очка / 1 матч / 2:1 и Teranga 0 / 1 / 1:2, остальные восемь — 0 / 0 / 0:0.
 `/settings` показал «Настройки» и отдельный статус напоминаний. `/timezone` вывел
@@ -95,4 +84,4 @@ UTC 09:43, затем UTC. `preferred_kickoff_minute` остался NULL. Пр�
 last_game_action_at и expires_at: не изменились. Срок оставался от `/table`
 09:41:20Z; настройки его не продлевали. Тестовому аккаунту возвращён исходный UTC.
 
-Новые правила, включая отказ до межсезонья и оценку всего клуба: [code-only приёмка](prelaunch-code-2026-10-20.md). Эта работа не заявляет установки нового релиза на HDC.
+Новые правила, включая отказ до межсезонья и оценку всего клуба: [code-only приёмка](prelaunch-code-2026-10-20.md). Эта работа не заявляет установки нового релиза на production.

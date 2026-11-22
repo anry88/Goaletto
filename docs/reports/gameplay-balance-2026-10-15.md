@@ -73,6 +73,6 @@ Values are fractional points; friendly coefficient remains uncalibrated.
 
 ## Limits of this audit
 
-No DB throughput/p95, no worker/ledger races, no HDC infrastructure, no
+No DB throughput/p95, no worker/ledger races, no production infrastructure, no
 connected cup mechanics, no real match results (pinned calendar income).
 See `assumptions` in the JSON.

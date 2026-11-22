@@ -117,7 +117,7 @@
       "milestone": "world",
       "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
       "context": "Реализованы domain.world/build_world, application.world/initialize_world и CLI goaletto-world. Воспроизводимый комплект: 5 лиг × 10 клубов × 20 футболистов, все без владельцев; fixed 4-4-2/bench с запасным GK, сопоставимые профили навыков без tier handicap, одинаковый общий budget parameter. PostgreSQL seed использует общий allocation transaction lock, immutable receipt/config hash, 1000 уникальных person/face reservations и отказ при исчерпании age-compatible каталога. Repeat receipt возвращает прежние IDs и не сбрасывает финансы/лица/возраст/составы/владение после матчей. Стартеры 32–38 получают persisted first-season retirement decision; 38 всегда последний. Шкала staff и стартовый staff pool не вводятся.",
-      "acceptance": "Проверен offline preview: 5 лиг, 50 клубов, 1000 игроков/лиц, 450 fixtures и 15302 held jobs. Core skill mean 8.91875, spread 0; это proxy начального баланса, не окончательный OVR. 134 unit tests passed, 2 integration deselected; Ruff/format/mypy и offline upgrade/downgrade прошли. SQL-recording проверяет compiled batches, unique faces, held jobs и receipt последним; retry не перестраивает мир. По указанию пользователя новые БД не создаются: реальный PostgreSQL seed/concurrency/rollback и --apply не выполнялись. Документация docs/world-initialization.md. Реализованный seed не означает runtime матчей, claim или HDC deploy.",
+      "acceptance": "Проверен offline preview: 5 лиг, 50 клубов, 1000 игроков/лиц, 450 fixtures и 15302 held jobs. Core skill mean 8.91875, spread 0; это proxy начального баланса, не окончательный OVR. 134 unit tests passed, 2 integration deselected; Ruff/format/mypy и offline upgrade/downgrade прошли. SQL-recording проверяет compiled batches, unique faces, held jobs и receipt последним; retry не перестраивает мир. По указанию пользователя новые БД не создаются: реальный PostgreSQL seed/concurrency/rollback и --apply не выполнялись. Документация docs/world-initialization.md. Реализованный seed не означает runtime матчей, claim или production deploy.",
       "depends": [
         "AND-45"
       ]
@@ -131,7 +131,7 @@
       "key": "onboarding",
       "milestone": "world",
       "milestone_id": "6beb97a5-f02b-450a-8643-3d108d3128a9",
-      "context": "В рамках AND-47 реализован backend begin_game/preview/claim: Manager/pseudonym/source до claim, общий allocation lock, только free tier5, один owner, idempotent operation, budget/roster/history без сброса. При исчерпании мест полный новый5×10×20 через initializer+savepoint+activation; нехватка новых unique faces даёт no_capacity без частичного мира/повторов. Backend не вызывался на реальной БД.\n\nActor scope/GameActionReceipt dedupe работает независимо от analytics opt-out/retention; обязательные refs/тип effect проверяются и без analytics.6 calendar months, reminders1/3/5mo, expiry/release/stale jobs/backend worker реализованы; accepted команды прежнего ownership cancelled при expiry.\n\nRuff/format, mypy50, полный pytest212 passed/2 deselected; новый guard test и16 targeted tests проходят. Offline0008 upgrade/downgrade/DDL без БД. Документ docs/club-entry.md.\n\nЗадача остаётся In Progress: игровой Telegram start/выбор/claim/navigation ещё не routed, sender отсутствует. Второму комплекту нужен новый банк1000 уникальных identities. PG execution/races/rollback не проверены по запрету тестовых БД. HDC/polling/--apply не запускались.",
+      "context": "В рамках AND-47 реализован backend begin_game/preview/claim: Manager/pseudonym/source до claim, общий allocation lock, только free tier5, один owner, idempotent operation, budget/roster/history без сброса. При исчерпании мест полный новый5×10×20 через initializer+savepoint+activation; нехватка новых unique faces даёт no_capacity без частичного мира/повторов. Backend не вызывался на реальной БД.\n\nActor scope/GameActionReceipt dedupe работает независимо от analytics opt-out/retention; обязательные refs/тип effect проверяются и без analytics.6 calendar months, reminders1/3/5mo, expiry/release/stale jobs/backend worker реализованы; accepted команды прежнего ownership cancelled при expiry.\n\nRuff/format, mypy50, полный pytest212 passed/2 deselected; новый guard test и16 targeted tests проходят. Offline0008 upgrade/downgrade/DDL без БД. Документ docs/club-entry.md.\n\nЗадача остаётся In Progress: игровой Telegram start/выбор/claim/navigation ещё не routed, sender отсутствует. Второму комплекту нужен новый банк1000 уникальных identities. PG execution/races/rollback не проверены по запрету тестовых БД. production/polling/--apply не запускались.",
       "acceptance": "Один Telegram ID — один клуб; параллельный claim последнего места не делит клуб/не создаёт лишние комплекты; верхние лиги недоступны новичкам; текущие финансы/таблица клуба сохраняются. Приёмка аналитики: первый игровой /start и источник фиксируются до claim; club_claimed атомарен с владением, retry/race не удваивают событие. Internal/автоматика отделены. Полнота воронки проверяется в AND-76.",
       "depends": [
         "AND-46",
@@ -198,7 +198,7 @@
       "key": "simulation",
       "milestone": "matches",
       "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
-      "context": "Реализован чистый regulation-v1: frozen snapshots/state/commands, explicit seed и policy, 7 секторов + GK, владение, моменты/исходы, усталость, карточки/травмы, injury-only замены, 5/3 окон, тактика/менталитет, остановка при <7. Закрытый JSON checkpoint/hash и точный replay без Telegram/SQLAlchemy/сети/часов. Домашняя поддержка временно повышает мораль 0–100 по фактическим home_fans, ограниченным вместимостью стадиона; crowd и policy pinned в snapshot. Большая пустая арена не даёт бонус.\n\nПроверка: golden seed7 1:2, 57 событий, checkpoint после 17 тиков даёт тот же финал; 200 seeds с 2500 болельщиками: home/away/draw 78/56/66 против 67/67/66 без поддержки. Коэффициенты предварительные. CLI goaletto-match без БД.\n\nПриёмка: domain/replay/команды/поле реализованы и проверены; runtime/accepted-command persistence/UTC jobs/outbox/Telegram UI остаются AND-52/53/68, финансовый спрос/стадион — AND-63. PostgreSQL и HDC не запускались, тестовые БД не создавались. Документация: docs/match-engine.md.",
+      "context": "Реализован чистый regulation-v1: frozen snapshots/state/commands, explicit seed и policy, 7 секторов + GK, владение, моменты/исходы, усталость, карточки/травмы, injury-only замены, 5/3 окон, тактика/менталитет, остановка при <7. Закрытый JSON checkpoint/hash и точный replay без Telegram/SQLAlchemy/сети/часов. Домашняя поддержка временно повышает мораль 0–100 по фактическим home_fans, ограниченным вместимостью стадиона; crowd и policy pinned в snapshot. Большая пустая арена не даёт бонус.\n\nПроверка: golden seed7 1:2, 57 событий, checkpoint после 17 тиков даёт тот же финал; 200 seeds с 2500 болельщиками: home/away/draw 78/56/66 против 67/67/66 без поддержки. Коэффициенты предварительные. CLI goaletto-match без БД.\n\nПриёмка: domain/replay/команды/поле реализованы и проверены; runtime/accepted-command persistence/UTC jobs/outbox/Telegram UI остаются AND-52/53/68, финансовый спрос/стадион — AND-63. PostgreSQL и production не запускались, тестовые БД не создавались. Документация: docs/match-engine.md.",
       "acceptance": "Golden/replay, immutable inputs, события, sector/form/fatigue/morale, команды/лимиты, форсированные cards/injuries и серия баланса проверены без БД.",
       "depends": [
         "AND-45",
@@ -214,7 +214,7 @@
       "key": "ticks",
       "milestone": "matches",
       "milestone_id": "9a82e1f5-d63b-4ad2-adcf-aba26e120ff4",
-      "context": "Реализован durable regulation runtime, worker dispatcher и explicit season activation CLI. Fixture/Match locks, immutable starting snapshots/seed/version, absolute UTC deadlines от actual_start_at, 15/18/19/33 minute boundaries, closed checkpoint/projection validation, идемпотентные ticks/stages и outbox в одной game transaction. Поддержка трибун pinned: capacity/supporters persisted, baseline attendance=min(supporters,capacity), прогноз спроса остаётся AND-63.\n\nAccepted commands ordered, deadline check, tick FK insert-before-apply, halftime free window без FK на будущий tick16, applied lifecycle/command correlation. System lifecycle не human activity. Operation attempts, savepoint deferral/failed codes. Late kickoff rebases один раз; mid-match lateness не сдвигает clock. Explicit pause/resume/postpone сохраняют actual dates; abandoned отдельно, без присуждения3:0/очков.\n\nПроверка: Ruff/format, mypy42, полный offline pytest182 passed/2 deselected плюс новый snapshot pin test, 17 targeted runtime/dispatcher checks. Непрерывные30 ticks дают hash ae4002fb500d7769e280a9939d3f345f78e935b6c1b1be6a3f0bb792850c6841; retry/restart/halftime/delay/pause/command FK/deadline/abandoned/outbox проверены SQL-recording без БД. Миграция0005 offline upgrade/ALTER/DDL.\n\nПо указанию пользователя тестовые БД не создавались; real PG locks/races/rollback/trigger execution не проверялись. Seed/runtime --apply и HDC не запускались, held jobs не активированы. Sender/live Telegram edit — AND-68, command admission/UI/instructions — AND-53, standings/results — AND-56, rollover — AND-57, disaster recovery — AND-69. Документ docs/match-runtime.md.",
+      "context": "Реализован durable regulation runtime, worker dispatcher и explicit season activation CLI. Fixture/Match locks, immutable starting snapshots/seed/version, absolute UTC deadlines от actual_start_at, 15/18/19/33 minute boundaries, closed checkpoint/projection validation, идемпотентные ticks/stages и outbox в одной game transaction. Поддержка трибун pinned: capacity/supporters persisted, baseline attendance=min(supporters,capacity), прогноз спроса остаётся AND-63.\n\nAccepted commands ordered, deadline check, tick FK insert-before-apply, halftime free window без FK на будущий tick16, applied lifecycle/command correlation. System lifecycle не human activity. Operation attempts, savepoint deferral/failed codes. Late kickoff rebases один раз; mid-match lateness не сдвигает clock. Explicit pause/resume/postpone сохраняют actual dates; abandoned отдельно, без присуждения3:0/очков.\n\nПроверка: Ruff/format, mypy42, полный offline pytest182 passed/2 deselected плюс новый snapshot pin test, 17 targeted runtime/dispatcher checks. Непрерывные30 ticks дают hash ae4002fb500d7769e280a9939d3f345f78e935b6c1b1be6a3f0bb792850c6841; retry/restart/halftime/delay/pause/command FK/deadline/abandoned/outbox проверены SQL-recording без БД. Миграция0005 offline upgrade/ALTER/DDL.\n\nПо указанию пользователя тестовые БД не создавались; real PG locks/races/rollback/trigger execution не проверялись. Seed/runtime --apply и production не запускались, held jobs не активированы. Sender/live Telegram edit — AND-68, command admission/UI/instructions — AND-53, standings/results — AND-56, rollover — AND-57, disaster recovery — AND-69. Документ docs/match-runtime.md.",
       "acceptance": "Runtime/worker/activation, exact UTC deadlines, atomic checkpoint/events/jobs/outbox, commands and attempts реализованы и unit/offline SQL проверены. Online PG не запускался; календарь не активирован.",
       "depends": [
         "AND-51",
@@ -475,8 +475,8 @@
     {
       "id": "AND-69",
       "uuid": "4d964e2b-6b3b-414c-8afb-4bc4e0273f91",
-      "title": "Проверить восстановление после сбоев HDC и БД",
-      "url": "https://linear.app/andrei-brazhnikov/issue/AND-69/proverit-vosstanovlenie-posle-sboev-hdc-i-bd",
+      "title": "Проверить восстановление после сбоев production и БД",
+      "url": "Сведения об эксплуатации хранятся в операторской документации.",
       "state": "Backlog",
       "key": "recovery",
       "milestone": "operations",
@@ -492,14 +492,14 @@
     {
       "id": "AND-70",
       "uuid": "7ece0b71-a857-45bf-9ec0-8c24efc75214",
-      "title": "Подготовить backup, health и наблюдаемость на HDC",
-      "url": "https://linear.app/andrei-brazhnikov/issue/AND-70/podgotovit-backup-health-i-nablyudaemost-na-hdc",
+      "title": "Подготовить backup, health и наблюдаемость на production",
+      "url": "Сведения об эксплуатации хранятся в операторской документации.",
       "state": "Backlog",
       "key": "observability",
       "milestone": "operations",
       "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
-      "context": "Метрики tick lateness/queue/outbox/failed jobs/диск; ежедневные backup вне HDC и restore drill; автозапуск после reboot.",
-      "acceptance": "Секреты не попадают в логи; backup восстанавливается в изолированной БД; health отражает DB/worker heartbeat; monitoring интегрирован в существующий HDC без нарушения соседних сервисов.",
+      "context": "Метрики tick lateness/queue/outbox/failed jobs/диск; ежедневные backup вне production и restore drill; автозапуск после reboot.",
+      "acceptance": "Секреты не попадают в логи; backup восстанавливается в изолированной БД; health отражает DB/worker heartbeat; monitoring интегрирован в существующий production без нарушения соседних сервисов.",
       "depends": [
         "AND-39"
       ]
@@ -513,7 +513,7 @@
       "key": "qa",
       "milestone": "operations",
       "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
-      "context": "Несколько комплектов, одновременные матчи/регистрации/ставки; сезонные sim-прогоны; целевые показатели определить по измеренным ресурсам HDC.",
+      "context": "Несколько комплектов, одновременные матчи/регистрации/ставки; сезонные sim-прогоны; целевые показатели определить по измеренным ресурсам production.",
       "acceptance": "Проверены race cases и аварии; измерены p95 tick lateness/callback latency; сезон сохраняет 10 клубов в лиге; документированы bottlenecks и лимиты для запуска. Уточнение пользователя: Дополнительные сценарии: бот-клубы играют фиксированной XI без тренировок/тактической ротации; близкие начальные составы; injury-only substitutions; retirement+young replacement в межсезонье; шесть календарных месяцев/конец месяца/возврат одновременно с release. Никакой внешний ИИ.",
       "depends": [
         "AND-57",
@@ -525,14 +525,14 @@
     {
       "id": "AND-72",
       "uuid": "d1733778-8929-4a3e-afbf-70e32fd9876d",
-      "title": "Развернуть готовый MVP на HDC и провести smoke",
-      "url": "https://linear.app/andrei-brazhnikov/issue/AND-72/razvernut-gotovyj-mvp-na-hdc-i-provesti-smoke",
+      "title": "Развернуть готовый MVP на production и провести smoke",
+      "url": "Сведения об эксплуатации хранятся в операторской документации.",
       "state": "Backlog",
       "key": "deploy",
       "milestone": "operations",
       "milestone_id": "d0d6af5f-bf0b-405d-959f-d6fb6762179c",
       "context": "Существующий Windows Docker host; отдельный Compose project/volumes/secrets, без публичного PostgreSQL и Mini App. Запуск bot long polling после migration.",
-      "acceptance": "Проверены BotFather username/token и один polling instance; /start→claim→lineup→live→result; reboot/rollback/restore; соседние сервисы не перезапущены; deploy записан в runbook. Дополнительный gate: AND-82 подтверждает точные воронки/зрелые когорты и исключение internal/автоматика до первого внешнего привлечения. Зафиксировать coverage_start; операторские отчёты доступны. Эксперименты AND-81 не блокируют MVP. Решение пользователя 2026-10-11: локально управляемый ручной деплой. Основной путь: собрать/проверить образ здесь под архитектуру HDC → docker save → SFTP/SCP → SHA-256/image ID check → docker load на HDC → Compose --no-build. Альтернатива: commit/push здесь → git pull --ff-only выбранного проверенного SHA на HDC → локальный docker build там. Оба пути используют immutable release tag/GOALETTO_IMAGE и deploy/compose.release.yaml для migrate/bot/worker. Credentials только host-only, CI выполняет проверки и не деплоит. Приёмка AND-72: проверены согласованный путь, metadata/smoke/rollback предыдущего image, миграции до запуска worker и отсутствие изменений соседних сервисов. Документация: docs/deployment-hdc.md. Настройка пути не означает выполненный HDC deploy.",
+      "acceptance": "Сведения об эксплуатации хранятся в операторской документации.",
       "depends": [
         "AND-71",
         "AND-70",
@@ -563,7 +563,7 @@
         "AND-45"
       ],
       "acceptance": "Collector/schema/session/dedupe/exclusion/deletion/retention helpers реализованы, offline SQL и unit checks проходят. Online PG/roles не запускались по текущему запрету тестовых БД.",
-      "context": "Реализован transactional collector infrastructure.analytics и миграция 0004: coverage, exclusions/tombstones, journey sessions/events, restricted mapping и default journey_export. Псевдоним создаётся до claim, preview не начинает coverage. Version/operation/effect UNIQUE; retry не обновляет session, конфликт content отклоняется. Запись в транзакции игрового caller без самостоятельного commit/экспорта; rollback откатывает успех.\n\nУспешные allowlist user-действия образуют сессии с gap <30 минут; action_rejected не создаёт/продлевает session, background без session. Internal/test/operator/opt_out исключены; deletion удаляет mapping/events/sessions и оставляет tombstone. First start не создаётся заново после retention cleanup. Closed envelope/имена/UPDATE guard; retention helper180д, PUBLIC revoke и view без Telegram/envelope/operation refs.\n\nПроверка: Ruff/format, mypy40, pytest166 passed/2 deselected, offline Alembic DDL. SQL-recording проверяет collector/session/dedupe/exclusions/cleanup, без тестовых БД по указанию пользователя. PostgreSQL execution/races/CASCADE/GRANT не проверены и реальный сбор не включён; before launch требуется эксплуатационная проверка. UI instrumentation, SQL KPI, maintenance jobs и фактические HDC roles остаются AND-76/77/79/82. Документ docs/analytics/storage.md.",
+      "context": "Реализован transactional collector infrastructure.analytics и миграция 0004: coverage, exclusions/tombstones, journey sessions/events, restricted mapping и default journey_export. Псевдоним создаётся до claim, preview не начинает coverage. Version/operation/effect UNIQUE; retry не обновляет session, конфликт content отклоняется. Запись в транзакции игрового caller без самостоятельного commit/экспорта; rollback откатывает успех.\n\nУспешные allowlist user-действия образуют сессии с gap <30 минут; action_rejected не создаёт/продлевает session, background без session. Internal/test/operator/opt_out исключены; deletion удаляет mapping/events/sessions и оставляет tombstone. First start не создаётся заново после retention cleanup. Closed envelope/имена/UPDATE guard; retention helper180д, PUBLIC revoke и view без Telegram/envelope/operation refs.\n\nПроверка: Ruff/format, mypy40, pytest166 passed/2 deselected, offline Alembic DDL. SQL-recording проверяет collector/session/dedupe/exclusions/cleanup, без тестовых БД по указанию пользователя. PostgreSQL execution/races/CASCADE/GRANT не проверены и реальный сбор не включён; before launch требуется эксплуатационная проверка. UI instrumentation, SQL KPI, maintenance jobs и фактические production roles остаются AND-76/77/79/82. Документ docs/analytics/storage.md.",
       "id": "AND-74",
       "uuid": "f290c896-a714-4be1-b755-b7da0e9767bd",
       "url": "https://linear.app/andrei-brazhnikov/issue/AND-74/sohranyat-sobytiya-menedzherov-v-postgresql-bez-dublej-i-vnutrennih",
@@ -666,7 +666,7 @@
         "AND-78",
         "AND-70"
       ],
-      "acceptance": "Приватный dashboard existing HDC Grafana: coverage/источники, onboarding, зрелые opportunities/cohorts, ошибки/recovery, response/skip и guardrails очереди. Фильтры неделя/source/locale/variant/tier-set в restricted SQL; Prometheus только low-cardinality агрегаты без IDs/текстов. Restricted доступы и понятные n/N/зрелость/период. Dashboard provisioned/documented, неизвестные/нет данных не превращаются в ноль. Нет публичного UI/API.",
+      "acceptance": "Приватный dashboard existing production Grafana: coverage/источники, onboarding, зрелые opportunities/cohorts, ошибки/recovery, response/skip и guardrails очереди. Фильтры неделя/source/locale/variant/tier-set в restricted SQL; Prometheus только low-cardinality агрегаты без IDs/текстов. Restricted доступы и понятные n/N/зрелость/период. Dashboard provisioned/documented, неизвестные/нет данных не превращаются в ноль. Нет публичного UI/API.",
       "context": "Использовать имеющиеся PostgreSQL/Grafana, подключение проверять без воздействия на соседние сервисы. Отдельный restricted просмотр комментариев, не в общем dashboard.",
       "id": "AND-80",
       "uuid": "6e5e0a9d-2050-4de6-8607-c5464ae218a3",

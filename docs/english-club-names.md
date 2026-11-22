@@ -69,29 +69,10 @@ checkpoint/hash не переписываются. Production не сбрасы�
 
 ## Релиз
 
-Код опубликован в main: `927913d4`. Подготовлен runtime-образ
-`goaletto:927913d4-hdc`, linux/amd64. Архив: 75 648 512 байт,
-SHA256 `ae8ca6ed73f1c16d8496851e344501901e9522d00112cdb2ce72d3a224eb11e0`;
-image config `63e56bdeb7f93b5ad4de88b5bd16446c45dd389b36181721ab14b885737c9d71`.
-
 После явного согласия владельца на production-установку 2026-10-27 релиз
-установлен на HDC, schema `0061_default_club_names`:
+установлен на production, schema `0061_default_club_names`:
 
-- Ровно 94 никогда не принадлежавших менеджерам клуба получили разные английские
-  названия. Все 6 клубов с историей владения сохранили свои названия.
-- При остановленных bot/worker сверены полные fingerprints 103 старых таблиц.
-  Данные совпали, кроме ожидаемого Club.name; отдельно добавлены 94 immutable
-  квитанции и обновлена версия миграции. Повторное применение вернуло 0 изменений.
-- Проверены все 67 сохранённых матчевых хэшей: checkpoint/result совпадают.
-  Защита production включена; контейнер PostgreSQL, его PGDATA на D и Grafana
-  не пересоздавались.
-- Bot и worker работают на `goaletto:927913d4-hdc`; worker healthy, jobs/sender
-  heartbeat проверены. Все прежние overlay, включая monitoring/data-d/audience,
-  сохранены. Проверка не отправляла искусственных Telegram-сообщений.
-- Примеры реально назначенных названий: Westbank County, Maplebrook County,
-  Goldbridge Rovers, Blackthorn Lions, Springfield Borough, Goldford Rangers.
-
-Снимки до/после и план/результат применения сохранены в HDC releases и локальном
+Снимки до/после и план/результат применения сохранены в production releases и локальном
 work. Сначала установка была остановлена до миграции проверкой окружения:
 для одноразового migrate-контейнера потребовался явный
 `-e GOALETTO_ENVIRONMENT=production`; после исправления приёмка прошла.

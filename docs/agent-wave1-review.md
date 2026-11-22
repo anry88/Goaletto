@@ -60,12 +60,12 @@ Update IDs, `/start → offers → preview → claim → club`, `/squad /lineup 
   при каждом send/edit. Никаких реальных Telegram запросов.
 
 Длительность матча проверяется по scheduled deadlines с управляемым временем;
-это не 33-минутная запись реального polling. Нет проверки HDC, реального Telegram
+это не 33-минутная запись реального polling. Нет проверки production, реального Telegram
 API, rollover/экономики или человеческих live-команд, которые ещё не реализованы.
 
 ## Единственная рабочая БД
 
-Документы/предыдущий основной чат подтвердили: persistent Goaletto DB и HDC deploy
+Документы/предыдущий основной чат подтвердили: persistent Goaletto DB и production deploy
 ранее не создавались. Старые временные DB были удалены. Порт5432 занят New Universe.
 Создана одна основная локальная `goaletto` в `goaletto-postgres-1`, PostgreSQL17,
 127.0.0.1:5433, постоянный volume `goaletto_postgres_data`. Пароль в host-only .env
@@ -79,7 +79,7 @@ Fixture требует environment development, database goaletto и явный
 
 После тестов искусственные менеджеры/матчи удалены. Оставлен первый основной мир:
 50 клубов, 1000 футболистов и уникальных faces, 0 менеджеров. Все calendar jobs
-held. Основной календарь/worker/polling/sender не запущены; HDC не изменялся.
+held. Основной календарь/worker/polling/sender не запущены; production не изменялся.
 Локальный запуск postgres: `docker compose -f compose.yaml -f compose.local.yaml
 up -d postgres`. CI без DB service, unit+offline migrations.
 

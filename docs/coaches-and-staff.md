@@ -91,16 +91,7 @@ Telegram-поток проверяется настоящим Dispatcher с ло
 
 ## Разделение меню · 2026-10-20
 
-Опубликован main `006931e6`, установлен `goaletto:006931e6-hdc`.
-1164 unit/offline checks, ruff/format/mypy и offline migration SQL прошли.
-На единственной локальной development DB дополнительно проверены реальные
-application services и Dispatcher с fake Telegram: отдельные списки, RU/EN,
-карточки сотрудников/кандидатов, страницы рынка и возврат. Все изменения этих
-проверок откатились внешней транзакцией; reset и новая test DB не использовались,
-сезонная симуляция продолжает работать. Сценарии обычных PG-тестов обновлены
-для нового входа на рынок; их reset fixtures параллельно с симуляцией не запускали.
-
-На HDC обновлены только bot/worker; PostgreSQL/D и 19 соседних контейнеров
+На production обновлены только bot/worker; PostgreSQL/D и 19 соседних контейнеров
 сохранены, 2 платёжных receipt и data protection не изменены. Read-only
 getMe/private commands, private Prometheus и jobs/sender health прошли.
 [CI изменения меню](https://github.com/anry88/Goaletto/actions/runs/39435627596)

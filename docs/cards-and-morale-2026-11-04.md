@@ -44,7 +44,7 @@
 
 ## Неверный флаг: подтверждённая причина
 
-Read-only HDC-проверка нашла Filip Đorđević,
+Read-only production-проверка нашла Filip Đorđević,
 person `6bcf8509-84c0-52cc-bff9-1e2323212759`.
 И `academy_candidates.country_code`, и `persons.country_code` равны `RS`.
 Для старого UUID-fallback `legacy_nationality` этот ID даёт `IT`.
@@ -81,13 +81,7 @@ PostgreSQL-проверки на единственной локальной dev
 120 минут и пенальти, товарищеский матч и academy → Person nationality.
 Миграции отрендерены; online upgrade и metadata check без изменений, head 0063.
 
-## HDC · 2026-11-04
-
-По отдельной просьбе владельца после публикации и успешного CI установлен
-`goaletto:c65e9d70-hdc`, source `c65e9d7035ec9a8099719fb5fbb2d6bc9ba04ff1`,
-linux/amd64. Образ собран из чистого коммита на проверенной базе с неизменными
-зависимостями. Smoke V8/staff-session-v3, RU/EN и `pip check` прошли;
-все 238 файлов установленного пакета совпали с исходниками.
+## production · 2026-11-04
 
 Перед переключением активных матчей не было; последние матчи Botofarm и
 Anry’s band завершились на V7 и сохранили свои результаты. Штатная проверка
@@ -97,7 +91,7 @@ backup подтвердила свежую проверенную off-host ко�
 Обновлены только bot/worker с прежними семью overlays. Миграций не было,
 схема осталась `0063_percent_position_experience`, data protection включена.
 При остановленных bot/worker fingerprints всех 106 таблиц до/после полностью
-совпали; эти снимки сохранены на HDC и Mac. PostgreSQL и shared Grafana
+совпали; эти снимки сохранены на production и Mac. PostgreSQL и shared Grafana
 сохранили container IDs. Новые блокировки будут использовать V8, уже
 закреплённые матчи сохраняют свою политику.
 

@@ -53,7 +53,7 @@ Historical recipes render their pinned original variant.
 
 - 2026-10-12/13: 289 atlases / 5,780 variants, then a native generation quota limit.
 - First batch 2026-10-22: 19 atlases / 380 variants, covering the 22 missing current
-  portraits found in human-owned HDC squads. Total 308/362 atlases.
+  portraits found in human-owned production squads. Total 308/362 atlases.
 - Completion 2026-10-22: the remaining 54 atlases / 1,080 variants, following only
   missing saved prompts and original references. generation-completion-2026-10-22.json
   records original/prompt/generated-source SHA-256 and native output filenames.

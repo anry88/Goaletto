@@ -1,4 +1,4 @@
-# Stars, VIP и PostgreSQL на D · 2026-10-20
+# Stars и VIP · 2026-10-20
 
 ## Правила
 
@@ -33,7 +33,7 @@ pre-checkout проверяются плательщик, сумма, валют
 
 `/paysupport` показывает собственные покупки без выполненного возврата с пагинацией.
 `/paysupport PAYMENT_UUID причина` создаёт один durable запрос. Отправка идёт в
-**тот же админ-чат, что у RiverKing**: числовой ID перенесён на HDC из его host-only
+**тот же админ-чат, что у RiverKing**: числовой ID перенесён на production из его host-only
 конфигурации, токены и другие настройки не копировались. Команды администратора:
 
 - `/refund REQUEST_UUID` — одобрить возврат;
@@ -62,22 +62,6 @@ pre-checkout проверяются плательщик, сумма, валют
 [refundStarPayment](https://core.telegram.org/bots/api#refundstarpayment),
 [RefundedPayment](https://core.telegram.org/bots/api#refundedpayment).
 
-## Фактический перенос на D
-
-Goaletto PostgreSQL остановлен вместе с его bot/worker, PGDATA скопирован с
-сохранением файлов и прав из `goaletto_postgres_data` в
-`D:/HomeDataCenter/services/goaletto/data/postgres`. Добавлен последним
-`deploy/compose.data-d.yaml`. Проверены PG_VERSION=17, global/base/pg_wal,
-сохраняемые UID/GID 70:70 и mode 700; Windows Docker Desktop account получил
-права только на каталог данных. `.env` остаётся приватным.
-
-После старта inspect подтвердил **bind** с этого пути D на
-`/var/lib/postgresql/data`. Сразу после переноса сохранены 100 клубов, 2100 людей,
-270 матчевых тиков, схема 0044. Сброс не потребовался. Соседние контейнеры
-сохранили ID и StartedAt. Старый named volume сохранён как исходная копия и
-больше не обслуживает работающую БД. Это не перенос всего диска Docker Desktop:
-image layers соседних проектов остаются в его прежнем хранилище.
-
 ## Проверки реализации
 
 Ruff check/format, mypy (209 application modules), offline migration SQL прошли.
@@ -95,52 +79,4 @@ Goaletto development DB: точные invoice terms, pre-checkout без выд�
 Новую тестовую БД не создавали. **Реальные Stars не покупали и не возвращали**:
 личная платёжная приёмка владельца за 1 Star остаётся отдельным действием.
 
-## HDC release и backup
-
-Развёрнут main `42db6df339782bb376134f3d838b205ce962fee3`,
-`goaletto:42db6df3-hdc` (linux/amd64, runtime target). Архив 76 319 232 bytes,
-SHA-256 `69ca640aab13e1c1cc94929778046ef70341d6d4f1261c91c7ab082b7180f525`,
-config digest `sha256:8f43f04f978e2d2c295f0f22fb64c84e820423f4407f441bec2fd4948b1d36a7`.
-[CI реализации](https://github.com/anry88/Goaletto/actions/runs/39421516903) — success.
-
-При остановленных только bot/worker применён upgrade 0044→0049. Online
-`alembic check` прошёл в том же image на HDC. PostgreSQL не пересоздавался во
-время app rollout; D mount сохранился. После upgrade: 100 клубов, 2100 людей,
-270 тиков, 0 платежей. Все 19 соседних контейнеров независимо сравнены с
-baseline до переноса: ID/StartedAt не изменились. Bot/worker используют новый
-image, running=true, restarts=0; PostgreSQL и worker healthy.
-
-Read-only Telegram getMe/getMyCommands проверяет `/settings` и `/paysupport`
-в `all_private_chats`, без invoice или сообщений. Private Prometheus endpoint
-bot отвечает, health CLI worker проходит. Allowlist сохранён, внешнего запуска
-и реальных денежных операций не было. Host-only support chat настроен.
-
-Свежая off-host копия схемы0049 забрана на этот Mac:
-`~/Documents/Goaletto Backups/goaletto-20261020T122436Z-9fbbc8f8.dump` и manifest,
-1 573 188 bytes. Проверены PGDMP, размер и SHA-256; прежние копии сохранены.
-На момент этого первого релиза личная проверка VIP за 1 Star через `/settings`
-и `/paysupport` ещё ожидалась. Позднее владелец подтвердил успешную проверку;
-текущая цена повышена до 100 Stars, см. последующее обновление ниже.
-
 ## VIP за 100 Stars после личной проверки
-
-Владелец подтвердил работу платежей и поручил установить обычную цену 100 Stars.
-Код main `f8ddb6b8` установлен на HDC как `goaletto:f8ddb6b8-hdc`.
-Config digest из проверенного docker-save архива:
-`sha256:46af334bb8beb79dbad798dcb41ab17c5f1056f319256f3df33d32e2f70a7319`.
-Счёт и кнопка настроек показывают 100 Stars; переименование по-прежнему 50 Stars.
-Старый созданный счёт за 1 Star отменяется при новом заказе и отклоняется на
-precheckout. Уже одобренный платёж получает услугу по исходным условиям;
-receipt и сумма возможного возврата сохраняют фактическую сумму.
-
-Проверки: 1164 unit/offline, ruff/format, mypy 210 модулей, offline migration SQL.
-Локальные PostgreSQL-тесты не запускались параллельно с сезонной калибровкой.
-При установке сохранены 2 реальных receipt и data protection, PostgreSQL container
-и bind mount D; 19 соседних контейнеров не перезапускались. Read-only smoke
-подтвердил цену 100, 18 готовых клубов tier 5, Telegram private commands,
-Prometheus endpoint и healthy jobs/sender. Allowlist пока внутренний.
-Подробности интерфейса: [последующие уточнения](ui-followup-2026-10-20.md).
-[CI повышения цены](https://github.com/anry88/Goaletto/actions/runs/39430506781)
-завершился успешно. Новая off-host копия после реальных покупок:
-`~/Documents/Goaletto Backups/goaletto-20261020T133119Z-2c9911c1.dump`,
-1 590 139 bytes, размер/PGDMP/SHA-256 проверены, прежние копии сохранены.

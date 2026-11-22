@@ -24,11 +24,7 @@
 
 [Подготовка к запуску в коде](docs/prelaunch-code-2026-10-20.md): однократное
 переименование, флаги, signed финансы/банкротство, защита реальных данных и
-конфигурация PostgreSQL на D. Это не новая HDC-приёмка.
-
-[Закрытый HDC-запуск](docs/hdc-acceptance-2026-10-20.md): bot/worker/PostgreSQL,
-проверенный backup в Documents на рабочем Mac и restore из этой копии.
-Это исторический отчёт закрытого этапа; актуальный статус — в отчёте публичного запуска.
+конфигурация PostgreSQL на D. Это не новая production-приёмка.
 
 [Итоговая приёмка штаба, второй карьеры и развития](docs/staff-development-acceptance.md)
 — AND-61/83/64: игровые потоки подключены, сезонная калибровка учитывает все матчи.
@@ -190,17 +186,6 @@ goaletto-worker
 В отдельном терминале задайте GOALETTO_BOT_TOKEN в .env и запустите goaletto-bot.
 Для Windows PowerShell активация: .venv\Scripts\Activate.ps1.
 
-Исходящие уведомления worker включаются отдельно через `GOALETTO_OUTBOX_ENABLED=true`
-с тем же токеном, после миграций и подготовки игрового потока. Sender не запускает
-polling и не удерживает DB-транзакцию во время Telegram-вызова. Он проверен
-на PostgreSQL с fake Telegram; 2026-10-20 закрытый HDC smoke также использовал
-настоящие polling и Telegram IO для внутренних аккаунтов.
-[Эксплуатационная приёмка](docs/hdc-acceptance-2026-10-20.md).
-Локальная БД использует постоянный volume и порт 5433; 5432 занят другим проектом.
-Для игры включите `GOALETTO_GAME_ENABLED=true`; календарь активируется отдельно.
-Для закрытого теста задайте host-only списки `GOALETTO_ALLOWED_TELEGRAM_IDS` и
-`GOALETTO_INTERNAL_TELEGRAM_IDS` (JSON arrays). [Сценарий двух аккаунтов](docs/closed-telegram-test.md).
-
 Весь стек локально:
 1. В .env задайте URL с хостом **postgres**, а не localhost:
    postgresql+asyncpg://goaletto:YOUR_PASSWORD@postgres:5432/goaletto.
@@ -314,17 +299,8 @@ migrations/         Alembic
 tests/              unit и PostgreSQL integration
 docs/               правила, архитектура, план, эксплуатация
 assets/             цельные портреты, визуальные пробы и исторические части лиц
-deploy/             настройки существующего HDC
 ```
 
-## Размещение и права
-
-[Инструкция для HDC](docs/deployment-hdc.md): Linux-контейнеры на существующем Windows
-Docker host, PostgreSQL в закрытой сети и long polling. Закрытый HDC-запуск выполнен;
-внешняя launch-приёмка остаётся открытой.
-
-Деплой управляется локально: основной путь — сборка образа здесь и перенос на HDC;
-альтернатива — commit/push здесь, pull и сборка на HDC. GitHub Actions выполняет проверки.
-Для готового image используется deploy/compose.release.yaml поверх HDC override.
+## Права
 
 Copyright © 2026 anry88. Все права защищены. См. [LICENSE](LICENSE).

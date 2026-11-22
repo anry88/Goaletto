@@ -76,19 +76,4 @@ transactional ACCESS EXCLUSIVE lock; исторический trigger отклю
   stale ownership, immutability, реальный Dispatcher выбора страны→переименование,
   академия, национальности, рынок, staff cards, история, Stars и настройки.
 
-## Установка на HDC
-
-Установлен `goaletto:f2ae4d53-hdc`, schema `0050_club_country`.
-Config digest `sha256:8c5279b103bd172ee2237aa7d2d4e90ed50f507ae385c4455ad681fd4402d3c9`.
-[CI](https://github.com/anry88/Goaletto/actions/runs/39441882271) — success.
-Перед миграцией остановлены только bot/worker; PostgreSQL на D не перезапускался.
-До/после0050 сверены полные старые проекции людей, клубов, академии, матчей,
-денежного ledger и Stars receipts. Они совпали;2реальных платежа и data protection
-сохранены,19соседних контейнеров не изменены. Старые имена и страны не заменялись.
-После запуска прошли read-only getMe/private commands (включая country),81страна/
-селектор, Prometheus, jobs/sender health и online `alembic check`.
-Внутренний allowlist остаётся прежним.
-
-Свежая verified off-host копия0050 забрана на Mac:
-`~/Documents/Goaletto Backups/goaletto-20261020T144828Z-9a65ae64.dump`,
-1 617 883 bytes, проверены размер/PGDMP/SHA-256. Предыдущие копии сохранены.
+## Установка на production

@@ -72,7 +72,7 @@ Application пишет успешное бизнес-событие атомар
 infrastructure обеспечивает versioning, dedupe и псевдонимы до claim клуба.
 Domain не импортирует аналитический сборщик. User-действия отделены от system/automation;
 доставка уведомления не означает прочтение и не создаёт retention.
-Отчёты используют PostgreSQL и операторский Grafana на HDC без публичного API.
+Отчёты используют PostgreSQL и операторский Grafana на production без публичного API.
 Envelope/allowlist v1 реализован в `application.analytics`, [контракт](analytics/contract-v1.md).
 Таблица псевдонимов присутствует в новой миграции; journey collection, сессии и атрибуция реализованы; feedback и полные
 когортные SQL-отчёты ещё в плане.

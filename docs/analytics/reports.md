@@ -4,7 +4,7 @@
 Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
 match-opportunities подключены к операторскому CLI. Добавлены
 [технические latency](../runtime-observation.md), [внутренние опросы и сводка feedback](../feedback.md).
-Полный [gate HDC](launch-gate.md) ещё требует dashboard/access.
+Полный [gate production](launch-gate.md) ещё требует dashboard/access.
 
 Статус: Python report API/CLI и bounded PostgreSQL-запросы реализованы в
 отдельном checkout `codex/analytics-reports` от `origin/main` `ba16344a`.
@@ -115,7 +115,7 @@ manager/message, а не строки событий/попыток. `recorded_a
   не применяем journey-клиппинг; храним `outbox_id`/исходы для операций.
   Агрегаты CLI не выводят `chat_id`, токены, DSN или raw-ошибки Telegram.
 * Доступы: операторский CLI — restricted read-транзакция; обычный экспорт —
-  отдельно; реальные HDC-роли/GRANT — AND-82.
+  отдельно; реальные production-роли/GRANT — AND-82.
 
 ## CLI
 

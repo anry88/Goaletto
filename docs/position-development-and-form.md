@@ -103,15 +103,9 @@ V1–V4 движка, V1–V3 практики и прежние трениро�
 
 ## Приёмка · 2026-10-25
 
-Код опубликован в main `5befb4f9fd3fa08e0205971d0dc8107d36be34ff` и установлен
-на HDC как `goaletto:5befb4f9-hdc`, linux/amd64. Миграции 0056/0057 применены
-до `0057_active_form`; сохранены все семь Compose overlays, в том числе
-monitoring, data-d и audience. Обновлены только bot/worker, PostgreSQL не
-пересоздавался. Оба процесса работают, jobs/sender health — ok.
-
 Архив runtime: 76 677 632 bytes, SHA-256
 `315a95d43d395298e148f50e6a91d851a3468d991b2beeb2e0978d47c4e0ac0b`.
-Config digest на HDC:
+Config digest на production:
 `sha256:2db63694c9a037994cd9f94b82a5353f6bc038d6d5ef02e874efaef44b47bddf`.
 Mac containerd image/index:
 `sha256:d983271716d0c13071b8c6aab518aad4fe46b80b500980d02bc361c168635a13`.

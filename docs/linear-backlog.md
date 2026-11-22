@@ -22,7 +22,7 @@ AND-48/61/64/83 обновлены; завершённые базовые зад
 подключены, history bounded/season pages, read-only analytics/diagnostics.
 После подтверждённого Imagegen429 реализован AND-53 (включая instructions v2
 с сохранённым replay v1). Проверки docs/agent-wave2-review.md, docs/live-commands.md.
-AND-66/MVP, AND-79/full opportunities и AND-69/70/HDC остаются частичными.
+AND-66/MVP, AND-79/full opportunities и AND-69/70/production остаются частичными.
 
 Текущая сборка 2026-10-12: sender AND-68, состав AND-49 и routed results AND-56
 реализованы и проверены на единственной рабочей Goaletto DB. Карточки AND-48 и
@@ -33,11 +33,6 @@ docs/agent-handoff-plan.md. DB политика: без новых тестов�
 одной основной DB разрешены пользователем пока нет реальных пользователей.
 
 [Проект Goaletto](https://linear.app/andrei-brazhnikov/project/goaletto-eb8cb486bc79) · 45 задач · 5 вех.
-
-Linear — источник актуального статуса; реестр синхронизирован с выполненной работой 2026-10-12.
-Запланированный gameplay не отмечается выполненным. [Бот-клубы и владение](bot-clubs.md),
-[возраст и пенсия](player-lifecycle.md), [проверка качества портретов](portrait-feasibility.md),
-[аналитика](analytics/measurement-plan.md), [ручной деплой](deployment-hdc.md).
 
 ## 01 · Основание и оформление
 
@@ -124,7 +119,7 @@ Linear — источник актуального статуса; реестр 
 
 Реализованы domain.world/build_world, application.world/initialize_world и CLI goaletto-world. Воспроизводимый комплект: 5 лиг × 10 клубов × 20 футболистов, все без владельцев; fixed 4-4-2/bench с запасным GK, сопоставимые профили навыков без tier handicap, одинаковый общий budget parameter. PostgreSQL seed использует общий allocation transaction lock, immutable receipt/config hash, 1000 уникальных person/face reservations и отказ при исчерпании age-compatible каталога. Repeat receipt возвращает прежние IDs и не сбрасывает финансы/лица/возраст/составы/владение после матчей. Стартеры 32–38 получают persisted first-season retirement decision; 38 всегда последний. Шкала staff и стартовый staff pool не вводятся.
 
-**Приёмка:** Проверен offline preview: 5 лиг, 50 клубов, 1000 игроков/лиц, 450 fixtures и 15302 held jobs. Core skill mean 8.91875, spread 0; это proxy начального баланса, не окончательный OVR. 134 unit tests passed, 2 integration deselected; Ruff/format/mypy и offline upgrade/downgrade прошли. SQL-recording проверяет compiled batches, unique faces, held jobs и receipt последним; retry не перестраивает мир. По указанию пользователя новые БД не создаются: реальный PostgreSQL seed/concurrency/rollback и --apply не выполнялись. Документация docs/world-initialization.md. Реализованный seed не означает runtime матчей, claim или HDC deploy.
+**Приёмка:** Проверен offline preview: 5 лиг, 50 клубов, 1000 игроков/лиц, 450 fixtures и 15302 held jobs. Core skill mean 8.91875, spread 0; это proxy начального баланса, не окончательный OVR. 134 unit tests passed, 2 integration deselected; Ruff/format/mypy и offline upgrade/downgrade прошли. SQL-recording проверяет compiled batches, unique faces, held jobs и receipt последним; retry не перестраивает мир. По указанию пользователя новые БД не создаются: реальный PostgreSQL seed/concurrency/rollback и --apply не выполнялись. Документация docs/world-initialization.md. Реализованный seed не означает runtime матчей, claim или production deploy.
 
 **Зависимости:** AND-45.
 
@@ -136,7 +131,7 @@ Actor scope/GameActionReceipt dedupe работает независимо от 
 
 Ruff/format, mypy50, полный pytest212 passed/2 deselected; новый guard test и16 targeted tests проходят. Offline0008 upgrade/downgrade/DDL без БД. Документ docs/club-entry.md.
 
-Задача остаётся In Progress: игровой Telegram start/выбор/claim/navigation ещё не routed, sender отсутствует. Второму комплекту нужен новый банк1000 уникальных identities. PG execution/races/rollback не проверены по запрету тестовых БД. HDC/polling/--apply не запускались.
+Задача остаётся In Progress: игровой Telegram start/выбор/claim/navigation ещё не routed, sender отсутствует. Второму комплекту нужен новый банк1000 уникальных identities. PG execution/races/rollback не проверены по запрету тестовых БД. production/polling/--apply не запускались.
 
 **Приёмка:** Один Telegram ID — один клуб; параллельный claim последнего места не делит клуб/не создаёт лишние комплекты; верхние лиги недоступны новичкам; текущие финансы/таблица клуба сохраняются. Приёмка аналитики: первый игровой /start и источник фиксируются до claim; club_claimed атомарен с владением, retry/race не удваивают событие. Internal/автоматика отделены. Полнота воронки проверяется в AND-76.
 
@@ -187,7 +182,7 @@ Worker поддерживает lease jobs; try-advisory lock avoids Job→alloc
 
 Успешные allowlist user-действия образуют сессии с gap <30 минут; action_rejected не создаёт/продлевает session, background без session. Internal/test/operator/opt_out исключены; deletion удаляет mapping/events/sessions и оставляет tombstone. First start не создаётся заново после retention cleanup. Closed envelope/имена/UPDATE guard; retention helper180д, PUBLIC revoke и view без Telegram/envelope/operation refs.
 
-Проверка: Ruff/format, mypy40, pytest166 passed/2 deselected, offline Alembic DDL. SQL-recording проверяет collector/session/dedupe/exclusions/cleanup, без тестовых БД по указанию пользователя. PostgreSQL execution/races/CASCADE/GRANT не проверены и реальный сбор не включён; before launch требуется эксплуатационная проверка. UI instrumentation, SQL KPI, maintenance jobs и фактические HDC roles остаются AND-76/77/79/82. Документ docs/analytics/storage.md.
+Проверка: Ruff/format, mypy40, pytest166 passed/2 deselected, offline Alembic DDL. SQL-recording проверяет collector/session/dedupe/exclusions/cleanup, без тестовых БД по указанию пользователя. PostgreSQL execution/races/CASCADE/GRANT не проверены и реальный сбор не включён; before launch требуется эксплуатационная проверка. UI instrumentation, SQL KPI, maintenance jobs и фактические production roles остаются AND-76/77/79/82. Документ docs/analytics/storage.md.
 
 **Приёмка:** Collector/schema/session/dedupe/exclusion/deletion/retention helpers реализованы, offline SQL и unit checks проходят. Online PG/roles не запускались по текущему запрету тестовых БД.
 
@@ -223,7 +218,7 @@ Ruff/format, mypy48, pytest204 passed/2 deselected; offline migration0007/SQL-re
 
 Проверка: golden seed7 1:2, 57 событий, checkpoint после 17 тиков даёт тот же финал; 200 seeds с 2500 болельщиками: home/away/draw 78/56/66 против 67/67/66 без поддержки. Коэффициенты предварительные. CLI goaletto-match без БД.
 
-Приёмка: domain/replay/команды/поле реализованы и проверены; runtime/accepted-command persistence/UTC jobs/outbox/Telegram UI остаются AND-52/53/68, финансовый спрос/стадион — AND-63. PostgreSQL и HDC не запускались, тестовые БД не создавались. Документация: docs/match-engine.md.
+Приёмка: domain/replay/команды/поле реализованы и проверены; runtime/accepted-command persistence/UTC jobs/outbox/Telegram UI остаются AND-52/53/68, финансовый спрос/стадион — AND-63. PostgreSQL и production не запускались, тестовые БД не создавались. Документация: docs/match-engine.md.
 
 **Приёмка:** Golden/replay, immutable inputs, события, sector/form/fatigue/morale, команды/лимиты, форсированные cards/injuries и серия баланса проверены без БД.
 
@@ -237,7 +232,7 @@ Accepted commands ordered, deadline check, tick FK insert-before-apply, halftime
 
 Проверка: Ruff/format, mypy42, полный offline pytest182 passed/2 deselected плюс новый snapshot pin test, 17 targeted runtime/dispatcher checks. Непрерывные30 ticks дают hash ae4002fb500d7769e280a9939d3f345f78e935b6c1b1be6a3f0bb792850c6841; retry/restart/halftime/delay/pause/command FK/deadline/abandoned/outbox проверены SQL-recording без БД. Миграция0005 offline upgrade/ALTER/DDL.
 
-По указанию пользователя тестовые БД не создавались; real PG locks/races/rollback/trigger execution не проверялись. Seed/runtime --apply и HDC не запускались, held jobs не активированы. Sender/live Telegram edit — AND-68, command admission/UI/instructions — AND-53, standings/results — AND-56, rollover — AND-57, disaster recovery — AND-69. Документ docs/match-runtime.md.
+По указанию пользователя тестовые БД не создавались; real PG locks/races/rollback/trigger execution не проверялись. Seed/runtime --apply и production не запускались, held jobs не активированы. Sender/live Telegram edit — AND-68, command admission/UI/instructions — AND-53, standings/results — AND-56, rollover — AND-57, disaster recovery — AND-69. Документ docs/match-runtime.md.
 
 **Приёмка:** Runtime/worker/activation, exact UTC deadlines, atomic checkpoint/events/jobs/outbox, commands and attempts реализованы и unit/offline SQL проверены. Online PG не запускался; календарь не активирован.
 
@@ -389,7 +384,7 @@ Backend и Telegram presenters реализованы: immutable result receipt,
 
 **Зависимости:** AND-59, AND-44.
 
-## 05 · HDC и эксплуатация
+## 05 · production и эксплуатация
 
 ### [AND-68 · Реализовать sender уведомлений и устойчивое live-табло](https://linear.app/andrei-brazhnikov/issue/AND-68/realizovat-sender-uvedomlenij-i-ustojchivoe-live-tablo)
 
@@ -400,7 +395,7 @@ finish/skip, отсутствие приоритетов у producers, пара�
 availability confirmation, fresh preflight и HTML escaping; frozen migration0009.
 Проверки без БД/сети. Общая сборка/фиксация изменений ещё в работе; задача In Progress.
 Подробности и ограничения — docs/outbox-delivery.md. Preferences UI остаётся AND-50,
-полная аналитика/метрики — AND-77; реальный PG/Telegram/HDC не запускались.
+полная аналитика/метрики — AND-77; реальный PG/Telegram/production не запускались.
 
 Outbox dispatcher с lease/retry_after, приоритетами и стабильным message_id; не держать DB transaction во время Telegram call.
 
@@ -408,35 +403,27 @@ Outbox dispatcher с lease/retry_after, приоритетами и стабил
 
 **Зависимости:** AND-52.
 
-### [AND-69 · Проверить восстановление после сбоев HDC и БД](https://linear.app/andrei-brazhnikov/issue/AND-69/proverit-vosstanovlenie-posle-sboev-hdc-i-bd)
-
 Crash points: тик до/после commit, rollover, claim, bid/settlement и отправка outbox; пауза live-матча вместо залпового catch-up.
 
 **Приёмка:** Голы/деньги/клубы не дублируются; менеджерам сохраняется окно решений после простоя; degraded mode и recovery runbook; периодический reconciliation jobs. Уточнение пользователя: Recovery включает last_game_action_at/ownership deadline, повтор освобождения и устаревшие reminders; нельзя отобрать вернувшийся активный клуб или отправить сообщение старому владельцу после нового claim.
 
 **Зависимости:** AND-52, AND-57, AND-60.
 
-### [AND-70 · Подготовить backup, health и наблюдаемость на HDC](https://linear.app/andrei-brazhnikov/issue/AND-70/podgotovit-backup-health-i-nablyudaemost-na-hdc)
+Метрики tick lateness/queue/outbox/failed jobs/диск; ежедневные backup вне production и restore drill; автозапуск после reboot.
 
-Метрики tick lateness/queue/outbox/failed jobs/диск; ежедневные backup вне HDC и restore drill; автозапуск после reboot.
-
-**Приёмка:** Секреты не попадают в логи; backup восстанавливается в изолированной БД; health отражает DB/worker heartbeat; monitoring интегрирован в существующий HDC без нарушения соседних сервисов.
+**Приёмка:** Секреты не попадают в логи; backup восстанавливается в изолированной БД; health отражает DB/worker heartbeat; monitoring интегрирован в существующий production без нарушения соседних сервисов.
 
 **Зависимости:** AND-39.
 
 ### [AND-71 · Провести нагрузочные, балансные и конкурентные проверки](https://linear.app/andrei-brazhnikov/issue/AND-71/provesti-nagruzochnye-balansnye-i-konkurentnye-proverki)
 
-Несколько комплектов, одновременные матчи/регистрации/ставки; сезонные sim-прогоны; целевые показатели определить по измеренным ресурсам HDC.
+Несколько комплектов, одновременные матчи/регистрации/ставки; сезонные sim-прогоны; целевые показатели определить по измеренным ресурсам production.
 
 **Приёмка:** Проверены race cases и аварии; измерены p95 tick lateness/callback latency; сезон сохраняет 10 клубов в лиге; документированы bottlenecks и лимиты для запуска. Уточнение пользователя: Дополнительные сценарии: бот-клубы играют фиксированной XI без тренировок/тактической ротации; близкие начальные составы; injury-only substitutions; retirement+young replacement в межсезонье; шесть календарных месяцев/конец месяца/возврат одновременно с release. Никакой внешний ИИ.
 
 **Зависимости:** AND-57, AND-60, AND-68, AND-69.
 
-### [AND-72 · Развернуть готовый MVP на HDC и провести smoke](https://linear.app/andrei-brazhnikov/issue/AND-72/razvernut-gotovyj-mvp-na-hdc-i-provesti-smoke)
-
 Существующий Windows Docker host; отдельный Compose project/volumes/secrets, без публичного PostgreSQL и Mini App. Запуск bot long polling после migration.
-
-**Приёмка:** Проверены BotFather username/token и один polling instance; /start→claim→lineup→live→result; reboot/rollback/restore; соседние сервисы не перезапущены; deploy записан в runbook. Дополнительный gate: AND-82 подтверждает точные воронки/зрелые когорты и исключение internal/автоматика до первого внешнего привлечения. Зафиксировать coverage_start; операторские отчёты доступны. Эксперименты AND-81 не блокируют MVP. Решение пользователя 2026-10-11: локально управляемый ручной деплой. Основной путь: собрать/проверить образ здесь под архитектуру HDC → docker save → SFTP/SCP → SHA-256/image ID check → docker load на HDC → Compose --no-build. Альтернатива: commit/push здесь → git pull --ff-only выбранного проверенного SHA на HDC → локальный docker build там. Оба пути используют immutable release tag/GOALETTO_IMAGE и deploy/compose.release.yaml для migrate/bot/worker. Credentials только host-only, CI выполняет проверки и не деплоит. Приёмка AND-72: проверены согласованный путь, metadata/smoke/rollback предыдущего image, миграции до запуска worker и отсутствие изменений соседних сервисов. Документация: docs/deployment-hdc.md. Настройка пути не означает выполненный HDC deploy.
 
 **Зависимости:** AND-71, AND-70, AND-82.
 
@@ -452,14 +439,14 @@ Crash points: тик до/после commit, rollover, claim, bid/settlement и 
 
 Использовать имеющиеся PostgreSQL/Grafana, подключение проверять без воздействия на соседние сервисы. Отдельный restricted просмотр комментариев, не в общем dashboard.
 
-**Приёмка:** Приватный dashboard existing HDC Grafana: coverage/источники, onboarding, зрелые opportunities/cohorts, ошибки/recovery, response/skip и guardrails очереди. Фильтры неделя/source/locale/variant/tier-set в restricted SQL; Prometheus только low-cardinality агрегаты без IDs/текстов. Restricted доступы и понятные n/N/зрелость/период. Dashboard provisioned/documented, неизвестные/нет данных не превращаются в ноль. Нет публичного UI/API.
+**Приёмка:** Приватный dashboard existing production Grafana: coverage/источники, onboarding, зрелые opportunities/cohorts, ошибки/recovery, response/skip и guardrails очереди. Фильтры неделя/source/locale/variant/tier-set в restricted SQL; Prometheus только low-cardinality агрегаты без IDs/текстов. Restricted доступы и понятные n/N/зрелость/период. Dashboard provisioned/documented, неизвестные/нет данных не превращаются в ноль. Нет публичного UI/API.
 
 **Зависимости:** AND-79, AND-78, AND-70.
 
 ### [AND-81 · Подготовить последовательные эксперименты подсказок и ожидания первого матча](https://linear.app/andrei-brazhnikov/issue/AND-81/podgotovit-posledovatelnye-eksperimenty-podskazok-i-ozhidaniya-pervogo)
 
 Подготовка завершена 2026-10-20: [паспорта и правила запуска](analytics/experiments.md).
-Runner и внешний запуск не реализованы; baseline и HDC-проверки предшествуют запуску.
+Runner и внешний запуск не реализованы; baseline и production-проверки предшествуют запуску.
 
 Адаптация Frontline AND-37. Дневной retention — диагностика, недельные opportunities — основной результат; никакой гарантии причинности по небольшой когорте.
 

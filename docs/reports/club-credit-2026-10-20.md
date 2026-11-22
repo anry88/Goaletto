@@ -22,6 +22,6 @@ Baseline: {'clubs_and_attendance_cases': 100, 'bankrupt': 0, 'minimum_cash': 526
 - Fixed players/skills/ages and tenth-place prize; no transfer/scout/training growth or cup income. Baseline includes academy upkeep.
 - Optional 25% player-asset drop at cycle 19 is an explicit collateral stress, not a simulated retirement result.
 - Purchases/bids require free cash. Capital scenarios exclude upgrades above 600K available cash. Debt stress assumes already-owned assets and debt from wages/upkeep, not purchases financed by collateral.
-- Insolvency in aggressive scenarios is expected. This report checks arithmetic and baseline survival, not final gameplay balance or HDC capacity.
+- Insolvency in aggressive scenarios is expected. This report checks arithmetic and baseline survival, not final gameplay balance or production capacity.
 
 Content SHA256: 1cc171f98be057cee9dd56193980a9c7de6ce8beae9502b684495c86f42a4495

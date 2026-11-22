@@ -156,4 +156,4 @@ tick 16 due в 19:00, tick 30/full_time в 33:00. Domain не читает ча�
 
 Серии детерминированны и выполняются без БД. Runtime, сохранение результата/таблиц,
 accepted commands, actual UTC times, outbox и Telegram delivery — следующие задачи.
-Эта работа не запускает HDC, polling или held jobs.
+Эта работа не запускает production, polling или held jobs.

@@ -78,7 +78,7 @@ Internal/opt-out исключены; cohort обрезается по coverage �
 [техническую цепочку и latency](runtime-observation.md); AND-119 подключает
 [общий календарь новых комплектов](world-reserve.md). AND-78 подключает
 [внутренние опросы](feedback.md), AND-82 — [локальный gate](analytics/launch-gate.md).
-AND-80 (Grafana), сверка реальных доступов и HDC deployment остаются впереди.
+AND-80 (Grafana), сверка реальных доступов и production deployment остаются впереди.
 Реального polling/отправок/привлечения эта приёмка не запускает.
 
 ## Приёмка 2026-10-18

@@ -25,3 +25,5 @@ assets/portraits/whole-v2/lifecycle-v1/sources
 assets/portraits/whole-v2/lifecycle-v1/previews
 assets/portraits/whole-v2/lifecycle-v1/prompts
 assets/portraits/whole-v2/lifecycle-v1/*.html
+
+.private/

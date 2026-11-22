@@ -89,12 +89,6 @@
   Preserve signed/expired graduates and all existing player/history records.
   See docs/academy-runtime.md; this supersedes the old frozen-level intake rule.
 
-- User clarification 2026-10-20: retain the original HDC → Mac backup schedule
-  (hourly checks, login and 03:30; a new archive only without a verified copy
-  younger than 20 hours). Automatically prune owned backup archive/manifest pairs
-  older than 14 days on Mac and HDC after confirming a recent verified copy.
-  Never remove DB/PGDATA, unrelated files or links. Grafana DB snapshot age is
-  minute-scale monitoring aggregation, not a backup; keep its normal freshness.
 
 - User update 2026-10-20: acquisition start codes require no preregistration.
   Any valid 1..64-character Telegram payload (ASCII letters/digits/underscore/hyphen)
@@ -104,16 +98,16 @@
   Empty is direct; malformed is unknown. See docs/analytics/acquisition.md.
 
 - PUBLIC LAUNCH / FINAL RESET, user instruction 2026-10-20: the owner authorized
-  one final complete HDC world reset after both personal Stars purchases were
+  one final complete production world reset after both personal Stars purchases were
   refunded. This exception is consumed by the launch in
-  docs/public-launch-2026-10-20.md. From that point the HDC/application production
+  docs/public-launch-2026-10-20.md. From that point the production/application production
   database MUST NEVER be dropped, truncated, reset, regenerated or replaced with
   a disposable world, even for an internal purchase, calibration or convenient
   testing. Never clear/bypass the production latch or remove PGDATA/volumes.
   Preserve all users, payments, ownership and game history; use migrations and
   targeted, reviewed repairs. Older development reset permissions below apply
   only to the separately configured disposable LOCAL development database, never
-  HDC/production. Do not run destructive integration tests against production.
+  production/production. Do not run destructive integration tests against production.
 
 - `main` is the common integration branch. Start each new task branch from the
   latest `origin/main`; use the `codex/` prefix by default. After review and
@@ -402,7 +396,7 @@
   Recovery requires claim/manual save within 30 minutes and the same ownership.
   SQL opportunity reports use full league plans, actual times, mature windows,
   historical coverage, and reduced second denominator; do not infer churn from
-  calendar waiting. HDC deployment remains separate;
+  calendar waiting. production deployment remains separate;
   these reports do not launch polling or outreach.
 
 - AND-78 automatic feedback is internal-only and off by default. Durable
@@ -415,7 +409,7 @@
   See docs/feedback.md; migration 0042 forbids dropping used trigger/scope history.
 - AND-82 local cleanup/export/feedback gate is documented in docs/analytics/launch-gate.md.
   analytics_cleanup_cli is preview-only unless --apply and uses persisted retention.
-  Grafana parity and actual HDC role permissions remain open; a local READ ONLY
+  Grafana parity and actual production role permissions remain open; a local READ ONLY
   transaction or PUBLIC ACL check does not certify deployment or external outreach.
 
 - AND-77 records operational RuntimeRequest attempts for match/live/history,
@@ -430,7 +424,7 @@
   hash and matching projections/clock. Normal processing restores a late decision
   window before any tick. Never reset failed/done/held jobs, replay an admitted
   human world, mutate a checkpoint, or infer money/results. Skip paused/inactive/
-  preparing worlds. HDC reboot/DB-disconnect drill remains open under AND-69/72.
+  preparing worlds. production reboot/DB-disconnect drill remains open under AND-69/72.
 
 - AND-70 worker health uses migration 0043 and per-boot worker_heartbeats for
   jobs/sender separately. Pulse only after committed iterations or intentional
@@ -438,13 +432,13 @@
   processing is stuck. Health CLI reads this process's private boot file and DB,
   never another replica's success. Monitoring writes are bounded and do not undo
   game commits. See docs/worker-health.md. Docker unhealthy alone does not restart
-  a live container; HDC alerts/backup/reboot acceptance remain separate.
+  a live container; production alerts/backup/reboot acceptance remain separate.
 - AND-71 bounded load profile is tests/integration/test_launch_load.py;
   docs/launch-load.md records 50/75-match real-clock first-tick measurements.
   Synthetic past jobs are held, not invented as results. Separate committed-tick
   latency from deferred attempt percentiles, and fake Telegram time from real IO.
   Use the single real player-free application DB, serially; reset/recreate freely.
-  Local timings do not establish HDC capacity or full-season balance.
+  Local timings do not establish production capacity or full-season balance.
 
 - AND-80/82 operator dashboards use migration 0044 aggregate-only
   goaletto_operator.report and deploy/grafana provisioning. Frozen report SQL
@@ -456,7 +450,7 @@
   membership and exclude unclaimed managers. Operational panels are unfiltered;
   absent coverage/observations never become successful zeroes. See
   docs/analytics/grafana.md. Local real-login/Grafana acceptance does not certify
-  HDC organization membership, actual production grants or external outreach.
+  production organization membership, actual production grants or external outreach.
 
 - AND-61/83/64 functional acceptance is consolidated in
   docs/staff-development-acceptance.md. Their child runtime flows are implemented:
@@ -464,25 +458,8 @@
   careers and loyalty rehires, all-competition practice, shared growth and aging.
   simulate_staff_training now uses current V2 for every match, including optional
   friendlies and knockout ET; its 1056 scenarios are an upper-bound calibration,
-  never fabricated DB results. Balance/HDC/portrait-production tasks stay separate.
+  never fabricated DB results. Balance/production/portrait-production tasks stay separate.
 
-- HDC closed deployment is running as of 2026-10-20; see
-  docs/hdc-acceptance-2026-10-20.md. Only HDC runs this token's polling bot;
-  do not start a competing local poller. Keep the internal allowlist and feedback-off
-  settings until external launch is explicitly requested. Backup pulls to this Mac's
-  ~/Documents/Goaletto Backups through scripts/backup_hdc.py and its LaunchAgent;
-  an off-host archive was restored and verified against all 85 tables.
-  Shared Grafana uses organization 1 and the Goaletto operator folder, by explicit
-  user choice. User update 2026-10-20: Grafana must read VictoriaMetrics; bot/worker expose
-  private Prometheus /metrics. Remove its direct PostgreSQL datasource/login.
-  This is deployed and verified; see docs/monitoring-acceptance-2026-10-20.md.
-  Future HDC releases must retain deploy/compose.monitoring.yaml as the fifth overlay.
-  Keep labels bounded, without personal IDs, payloads or arbitrary text; fixed-window
-  SQL snapshot gauges are not durable counters or arbitrary historical cohorts.
-  A full Windows reboot and alerts/capacity acceptance remain open; restarting the
-  shared host requires a window for neighboring services. Never reset a live HDC
-  world concurrently with a gameplay/recovery check, and verify its exact target
-  and absence of external players before using the development reset permission.
 
 - User update 2026-10-20: docs/ui-feedback-2026-10-20.md tracks AND-143..147.
   Tables show all ten clubs with explicit points/played/goals; settings use whole
@@ -501,10 +478,6 @@
   assets (squad, staff, stadium, academy, paid construction), checked atomically.
   Preserve debts/history and end ownership into bot mode. Real external production
   claims permanently latch data protection; never reset a protected application DB.
-- User clarification 2026-10-20: prioritize remaining prelaunch code work; HDC is
-  the owner's personal PC and infrastructure security/reboot/capacity drills are
-  under their manual supervision, not new code approval gates. Prefer data on D.
-  Keep backups copied from HDC to a separate Documents folder on this Mac.
 
 - User update 2026-10-20: every rename is offseason-only, with at most one
   available credit. An empty slot can buy one credit for 50 Stars in settings.
@@ -515,7 +488,7 @@
   chat, persisted manual approval and refundStarPayment. Unknown outcomes never
   auto-retry. Any real production Stars receipt, including internal purchases,
   latches data protection: do not reset a world containing real payment history.
-  See docs/stars-vip-data-d.md. HDC PGDATA now binds to D, not the old C volume.
+  See docs/stars-vip-data-d.md.
 
 - Later user clarification 2026-10-20: restore the initial free rename immediately
   after claim, including midseason, until explicitly declined. Paid/VIP credits

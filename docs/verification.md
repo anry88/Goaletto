@@ -6,7 +6,7 @@
 read-only diagnostics. Исправления, миграция0011 и372 unit/16 PG —
 [agent-wave2-review.md](agent-wave2-review.md). После Imagegen429 продолжен AND-53;
 [v1 compatibility и live-приёмка](live-commands.md). PostgreSQL одна основная
-Goaletto DB; новых test DB нет, HDC/polling/Telegram не запускались.
+Goaletto DB; новых test DB нет, production/polling/Telegram не запускались.
 
 ## Текущая общая сборка первой волны · 2026-10-12
 
@@ -14,7 +14,7 @@ Goaletto DB; новых test DB нет, HDC/polling/Telegram не запуска
 файлов), mypy71, online upgrade/metadata check и downgrade0010→0008→upgradehead
 успешны. Рабочая локальная Goaletto DB одна, порт5433, без реальных пользователей;
 дополнительные тестовые DB не создаются. PostgreSQL race/rollback/full match и
-настоящий Dispatcher проверены с fake Telegram. Polling/Telegram/HDC не запускались.
+настоящий Dispatcher проверены с fake Telegram. Polling/Telegram/production не запускались.
 Полный перечень исправлений и ограничений — [agent-wave1-review.md](agent-wave1-review.md).
 
 Раздел sender ниже описывает промежуточный этап до PostgreSQL-проверки и интеграции.
@@ -34,7 +34,7 @@ Goaletto DB; новых test DB нет, HDC/polling/Telegram не запуска
   карточек/состава и портретов):289 passed,2 integration deselected.
 - Offline upgrade до текущего head0010 и downgrade0009→0008 сформированы;
   frozen CREATE TABLE/index/checks сверены с ORM. Одна Alembic head.
-- PostgreSQL, polling, seed/activation --apply, sender и HDC не запускались.
+- PostgreSQL, polling, seed/activation --apply, sender и production не запускались.
   Реальные PG races/rollback/constraints и Telegram не считаются проверенными.
 - Изменения остаются в рабочем дереве общей сборки; AND-68 In Progress.
   Чужие портретные изменения не включались в sender review.
@@ -50,14 +50,14 @@ Goaletto DB; новых test DB нет, HDC/polling/Telegram не запуска
 - pytest с изолированным PostgreSQL 17: 23 теста успешно.
 - Alembic upgrade head: успешно; alembic check: нет расхождений со схемой.
 - Проверены повторное enqueue, rollback незавершённой задачи и SKIP LOCKED.
-- Docker Compose HDC merge/config --quiet: успешно.
+- Docker Compose production merge/config --quiet: успешно.
 - Docker image python:3.12-slim: успешно собран; application работает от non-root user.
 - SVG/PNG: 6 портретов, recipes, contact sheet и HTML; компоненты проверены как XML.
 - Локальные ссылки документации: без отсутствующих файлов.
 
 Проверки относятся к начальному scaffold. Реальные матчи, club claim, сезонный
 rollover, экономика и отправка outbox-уведомлений пока не реализованы.
-Реальный Telegram-бот без токена и HDC production-деплой не запускались.
+Реальный Telegram-бот без токена и production production-деплой не запускались.
 CI на GitHub проверяется отдельно после первого push.
 
 ## Цельные возрастные портреты · 2026-10-11
@@ -97,7 +97,7 @@ CI на GitHub проверяется отдельно после первого
   указанию пользователя. Созданный до уточнения временный контейнер удалён вместе
   с его данными. CI больше не создаёт PostgreSQL service и не выполняет online migration.
 - Ни сбор событий, ни club claim/seed, ни симуляция/пенсия/найм из схемы автоматически
-  не появляются. Worker остаётся `system.ping`, Telegram-бот — preview; HDC не менялся.
+  не появляются. Worker остаётся `system.ping`, Telegram-бот — preview; production не менялся.
 
 ## Мир и двухкруговой календарь · 2026-10-12
 
@@ -121,7 +121,7 @@ CI на GitHub проверяется отдельно после первого
   pytest без БД: **134 passed, 2 deselected**. Новых DB/контейнеров не создавалось.
 - Offline upgrade до 0003 и downgrade 0003→0002 сформированы; полный CREATE TABLE/index
   новых таблиц соответствует ORM. Исполнение SQL, PG race/rollback/lock проверки и
-  `--apply` не запускались. HDC, токен, изображения и действующие боты не менялись.
+  `--apply` не запускались. production, токен, изображения и действующие боты не менялись.
 - AND-46 реализована как seed use case/CLI. AND-55: планировщик/fixtures/held jobs готовы,
   задача остаётся In Progress до подключения runtime AND-52 и уведомлений AND-68.
 
@@ -138,7 +138,7 @@ CI на GitHub проверяется отдельно после первого
 - Проверены лимиты 5/3/3, halftime windows, duplicate commands/ticks, cards/injuries,
   injury-only bench order, GK fallback и abandoned без присуждения счёта.
 - Ruff check/format, mypy strict39 модулей: успешно. pytest: **156 passed, 2 deselected**.
-- DB/контейнеры/polling/HDC не запускались; runtime/persistence/outbox ещё не подключены.
+- DB/контейнеры/polling/production не запускались; runtime/persistence/outbox ещё не подключены.
 
 ## Транзакционный collector · 2026-10-12
 
@@ -150,7 +150,7 @@ CI на GitHub проверяется отдельно после первого
 - Ruff/format и mypy40 модулей: успешно. **166 passed, 2 deselected**; offline SQL
   upgrade сформирован, CREATE TABLE/index соответствует ORM.
 - БД/контейнеры не создавались; PG races/rollback/CASCADE/GRANT не выполнялись.
-  Collector не включён в preview; HDC и текущие боты не изменены.
+  Collector не включён в preview; production и текущие боты не изменены.
 
 ## Regulation runtime · 2026-10-12
 
@@ -164,7 +164,7 @@ CI на GitHub проверяется отдельно после первого
   добавлен crowd pin test; все **17 runtime/dispatcher tests** проходят.
 - Offline CREATE/index/ALTER соответствует ORM; upgrade сформирован.
 - PG server/races/rollback/triggers не выполнялись; БД/контейнеры не создавались.
-  Seed/runtime --apply/polling/HDC не запускались; sender/standings/rollover ещё в плане.
+  Seed/runtime --apply/polling/production не запускались; sender/standings/rollover ещё в плане.
 - GitHub CI предыдущих engine/collector commits успешен.
 
 ## Результаты и таблицы · 2026-10-12
@@ -186,7 +186,7 @@ CI на GitHub проверяется отдельно после первого
 - Ruff/format, mypy48: успешно. Full pytest **204 passed, 2 deselected**.
   Offline0007 DDL/upgrade, CLI preview без .env/соединения: успешно.
 - AND-75 остаётся In Progress до game /start path в AND-47. Preview cohort отсутствует.
-  DB/HDC/Telegram не запускались; CI предыдущего results9ce74a0 прошёл.
+  DB/production/Telegram не запускались; CI предыдущего results9ce74a0 прошёл.
 
 ## Club entry/lease backend · 2026-10-12
 
@@ -200,4 +200,4 @@ CI на GitHub проверяется отдельно после первого
   без analytics; все16 targeted entry/dispatcher/schema tests проходят.
 - Offline0008 upgrade/downgrade/DDL без БД успешно. Существующий банк обеспечивает
   лишь первый полный комплект; расширение ждёт новых уникальных внешностей.
-- DB/HDC/polling не запускались, реальные PG locks/races/rollback не проверены.
+- DB/production/polling не запускались, реальные PG locks/races/rollback не проверены.

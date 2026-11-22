@@ -41,5 +41,5 @@ to select a prepared stage of the same person; missing stages never borrow anoth
 
 `simulate_ten_seasons.py` / `run_calibration_local.py`: десять сезонов на единственной
 локальной Goaletto development DB, реальные сервисы и ускоренный движок, семь
-стратегий и стресс пределов роста. Сбрасывает disposable локальный мир, не HDC;
+стратегий и стресс пределов роста. Сбрасывает disposable локальный мир, не production;
 не создаёт новую БД и не запускает Telegram. [Методика и команды](../docs/ten-season-calibration.md).

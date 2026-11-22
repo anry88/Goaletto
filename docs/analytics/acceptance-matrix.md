@@ -4,7 +4,7 @@
 Описание прежней внешней поставки ниже — история; текущие SQL last-steps/recovery/
 match-opportunities подключены к операторскому CLI. Технические latency и
 автоматические опросы теперь подключены отдельно: [отзывы](../feedback.md).
-[Локальный gate и оставшаяся проверка HDC](launch-gate.md) дополняют эту матрицу
+[Локальный gate и оставшаяся проверка production](launch-gate.md) дополняют эту матрицу
 реальными cleanup/export/ACL и внутренними опросами.
 
 Проверка существующей аналитики, а не новая instrumentation и не dashboard.
@@ -108,4 +108,4 @@ GOALETTO_ALLOW_DEVELOPMENT_RESET=1 python -m pytest -q -m integration \
 - Delivery — текущий snapshot; исторической реконструкции outcome на `--at`
   нет (`historical_outcomes_available=false`).
 - Текущие матчевые отчёты и feedback приняты отдельно; AND-82 целиком
-  не закрывать до dashboard/access HDC. См. [актуальный gate](launch-gate.md).
+  не закрывать до dashboard/access production. См. [актуальный gate](launch-gate.md).

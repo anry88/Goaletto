@@ -36,7 +36,7 @@ append-only event. Journey SQL as-of/retention/n/N проверен на Postgre
 Проверки: ruff/format, mypy82;372 unit/offline passed;16 real PostgreSQL integration
 passed. Проверены settings через настоящий Dispatcher, сохранение ownership
 deadline, seed/claims/lineup/match,12-season archive, hand-counted n/N, read-only
-snapshot и отсутствие false tick gap на full match. Telegram fake; polling/HDC
+snapshot и отсутствие false tick gap на full match. Telegram fake; polling/production
 не запускались. Новых DB нет; используется одна Goal app DB.
 
 После общей приёмки — main, затем portrait quota check. Если Imagegen ещё

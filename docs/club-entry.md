@@ -77,4 +77,4 @@ claim и перед сетью, подтверждает недоступнос�
 receipt idempotency без analytics,6 calendar months/end month, release retry/early return,
 stale/opt-out reminders, expiry без новых reminders, exhausted expansion без activation.
 Offline0008 schema/ALTER/DDL; реальный PG rollback/concurrency/triggers не проверены.
-Новые БД/контейнеры, Telegram polling и HDC не запускались.
+Новые БД/контейнеры, Telegram polling и production не запускались.

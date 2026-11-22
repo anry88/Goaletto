@@ -5,7 +5,7 @@
 запускает её рядом с **существующим** локальным PostgreSQL в Docker Desktop на Mac,
 чтобы не тратить время на тысячи round trips через границу Mac/VM. Новая БД и
 второй PostgreSQL не создаются. Это отдельный локальный процесс калибровки,
-без Telegram polling, отправителя, публичного HTTP/API и изменений HDC.
+без Telegram polling, отправителя, публичного HTTP/API и изменений production.
 
 ## Запуск
 
@@ -34,7 +34,7 @@ docker build --platform linux/arm64 --target runtime -t goaletto:calibration-loc
 Сценарий намеренно **сбрасывает development-мир** перед новым запуском. Это не
 команда для production: environment/driver/host/port/database проверяются до reset.
 Session advisory lock исключает второй экземпляр симулятора. Не менять scope
-для подключения HDC. Месяцы/годы проходят по явно заданным UTC датам, не wall clock.
+для подключения production. Месяцы/годы проходят по явно заданным UTC датам, не wall clock.
 Начальная дата2030-01-01, стартовый капитал600K — обычный игровой капитал, не грант.
 
 ## Стратегии и сравнение
