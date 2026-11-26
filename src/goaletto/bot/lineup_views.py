@@ -50,25 +50,27 @@ def _version_text(value: int) -> str:
     return str(value)
 
 
-def _badges(person_id: UUID, slot: str, data: LineupData) -> str:
+def _position_warning(member: SquadMember) -> str:
+    declared = (member.position, *member.alternatives)
+    if member.slot_position in declared:
+        return ""
+    return f" ⚠️ {'/'.join(declared)}"
+
+
+def _badges(member: SquadMember, slot: str, captain_id: UUID | None) -> str:
     marks = ""
-    if data.captain_id == person_id:
+    if captain_id == member.person_id:
         marks += " ©"
-    member = next(
-        (m for m in (*data.starters, *data.bench, *data.reserves) if m.person_id == person_id), None
-    )
-    if member is not None and member.last_season:
+    if member.last_season:
         marks += " 🔶"
-    if member is not None and member.injured:
+    if member.injured:
         marks += " 🤕"
-    if member is not None and member.suspended:
+    if member.suspended:
         marks += " ⛔"
-    if member is not None and member.tournament_yellows:
+    if member.tournament_yellows:
         marks += " 🟨1/2"
-    if member is not None:
-        value = dict(member.position_experience).get(slot, 0)
-        marks += tr(" · опыт {value}%", value=position_percent(value))
-    return marks
+    value = dict(member.position_experience).get(slot, 0)
+    return marks + tr(" · опыт {value}%", value=position_percent(value))
 
 
 def render_main(data: LineupData, notice: str | None = None) -> str:
@@ -82,18 +84,6 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
     except ValueError:
         mentality = data.mentality
     lines.append(tr("Тактика: {p0} · Настрой: {p1}", p0=escape(tactic), p1=escape(mentality)))
-    if data.discipline_competition:
-        competition = {
-            "league": tr("Лига"),
-            "cup": tr("Кубок"),
-            "champions": tr("Кубок чемпионов"),
-        }[data.discipline_competition]
-        lines.append(
-            tr(
-                "Карточки: {competition}. 🟨1/2 — предупреждение; ⛔ — пропуск матча.",
-                competition=competition,
-            )
-        )
     captain = next((m for m in data.starters if m.person_id == data.captain_id), None)
     lines.append(
         tr(
@@ -111,12 +101,13 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
     lines.append("")
     lines.append(tr("<b>Основа:</b>"))
     for index, member in enumerate(data.starters, start=1):
+        warning = _position_warning(member)
         lines.append(
             f"{index}. {escape(person_name(member))} ({escape(member.slot_position)})"
-            f"{_badges(member.person_id, member.slot_position, data)}"
+            f"{escape(warning)}{_badges(member, member.slot_position, data.captain_id)}"
             + (
-                f" · {'/'.join((member.position, *member.alternatives))}"
-                if member.alternatives
+                f" · {escape('/'.join((member.position, *member.alternatives)))}"
+                if member.alternatives and not warning
                 else ""
             )
             + tr(
@@ -131,7 +122,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
         lines.append(
             f"{index}. {escape(person_name(member))} "
             f"({escape('/'.join((member.position, *member.alternatives)))})"
-            f"{_badges(member.person_id, member.position, data)}"
+            f"{_badges(member, member.position, data.captain_id)}"
             + tr(
                 " · форма {form}/10 · ⚡ {energy}%",
                 form=member.form,
@@ -145,7 +136,7 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
             lines.append(
                 f"{escape(person_name(member))} "
                 f"({escape('/'.join((member.position, *member.alternatives)))})"
-                f"{_badges(member.person_id, member.position, data)}"
+                f"{_badges(member, member.position, data.captain_id)}"
                 + tr(
                     " · форма {form}/10 · ⚡ {energy}%",
                     form=member.form,
@@ -159,7 +150,21 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
             roster=len(data.starters) + len(data.bench) + len(data.reserves),
         )
     )
-    lines.append(tr("🔶 — последний сезон. Опыт позиции даёт 80–100% силы. 🤕 — травма."))
+    lines.append("")
+    lines.append(tr("⚠️ — не своя позиция, рядом указаны свои. 🔶 — последний сезон. 🤕 — травма."))
+    lines.append(tr("Опыт позиции даёт 80–100% силы."))
+    if data.discipline_competition:
+        competition = {
+            "league": tr("Лига"),
+            "cup": tr("Кубок"),
+            "champions": tr("Кубок чемпионов"),
+        }[data.discipline_competition]
+        lines.append(
+            tr(
+                "Карточки: {competition}. 🟨1/2 — предупреждение; ⛔ — пропуск матча.",
+                competition=competition,
+            )
+        )
     if notice:
         lines.append("")
         lines.append(escape(notice))
@@ -418,7 +423,7 @@ def condition_label(member: SquadMember) -> str:
     return tr(
         "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
         name=person_button_name(member),
-        position=member.slot_position,
+        position=member.slot_position + _position_warning(member),
         form=member.form,
         energy=f"{member.energy_bps / 100:.0f}",
     )

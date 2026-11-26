@@ -737,3 +737,64 @@ def test_all_formation_descriptions_match_real_slots_and_fit_telegram():
                 assert "DM" in segment
         assert "85%" not in text and "60%" not in text and "AMC" in text and "AMR" in text
         assert "100%" in text
+
+
+@pytest.mark.parametrize(
+    ("language", "warning", "experience", "cards"),
+    (
+        ("ru", "не своя позиция", "Опыт позиции", "Карточки: Кубок"),
+        ("en", "out of position", "Position experience", "Cards: Cup"),
+    ),
+)
+def test_lineup_marks_only_undeclared_slots_and_puts_the_legend_below_the_squad(
+    language, warning, experience, cards
+):
+    from goaletto.application.lineup import LineupData, SquadMember
+    from goaletto.presentation.i18n import using_locale
+
+    emergency = SquadMember(uuid4(), "Emergency", "DC", (), "GK", False, False)
+    versatile = SquadMember(uuid4(), "Versatile", "MC", ("ML", "MR"), "MR", False, False)
+    reserve = SquadMember(uuid4(), "Reserve", "GK", (), "GK", False, False)
+    familiar = SquadMember(
+        uuid4(),
+        "Familiar",
+        "DC",
+        ("DR", "DM"),
+        "DL",
+        False,
+        False,
+        position_experience=(("DL", 500_000),),
+    )
+    data = LineupData(
+        uuid4(),
+        "Club",
+        "4-4-2",
+        (emergency, versatile, familiar),
+        (),
+        None,
+        "normal",
+        "balanced",
+        1,
+        False,
+        None,
+        uuid4(),
+        reserves=(reserve,),
+        discipline_competition="cup",
+    )
+
+    with using_locale(language):
+        rows = views.render_main(data).splitlines()
+        keyboard = views.starter_keyboard(data).inline_keyboard
+
+    emergency_row, versatile_row, familiar_row, reserve_row = (
+        next(row for row in rows if player in row)
+        for player in ("Emergency", "Versatile", "Familiar", "Reserve")
+    )
+    assert "(GK) ⚠️ DC" in emergency_row
+    assert "(DL) ⚠️ DC/DR/DM" in familiar_row and "50%" in familiar_row
+    assert "(MR)" in versatile_row and "⚠️" not in versatile_row
+    assert "⚠️" not in reserve_row
+    assert "GK ⚠️ DC" in keyboard[0][0].text and "⚠️" not in keyboard[1][0].text
+    assert "DL ⚠️ DC/DR/DM" in keyboard[2][0].text
+    for label in (warning, experience, cards):
+        assert next(i for i, row in enumerate(rows) if label in row) > rows.index(reserve_row)
