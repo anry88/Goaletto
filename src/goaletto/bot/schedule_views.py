@@ -5,7 +5,7 @@ from html import escape
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup as Keyboard
 
-from goaletto.application.schedule import ScheduleScreen
+from goaletto.application.schedule import ScheduleEntry, ScheduleScreen
 from goaletto.bot.result_views import compact_id
 from goaletto.bot.training_views import FOCUS_LABELS, INTENSITY_LABELS
 from goaletto.domain.kickoff import local_datetime
@@ -35,20 +35,87 @@ VENUES = LabelMap(
         "home": "Дома",
         "away": "В гостях",
         "neutral": "Нейтральное поле",
-        "conditional": "При выходе в следующий раунд",
-        "pair": "Матч турнира",
     }
 )
 
 
 STAGES = LabelMap(
     {
+        "prelim": "Предварительный раунд",
+        "entry-16": "Отборочный раунд 1",
+        "entry-8": "Отборочный раунд 2",
+        "entry-4": "Отборочный раунд 3",
+        "round-32": "1/16 финала",
+        "round-16": "1/8 финала",
         "round_of_16": "1/8 финала",
+        "round_of_32": "1/16 финала",
+        "quarter": "Четвертьфинал",
+        "semi": "Полуфинал",
         "quarterfinal": "Четвертьфинал",
         "semifinal": "Полуфинал",
         "final": "Финал",
     }
 )
+
+
+def _match_lines(entry: ScheduleEntry, zone: str, *, bracket: bool) -> list[str]:
+    stage = entry.stage
+    if stage is not None and stage in STAGES:
+        label = STAGES[stage]
+    elif stage and stage.startswith("round_of_") and stage.removeprefix("round_of_").isdigit():
+        label = tr("Раунд на {number} команд", number=int(stage.removeprefix("round_of_")))
+    elif stage:
+        label = escape(stage)
+    else:
+        label = tr(
+            "Тур {number}" if entry.competition == "league" else "Раунд {number}",
+            number=entry.round_number,
+        )
+    heading = f"{TOURNAMENTS[entry.competition]} · {label}"
+    if entry.leg and entry.stage != "final":
+        heading += " · " + (tr("Первый матч") if entry.leg == 1 else tr("Ответный матч"))
+    home = escape(latin_name(entry.home)) if entry.home else tr("Соперник не определён")
+    away = escape(latin_name(entry.away)) if entry.away else tr("Соперник не определён")
+    result = entry.result
+    if result:
+        score_home, score_away = result.score
+        teams = f"{home} <b>{score_home}:{score_away}</b> {away}"
+    elif entry.home or entry.away:
+        teams = f"{home} — {away}"
+    else:
+        teams = tr("Участники не определены")
+    if entry.venue in VENUES:
+        teams += f" · {VENUES[entry.venue]}"
+    lines = [heading, teams]
+    if entry.kickoff:
+        lines.append("🕒 " + escape(local_datetime(entry.kickoff, zone)))
+    elif not entry.conditional:
+        lines.append(tr("Время не назначено"))
+    if entry.status in ("live", "paused"):
+        lines.append(tr("Матч идёт") if entry.status == "live" else tr("Матч приостановлен"))
+    elif entry.status == "finished":
+        lines.append(tr("✅ Матч завершён"))
+    if result is None:
+        return lines
+    if result.first_leg and not bracket:
+        first_home, first_away = result.first_leg
+        lines.append(f"{tr('Первый матч')}: {away} {first_home}:{first_away} {home}")
+    if result.extra_time:
+        lines.append(tr("Дополнительное время"))
+    if result.aggregate:
+        aggregate_home, aggregate_away = result.aggregate
+        lines.append(tr("Общий счёт: {home}:{away}", home=aggregate_home, away=aggregate_away))
+    if result.penalties:
+        penalty_home, penalty_away = result.penalties
+        lines.append(tr("Пенальти: {home}:{away}", home=penalty_home, away=penalty_away))
+    if result.winner:
+        lines.append(
+            tr(
+                "Победитель: {club}" if entry.stage == "final" else "Прошёл дальше: {club}",
+                club=escape(latin_name(result.winner)),
+            )
+        )
+    return lines
 
 
 def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
@@ -80,34 +147,7 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
                 if entry.status == "applied":
                     lines.append(tr("✅ Тренировка проведена"))
                 continue
-            home = escape(latin_name(entry.home)) if entry.home else tr("Соперник определится")
-            away = escape(latin_name(entry.away)) if entry.away else tr("Соперник определится")
-            stage = (
-                STAGES[entry.stage]
-                if entry.stage is not None and entry.stage in STAGES
-                else escape(entry.stage)
-                if entry.stage
-                else tr(
-                    "Тур {number}" if entry.competition == "league" else "Раунд {number}",
-                    number=entry.round_number,
-                )
-            )
-            label = f"{TOURNAMENTS[entry.competition]} · {stage}"
-            if entry.leg:
-                label += " · " + (tr("Первый матч") if entry.leg == 1 else tr("Ответный матч"))
-            lines.extend((label, f"{home} — {away} · {VENUES[entry.venue]}"))
-            if entry.kickoff:
-                lines.append("🕒 " + escape(local_datetime(entry.kickoff, screen.zone)))
-            else:
-                lines.append(tr("Время ещё не назначено."))
-            if entry.conditional:
-                lines.append(tr("Встреча состоится при выходе в следующий раунд."))
-            if entry.status in ("live", "paused"):
-                lines.append(
-                    tr("Матч идёт") if entry.status == "live" else tr("Матч приостановлен")
-                )
-            elif entry.status == "finished":
-                lines.append(tr("✅ Матч завершён"))
+            lines.extend(_match_lines(entry, screen.zone, bracket=screen.competition is not None))
         lines.append("")
     if not screen.days:
         lines.append(tr("Пар пока нет."))
@@ -124,7 +164,9 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
             Button(text=tr("Следующая →"), callback_data=f"ca:{mode}:{key}:{screen.page + 1}")
         )
     rows = [nav] if nav else []
-    available = {e.competition for day in screen.days for e in day.entries}
+    available = set(screen.tournaments) | {
+        e.competition for day in screen.days for e in day.entries
+    }
     cups = [
         Button(text=TOURNAMENTS[c], callback_data=f"ca:{c}:{key}:1")
         for c in ("cup", "champions")

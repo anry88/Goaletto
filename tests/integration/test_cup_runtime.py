@@ -16,9 +16,11 @@ from goaletto.application.lineup import LineupLocked, load_lineup, save_lineup
 from goaletto.application.match_runtime import NotReady, handle_calendar_job, team_snapshot
 from goaletto.application.onboarding import begin_game
 from goaletto.application.results import finalize_result
+from goaletto.application.schedule import load_schedule
 from goaletto.application.season_rollover import rollover_season
 from goaletto.bot.lineup_handlers import build_callback_response
 from goaletto.bot.lineup_views import swap_keyboard
+from goaletto.bot.schedule_views import schedule_view
 from goaletto.domain.match_codec import restore_state
 from goaletto.infrastructure.models import (
     Club,
@@ -192,7 +194,7 @@ async def finish_cup(sessions, season_id):
 
 
 async def test_full_cup_97_real_games_neutral_final_retry_and_frozen_history(sessions, monkeypatch):
-    world, _, _ = await setup_world(sessions)
+    world, actor, _ = await setup_world(sessions)
     async with sessions.begin() as session:
         row = await session.get(CupBracket, world.season_id)
         assert len(row.entry_snapshot) == 5
@@ -285,6 +287,23 @@ async def test_full_cup_97_real_games_neutral_final_retry_and_frozen_history(ses
             session, fixture.id, fixture.actual_finish_at + timedelta(hours=1)
         )
         assert final.winner_club_id is not None
+        calendar_actor = replace(
+            actor, at=fixture.actual_finish_at, operation_id=uuid4(), update_id=4001
+        )
+        calendar = await load_schedule(session, calendar_actor)
+        assert "cup" in calendar.tournaments
+        bracket = await load_schedule(
+            session,
+            replace(calendar_actor, operation_id=uuid4(), update_id=4002),
+            page=10,
+            competition="cup",
+        )
+        final_entry = next(e for day in bracket.days for e in day.entries if e.id == fixture.id)
+        winner = await session.get(Club, final.winner_club_id)
+        assert final_entry.result.score == (match.home_goals, match.away_goals)
+        assert final_entry.result.winner == winner.name
+        assert final_entry.result.aggregate is None
+        assert "Победитель: " in schedule_view(bracket)[0]
         prizes = (
             await session.scalars(
                 select(LedgerEntry).where(
@@ -408,6 +427,16 @@ async def test_real_et_penalties_restart_recovery_growth_and_rollback(sessions, 
             owner = await claim_club(session, actor, tie.home_club_id)
             owned = owner.club_id
     await play_fixture(sessions, first, separate=True)
+    async with sessions.begin() as session:
+        finished = await session.get(Fixture, first)
+        bracket = await load_schedule(
+            session,
+            replace(actor, at=finished.actual_finish_at, operation_id=uuid4(), update_id=4003),
+            competition="cup",
+        )
+        entries = {e.id: e for day in bracket.days for e in day.entries}
+        assert entries[first].result.score == (0, 0)
+        assert entries[first].result.winner is None and entries[second].result is None
     await job(sessions, "match.remind", second)
     await job(sessions, "match.lock_lineup", second)
     await job(sessions, "match.start", second)
@@ -519,7 +548,29 @@ async def test_real_et_penalties_restart_recovery_growth_and_rollback(sessions, 
                 previous = row["position_experience"][position]["before"]
                 expected += min(gain, 1000000 - previous)
             assert row["experience_gain"] == expected
-        assert (await session.get(CupTie, tie.id)).shootout_result is not None
+        decided = await session.get(CupTie, tie.id)
+        assert decided.shootout_result is not None
+        finished = await session.get(Fixture, second)
+        calendar_actor = replace(
+            actor, at=finished.actual_finish_at, operation_id=uuid4(), update_id=4004
+        )
+        calendar = await load_schedule(session, calendar_actor)
+        entry = next(e for day in calendar.days for e in day.entries if e.id == second)
+        winner = await session.get(Club, decided.winner_club_id)
+        from goaletto.domain.knockout_match import decision
+
+        outcome = decision(state)
+        assert entry.result.score == entry.result.first_leg == entry.result.aggregate == (0, 0)
+        assert entry.result.extra_time and entry.result.winner == winner.name
+        # Leg 2 starts at club B, so its shootout is displayed in B–A order.
+        assert entry.result.penalties == (outcome.penalty_b, outcome.penalty_a)
+        bracket = await load_schedule(
+            session,
+            replace(calendar_actor, operation_id=uuid4(), update_id=4005),
+            competition="cup",
+        )
+        entries = {e.id: e for day in bracket.days for e in day.entries}
+        assert entries[first].result.winner is None and entries[second].result == entry.result
         saved = list(receipt.results)
         replay = await session.get(Job, final_job)
         assert await handle_calendar_job(session, replay, replay.due_at) is None

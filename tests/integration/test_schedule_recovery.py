@@ -158,16 +158,12 @@ async def test_calendar_conditional_paths_timezone_activity_and_stale_owner(sess
         conditional = [e for d in screen.days for e in d.entries if e.id == plan.id]
         assert len(conditional) == 1 and conditional[0].kickoff is None
         assert conditional[0].conditional and conditional[0].venue == "neutral"
-        assert (
-            len(
-                (
-                    await load_schedule(
-                        session, replace(actor, operation_id=uuid4()), competition="cup"
-                    )
-                ).days
-            )
-            == 1
+        bracket = await load_schedule(
+            session, replace(actor, operation_id=uuid4()), competition="cup"
         )
+        bracket_entries = [entry for day in bracket.days for entry in day.entries]
+        assert any(entry.id == plan.id and entry.conditional for entry in bracket_entries)
+        assert len(bracket.days) == 2  # The first-leg and return-leg dates share a page.
         with pytest.raises(PermissionDenied):
             await load_schedule(session, actor, ownership_id=uuid4())
 
