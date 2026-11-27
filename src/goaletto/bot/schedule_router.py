@@ -9,9 +9,10 @@ from aiogram.types import CallbackQuery, Message, Update
 from goaletto.application.club_view import actor_for_callback
 from goaletto.application.game_actions import PermissionDenied, actor_for, owned_club
 from goaletto.application.schedule import load_schedule
+from goaletto.bot.club_cards import menu_view
 from goaletto.bot.responses import edit_response
 from goaletto.bot.result_views import expand_id
-from goaletto.bot.schedule_views import cups_view, schedule_view
+from goaletto.bot.schedule_views import schedule_view
 from goaletto.infrastructure.database import Database
 from goaletto.presentation.i18n import tr
 
@@ -50,11 +51,15 @@ async def calendar_callback(query: CallbackQuery, database: Database, event_upda
             )
             data = query.data or ""
             if data == "ca:cups":
-                owner, _ = await owned_club(session, actor)
-                text, keyboard = cups_view(owner.id)
+                # Refresh the previous release's menu callback for existing messages.
+                await owned_club(session, actor)
+                text, keyboard = menu_view()
             else:
-                if data == "ca:open":
-                    screen = await load_schedule(session, actor)
+                if data in ("ca:open", "ca:cup", "ca:champions"):
+                    mode = data.removeprefix("ca:")
+                    screen = await load_schedule(
+                        session, actor, competition=None if mode == "open" else mode
+                    )
                 else:
                     parts = data.split(":")
                     if (

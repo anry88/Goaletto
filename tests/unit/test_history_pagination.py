@@ -261,8 +261,8 @@ async def test_season_list_uses_batched_queries_without_n_plus_one() -> None:
 @pytest.mark.parametrize(
     ("locale", "labels"),
     (
-        ("ru", ("Тур 1", "Кубок", "Кубок лиги", "Товарищеский")),
-        ("en", ("Round 1", "Cup", "League Cup", "Friendly")),
+        ("ru", ("Тур 1", "Кубок", "Кубок чемпионов", "Товарищеский")),
+        ("en", ("Round 1", "Cup", "Champions Cup", "Friendly")),
     ),
 )
 async def test_history_match_buttons_use_the_same_score_format(locale, labels):

@@ -1,7 +1,6 @@
 """Compact localized schedule and tournament rounds; UTC phases, local kickoffs."""
 
 from html import escape
-from uuid import UUID
 
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup as Keyboard
@@ -17,7 +16,7 @@ from goaletto.presentation.i18n import LabelMap, tr
 PHASES = LabelMap(
     {
         "cup": "Кубок",
-        "champions": "Кубок лиги",
+        "champions": "Кубок чемпионов",
         "free": "Тренировки и товарищеские",
         "league": "Лига",
         "offseason": "Межсезонье",
@@ -27,7 +26,7 @@ TOURNAMENTS = LabelMap(
     {
         "league": "Лига",
         "cup": "Кубок",
-        "champions": "Кубок лиги",
+        "champions": "Кубок чемпионов",
         "friendly": "Товарищеский матч",
     }
 )
@@ -119,17 +118,6 @@ def _match_lines(entry: ScheduleEntry, zone: str, *, bracket: bool) -> list[str]
     return lines
 
 
-def cups_view(ownership_id: UUID) -> tuple[str, Keyboard]:
-    key = compact_id(ownership_id)
-    return tr("🏆 Кубки"), Keyboard(
-        inline_keyboard=[
-            [Button(text=TOURNAMENTS[cup], callback_data=f"ca:{cup}:{key}:1")]
-            for cup in ("cup", "champions")
-        ]
-        + [[Button(text=tr("🏠 Главное меню"), callback_data="vc:menu")]]
-    )
-
-
 def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
     title = (
         tr("🗓 Ближайшие 10 дней")
@@ -191,12 +179,7 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
     if cups:
         rows.append(cups)
     if screen.competition:
-        rows.append(
-            [
-                Button(text=tr("🏆 Кубки"), callback_data="ca:cups"),
-                Button(text=tr("← К расписанию"), callback_data=f"ca:list:{key}:1"),
-            ]
-        )
+        rows.append([Button(text=tr("← К расписанию"), callback_data=f"ca:list:{key}:1")])
     rows.extend(
         (
             [

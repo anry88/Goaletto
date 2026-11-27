@@ -135,15 +135,14 @@ def test_club_view_escapes_and_has_menu() -> None:
 
 
 @pytest.mark.parametrize(
-    ("language", "league", "cup", "champions"),
-    (("ru", "Лига", "Кубок", "Кубок лиги"), ("en", "League", "Cup", "League Cup")),
+    ("language", "legend"),
+    (
+        ("ru", "🔶 — последний сезон · 🤕 — травма"),
+        ("en", "🔶 — last season · 🤕 — injured"),
+    ),
 )
-def test_whole_squad_fits_one_message_with_discipline_by_tournament(
-    language, league, cup, champions
-):
-    from goaletto.application.discipline import SquadDiscipline
+def test_whole_squad_fits_one_message_with_only_injury_and_last_season_badges(language, legend):
     from goaletto.presentation.i18n import using_locale
-    from goaletto.presentation.squad import squad_legend
 
     page = squad_page(1, 25)
     members = tuple(
@@ -159,24 +158,12 @@ def test_whole_squad_fits_one_message_with_discipline_by_tournament(
         )
         for i, m in enumerate(page.members)
     )
-    first, second = members[:2]
-    page = replace(
-        page,
-        members=members,
-        discipline=(
-            SquadDiscipline("league", (first.person_id,), ()),
-            SquadDiscipline("cup", (second.person_id,), ((first.person_id, 2),)),
-            SquadDiscipline("champions", (), ((second.person_id, 1),)),
-        ),
-    )
     with using_locale(language):
-        text, keyboard = squad_view(page)
-        assert text.endswith("\n".join(squad_legend()))
+        text, keyboard = squad_view(replace(page, members=members))
+    assert text.endswith(legend)
     assert "Igrok &lt;1&gt;" in text and "Igrok &lt;25&gt;" in text
-    assert "(GK) ⚠️ DC/DR 🔶 🤕" in text and len(text.encode("utf-16-le")) // 2 < 4096
-    assert f"{league} · 🟨1/2 #1" in text
-    assert f"{cup} · 🟨1/2 #2 · ⛔ #1×2" in text
-    assert f"{champions} · ⛔ #2" in text
+    assert "(GK) · DC/DR 🔶 🤕" in text and len(text.encode("utf-16-le")) // 2 < 4096
+    assert all(mark not in text for mark in ("⚠️", "🟨", "⛔"))
     callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
     assert callbacks[:25] == [player_callback(m.person_id) for m in members]
     assert callbacks[25:] == [club_callback(), MENU_CALLBACK]
@@ -204,7 +191,10 @@ def test_menu_has_no_fake_market_or_hiring() -> None:
     text, keyboard = menu_view()
     assert "Главное меню" in text
     buttons = {b.callback_data: b.text for row in keyboard.inline_keyboard for b in row}
-    assert buttons["nav:table"] == "🏆 Лига" and buttons["ca:cups"] == "🏆 Кубки"
+    assert buttons["nav:table"] == "🏆 Лига"
+    assert buttons["ca:cup"] == "🏆 Кубок"
+    assert buttons["ca:champions"] == "🏆 Кубок чемпионов"
+    assert "ca:cups" not in buttons
     callbacks = list(buttons)
     joined = " ".join(c or "" for c in callbacks)
     assert "market" not in joined and "hire" not in joined and "transfer" not in joined

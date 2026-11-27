@@ -229,13 +229,15 @@ async def test_calendar_and_energy_through_real_dispatcher_after_commit(sessions
     main = await send(data="vc:menu")
     buttons = {b.text: b.callback_data for row in main.reply_markup.inline_keyboard for b in row}
     assert buttons["🏆 Лига"] == "nav:table"
-    cups = await send(data=buttons["🏆 Кубки"])
-    cup_button = next(
-        b for row in cups.reply_markup.inline_keyboard for b in row if b.text == "Кубок"
-    )
-    assert "🏆 Кубок ·" in (await send(data=cup_button.callback_data)).text
+    assert buttons["🏆 Кубок"] == "ca:cup"
+    assert buttons["🏆 Кубок чемпионов"] == "ca:champions"
+    assert "🏆 Кубок ·" in (await send(data=buttons["🏆 Кубок"])).text
+    assert "🏆 Кубок чемпионов ·" in (await send(data=buttons["🏆 Кубок чемпионов"])).text
+    old_menu = await send(data="ca:cups")
+    assert "Главное меню" in old_menu.text
     squad = await send(data="vc:s:4")
-    assert "Состав" in squad.text and "жёлтая карточка" in squad.text
+    assert "Состав" in squad.text and "последний сезон" in squad.text and "травма" in squad.text
+    assert all(mark not in squad.text for mark in ("🟨", "⛔", "⚠️"))
     assert (
         len(
             [

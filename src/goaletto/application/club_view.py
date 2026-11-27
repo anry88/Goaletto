@@ -14,7 +14,6 @@ from sqlalchemy.dialects.postgresql import JSONPATH
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import Surface, require_utc
-from goaletto.application.discipline import SquadDiscipline, squad_discipline
 from goaletto.application.game_actions import (
     Actor,
     PermissionDenied,
@@ -82,7 +81,6 @@ class SquadPage:
     total_pages: int
     total_members: int
     formation: str | None = None
-    discipline: tuple[SquadDiscipline, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -291,9 +289,6 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
                 injured=row.injured_until is not None and row.injured_until > actor.at,
             )
         )
-    discipline = await squad_discipline(
-        session, club.id, league.id, [member.person_id for member in members]
-    )
     await user_effect(
         session,
         actor,
@@ -309,7 +304,6 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
         1,
         len(members),
         formation=lineup.formation if lineup is not None else None,
-        discipline=discipline,
     )
 
 

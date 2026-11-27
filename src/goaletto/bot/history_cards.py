@@ -39,7 +39,7 @@ from goaletto.presentation.i18n import LabelMap, tr
 from goaletto.presentation.progress import experience_line, position_percent_line, progress_line
 
 RESULT_COMPETITIONS = LabelMap(
-    {"cup": "Кубок", "champions": "Кубок лиги", "friendly": "Товарищеский"}
+    {"cup": "Кубок", "champions": "Кубок чемпионов", "friendly": "Товарищеский"}
 )
 OUTCOME_MARKERS = {"win": "✅", "draw": "➖", "loss": "❌"}
 
