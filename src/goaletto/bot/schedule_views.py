@@ -1,6 +1,7 @@
 """Compact localized schedule and tournament rounds; UTC phases, local kickoffs."""
 
 from html import escape
+from uuid import UUID
 
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup as Keyboard
@@ -16,7 +17,7 @@ from goaletto.presentation.i18n import LabelMap, tr
 PHASES = LabelMap(
     {
         "cup": "Кубок",
-        "champions": "Кубок чемпионов",
+        "champions": "Кубок лиги",
         "free": "Тренировки и товарищеские",
         "league": "Лига",
         "offseason": "Межсезонье",
@@ -26,7 +27,7 @@ TOURNAMENTS = LabelMap(
     {
         "league": "Лига",
         "cup": "Кубок",
-        "champions": "Кубок чемпионов",
+        "champions": "Кубок лиги",
         "friendly": "Товарищеский матч",
     }
 )
@@ -118,8 +119,23 @@ def _match_lines(entry: ScheduleEntry, zone: str, *, bracket: bool) -> list[str]
     return lines
 
 
+def cups_view(ownership_id: UUID) -> tuple[str, Keyboard]:
+    key = compact_id(ownership_id)
+    return tr("🏆 Кубки"), Keyboard(
+        inline_keyboard=[
+            [Button(text=TOURNAMENTS[cup], callback_data=f"ca:{cup}:{key}:1")]
+            for cup in ("cup", "champions")
+        ]
+        + [[Button(text=tr("🏠 Главное меню"), callback_data="vc:menu")]]
+    )
+
+
 def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
-    title = tr("🗓 Ближайшие 10 дней") if screen.competition is None else tr("🏆 Сетка турнира")
+    title = (
+        tr("🗓 Ближайшие 10 дней")
+        if screen.competition is None
+        else f"🏆 {TOURNAMENTS[screen.competition]}"
+    )
     lines = [
         f"<b>{title} · {escape(latin_name(screen.club_name))}</b>",
         tr("Время событий: {zone}", zone=escape(screen.zone)),
@@ -150,7 +166,7 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
             lines.extend(_match_lines(entry, screen.zone, bracket=screen.competition is not None))
         lines.append("")
     if not screen.days:
-        lines.append(tr("Пар пока нет."))
+        lines.append(tr("Матчей клуба пока нет.") if screen.competition else tr("Пар пока нет."))
     lines.append(tr("Страница {page}/{pages}", page=screen.page, pages=screen.pages))
     key = compact_id(screen.ownership_id)
     mode = screen.competition or "list"
@@ -175,7 +191,12 @@ def schedule_view(screen: ScheduleScreen) -> tuple[str, Keyboard]:
     if cups:
         rows.append(cups)
     if screen.competition:
-        rows.append([Button(text=tr("← К расписанию"), callback_data=f"ca:list:{key}:1")])
+        rows.append(
+            [
+                Button(text=tr("🏆 Кубки"), callback_data="ca:cups"),
+                Button(text=tr("← К расписанию"), callback_data=f"ca:list:{key}:1"),
+            ]
+        )
     rows.extend(
         (
             [

@@ -174,6 +174,10 @@ async def load_schedule(
         )
     else:
         query = query.where(FixturePlan.competition == competition)
+        if competition in ("cup", "champions"):
+            query = query.where(
+                or_(FixturePlan.home_club_id == club.id, FixturePlan.away_club_id == club.id)
+            )
     plans = list(
         (
             await session.scalars(

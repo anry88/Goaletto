@@ -96,7 +96,10 @@ async def test_concurrent_reserves_settle_once_and_rollback(sessions):
 
 
 async def test_bills_use_credit_protect_reservations_and_income_repays_debt(sessions):
-    _, _, club_id = await setup_world(sessions)
+    from goaletto.application.stadium import load_stadium
+    from goaletto.bot.stadium_views import stadium_view
+
+    _, actor, club_id = await setup_world(sessions)
     key = uuid4()
     async with sessions.begin() as session:
         await reserve(session, club_id, key, 40000, {"auction": "test"}, NOW)
@@ -120,6 +123,13 @@ async def test_bills_use_credit_protect_reservations_and_income_repays_debt(sess
         assert not await release(session, club_id, key, NOW)
         account = (await locked_accounts(session, club_id))[club_id]
         assert (account.club.budget, account.record.arrears) == (-10000, 0)
+        stadium = await load_stadium(session, actor, record=False)
+        panel_text, keyboard = stadium_view(stadium)
+        assert stadium.debt == 10000 and stadium.available == 0
+        assert "долг: 10" in panel_text
+        assert all(
+            not b.callback_data.startswith("st:u:") for row in keyboard.inline_keyboard for b in row
+        )
         await credit_locked(session, account, "grant", "grant", 20000, NOW)
         assert (account.club.budget, account.record.arrears) == (10000, 0)
         assert not await credit_locked(session, account, "grant", "grant", 20000, NOW)

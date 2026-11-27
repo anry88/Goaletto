@@ -26,10 +26,10 @@ from goaletto.presentation.club_status import club_label
 from goaletto.presentation.i18n import LabelMap, locale, tr
 from goaletto.presentation.person_names import person_button_name, person_name
 from goaletto.presentation.progress import position_percent
+from goaletto.presentation.squad import position_warning, squad_legend
 
 MENU_CALLBACK = "vc:menu"
 CLUB_CALLBACK = "vc:c"
-PAGE_SIZE = 5
 
 SKILL_LABELS = (
     ("goalkeeping", "Вратарское мастерство"),
@@ -144,7 +144,10 @@ def menu_view() -> tuple[str, InlineKeyboardMarkup]:
             [InlineKeyboardButton(text=tr("🤝 Товарищеские матчи"), callback_data="fr:open")],
             [InlineKeyboardButton(text=tr("🎓 Академия"), callback_data="ac:open")],
             [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
-            [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
+            [
+                InlineKeyboardButton(text=tr("🏆 Лига"), callback_data="nav:table"),
+                InlineKeyboardButton(text=tr("🏆 Кубки"), callback_data="ca:cups"),
+            ],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
             [InlineKeyboardButton(text=tr("⚙️ Настройки"), callback_data="ntf:open")],
         ]
@@ -183,7 +186,10 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
             ],
             [InlineKeyboardButton(text=tr("🎓 Академия"), callback_data="ac:open")],
             [InlineKeyboardButton(text=tr("👥 Персонал"), callback_data="cg:s:0")],
-            [InlineKeyboardButton(text=tr("🏆 Таблица"), callback_data="nav:table")],
+            [
+                InlineKeyboardButton(text=tr("🏆 Лига"), callback_data="nav:table"),
+                InlineKeyboardButton(text=tr("🏆 Кубки"), callback_data="ca:cups"),
+            ],
             [InlineKeyboardButton(text=tr("📜 История"), callback_data=results_callback(1))],
             [InlineKeyboardButton(text=tr("🗂 Сезоны"), callback_data=seasons_callback(1))],
             [InlineKeyboardButton(text=tr("⚙️ Настройки"), callback_data="ntf:open")],
@@ -193,37 +199,18 @@ def club_view(card: ClubCard) -> tuple[str, InlineKeyboardMarkup]:
     return text, keyboard
 
 
-def _member_line(index: int, name: str, position: str, age: int, form: int, status: str) -> str:
-    marker = " ⏳" if status == "last_season" else ""
-    return tr(
-        "{p0}. <b>{p1}</b> {p2} · {p3} · форма {p4}{p5}",
-        p0=index,
-        p1=escape(latin_name(name)),
-        p2=escape(position),
-        p3=age,
-        p4=form,
-        p5=marker,
-    )
-
-
 def squad_view(page: SquadPage) -> tuple[str, InlineKeyboardMarkup]:
-    if page.total_pages < 1 or not 1 <= page.page <= page.total_pages:
-        raise ValueError("Invalid squad page view")
     lines = [
-        tr(
-            "👥 <b>{p0}</b> · Состав {p1}/{p2}",
-            p0=escape(latin_name(page.club.name)),
-            p1=page.page,
-            p2=page.total_pages,
-        ),
+        tr("👥 <b>{club}</b> · Состав", club=escape(latin_name(page.club.name))),
         tr("Всего: {p0}", p0=page.total_members),
-        "",
     ]
-    buttons: list[list[InlineKeyboardButton]] = []
     if page.formation is not None:
-        lines.insert(-1, tr("Схема: {formation}", formation=escape(page.formation)))
+        lines.append(tr("Схема: {formation}", formation=escape(page.formation)))
+    buttons: list[list[InlineKeyboardButton]] = []
     previous_group = ""
-    for offset, member in enumerate(page.members, start=(page.page - 1) * PAGE_SIZE + 1):
+    indices = {member.person_id: index for index, member in enumerate(page.members, start=1)}
+    for member in page.members:
+        index = indices[member.person_id]
         group = (
             tr("<b>Основа:</b>")
             if member.slot is not None and member.slot <= 11
@@ -232,53 +219,62 @@ def squad_view(page: SquadPage) -> tuple[str, InlineKeyboardMarkup]:
             else tr("<b>Вне заявки:</b>")
         )
         if group != previous_group:
-            lines.append(group)
+            lines.extend(("", group))
             previous_group = group
-        position = "/".join((member.position, *member.alternatives))
+        declared = (member.position, *member.alternatives)
+        position = member.slot_position or "/".join(declared)
+        name = person_name(member)
+        if len(name) > 46:
+            name = name[:45] + "…"
+        line = f"{index}. {escape(name)} ({escape(position)})"
         if member.slot_position is not None:
-            position = member.slot_position
-            if position != member.position:
-                position += f" ← {member.position}"
+            warning = position_warning(member.slot_position, declared)
+            if warning:
+                line += escape(warning)
+            elif member.alternatives:
+                line += " · " + escape("/".join(declared))
+        if member.status == "last_season":
+            line += " 🔶"
+        if member.injured:
+            line += " 🤕"
+        if member.slot_position is not None:
             value = dict(member.position_experience).get(member.slot_position, 0)
-            position += tr(" · опыт {value}%", value=position_percent(value))
-        lines.append(
-            _member_line(
-                offset,
-                person_name(member),
-                position,
-                member.age,
-                member.form,
-                member.status,
-            )
-            + f" · ⚡ {member.energy_bps / 100:.0f}%"
+            line += tr(" · опыт {value}%", value=position_percent(value))
+        line += f" · {member.age}" + tr(
+            " · форма {form}/10 · ⚡ {energy}%",
+            form=member.form,
+            energy=f"{member.energy_bps / 100:.0f}",
         )
+        lines.append(line)
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f"{offset}. {person_button_name(member)}"[:60],
-                    callback_data=player_callback(member.person_id, page.page),
+                    text=f"{index}. {person_button_name(member)}"[:60],
+                    callback_data=player_callback(member.person_id),
                 )
             ]
         )
     if not page.members:
         lines.append(tr("Состав пока пуст."))
-    nav: list[InlineKeyboardButton] = []
-    if page.page > 1:
-        nav.append(
-            InlineKeyboardButton(text=tr("← Назад"), callback_data=squad_callback(page.page - 1))
-        )
-    if page.page < page.total_pages:
-        nav.append(
-            InlineKeyboardButton(text=tr("Вперёд →"), callback_data=squad_callback(page.page + 1))
-        )
-    if nav:
-        buttons.append(nav)
-    buttons.append(
-        [InlineKeyboardButton(text=tr("🏟 Клуб"), callback_data=CLUB_CALLBACK)],
-    )
-    buttons.append(
-        [InlineKeyboardButton(text=tr("🏠 Главное меню"), callback_data=MENU_CALLBACK)],
-    )
+    if page.discipline:
+        lines.append("")
+        competitions = {"league": tr("Лига"), "cup": tr("Кубок"), "champions": tr("Кубок лиги")}
+        for entry in page.discipline:
+            marks = []
+            if entry.cautions:
+                marks.append("🟨1/2 " + " ".join(f"#{indices[pid]}" for pid in entry.cautions))
+            if entry.suspensions:
+                marks.append(
+                    "⛔ "
+                    + " ".join(
+                        f"#{indices[pid]}×{games}" if games > 1 else f"#{indices[pid]}"
+                        for pid, games in entry.suspensions
+                    )
+                )
+            lines.append(f"{competitions[entry.competition]} · " + " · ".join(marks))
+    lines.extend(("", *squad_legend()))
+    buttons.append([InlineKeyboardButton(text=tr("🏟 Клуб"), callback_data=CLUB_CALLBACK)])
+    buttons.append([InlineKeyboardButton(text=tr("🏠 Главное меню"), callback_data=MENU_CALLBACK)])
     return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=buttons)
 
 

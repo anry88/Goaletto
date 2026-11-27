@@ -1,4 +1,4 @@
-"""Squad list router. Handles vc:s:<page>. Paginated, 5 players per page."""
+"""Squad list router. Older page callbacks open the complete squad."""
 
 from datetime import UTC, datetime
 

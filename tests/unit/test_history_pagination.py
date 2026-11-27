@@ -256,3 +256,37 @@ async def test_season_list_uses_batched_queries_without_n_plus_one() -> None:
     # Memberships (1) + seasons IN (1) + leagues IN (1) + auth/receipt, no per-season gets.
     added = len(recorder.statements) - before
     assert added < 15
+
+
+@pytest.mark.parametrize(
+    ("locale", "labels"),
+    (
+        ("ru", ("Тур 1", "Кубок", "Кубок лиги", "Товарищеский")),
+        ("en", ("Round 1", "Cup", "League Cup", "Friendly")),
+    ),
+)
+async def test_history_match_buttons_use_the_same_score_format(locale, labels):
+    from dataclasses import replace
+
+    from goaletto.bot.history_callbacks import match_callback
+    from goaletto.bot.history_cards import results_view
+    from goaletto.presentation.i18n import using_locale
+
+    recorder = Recorder()
+    page = await get_club_results(session(recorder), recorder.actor, 1)
+    entries = tuple(
+        replace(
+            page.entries[0],
+            competition=competition,
+            fixture_id=uuid4(),
+            round_number=1,
+            home_goals=2,
+            away_goals=1,
+        )
+        for competition in ("league", "cup", "champions", "friendly")
+    )
+    with using_locale(locale):
+        _, keyboard = results_view(replace(page, entries=entries))
+    for row, label, entry in zip(keyboard.inline_keyboard[:4], labels, entries, strict=True):
+        assert row[0].text == f"{label} · 2:1"
+        assert row[0].callback_data == match_callback(entry.fixture_id, 1)

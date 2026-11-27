@@ -1,9 +1,10 @@
 """Durable tournament cautions and bans. Caller holds the shared allocation gate."""
 
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.domain.clock import MatchPhase
@@ -19,6 +20,8 @@ from goaletto.infrastructure.models import (
     Person,
     Player,
     PlayerDiscipline,
+    Season,
+    SeasonClub,
 )
 
 
@@ -65,6 +68,65 @@ async def balances(
             .execution_options(populate_existing=True)
         )
     }
+
+
+@dataclass(frozen=True)
+class SquadDiscipline:
+    competition: str
+    cautions: tuple[UUID, ...]
+    suspensions: tuple[tuple[UUID, int], ...]
+
+
+async def squad_discipline(
+    session: AsyncSession, club_id: UUID, league_id: UUID, person_ids: list[UUID]
+) -> tuple[SquadDiscipline, ...]:
+    if not person_ids:
+        return ()
+    season_id = await session.scalar(
+        select(Season.id)
+        .join(SeasonClub, SeasonClub.season_id == Season.id)
+        .where(
+            SeasonClub.club_id == club_id,
+            SeasonClub.league_id == league_id,
+            Season.status.in_(("scheduled", "active")),
+        )
+        .order_by(Season.starts_at.desc(), Season.id)
+        .limit(1)
+    )
+    if season_id is None:
+        return ()
+    from goaletto.application.champions import host_seasons_for
+
+    tournaments = await session.scalars(
+        select(ChampionsTie.tournament_id)
+        .where(
+            or_(
+                ChampionsTie.season_id == season_id,
+                ChampionsTie.season_id.in_(host_seasons_for(season_id)),
+            ),
+            or_(
+                (ChampionsTie.home_kind == "club") & (ChampionsTie.home_club_id == club_id),
+                (ChampionsTie.away_kind == "club") & (ChampionsTie.away_club_id == club_id),
+            ),
+        )
+        .distinct()
+        .order_by(ChampionsTie.tournament_id)
+    )
+    scopes = [
+        ("league", f"league:{season_id}:{league_id}"),
+        ("cup", f"cup:{season_id}"),
+        *(("champions", f"champions:{tournament}") for tournament in tournaments),
+    ]
+    result = []
+    for competition, scope in scopes:
+        rows = await balances(session, scope, person_ids)
+        cautions = tuple(pid for pid in person_ids if pid in rows and rows[pid].yellows)
+        suspensions = tuple(
+            (pid, rows[pid].bans) for pid in person_ids if pid in rows and rows[pid].bans
+        )
+        if cautions or suspensions:
+            result.append(SquadDiscipline(competition, cautions, suspensions))
+    return tuple(result)
 
 
 async def exclusions(

@@ -194,7 +194,7 @@ async def finish_cup(sessions, season_id):
 
 
 async def test_full_cup_97_real_games_neutral_final_retry_and_frozen_history(sessions, monkeypatch):
-    world, actor, _ = await setup_world(sessions)
+    world, actor, owned = await setup_world(sessions)
     async with sessions.begin() as session:
         row = await session.get(CupBracket, world.season_id)
         assert len(row.entry_snapshot) == 5
@@ -295,15 +295,20 @@ async def test_full_cup_97_real_games_neutral_final_retry_and_frozen_history(ses
         bracket = await load_schedule(
             session,
             replace(calendar_actor, operation_id=uuid4(), update_id=4002),
-            page=10,
             competition="cup",
         )
-        final_entry = next(e for day in bracket.days for e in day.entries if e.id == fixture.id)
-        winner = await session.get(Club, final.winner_club_id)
-        assert final_entry.result.score == (match.home_goals, match.away_goals)
-        assert final_entry.result.winner == winner.name
-        assert final_entry.result.aggregate is None
-        assert "Победитель: " in schedule_view(bracket)[0]
+        campaign = [entry for day in bracket.days for entry in day.entries]
+        assert campaign and all(bracket.club_name in (entry.home, entry.away) for entry in campaign)
+        finals = [entry for entry in campaign if entry.id == fixture.id]
+        if owned in (fixture.home_club_id, fixture.away_club_id) and bracket.pages == 1:
+            (final_entry,) = finals
+            winner = await session.get(Club, final.winner_club_id)
+            assert final_entry.result.score == (match.home_goals, match.away_goals)
+            assert final_entry.result.winner == winner.name
+            assert final_entry.result.aggregate is None
+            assert "Победитель: " in schedule_view(bracket)[0]
+        elif owned not in (fixture.home_club_id, fixture.away_club_id):
+            assert not finals
         prizes = (
             await session.scalars(
                 select(LedgerEntry).where(

@@ -162,8 +162,8 @@ async def test_calendar_conditional_paths_timezone_activity_and_stale_owner(sess
             session, replace(actor, operation_id=uuid4()), competition="cup"
         )
         bracket_entries = [entry for day in bracket.days for entry in day.entries]
-        assert any(entry.id == plan.id and entry.conditional for entry in bracket_entries)
-        assert len(bracket.days) == 2  # The first-leg and return-leg dates share a page.
+        assert bracket_entries and all(entry.id != plan.id for entry in bracket_entries)
+        assert all(bracket.club_name in (entry.home, entry.away) for entry in bracket_entries)
         with pytest.raises(PermissionDenied):
             await load_schedule(session, actor, ownership_id=uuid4())
 
@@ -226,6 +226,27 @@ async def test_calendar_and_energy_through_real_dispatcher_after_commit(sessions
     )
     assert "Страница 2/3" in (await send(data=next_page)).text
     assert "⚡" in (await send("/lineup")).text
+    main = await send(data="vc:menu")
+    buttons = {b.text: b.callback_data for row in main.reply_markup.inline_keyboard for b in row}
+    assert buttons["🏆 Лига"] == "nav:table"
+    cups = await send(data=buttons["🏆 Кубки"])
+    cup_button = next(
+        b for row in cups.reply_markup.inline_keyboard for b in row if b.text == "Кубок"
+    )
+    assert "🏆 Кубок ·" in (await send(data=cup_button.callback_data)).text
+    squad = await send(data="vc:s:4")
+    assert "Состав" in squad.text and "жёлтая карточка" in squad.text
+    assert (
+        len(
+            [
+                b
+                for row in squad.reply_markup.inline_keyboard
+                for b in row
+                if (b.callback_data or "").startswith("vc:p:")
+            ]
+        )
+        == 20
+    )
     async with sessions.begin() as session:
         (await session.get(Manager, actor.manager_id)).locale = "en"
     screen = await send("/calendar")

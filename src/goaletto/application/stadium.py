@@ -125,7 +125,7 @@ class StadiumScreen:
     capacity: int
     supporters: int
     available: int
-    arrears: int
+    debt: int
     expansion: StadiumExpansion | None
     next_home_at: datetime | None
     projected: Attendance | None
@@ -188,7 +188,7 @@ async def load_stadium(
         club.stadium_capacity,
         club.supporters,
         account.available,
-        account.record.arrears,
+        max(0, -account.club.budget) + account.record.arrears,
         expansion,
         fixture.scheduled_start_at if fixture else None,
         projected,

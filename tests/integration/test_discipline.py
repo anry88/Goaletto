@@ -345,7 +345,10 @@ async def test_friendly_does_not_serve_or_add_official_cards(sessions, monkeypat
 async def test_cup_suspension_allows_league_appearance_without_serving_cup_ban(
     sessions, monkeypatch
 ):
-    _, _, club_id = await setup_world(sessions)
+    from goaletto.application.club_view import get_squad_page
+    from goaletto.application.discipline import SquadDiscipline
+
+    _, actor, club_id = await setup_world(sessions)
     await job(sessions, "season.open")
     async with sessions.begin() as session:
         target = await session.scalar(
@@ -375,6 +378,13 @@ async def test_cup_suspension_allows_league_appearance_without_serving_cup_ban(
         assert (await session.get(PlayerDiscipline, (cup_scope, target))).bans == 1
         league_account = await session.get(PlayerDiscipline, (league_scope, target))
         assert (league_account.yellows, league_account.bans) == (1, 0)
+        squad = await get_squad_page(
+            session, replace(actor, operation_id=uuid4(), update_id=998), 1
+        )
+        assert squad.discipline == (
+            SquadDiscipline("league", (target,), ()),
+            SquadDiscipline("cup", (), ((target, 1),)),
+        )
         match = await session.get(Match, match_id)
         state = restore_state(match.state)
         assert any(
@@ -517,3 +527,90 @@ async def test_abandoned_match_records_reds_but_does_not_serve_existing_ban(
             assert any(r.yellows == 2 and r.awarded == 1 for r in rows)
         assert not any(r.served for r in rows)
         await apply_discipline(session, restore_state(match.state), fixture.actual_finish_at)
+
+
+async def test_squad_shows_the_guest_clubs_league_cup_discipline(sessions):
+    from goaletto.application.club_view import get_squad_page
+    from goaletto.application.discipline import SquadDiscipline
+    from goaletto.application.world import initialize_world
+    from goaletto.infrastructure.models import (
+        ChampionsDraw,
+        ChampionsTie,
+        ChampionsTournament,
+        SeasonClub,
+    )
+    from tests.integration.test_agent_wave import OPTIONS
+
+    world, actor, club_id = await setup_world(sessions)
+    tournament_id, unrelated = uuid4(), uuid4()
+    async with sessions.begin() as session:
+        host = await initialize_world(
+            session, replace(OPTIONS, key="champions-discipline-host", seed=1), initialized_at=NOW
+        )
+        opponent = await session.scalar(
+            select(SeasonClub.club_id).where(SeasonClub.season_id == host.season_id).limit(1)
+        )
+        session.add_all(
+            [
+                ChampionsDraw(
+                    id=uuid4(),
+                    season_id=world.season_id,
+                    qualifying_season_id=world.season_id,
+                    league_set_id=world.league_set_id,
+                    cohort_key="squad-test-host",
+                    seed=0,
+                    policy_version="champions-groups-v1",
+                    snapshots=[{}] * 5,
+                    created_at=NOW,
+                ),
+                ChampionsTournament(
+                    id=tournament_id,
+                    season_id=host.season_id,
+                    qualifying_season_id=world.season_id,
+                    tier=5,
+                    group_index=0,
+                    participant_count=8,
+                    cohort_key="squad-test-host",
+                    seed=0,
+                    bracket_seed=0,
+                    policy_version="champions-bracket-v1",
+                    created_at=NOW,
+                ),
+            ]
+        )
+        await session.flush()
+        session.add(
+            ChampionsTie(
+                id=uuid4(),
+                tournament_id=tournament_id,
+                season_id=host.season_id,
+                round_number=1,
+                tie_index=0,
+                round_label="quarterfinal",
+                home_kind="club",
+                home_club_id=opponent,
+                away_kind="club",
+                away_club_id=club_id,
+                champions_cycles=[1, 2],
+                neutral=False,
+                status="pending",
+            )
+        )
+        target = await session.scalar(
+            select(LineupSlot.person_id).where(LineupSlot.club_id == club_id, LineupSlot.slot == 2)
+        )
+        session.add_all(
+            [
+                PlayerDiscipline(
+                    scope=f"champions:{tournament_id}", person_id=target, bans=2, yellows=1
+                ),
+                PlayerDiscipline(
+                    scope=f"champions:{unrelated}", person_id=target, bans=9, yellows=0
+                ),
+            ]
+        )
+        await session.flush()
+        squad = await get_squad_page(
+            session, replace(actor, operation_id=uuid4(), update_id=999), 1
+        )
+        assert squad.discipline == (SquadDiscipline("champions", (target,), ((target, 2),)),)

@@ -81,9 +81,9 @@ def stadium_view(screen: StadiumScreen, notice: str | None = None) -> tuple[str,
             upkeep=amount(stadium_upkeep(screen.capacity)),
         ),
         tr(
-            "Доступно: {available} · долг: {arrears}",
+            "Доступно: {available} · долг: {debt}",
             available=amount(screen.available),
-            arrears=amount(screen.arrears),
+            debt=amount(screen.debt),
         ),
     ]
     if notice:
@@ -153,7 +153,7 @@ def stadium_view(screen: StadiumScreen, notice: str | None = None) -> tuple[str,
                 ),
             )
         )
-        if not screen.arrears and screen.available >= cost:
+        if not screen.debt and screen.available >= cost:
             rows.append(
                 [
                     Button(

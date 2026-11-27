@@ -275,22 +275,19 @@ async def test_former_owner_is_rechecked_on_every_view() -> None:
         await get_owned_club(session(recorder), recorder.actor)
 
 
-async def test_squad_pagination_is_stable_and_hides_retired() -> None:
+async def test_legacy_squad_pages_open_all_current_players() -> None:
     recorder = Recorder()
     page1 = await get_squad_page(
         session(recorder), Actor(recorder.manager.id, 123, None, uuid4(), NOW), 1
     )
-    assert page1.total_members == 6 and page1.total_pages == 2
-    assert [m.slot for m in page1.members] == [1, 2, 3, 4, 5]
-    page2 = await get_squad_page(
-        session(recorder), Actor(recorder.manager.id, 123, None, uuid4(), NOW), 2
+    assert page1.total_members == 6 and page1.total_pages == 1
+    assert [m.slot for m in page1.members] == [1, 2, 3, 4, 5, 6]
+    assert page1.members[-1].status == "last_season"
+    assert all(m.name != "Пенсионер" for m in page1.members)
+    legacy = await get_squad_page(
+        session(recorder), Actor(recorder.manager.id, 123, None, uuid4(), NOW), 3
     )
-    assert len(page2.members) == 1 and page2.members[0].status == "last_season"
-    assert all(m.name != "Пенсионер" for m in (*page1.members, *page2.members))
-    with pytest.raises(ValueError):
-        await get_squad_page(
-            session(recorder), Actor(recorder.manager.id, 123, None, uuid4(), NOW), 3
-        )
+    assert legacy == page1
 
 
 async def test_player_cards_last_season_retired_and_foreign() -> None:
@@ -341,7 +338,7 @@ def full_energy_projection(monkeypatch):
     "formation",
     list(FORMATION_SLOTS),
 )
-async def test_squad_pages_use_saved_slots_and_preserve_all_people(formation):
+async def test_squad_uses_saved_slots_and_preserve_all_people(formation):
     from goaletto.bot.club_cards import squad_view
     from goaletto.infrastructure.models import ClubLineup
 
@@ -370,20 +367,14 @@ async def test_squad_pages_use_saved_slots_and_preserve_all_people(formation):
         return await original_scalar(statement, params)
 
     recorder.scalar = scalar
-    pages = [await get_squad_page(recorder, recorder.actor, i) for i in range(1, 6)]
-    people = [m for p in pages for m in p.members]
+    page = await get_squad_page(recorder, recorder.actor, 1)
+    people = page.members
     assert len(people) == len({m.person_id for m in people}) == 23
     assert tuple(m.slot_position for m in people[:11]) == FORMATION_SLOTS[formation]
-    assert all(p.formation == formation for p in pages)
+    assert page.formation == formation
     assert all(m.slot_position is None for m in people[11:])
-    for page in pages:
-        text, keyboard = squad_view(page)
-        assert formation in text
-        assert len(
-            [
-                b
-                for row in keyboard.inline_keyboard
-                for b in row
-                if b.callback_data.startswith("vc:p:")
-            ]
-        ) == len(page.members)
+    text, keyboard = squad_view(page)
+    assert formation in text
+    assert len(
+        [b for row in keyboard.inline_keyboard for b in row if b.callback_data.startswith("vc:p:")]
+    ) == len(page.members)

@@ -740,14 +740,14 @@ def test_all_formation_descriptions_match_real_slots_and_fit_telegram():
 
 
 @pytest.mark.parametrize(
-    ("language", "warning", "experience", "cards"),
+    ("language", "warning", "deadline", "cards"),
     (
-        ("ru", "не своя позиция", "Опыт позиции", "Карточки: Кубок"),
-        ("en", "out of position", "Position experience", "Cards: Cup"),
+        ("ru", "не на своей позиции", "Сохраните состав до", "Карточки: Кубок"),
+        ("en", "out of position", "Save your lineup by", "Cards: Cup"),
     ),
 )
 def test_lineup_marks_only_undeclared_slots_and_puts_the_legend_below_the_squad(
-    language, warning, experience, cards
+    language, warning, deadline, cards
 ):
     from goaletto.application.lineup import LineupData, SquadMember
     from goaletto.presentation.i18n import using_locale
@@ -776,7 +776,7 @@ def test_lineup_marks_only_undeclared_slots_and_puts_the_legend_below_the_squad(
         "balanced",
         1,
         False,
-        None,
+        NOW,
         uuid4(),
         reserves=(reserve,),
         discipline_competition="cup",
@@ -796,5 +796,7 @@ def test_lineup_marks_only_undeclared_slots_and_puts_the_legend_below_the_squad(
     assert "⚠️" not in reserve_row
     assert "GK ⚠️ DC" in keyboard[0][0].text and "⚠️" not in keyboard[1][0].text
     assert "DL ⚠️ DC/DR/DM" in keyboard[2][0].text
-    for label in (warning, experience, cards):
+    for label in (warning, cards, "⛔", "🟨1/2"):
         assert next(i for i, row in enumerate(rows) if label in row) > rows.index(reserve_row)
+    assert any(deadline in row and "UTC" in row for row in rows)
+    assert all("Опыт позиции" not in row and "Position experience" not in row for row in rows)

@@ -19,6 +19,7 @@ from goaletto.domain.names import latin_name
 from goaletto.presentation.i18n import LabelMap, tr
 from goaletto.presentation.person_names import person_button_name, person_name
 from goaletto.presentation.progress import position_percent
+from goaletto.presentation.squad import position_warning, squad_legend
 
 TACTIC_LABELS = LabelMap(
     {
@@ -48,13 +49,6 @@ def _version_text(value: int) -> str:
     if type(value) is not int or not 1 <= value <= 2**31 - 1:
         raise ValueError("Editor revision must be a positive integer")
     return str(value)
-
-
-def _position_warning(member: SquadMember) -> str:
-    declared = (member.position, *member.alternatives)
-    if member.slot_position in declared:
-        return ""
-    return f" ⚠️ {'/'.join(declared)}"
 
 
 def _badges(member: SquadMember, slot: str, captain_id: UUID | None) -> str:
@@ -94,14 +88,14 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
     if data.lock_at is not None:
         stamp = data.lock_at.strftime("%d.%m %H:%M UTC")
         lines.append(
-            tr("🔒 Состав заблокирован перед матчем.")
+            tr("🔒 Состав на матч уже зафиксирован.")
             if data.locked
-            else tr("Блокировка: {p0}.", p0=stamp)
+            else tr("Сохраните состав до {time}.", time=stamp)
         )
     lines.append("")
     lines.append(tr("<b>Основа:</b>"))
     for index, member in enumerate(data.starters, start=1):
-        warning = _position_warning(member)
+        warning = position_warning(member.slot_position, (member.position, *member.alternatives))
         lines.append(
             f"{index}. {escape(person_name(member))} ({escape(member.slot_position)})"
             f"{escape(warning)}{_badges(member, member.slot_position, data.captain_id)}"
@@ -151,20 +145,14 @@ def render_main(data: LineupData, notice: str | None = None) -> str:
         )
     )
     lines.append("")
-    lines.append(tr("⚠️ — не своя позиция, рядом указаны свои. 🔶 — последний сезон. 🤕 — травма."))
-    lines.append(tr("Опыт позиции даёт 80–100% силы."))
     if data.discipline_competition:
         competition = {
             "league": tr("Лига"),
             "cup": tr("Кубок"),
-            "champions": tr("Кубок чемпионов"),
+            "champions": tr("Кубок лиги"),
         }[data.discipline_competition]
-        lines.append(
-            tr(
-                "Карточки: {competition}. 🟨1/2 — предупреждение; ⛔ — пропуск матча.",
-                competition=competition,
-            )
-        )
+        lines.append(tr("Карточки: {competition}", competition=competition))
+    lines.extend(squad_legend())
     if notice:
         lines.append("")
         lines.append(escape(notice))
@@ -423,7 +411,8 @@ def condition_label(member: SquadMember) -> str:
     return tr(
         "{name} · {position} · форма {form}/10 · ⚡ {energy}%",
         name=person_button_name(member),
-        position=member.slot_position + _position_warning(member),
+        position=member.slot_position
+        + position_warning(member.slot_position, (member.position, *member.alternatives)),
         form=member.form,
         energy=f"{member.energy_bps / 100:.0f}",
     )

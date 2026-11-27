@@ -35,9 +35,12 @@ from goaletto.bot.history_callbacks import (
 from goaletto.bot.result_views import table_view
 from goaletto.domain.names import latin_name
 from goaletto.domain.nationalities import flag_name, legacy_nationality
-from goaletto.presentation.i18n import tr
+from goaletto.presentation.i18n import LabelMap, tr
 from goaletto.presentation.progress import experience_line, position_percent_line, progress_line
 
+RESULT_COMPETITIONS = LabelMap(
+    {"cup": "Кубок", "champions": "Кубок лиги", "friendly": "Товарищеский"}
+)
 OUTCOME_MARKERS = {"win": "✅", "draw": "➖", "loss": "❌"}
 
 
@@ -82,54 +85,25 @@ def results_view(
     for entry in page.entries:
         marker = OUTCOME_MARKERS.get(entry.outcome, "")
         date = entry.scheduled_start_at.strftime("%d.%m")
-        if entry.competition in {"cup", "champions", "friendly"}:
-            lines.append(
-                tr("Кубок чемпионов · {date}", date=date)
-                if entry.competition == "champions"
-                else tr("Товарищеский · {date}", date=date)
-                if entry.competition == "friendly"
-                else tr("Кубок · {date}", date=date)
-            )
-            lines.append(
-                f"{marker} <b>{escape(latin_name(entry.home_name))} "
-                f"{entry.home_goals}:{entry.away_goals} "
-                f"{escape(latin_name(entry.away_name))}</b>"
-            )
-            if entry.penalties:
-                lines.append(
-                    tr("Пенальти: {home}:{away}", home=entry.penalties[0], away=entry.penalties[1])
-                )
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=tr("📋 Отчёт о матче"),
-                        callback_data=open_report(entry.fixture_id),
-                    )
-                ]
-            )
-            continue
-        lines.append(
-            tr(
-                "{p0} Тур {p1} · {p2}\n<b>{p3} {p4}:{p5} {p6}</b>",
-                p0=marker,
-                p1=entry.round_number,
-                p2=date,
-                p3=escape(latin_name(entry.home_name)),
-                p4=entry.home_goals,
-                p5=entry.away_goals,
-                p6=escape(latin_name(entry.away_name)),
-            )
+        label = (
+            tr("Тур {number}", number=entry.round_number)
+            if entry.competition == "league"
+            else RESULT_COMPETITIONS[entry.competition]
         )
+        score = f"{entry.home_goals}:{entry.away_goals}"
+        lines.append(f"{marker} {label} · {date}")
+        lines.append(
+            f"<b>{escape(latin_name(entry.home_name))} {score} "
+            f"{escape(latin_name(entry.away_name))}</b>"
+        )
+        if entry.penalties:
+            lines.append(
+                tr("Пенальти: {home}:{away}", home=entry.penalties[0], away=entry.penalties[1])
+            )
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=tr(
-                        "Тур {p0}: {p1}:{p2}",
-                        p0=entry.round_number,
-                        p1=entry.home_goals,
-                        p2=entry.away_goals,
-                    )[:60],
-                    callback_data=open_report(entry.fixture_id),
+                    text=f"{label} · {score}", callback_data=open_report(entry.fixture_id)
                 )
             ]
         )

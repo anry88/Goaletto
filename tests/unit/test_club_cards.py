@@ -1,5 +1,6 @@
 """Presenter, keyboard and callback tests. No database, no network."""
 
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -51,9 +52,7 @@ def member(i: int, status: str = "active") -> SquadMember:
 
 def squad_page(page: int, total: int = 6) -> SquadPage:
     members = tuple(member(i) for i in range(1, total + 1))
-    per = 5
-    total_pages = max(1, (total + per - 1) // per)
-    return SquadPage(club(), members[(page - 1) * per : page * per], page, total_pages, total)
+    return SquadPage(club(), members, page, 1, total)
 
 
 def player(status: str = "active") -> PlayerCard:
@@ -135,20 +134,52 @@ def test_club_view_escapes_and_has_menu() -> None:
     assert not any((c or "").startswith("hire:") for c in callbacks)
 
 
-def test_squad_pagination_back_and_return_page() -> None:
-    text1, kb1 = squad_view(squad_page(1))
-    assert "1/2" in text1 and "Igrok &lt;1&gt;" in text1 and "Igrok &lt;6&gt;" not in text1
-    text2, kb2 = squad_view(squad_page(2))
-    assert "2/2" in text2 and "Igrok &lt;6&gt;" in text2
-    flat1 = [b.callback_data for row in kb1.inline_keyboard for b in row]
-    flat2 = [b.callback_data for row in kb2.inline_keyboard for b in row]
-    assert squad_callback(2) in flat1 and squad_callback(1) in flat2
-    assert club_callback() in flat1 and MENU_CALLBACK in flat2
-    # Player buttons remember their squad page for Back navigation.
-    first = kb1.inline_keyboard[0][0].callback_data or ""
-    assert parse_view_callback(first)[2] == 1
-    last = kb2.inline_keyboard[0][0].callback_data or ""
-    assert parse_view_callback(last)[2] == 2
+@pytest.mark.parametrize(
+    ("language", "league", "cup", "champions"),
+    (("ru", "Лига", "Кубок", "Кубок лиги"), ("en", "League", "Cup", "League Cup")),
+)
+def test_whole_squad_fits_one_message_with_discipline_by_tournament(
+    language, league, cup, champions
+):
+    from goaletto.application.discipline import SquadDiscipline
+    from goaletto.presentation.i18n import using_locale
+    from goaletto.presentation.squad import squad_legend
+
+    page = squad_page(1, 25)
+    members = tuple(
+        replace(
+            m,
+            name=m.name + " Long player name" * 3,
+            position="DC",
+            slot_position="GK" if i == 0 else "DC" if i < 11 else None,
+            slot=m.slot if i < 20 else None,
+            alternatives=("DR",),
+            injured=i == 0,
+            status="last_season" if i == 0 else "active",
+        )
+        for i, m in enumerate(page.members)
+    )
+    first, second = members[:2]
+    page = replace(
+        page,
+        members=members,
+        discipline=(
+            SquadDiscipline("league", (first.person_id,), ()),
+            SquadDiscipline("cup", (second.person_id,), ((first.person_id, 2),)),
+            SquadDiscipline("champions", (), ((second.person_id, 1),)),
+        ),
+    )
+    with using_locale(language):
+        text, keyboard = squad_view(page)
+        assert text.endswith("\n".join(squad_legend()))
+    assert "Igrok &lt;1&gt;" in text and "Igrok &lt;25&gt;" in text
+    assert "(GK) ⚠️ DC/DR 🔶 🤕" in text and len(text.encode("utf-16-le")) // 2 < 4096
+    assert f"{league} · 🟨1/2 #1" in text
+    assert f"{cup} · 🟨1/2 #2 · ⛔ #1×2" in text
+    assert f"{champions} · ⛔ #2" in text
+    callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
+    assert callbacks[:25] == [player_callback(m.person_id) for m in members]
+    assert callbacks[25:] == [club_callback(), MENU_CALLBACK]
 
 
 def test_player_statuses_and_portrait_notice() -> None:
@@ -172,7 +203,9 @@ def test_player_statuses_and_portrait_notice() -> None:
 def test_menu_has_no_fake_market_or_hiring() -> None:
     text, keyboard = menu_view()
     assert "Главное меню" in text
-    callbacks = [b.callback_data for row in keyboard.inline_keyboard for b in row]
+    buttons = {b.callback_data: b.text for row in keyboard.inline_keyboard for b in row}
+    assert buttons["nav:table"] == "🏆 Лига" and buttons["ca:cups"] == "🏆 Кубки"
+    callbacks = list(buttons)
     joined = " ".join(c or "" for c in callbacks)
     assert "market" not in joined and "hire" not in joined and "transfer" not in joined
     text, keyboard = stale_view()

@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONPATH
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goaletto.application.analytics import Surface, require_utc
+from goaletto.application.discipline import SquadDiscipline, squad_discipline
 from goaletto.application.game_actions import (
     Actor,
     PermissionDenied,
@@ -35,7 +36,6 @@ from goaletto.infrastructure.models import (
 )
 
 CALLBACK_NAMESPACE = UUID("0e9f4f0e-9a1b-5c9a-9d2e-9b6b1a2c3d4e")
-SQUAD_PAGE_SIZE = 5
 ACTIVE_SQUAD_STATUSES = ("active", "last_season")
 NEUTRAL_KIT_PRIMARY = "#444444"
 NEUTRAL_KIT_SECONDARY = "#DDDDDD"
@@ -71,6 +71,7 @@ class SquadMember:
     alternatives: tuple[str, ...] = ()
     energy_bps: int = 10000
     position_experience: tuple[tuple[str, int], ...] = ()
+    injured: bool = False
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,7 @@ class SquadPage:
     total_pages: int
     total_members: int
     formation: str | None = None
+    discipline: tuple[SquadDiscipline, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -264,12 +266,8 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
         return (slots.get(row.person_id, 999), name, str(row.person_id))
 
     ordered = sorted(player_rows, key=sort_key)
-    total = len(ordered)
-    total_pages = max(1, (total + SQUAD_PAGE_SIZE - 1) // SQUAD_PAGE_SIZE)
-    if page > total_pages:
-        raise ValueError("Invalid squad page")
     members: list[SquadMember] = []
-    for row in ordered[(page - 1) * SQUAD_PAGE_SIZE : page * SQUAD_PAGE_SIZE]:
+    for row in ordered:
         from goaletto.application.recovery import energy_status
 
         energy = await energy_status(session, row.person_id, actor.at)
@@ -290,8 +288,12 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
                 alternatives=tuple(row.alternative_positions or ()),
                 position_experience=tuple((row.position_experience or {}).items()),
                 energy_bps=energy.bps,
+                injured=row.injured_until is not None and row.injured_until > actor.at,
             )
         )
+    discipline = await squad_discipline(
+        session, club.id, league.id, [member.person_id for member in members]
+    )
     await user_effect(
         session,
         actor,
@@ -303,10 +305,11 @@ async def get_squad_page(session: AsyncSession, actor: Actor, page: int) -> Squa
     return SquadPage(
         card,
         tuple(members),
-        page,
-        total_pages,
-        total,
+        1,
+        1,
+        len(members),
         formation=lineup.formation if lineup is not None else None,
+        discipline=discipline,
     )
 
 
